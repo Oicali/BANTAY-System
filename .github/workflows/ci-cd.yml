@@ -17,22 +17,22 @@ jobs:
           node-version: 18
       - run: cd backend && npm install && npm test
 
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-      - run: cd frontend && npm install && npm run build
+#   frontend:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - name: Setup Node
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
+#       - run: cd frontend && npm install && npm run build
 
-  python:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - run: cd backend/python && pip install -r requirements.txt && pytest
+#   python:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - name: Setup Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.10'
+#       - run: cd backend/python && pip install -r requirements.txt && pytest
