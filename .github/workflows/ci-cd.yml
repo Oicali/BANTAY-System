@@ -10,21 +10,21 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: cd backend && npm install && npm test
 
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: cd frontend && npm install && npm run build
 
 #   python:
@@ -35,4 +35,4 @@ jobs:
 #         uses: actions/setup-python@v4
 #         with:
 #           python-version: '3.10'
-#       - run: cd backend/python && pip install -r requirements.txt && pytest
+#       - run: cd backend/python && pip install -r requirements.txt && pytes
