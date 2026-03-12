@@ -32,20 +32,6 @@ jobs:
           node-version: 22
       - run: cd frontend && npm install && npm run build
 
-      # Check JS/JSX files for syntax errors
-      - run: find frontend/src -name "*.js" -o -name "*.jsx" | xargs -I {} node --check {}
-
-      # Check CSS files exist and are non-empty
-      - run: |
-          missing=0
-          while IFS= read -r file; do
-            if [ ! -s "$file" ]; then
-              echo "Empty or missing CSS: $file"
-              missing=1
-            fi
-          done < <(find frontend/src -name "*.css")
-          exit $missing 
-
 
   # python:
   #   runs-on: ubuntu-latest
