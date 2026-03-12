@@ -147,24 +147,29 @@ const LoginSystem = () => {
     setError("");
     setSuccess("");
 
-    console.log("click")
+    console.log("click");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: formData.username.trim(),
+            password: formData.password.trim(),
+          }),
         },
-        body: JSON.stringify({
-          username: formData.username.trim(),
-          password: formData.password.trim(),
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Login failed! Please enter your credentials.");
+        setError(
+          data.message || "Login failed! Please enter your credentials.",
+        );
         setIsLoading(false);
         return;
       }
@@ -184,7 +189,7 @@ const LoginSystem = () => {
       }));
 
       setTimeout(() => {
-        window.location.href = "/crime-dashboard";
+        navigate("/crime-dashboard");
       }, 800);
     } catch (error) {
       console.error("Login error:", error);
@@ -203,13 +208,16 @@ const LoginSystem = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/otp/send`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: formData.email }),
         },
-        body: JSON.stringify({ email: formData.email }),
-      });
+      );
 
       const data = await response.json();
 
@@ -252,16 +260,19 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/otp/verify`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            code: code,
+          }),
         },
-        body: JSON.stringify({
-          email: formData.email,
-          code: code,
-        }),
-      });
+      );
 
       const data = await response.json();
 
@@ -293,13 +304,16 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/resend`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/auth/otp/resend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: formData.email }),
         },
-        body: JSON.stringify({ email: formData.email }),
-      });
+      );
 
       const data = await response.json();
 
