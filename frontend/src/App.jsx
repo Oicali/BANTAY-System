@@ -1,35 +1,58 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import LoginSystem from "./components/views/LoginSystem";
+import ModusManagement from "./components/views/ModusManagement";
+import CrimeDashboard from "./components/views/CrimeDashboard";
+import CrimeAnalytics from "./components/views/CrimeAnalytics";
+import EBlotter from "./components/views/EBlotter";
+import CaseManagement from "./components/views/CaseManagement";
+import CrimeMapping from "./components/views/CrimeMapping";
+import PatrolDashboard from "./components/views/PatrolDashboard";
+import PatrolScheduling from "./components/views/PatrolScheduling";
+import UserManagement from "./components/views/UserManagement";
+import ProfileSettings from "./components/views/ProfileSettings";
+
+import VerificationSuccess from "./components/views/VerificationSucess";
+
+import ProtectedRoute from "./components/ProtectedRoute";
+import DashboardLayout from "./components/layout/DashboardLayout";
+
+
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Router>
+      <Routes>
+        {/* Public */}
+        <Route path="/login" element={<LoginSystem />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/verification-success" element={<VerificationSuccess />} />
+        {/* Protected Layout */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/crime-dashboard" element={<CrimeDashboard />} />
+          <Route path="/crime-analytics" element={<CrimeAnalytics />} />
+          <Route path="/e-blotter" element={<EBlotter />} />
+          <Route path="/case-management" element={<CaseManagement />} />
+          <Route path="/crime-mapping" element={<CrimeMapping />} />
+          <Route path="/patrol-dashboard" element={<PatrolDashboard />} />
+          <Route path="/patrol-scheduling" element={<PatrolScheduling />} />
+          <Route path="/user-management" element={<UserManagement />} />
+          <Route path="/profile" element={<ProfileSettings />} />
+          <Route path="/modus-management" element={<ModusManagement />} /> 
+
+          
+        </Route>
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;

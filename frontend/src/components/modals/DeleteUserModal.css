@@ -1,0 +1,332 @@
+/* === MODAL OVERLAY === */
+.dum-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 22, 40, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* === MODAL CONTAINER === */
+.dum-modal-container {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 550px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* === MODAL HEADER === */
+.dum-modal-header {
+  padding: 20px 32px;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.dum-modal-header h2 {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a1628;
+  margin: 0;
+}
+
+.dum-modal-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.dum-modal-close:hover {
+  color: #212529;
+}
+
+.dum-modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === MODAL FORM === */
+.dum-modal-form {
+  padding: 24px 32px;
+}
+
+/* === WARNING BOX === */
+.dum-warning-box {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: #fef2f2;
+  border-left: 4px solid #ef4444;
+  border-radius: 8px;
+  margin-bottom: 32px;
+}
+
+.dum-warning-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.dum-warning-content {
+  flex: 1;
+}
+
+.dum-warning-content h3 {
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #991b1b;
+  margin-bottom: 8px;
+}
+
+.dum-warning-content p {
+  font-size: 14px;
+  color: #7f1d1d;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.dum-warning-content p:last-child {
+  margin-bottom: 0;
+}
+
+.dum-warning-content p strong {
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.dum-warning-description {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #fca5a5;
+  font-size: 13px !important;
+  color: #991b1b !important;
+}
+
+/* === FORM SECTIONS === */
+.dum-form-section {
+  margin-bottom: 32px;
+}
+
+.dum-form-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.dum-form-section-title {
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 8px;
+}
+
+.dum-form-section-description {
+  font-size: 14px;
+  color: #6c757d;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.dum-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dum-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dum-form-input {
+  padding: 12px 16px;
+  padding-right: 48px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: "DM Sans", sans-serif;
+  color: #212529;
+  background: white;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.dum-form-input:focus {
+  outline: none;
+  border-color: #1e3a5f;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.dum-form-input.dum-error {
+  border-color: #c1272d;
+  background: #fef2f2;
+}
+
+.dum-form-input:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.dum-error-text {
+  font-size: 12px;
+  color: #c1272d;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+/* === PASSWORD INPUT WITH TOGGLE === */
+.dum-password-input-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+}
+
+.dum-password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+}
+
+.dum-password-toggle:hover {
+  color: #1e3a5f;
+}
+
+.dum-password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dum-password-toggle:focus {
+  outline: none;
+}
+
+/* === MODAL ACTIONS === */
+.dum-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid #dee2e6;
+}
+
+.dum-btn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dum-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dum-btn-secondary {
+  background: white;
+  color: #495057;
+  border: 1px solid #ced4da;
+}
+
+.dum-btn-secondary:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+
+.dum-btn-danger {
+  background: #c1272d;
+  color: white;
+}
+
+.dum-btn-danger:hover:not(:disabled) {
+  background: #8b1a1f;
+}
+
+/* Remove autofill dark background - ADD THIS */
+.dum-form-input:-webkit-autofill,
+.dum-form-input:-webkit-autofill:hover,
+.dum-form-input:-webkit-autofill:focus,
+.dum-form-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #212529 !important;
+}
+
+/* For error state autofill */
+.dum-form-input.dum-error:-webkit-autofill,
+.dum-form-input.dum-error:-webkit-autofill:hover,
+.dum-form-input.dum-error:-webkit-autofill:focus,
+.dum-form-input.dum-error:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #fef2f2 inset !important;
+  box-shadow: 0 0 0 30px #fef2f2 inset !important;
+  -webkit-text-fill-color: #212529 !important;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .dum-modal-container {
+    width: 95%;
+    margin: 20px;
+  }
+
+  .dum-modal-header {
+    padding: 20px 24px;
+  }
+
+  .dum-modal-form {
+    padding: 24px;
+  }
+
+  .dum-warning-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dum-warning-icon {
+    font-size: 28px;
+  }
+}

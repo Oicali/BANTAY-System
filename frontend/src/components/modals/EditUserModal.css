@@ -1,0 +1,687 @@
+/* === MODAL OVERLAY === */
+.eum-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 22, 40, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* === MODAL CONTAINER === */
+.eum-modal-container {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.eum-modal-container.eum-modal-large {
+  max-width: 1000px;
+}
+
+/* === MODAL HEADER === */
+.eum-modal-header {
+  padding: 20px 32px;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+}
+
+.eum-modal-header h2 {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a1628;
+  margin: 0;
+}
+
+.eum-modal-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.eum-modal-close:hover {
+  color: #212529;
+}
+
+/* === MODAL FORM === */
+.eum-modal-form {
+  padding: 24px 32px;
+}
+
+/* === PROFILE PICTURE UPLOAD === */
+.eum-profile-picture-upload {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 0;
+}
+
+.eum-profile-picture-preview {
+  width: 150px;
+  height: 150px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #dee2e6;
+  flex-shrink: 0;
+}
+
+.eum-profile-picture-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.eum-profile-picture-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  color: #6c757d;
+}
+
+.eum-profile-picture-placeholder span {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.eum-profile-picture-placeholder p {
+  font-size: 12px;
+  margin: 0;
+}
+
+.eum-profile-picture-actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eum-upload-hint {
+  font-size: 12px;
+  color: #6c757d;
+  margin: 0;
+}
+
+.eum-profile-picture-actions label.eum-btn {
+  width: fit-content;
+  cursor: pointer;
+}
+
+/* === LOCKED ACCOUNT NOTICE === */
+.eum-locked-notice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(234, 179, 8, 0.1);
+  border-left: 3px solid #eab308;
+  border-radius: 4px;
+}
+
+.eum-locked-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.eum-locked-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #854d0e;
+  margin-bottom: 4px;
+}
+
+.eum-locked-text p {
+  font-size: 13px;
+  color: #a16207;
+  margin: 0;
+}
+
+/* === FORM SECTIONS === */
+.eum-form-section {
+  margin-bottom: 32px;
+}
+
+.eum-form-section:last-of-type {
+  margin-bottom: 32px;
+}
+
+.eum-form-section-title {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+/* === FORM GRIDS === */
+.eum-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+.eum-form-row-triple {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+/* ← THIS IS THE MISSING CLASS */
+.eum-form-row-quad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 16px;
+  margin-bottom: 16px;
+}
+
+.eum-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eum-form-group.eum-full-width {
+  grid-column: 1 / -1;
+}
+
+.eum-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* === FORM INPUTS === */
+.eum-form-input {
+  padding: 12px 16px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: "DM Sans", sans-serif;
+  color: #212529;
+  background: white;
+  transition: all 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.eum-form-input[type="date"] {
+  color-scheme: light;
+}
+
+.eum-form-input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.eum-form-input:focus {
+  outline: none;
+  border-color: #1e3a5f;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.eum-form-input.eum-error {
+  border-color: #c1272d;
+  background: #fef2f2;
+}
+
+.eum-form-input:disabled {
+  background: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Autofill fix */
+.eum-form-input:-webkit-autofill,
+.eum-form-input:-webkit-autofill:hover,
+.eum-form-input:-webkit-autofill:focus,
+.eum-form-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #212529 !important;
+}
+
+.eum-form-textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+/* === ERROR / ALERT === */
+.eum-error-text {
+  font-size: 11.5px;
+  color: #c1272d;
+  margin-top: 1px;
+  font-weight: 500;
+}
+
+.eum-alert-error {
+  padding: 12px 16px;
+  background: rgba(193, 39, 45, 0.1);
+  border-left: 3px solid #c1272d;
+  border-radius: 4px;
+  color: #c1272d;
+  font-size: 14px;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+/* === INFO BOX === */
+.eum-info-box {
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  margin-bottom: 24px;
+}
+
+.eum-info-box p {
+  font-size: 13px;
+  color: #495057;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.eum-info-box strong {
+  color: #1e3a5f;
+}
+
+/* === PASSWORD SECTION === */
+.eum-password-toggle {
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+.eum-toggle-password-btn {
+  background: #1e3a5f;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eum-toggle-password-btn:hover {
+  background: #0a1628;
+}
+
+.eum-password-section {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  margin-top: 16px;
+}
+
+.eum-password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.eum-password-input-wrapper input {
+  padding-right: 48px;
+  width: 100%;
+}
+
+.eum-password-toggle-icon {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  transition: color 0.2s ease;
+}
+
+.eum-password-toggle-icon:hover {
+  color: #212529;
+}
+
+.eum-password-requirements {
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.05);
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.eum-requirements-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.eum-requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.eum-requirements-list li {
+  font-size: 14px;
+  color: #6c757d;
+  padding: 4px 0 4px 24px;
+  position: relative;
+}
+
+.eum-requirements-list li::before {
+  content: "○";
+  position: absolute;
+  left: 0;
+  color: #adb5bd;
+  font-weight: bold;
+}
+
+.eum-requirements-list li.eum-valid {
+  color: #22c55e;
+}
+
+.eum-requirements-list li.eum-valid::before {
+  content: "✓";
+  color: #22c55e;
+}
+
+/* === PHONE INPUT === */
+.eum-phone-input-wrapper {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.eum-phone-input-wrapper:focus-within {
+  border-color: #1e3a5f;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.eum-phone-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #e9ecef;
+  color: #495057;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  border-right: 1px solid #ced4da;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.eum-phone-input {
+  flex: 1;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 12px 16px;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.eum-phone-input:focus {
+  outline: none;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.eum-phone-input-wrapper:has(.eum-error) {
+  border-color: #c1272d;
+  background: #fef2f2;
+}
+
+.eum-phone-input-wrapper:has(.eum-error):focus-within {
+  border-color: #c1272d;
+  background: white;
+}
+
+.eum-phone-error {
+  border-color: #c1272d !important;
+  background: #fef2f2 !important;
+}
+
+/* === MODAL ACTIONS === */
+.eum-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid #dee2e6;
+}
+
+.eum-btn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.eum-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.eum-btn-primary {
+  background: #c1272d;
+  color: white;
+}
+
+.eum-btn-primary:hover:not(:disabled) {
+  background: #8b1a1f;
+}
+
+.eum-btn-secondary {
+  background: white;
+  color: #495057;
+  border: 1px solid #ced4da;
+}
+
+.eum-btn-secondary:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+
+/* === TOAST NOTIFICATIONS === */
+.eum-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 9999;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(400px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.eum-toast-success {
+  background: white;
+  border-left: 4px solid #22c55e;
+}
+
+.eum-toast-error {
+  background: white;
+  border-left: 4px solid #ef4444;
+}
+
+.eum-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eum-toast-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.eum-toast-success .eum-toast-icon { color: #22c55e; }
+.eum-toast-error .eum-toast-icon   { color: #ef4444; }
+
+.eum-toast-content span {
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #212529;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   ADD THESE RULES TO THE BOTTOM OF EditUserModal.css
+   They mirror the ProfileSettings sensitive-field styles.
+   ============================================================ */
+
+/* Sensitive idle — field has a stored value but user hasn't typed yet */
+.eum-sensitive-idle {
+  background: #f8f9fa !important;
+  border-color: #ced4da !important;
+  color: #6c757d !important;
+  font-style: italic;
+}
+
+/* Sensitive active — user has started typing a new value */
+.eum-sensitive-active {
+  background: #fff8e1 !important;
+  border-color: #f59e0b !important;
+}
+
+/* Phone wrapper variants */
+.eum-phone-input-wrapper.eum-sensitive-idle-phone {
+  background: #f8f9fa !important;
+  border-color: #ced4da !important;
+}
+
+.eum-phone-input-wrapper.eum-sensitive-idle-phone .eum-phone-input {
+  color: #6c757d !important;
+  font-style: italic;
+  background: transparent !important;
+}
+
+.eum-phone-input-wrapper.eum-sensitive-active-phone {
+  background: #fff8e1 !important;
+  border-color: #f59e0b !important;
+}
+
+.eum-phone-input-wrapper.eum-sensitive-active-phone:focus-within {
+  border-color: #d97706 !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* Keep / change hint row */
+.eum-keep-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: #6c757d;
+  font-style: italic;
+  transition: color 0.2s;
+}
+
+.eum-keep-hint-changed {
+  color: #d97706;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.eum-keep-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #adb5bd;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.eum-keep-hint-changed .eum-keep-dot {
+  background: #f59e0b;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 1024px) {
+  .eum-modal-container.eum-modal-large { max-width: 95%; }
+  .eum-form-row-quad { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 768px) {
+  .eum-modal-container,
+  .eum-modal-container.eum-modal-large { width: 95%; max-width: 95%; }
+
+  .eum-modal-header { padding: 20px 24px; }
+  .eum-modal-form   { padding: 24px; }
+
+  .eum-form-row,
+  .eum-form-row-triple,
+  .eum-form-row-quad { grid-template-columns: 1fr; }
+
+  .eum-modal-actions { flex-direction: column-reverse; }
+  .eum-btn { width: 100%; }
+
+  .eum-toast { left: 16px; right: 16px; min-width: unset; }
+}
+
+@media (max-width: 480px) {
+  .eum-form-row-quad { grid-template-columns: 1fr; }
+}

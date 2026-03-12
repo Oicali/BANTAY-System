@@ -1,0 +1,281 @@
+/* === COLOR VARIABLES === */
+:root {
+  --navy-dark: #0a1628;
+  --navy-primary: #1e3a5f;
+  --navy-light: #2d4a6f;
+  --red-primary: #c1272d;
+  --red-dark: #8b1a1f;
+  --white: #ffffff;
+  --gray-50: #f8f9fa;
+  --gray-100: #e9ecef;
+  --gray-200: #dee2e6;
+  --gray-300: #ced4da;
+  --gray-400: #adb5bd;
+  --gray-600: #6c757d;
+  --gray-700: #495057;
+  --gray-900: #212529;
+}
+
+/* === BASE STYLES === */
+body {
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-900);
+  line-height: 1.6;
+}
+
+/* === CONTENT AREA === */
+.psch-content-area {
+  padding: 32px;
+  width: 100%;
+  max-width: none;
+}
+
+.psch-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.psch-page-header-left h1 {
+  font-family: "Inter", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin-bottom: 8px;
+}
+
+.psch-page-header-left p {
+  color: var(--gray-600);
+  font-size: 15px;
+}
+
+.psch-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.psch-btn-primary {
+  background: var(--red-primary);
+  color: var(--white);
+}
+
+.psch-btn-primary:hover {
+  background: var(--red-dark);
+}
+
+/* === CALENDAR CONTROLS === */
+.psch-calendar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+}
+
+.psch-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.psch-nav-btn {
+  padding: 8px 16px;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.psch-nav-btn:hover {
+  background: var(--gray-50);
+}
+
+.psch-current-period {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.psch-view-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.psch-toggle-btn {
+  padding: 8px 16px;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.psch-toggle-btn:hover {
+  background: var(--gray-50);
+}
+
+.psch-toggle-btn.psch-active {
+  background: var(--navy-primary);
+  color: var(--white);
+  border-color: var(--navy-primary);
+}
+
+/* === SCHEDULE TABLE === */
+.psch-schedule-card {
+  width: 100%;
+  overflow-x: auto;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.psch-schedule-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.psch-schedule-table thead {
+  background: var(--gray-50);
+}
+
+.psch-schedule-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.psch-schedule-table td {
+  padding: 16px 20px;
+  font-size: 14px;
+  color: var(--gray-700);
+  border-bottom: 1px solid var(--gray-200);
+  vertical-align: top;
+}
+
+.psch-schedule-table tbody tr:hover {
+  background: var(--gray-50);
+}
+
+.psch-schedule-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* === SHIFT BADGE === */
+.psch-shift-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.psch-shift-morning {
+  background: rgba(251, 191, 36, 0.1);
+  color: #d97706;
+}
+
+.psch-shift-afternoon {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.psch-shift-night {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+/* === ASSIGNMENT CELL === */
+.psch-assignment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.psch-officer-name {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.psch-area-assignment {
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+/* === ACTIONS === */
+.psch-table-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.psch-action-link {
+  color: var(--navy-primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.psch-action-link:hover {
+  color: var(--navy-dark);
+  text-decoration: underline;
+}
+
+.psch-action-link.psch-danger {
+  color: var(--red-primary);
+}
+
+.psch-action-link.psch-danger:hover {
+  color: var(--red-dark);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .psch-page-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .psch-calendar-controls {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .psch-calendar-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .psch-view-toggle {
+    width: 100%;
+  }
+
+  .psch-toggle-btn {
+    flex: 1;
+  }
+}

@@ -1,0 +1,856 @@
+/* Professional Government-Grade Login System CSS - PERFECT RESPONSIVE VERSION */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Custom scrollbar for entire page */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 6px;
+  border: 2px solid #1e293b;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+}
+
+/* Main Container */
+.login-container {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  position: relative;
+}
+
+/* ===== LEFT SIDE - BRANDING ===== */
+.branding-side {
+  flex: 0 0 50%;
+  width: 50%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5vh 40px;
+  position: relative;
+}
+
+.branding-side::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(29, 78, 216, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(220, 38, 38, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.branding-side > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Logo Container */
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 40px;
+  flex-shrink: 0;
+}
+
+.logo-image {
+  width: 140px;
+  height: 160px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+  margin-right: -50px;
+}
+
+.logo-image2 {
+  width: 140px;
+  height: 160px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+/* Title Section */
+.title-section {
+  text-align: center;
+  margin-top: -29px;
+  margin-bottom: 32px;
+  flex-shrink: 0;
+}
+
+.main-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 12px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  color: #0f172a;
+  font-weight: 600;
+  margin-bottom: -16px;
+  letter-spacing: -0.01em;
+}
+
+/* BANTAY Logo Box */
+.bantay-logo-box {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(220, 38, 38, 0.05));
+  padding: 25px;
+  border-radius: 20px;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+}
+
+.bantay-logo-container {
+  margin-bottom: 24px;
+}
+
+.bantay-logo-image {
+  width: 500px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+}
+
+/* Tagline */
+.tagline {
+  color: #475569;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  text-align: center;
+  max-width: 420px;
+  margin-bottom: 30px;
+  margin-top: 10px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+/* Bottom Section */
+.bottom-line {
+  width: 320px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #cbd5e1 50%, transparent 100%);
+  margin-bottom: 22px;
+}
+
+.republic-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ===== RIGHT SIDE - FORMS ===== */
+.forms-side {
+  flex: 0 0 50%;
+  width: 50%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 35%, #1e3a8a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5vh 40px;
+  position: relative;
+}
+
+/* Form Container */
+.form-container {
+  width: 100%;
+  max-width: 460px;
+}
+
+/* Back Button */
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 28px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+/* Remove outline from Back to Login button */
+.back-button:focus {
+  outline: none !important;
+}
+
+.back-button:focus-visible {
+  outline: none !important;
+}
+
+/* Remove outline from Forgot Password link */
+.link-button:focus {
+  outline: none !important;
+}
+
+.link-button:focus-visible {
+  outline: none !important;
+}
+.back-button:hover {
+  
+  gap: 2px;
+}
+
+.back-button svg {
+  transition: transform 0.2s ease;
+}
+
+.back-button:hover svg {
+  transform: translateX(-4px);
+}
+
+.back-button:hover {
+  color: #93c5fd;
+}
+
+.back-button:hover::after {
+  width: 100%;
+}
+
+
+
+/* Form Headers */
+.form-title {
+  font-size: 38px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.form-subtitle {
+  color: #cbd5e1;
+  font-size: 14px;
+  margin-bottom: 32px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.form-subtitle-small {
+  color: #cbd5e1;
+  font-size: 14px;
+  margin-bottom: 4px;
+  font-weight: 400;
+}
+
+.email-display {
+  color: #60a5fa;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 32px;
+  word-break: break-all;
+}
+
+/* Alert Messages */
+.alert {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  animation: slideDown 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+.alert-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.1) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 26px;
+  text-align: left;
+}
+
+.form-group:last-of-type {
+  margin-bottom: 10px;
+}
+
+/* Form Labels */
+.form-label {
+  display: block;
+  color: #b5bdc7 !important;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+}
+
+/* Input Wrapper */
+.input-wrapper {
+  position: relative;
+}
+
+/* Form Input */
+.form-input {
+  width: 100%;
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 2px solid rgba(100, 116, 139, 0.4) !important;
+  border-radius: 10px;
+  padding: 14px 16px;
+  padding-right: 44px;
+  color: #ffffff !important;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  outline: none !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.form-input::placeholder {
+  color: #64748b !important;
+  font-weight: 400;
+}
+
+.form-input:hover {
+  border-color: rgba(100, 116, 139, 0.6) !important;
+  background: rgba(30, 41, 59, 0.9) !important;
+}
+
+.form-input:focus {
+  outline: none !important;
+  border: 2px solid #3b82f6 !important;
+  background: rgba(30, 41, 59, 0.95) !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 
+              0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+.form-input:focus-visible,
+.form-input:active {
+  outline: none !important;
+}
+
+/* More aggressive autofill fix - add after existing autofill styles */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(30, 41, 59, 0.8) inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: 0 0 0 1000px rgba(30, 41, 59, 0.8) inset !important;
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  background-image: none !important;
+  transition: background-color 0s !important;
+}
+
+
+
+
+/* Eye Toggle Button */
+.eye-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+  z-index: 10;
+}
+
+.eye-toggle:hover {
+  color: #cbd5e1;
+}
+
+.eye-toggle:focus {
+  outline: none;
+}
+
+.eye-toggle:focus-visible {
+  outline: none;
+}
+
+/* Input Icon */
+.input-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  transition: color 0.2s ease;
+  z-index: 5;
+}
+
+.form-input:focus ~ .input-icon,
+.form-input:focus ~ .eye-toggle {
+  color: #3b82f6;
+}
+
+/* Forgot Password Link */
+.forgot-password-link {
+  text-align: right;
+  margin-top: 12px;
+  margin-bottom: 32px;
+}
+
+.link-button {
+  color: #60a5fa;
+  font-size: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  position: relative;
+}
+
+.link-button::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #60a5fa;
+  transition: width 0.3s ease;
+}
+
+.link-button:hover {
+  color: #93c5fd;
+}
+
+.link-button:hover::after {
+  width: 100%;
+}
+
+/* Primary Button */
+.primary-button {
+  width: 100%;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 14px;
+  transition: all 0.25s ease;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.primary-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.primary-button:hover::before {
+  left: 100%;
+}
+
+.primary-button:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  box-shadow: 0 8px 25px rgba(220, 38, 38, 0.45);
+  transform: translateY(-2px);
+}
+
+.primary-button:active {
+  transform: translateY(0);
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-button:disabled:hover {
+  transform: none;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+}
+
+/* Secondary Button */
+.secondary-button {
+  width: 100%;
+  background: rgba(51, 65, 85, 0.6);
+  color: #e2e8f0;
+  font-weight: 600;
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 13px;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(10px);
+  margin-top: 12px;
+}
+
+.secondary-button:hover {
+  background: rgba(71, 85, 105, 0.7);
+  border-color: rgba(100, 116, 139, 0.6);
+  transform: translateY(-1px);
+}
+
+.secondary-button.disabled {
+  background: rgba(30, 41, 59, 0.4);
+  color: #64748b;
+  cursor: not-allowed;
+  border-color: rgba(51, 65, 85, 0.3);
+}
+
+.secondary-button.disabled:hover {
+  background: rgba(30, 41, 59, 0.4);
+  transform: none;
+}
+
+/* Security Notice */
+.security-notice {
+  margin-top: 32px;
+  padding: 18px 20px;
+  background: rgba(30, 41, 59, 0.6);
+  border-left: 3px solid #3b82f6;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.security-notice p {
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.notice-bold {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+/* Verification Code Section */
+.verification-section {
+  margin-bottom: 28px;
+}
+
+.code-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.code-input {
+  width: 58px;
+  height: 68px;
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 2px solid rgba(100, 116, 139, 0.4);
+  border-radius: 10px;
+  color: #ffffff !important;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(10px);
+}
+
+.code-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(30, 41, 59, 0.95) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: scale(1.05);
+}
+
+/* Add this CSS to your LoginSystem.css file after the existing .back-button styles */
+
+/* Back Button Disabled State */
+.back-button:disabled,
+.back-button.disabled {
+  pointer-events: none !important;
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+.back-button:disabled:hover,
+.back-button.disabled:hover {
+  color: #94a3b8 !important;
+  gap: 8px !important;
+}
+
+.back-button:disabled svg,
+.back-button.disabled svg {
+  transform: none !important;
+}
+
+.back-button:disabled::after,
+.back-button.disabled::after {
+  width: 0 !important;
+}
+
+.code-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Password Requirements */
+.password-requirements {
+  margin-bottom: 24px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.requirements-title {
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.password-requirements ul {
+  list-style: none;
+  padding-left: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.password-requirements li {
+  position: relative;
+  padding-left: 8px;
+  transition: color 0.3s ease;
+}
+
+.password-requirements li.requirement-met {
+  color: #86efac;
+  font-weight: 600;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (min-width: 769px) {
+  .login-container {
+    flex-direction: row;
+  }
+  
+  .branding-side,
+  .forms-side {
+    flex: 0 0 50%;
+    width: 50%;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+
+  .branding-side,
+  .forms-side {
+    flex: none;
+    width: 100%;
+    min-height: auto;
+  }
+
+  .branding-side {
+    padding: 60px 24px;
+  }
+
+  .forms-side {
+    padding: 60px 24px;
+  }
+
+  .logo-container {
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  .logo-image,
+  .logo-image2 {
+    width: 100px;
+    height: 100px;
+  }
+
+  .main-title {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    font-size: 16px;
+  }
+
+  .bantay-logo-image {
+    width: 320px;
+  }
+
+  .form-title {
+    font-size: 30px;
+  }
+
+  .code-input {
+    width: 48px;
+    height: 58px;
+    font-size: 22px;
+  }
+
+  .code-inputs {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .branding-side,
+  .forms-side {
+    padding: 40px 20px;
+  }
+
+  .logo-image,
+  .logo-image2 {
+    width: 80px;
+    height: 80px;
+  }
+
+  .main-title {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .bantay-logo-image {
+    width: 280px;
+  }
+
+  .form-title {
+    font-size: 26px;
+  }
+
+  .code-input {
+    width: 42px;
+    height: 52px;
+    font-size: 20px;
+  }
+
+  .code-inputs {
+    gap: 6px;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 769px) {
+  .branding-side,
+  .forms-side {
+    padding: 3vh 36px;
+  }
+
+  .logo-image,
+  .logo-image2 {
+    width: 110px;
+    height: 110px;
+  }
+
+  .bantay-logo-image {
+    width: 360px;
+  }
+}

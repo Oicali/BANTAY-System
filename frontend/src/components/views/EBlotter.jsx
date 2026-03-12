@@ -1,0 +1,4135 @@
+import React, { useState, useEffect } from "react";
+import { usePSGC } from "../../utils/usePSGC";
+import "./EBlotter.css";
+const OFFENSE_TO_CRIME_TYPE = {
+  "Murder": "MURDER",
+  "Homicide": "HOMICIDE",
+  "Physical Injury": "PHYSICAL INJURIES",
+  "Rape": "RAPE",
+  "Robbery": "ROBBERY",
+  "Theft": "THEFT",
+  "Carnapping - MC": "CARNAPPING - MC",
+  "Carnapping - MV": "CARNAPPING - MV",
+  "Special Complex Crime": "SPECIAL COMPLEX CRIME",
+};
+
+// Simple validation component
+const FieldError = ({ error }) => {
+  if (!error) return null;
+  return <span className="eb-field-error">{error}</span>;
+};
+
+const ViewIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+
+const DeleteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+);
+
+function EBlotter() {
+  const [showModal, setShowModal] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [blotters, setBlotters] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [originalData, setOriginalData] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
+const [deletedBlotters, setDeletedBlotters] = useState([]);
+const [trashLoading, setTrashLoading] = useState(false);
+  const [offenseModus, setOffenseModus] = useState({});       
+  const [offenseSelectedModus, setOffenseSelectedModus] = useState({}); 
+  const [typeOfPlace, setTypeOfPlace] = useState("");
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "",
+    incident_type: "",
+    date_from: "",
+    date_to: "",
+    barangay: "",
+  });
+  const [editMode, setEditMode] = useState(false);
+  const [editingBlotterId, setEditingBlotterId] = useState(null);
+  const [viewMode, setViewMode] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ show: false, type: "", id: null, message: "" });
+  const [complainants, setComplainants] = useState([
+    {
+      first_name: "",
+      middle_name: "",
+      last_name: "",
+      qualifier: "",
+      alias: "",
+      gender: "Male",
+      nationality: "FILIPINO",
+      contact_number: "",
+      region_code: "",
+      province_code: "",
+      municipality_code: "",
+      barangay_code: "",
+      house_street: "",
+      info_obtained: "PERSONAL",
+      occupation: "",
+    },
+  ]);
+  const { regions, loadingRegions, fetchProvinces, fetchCities, fetchBarangays } = usePSGC();
+
+  const [cProvinces, setCProvinces]   = useState({});
+  const [cCities, setCCities]         = useState({});
+  const [cBarangays, setCBarangays]   = useState({});
+  const [cLoadingProv, setCLoadingProv] = useState({});
+  const [cLoadingCity, setCLoadingCity] = useState({});
+  const [cLoadingBrgy, setCLoadingBrgy] = useState({});
+
+  const [sProvinces, setSProvinces]   = useState({});
+  const [sCities, setSCities]         = useState({});
+  const [sBarangays, setSBarangays]   = useState({});
+  const [sLoadingProv, setSLoadingProv] = useState({});
+  const [sLoadingCity, setSLoadingCity] = useState({});
+  const [sLoadingBrgy, setSLoadingBrgy] = useState({});
+  const [caseProvinces, setCaseProvinces] = useState([]);
+  const [caseCities, setCaseCities] = useState([]);
+  const [bacoorBarangays, setBacoorBarangays] = useState([]);
+const [loadingBacoorBrgy, setLoadingBacoorBrgy] = useState(false);
+  const [suspects, setSuspects] = useState([
+    {
+      first_name: "",
+      middle_name: "",
+      last_name: "",
+      qualifier: "",
+      alias: "",
+      gender: "Male",
+      birthday: "",
+      age: "",
+      birth_place: "",
+      nationality: "FILIPINO",
+      region_code: "",
+      province_code: "",
+      municipality_code: "",
+      barangay_code: "",
+      house_street: "",
+      status: "At Large",
+      location_if_arrested: "",
+      degree_participation: "Principal",
+      relation_to_victim: "",
+      educational_attainment: "",
+      height_cm: "",
+      drug_used: false,
+      motive: "",
+      occupation: "",
+    },
+  ]);
+
+  const [offenses, setOffenses] = useState([
+  {
+    is_principal_offense: true,
+    offense_type: "",          
+    offense_name: "",          
+    stage_of_felony: "",       
+    index_type: "Non-Index",
+    investigator_on_case: "",
+    most_investigator: "",      
+  },
+]);
+
+  const [caseDetail, setCaseDetail] = useState({
+    incident_type: "Theft",
+    cop: "",
+    date_time_commission: "",
+    date_time_reported: "",
+    is_crime: true,
+    place_region: "Region IV-A (CALABARZON)",
+    place_district_province: "Cavite",
+    place_city_municipality: "Bacoor City",
+    place_barangay: "",
+    place_barangay_other: "",
+    place_street: "",
+    is_private_place: "",
+    narrative: "",
+    amount_involved: "",
+    referred_by_barangay: false,
+    referred_to_barangay: false,
+    referred_by_dilg: false,
+  });
+
+  const totalSteps = 4;
+  const API_URL = "http://localhost:5000/blotters";
+
+  useEffect(() => {
+  fetchBlotters();
+
+  const CALABARZON_CODE = "040000000";
+  const CAVITE_CODE = "042100000";
+  const BACOOR_CODE = "042103000";
+
+  fetchProvinces(CALABARZON_CODE).then(data => setCaseProvinces(data));
+  fetchCities(CAVITE_CODE).then(data => setCaseCities(data));
+  fetchBarangays(BACOOR_CODE).then(data => {
+    setBacoorBarangays(data);
+    setLoadingBacoorBrgy(false);
+  });
+}, []);
+
+  const fetchBlotters = async () => {
+    try {
+      setLoading(true);
+      const queryParams = new URLSearchParams();
+      if (filters.search) queryParams.append("search", filters.search);
+      if (filters.status) queryParams.append("status", filters.status);
+      if (filters.incident_type)
+        queryParams.append("incident_type", filters.incident_type);
+      if (filters.date_from) queryParams.append("date_from", filters.date_from);
+      if (filters.barangay) queryParams.append("barangay", filters.barangay);
+
+      const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    const response = handleApiResponse(rawResponse);
+    if (!response) return;
+    const data = await response.json();
+    if (data.success) setBlotters(data.data);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+const fetchDeletedBlotters = async () => {
+  try {
+    setTrashLoading(true);
+    const response = await fetch(`${API_URL}/deleted/all`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    const data = await response.json();
+    if (data.success) setDeletedBlotters(data.data);
+  } catch (error) {
+    console.error("Error fetching deleted blotters:", error);
+  } finally {
+    setTrashLoading(false);
+  }
+};
+
+const handleRestore = (blotterId) => {
+  showConfirm("restore", blotterId, "Restore this blotter entry? It will be moved back to active records.");
+};
+const showConfirm = (type, id, message) => {
+  setConfirmModal({ show: true, type, id, message });
+};
+
+const handleConfirmAction = async () => {
+  const { type, id } = confirmModal;
+  setConfirmModal({ show: false, type: "", id: null, message: "" });
+
+  if (type === "delete") {
+    try {
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        const toast = document.createElement("div");
+        toast.className = "eb-toast-success";
+        toast.textContent = "Blotter deleted successfully.";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add("show"), 10);
+        setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 3000);
+        fetchBlotters();
+      }
+    } catch (error) { alert("Error deleting blotter."); }
+  }
+
+  if (type === "restore") {
+    try {
+      const response = await fetch(`${API_URL}/${id}/restore`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        const toast = document.createElement("div");
+        toast.className = "eb-toast-success";
+        toast.textContent = "Blotter restored successfully.";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add("show"), 10);
+        setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 3000);
+        fetchDeletedBlotters();
+        fetchBlotters();
+      }
+    } catch (error) { alert("Error restoring blotter."); }
+  }
+};
+  const fetchModusForOffense = async (offenseName, offenseIndex) => {
+  const crimeType = OFFENSE_TO_CRIME_TYPE[offenseName];
+  if (!crimeType) {
+    setOffenseModus(prev => ({ ...prev, [offenseIndex]: [] }));
+    setOffenseSelectedModus(prev => ({ ...prev, [offenseIndex]: [] }));
+    return;
+  }
+  try {
+    const res = await fetch(
+      `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+    );
+    const data = await res.json();
+    if (data.success) {
+      setOffenseModus(prev => ({ ...prev, [offenseIndex]: data.data }));
+      setOffenseSelectedModus(prev => ({ ...prev, [offenseIndex]: [] }));
+    }
+  } catch (err) {
+    console.error("Modus fetch error:", err);
+  }
+};
+
+  const handleEdit = async (blotterId) => {
+    try {
+      const response = await fetch(`${API_URL}/${blotterId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setComplainants(data.data.complainants);
+        setSuspects(data.data.suspects);
+        setOffenses(data.data.offenses);
+          // Load modus for edit mode
+       setTypeOfPlace(data.data.type_of_place || "");
+
+        const loadedOffenses = data.data.offenses || [];
+        const newOffenseModus = {};
+        const newOffenseSelectedModus = {};
+        for (let i = 0; i < loadedOffenses.length; i++) {
+          const crimeType = OFFENSE_TO_CRIME_TYPE[loadedOffenses[i].offense_name];
+          if (crimeType) {
+            try {
+              const modusRes = await fetch(
+                `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+              );
+              const modusData = await modusRes.json();
+              if (modusData.success) {
+                newOffenseModus[i] = modusData.data;
+                newOffenseSelectedModus[i] = data.data.modus
+                  ? data.data.modus.map((m) => m.modus_reference_id)
+                  : [];
+              }
+            } catch (e) { console.error(e); }
+          } else {
+            newOffenseModus[i] = [];
+            newOffenseSelectedModus[i] = [];
+          }
+        }
+        setOffenseModus(newOffenseModus);
+        setOffenseSelectedModus(newOffenseSelectedModus);
+        const isCustomBarangay = false;
+
+        setCaseDetail({
+          incident_type: data.data.incident_type,
+          cop: data.data.cop,
+          date_time_commission: data.data.date_time_commission || "",
+          date_time_reported: data.data.date_time_reported || "",
+          is_crime: data.data.is_crime,
+          place_region: "Region IV-A (CALABARZON)",
+          place_district_province: "Cavite",
+          place_city_municipality: "Bacoor City",
+          place_barangay: data.data.place_barangay,
+          place_barangay_other: "",
+          place_street: data.data.place_street,
+          is_private_place: data.data.is_private_place,
+          narrative: data.data.narrative,
+          amount_involved: data.data.amount_involved,
+          referred_by_barangay: data.data.referred_by_barangay,
+          referred_to_barangay: data.data.referred_to_barangay,
+          referred_by_dilg: data.data.referred_by_dilg,
+        });
+
+        // Store original data for change detection
+        setOriginalData({
+          complainants: data.data.complainants,
+          suspects: data.data.suspects,
+          offenses: data.data.offenses,
+          caseDetail: {
+            incident_type: data.data.incident_type,
+            cop: data.data.cop,
+            date_time_commission: data.data.date_time_commission || "",
+            date_time_reported: data.data.date_time_reported || "",
+            is_crime: data.data.is_crime,
+            place_region: data.data.place_region,
+            place_district_province: data.data.place_district_province,
+            place_city_municipality: data.data.place_city_municipality,
+            place_barangay: isCustomBarangay
+              ? "Other"
+              : data.data.place_barangay,
+            place_barangay_other: isCustomBarangay
+              ? data.data.place_barangay
+              : "",
+            place_street: data.data.place_street,
+            is_private_place: data.data.is_private_place,
+            narrative: data.data.narrative,
+            amount_involved: data.data.amount_involved,
+            referred_by_barangay: data.data.referred_by_barangay,
+            referred_to_barangay: data.data.referred_to_barangay,
+            referred_by_dilg: data.data.referred_by_dilg,
+          },
+        });
+      const newCProvinces = {}, newCCities = {}, newCBarangays = {};
+      const updatedComplainants = data.data.complainants.map(c => ({
+        ...c,
+        region_code: c.region_code || "",
+        province_code: c.province_code || "",
+        municipality_code: c.municipality_code || "",
+        barangay_code: c.barangay_code || "",
+      }));
+
+      try {
+        await Promise.all(updatedComplainants.map(async (c, i) => {
+          const [provs, cities, brgys] = await Promise.all([
+            c.region_code ? fetchProvinces(c.region_code) : Promise.resolve([]),
+            c.province_code ? fetchCities(c.province_code) : Promise.resolve([]),
+            c.municipality_code ? fetchBarangays(c.municipality_code) : Promise.resolve([]),
+          ]);
+          newCProvinces[i] = provs;
+          newCCities[i] = cities;
+          newCBarangays[i] = brgys;
+        }));
+      } catch (e) {
+        const toast = document.createElement("div");
+        toast.className = "eb-toast-success";
+        toast.textContent = "⚠️ Some address dropdowns failed to load. Please re-select.";
+        toast.style.background = "#b45309";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add("show"), 10);
+        setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 4000);
+      }
+      setComplainants(updatedComplainants);
+      setCProvinces(newCProvinces);
+      setCCities(newCCities);
+      setCBarangays(newCBarangays);
+
+    const newSProvinces = {}, newSCities = {}, newSBarangays = {};
+    const updatedSuspects = data.data.suspects.map(s => ({
+      ...s,
+      region_code: s.region_code || "",
+      province_code: s.province_code || "",
+      municipality_code: s.municipality_code || "",
+      barangay_code: s.barangay_code || "",
+    }));
+
+    try {
+      await Promise.all(updatedSuspects.map(async (s, i) => {
+        const [provs, cities, brgys] = await Promise.all([
+          s.region_code ? fetchProvinces(s.region_code) : Promise.resolve([]),
+          s.province_code ? fetchCities(s.province_code) : Promise.resolve([]),
+          s.municipality_code ? fetchBarangays(s.municipality_code) : Promise.resolve([]),
+        ]);
+        newSProvinces[i] = provs;
+        newSCities[i] = cities;
+        newSBarangays[i] = brgys;
+      }));
+    } catch (e) {
+      const toast = document.createElement("div");
+      toast.className = "eb-toast-success";
+      toast.textContent = "⚠️ Some address dropdowns failed to load. Please re-select.";
+      toast.style.background = "#b45309";
+      document.body.appendChild(toast);
+      setTimeout(() => toast.classList.add("show"), 10);
+      setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 4000);
+    }
+        setSuspects(updatedSuspects);
+        setSProvinces(newSProvinces);
+        setSCities(newSCities);
+        setSBarangays(newSBarangays);
+        setEditMode(true);
+        setViewMode(false);
+        setEditingBlotterId(blotterId);
+        setShowModal(true);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Failed to load blotter data");
+    }
+  };
+  const handleView = async (blotterId) => {
+    try {
+      const response = await fetch(`${API_URL}/${blotterId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+      const data = await response.json();
+
+      if (data.success) {
+        setComplainants(data.data.complainants);
+        setSuspects(data.data.suspects);
+        setOffenses(data.data.offenses);
+        setTypeOfPlace(data.data.type_of_place || "");
+
+        // Load per-offense modus
+        const loadedOffenses = data.data.offenses || [];
+        const newOffenseModus = {};
+        const newOffenseSelectedModus = {};
+        for (let i = 0; i < loadedOffenses.length; i++) {
+          const crimeType = OFFENSE_TO_CRIME_TYPE[loadedOffenses[i].offense_name];
+          if (crimeType) {
+            try {
+              const modusRes = await fetch(
+                `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+              );
+              const modusData = await modusRes.json();
+              if (modusData.success) {
+                newOffenseModus[i] = modusData.data;
+                newOffenseSelectedModus[i] = data.data.modus
+                  ? data.data.modus.map((m) => m.modus_reference_id)
+                  : [];
+              }
+            } catch (e) { console.error(e); }
+          } else {
+            newOffenseModus[i] = [];
+            newOffenseSelectedModus[i] = [];
+          }
+        }
+        setOffenseModus(newOffenseModus);
+        setOffenseSelectedModus(newOffenseSelectedModus);
+        const isCustomBarangay = false;
+
+        setCaseDetail({
+          incident_type: data.data.incident_type,
+          cop: data.data.cop,
+          date_time_commission: data.data.date_time_commission || "",
+          date_time_reported: data.data.date_time_reported || "",
+          is_crime: data.data.is_crime,
+          place_region: "Region IV-A (CALABARZON)",
+          place_district_province: "Cavite",
+          place_city_municipality: "Bacoor City",
+          place_barangay: data.data.place_barangay,
+          place_barangay_other: "",
+          place_street: data.data.place_street,
+          is_private_place: data.data.is_private_place,
+          narrative: data.data.narrative,
+          amount_involved: data.data.amount_involved,
+          referred_by_barangay: data.data.referred_by_barangay,
+          referred_to_barangay: data.data.referred_to_barangay,
+          referred_by_dilg: data.data.referred_by_dilg,
+        });
+        setViewMode(true);
+        setEditMode(false);
+        setEditingBlotterId(null);
+        setShowModal(true);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Failed to load blotter data");
+    }
+  };
+
+  const handleApiResponse = (response) => {
+  if (response.status === 401) {
+    alert("Your session has expired. Please log in again.");
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+    return null;
+  }
+  return response;
+};
+
+ const handleDelete = (blotterId) => {
+  showConfirm("delete", blotterId, "Are you sure you want to delete this blotter entry? This will move it to Deleted Records.");
+};
+
+  const handleFilterChange = (e) => {
+    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const clearFilters = async () => {
+  setFilters({
+    search: "",
+    status: "",
+    incident_type: "",
+    date_from: "",
+    date_to: "",
+    barangay: "",
+  });
+  
+  try {
+    setLoading(true);
+    const response = await fetch(`${API_URL}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    const data = await response.json();
+    if (data.success) setBlotters(data.data);
+  } catch (error) {
+    console.error("Error:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Input helpers
+  const handleLettersOnly = (value) => value.replace(/[^A-Za-zÑñ\s'-]/g, "");
+  const handleNumbersOnly = (value) => value.replace(/\D/g, "");
+
+  const validateCurrentStep = () => {
+    const errors = {};
+
+    if (currentStep === 1) {
+      complainants.forEach((c, i) => {
+        const p = `complainant_${i}`;
+
+        // First Name validation
+        if (!c.first_name || c.first_name.trim().length === 0) {
+          errors[`${p}_first_name`] = "Required";
+        } else if (c.first_name.trim().length < 2) {
+          errors[`${p}_first_name`] = "Must be at least 2 characters";
+        } else if (c.first_name.trim().length > 50) {
+          errors[`${p}_first_name`] = "Maximum 50 characters";
+        } else if (!/^[A-Za-zÑñ\s'-]+$/.test(c.first_name.trim())) {
+          errors[`${p}_first_name`] = "Letters only";
+        }
+
+        // Middle Name validation (optional)
+        if (c.middle_name && c.middle_name.trim().length > 0) {
+          if (c.middle_name.trim().length < 2) {
+            errors[`${p}_middle_name`] = "Must be at least 2 characters";
+          } else if (c.middle_name.trim().length > 50) {
+            errors[`${p}_middle_name`] = "Maximum 50 characters";
+          } else if (!/^[A-Za-zÑñ\s'-]+$/.test(c.middle_name.trim())) {
+            errors[`${p}_middle_name`] = "Letters only";
+          }
+        }
+
+        // Last Name validation
+        if (!c.last_name || c.last_name.trim().length === 0) {
+          errors[`${p}_last_name`] = "Required";
+        } else if (c.last_name.trim().length < 2) {
+          errors[`${p}_last_name`] = "Must be at least 2 characters";
+        } else if (c.last_name.trim().length > 50) {
+          errors[`${p}_last_name`] = "Maximum 50 characters";
+        } else if (!/^[A-Za-zÑñ\s'-]+$/.test(c.last_name.trim())) {
+          errors[`${p}_last_name`] = "Letters only";
+        }
+
+       if (!c.region_code) {
+          errors[`${p}_region_code`] = "Please select a region";
+        }
+        if (!c.province_code) {
+          errors[`${p}_province_code`] = "Required";
+        }
+        if (!c.municipality_code) {
+          errors[`${p}_municipality_code`] = "Required";
+        }
+        if (!c.barangay_code) {
+          errors[`${p}_barangay_code`] = "Required";
+        }
+
+        // House/Street validation
+        if (!c.house_street || c.house_street.trim().length === 0) {
+          errors[`${p}_house_street`] = "Required";
+        } else if (c.house_street.trim().length < 5) {
+          errors[`${p}_house_street`] = "Must be at least 5 characters";
+        } else if (c.house_street.trim().length > 200) {
+          errors[`${p}_house_street`] = "Maximum 200 characters";
+        }
+
+        // Contact Number validation (optional)
+        if (c.contact_number && c.contact_number.length > 0) {
+          if (c.contact_number.length !== 11) {
+            errors[`${p}_contact_number`] = "Must be exactly 11 digits";
+          } else if (!c.contact_number.startsWith("09")) {
+            errors[`${p}_contact_number`] = "Must start with 09";
+          }
+        }
+
+        // Gender validation
+        if (!c.gender) {
+          errors[`${p}_gender`] = "Please select gender";
+        }
+
+        // Nationality validation
+        if (!c.nationality) {
+          errors[`${p}_nationality`] = "Please select nationality";
+        }
+
+        // Info Obtained validation
+        if (!c.info_obtained) {
+          errors[`${p}_info_obtained`] = "Required";
+        }
+      });
+    }
+
+    if (currentStep === 2) {
+      suspects.forEach((s, i) => {
+        const p = `suspect_${i}`;
+
+        // First Name
+        if (!s.first_name || s.first_name.trim().length === 0) {
+          errors[`${p}_first_name`] = "Required";
+        } else if (s.first_name.trim().length < 2) {
+          errors[`${p}_first_name`] = "At least 2 characters";
+        } else if (s.first_name.trim().length > 50) {
+          errors[`${p}_first_name`] = "Maximum 50 characters";
+        }
+
+        // Middle Name (optional)
+        if (s.middle_name && s.middle_name.trim().length > 0) {
+        if (s.middle_name.trim().length < 2) {
+          errors[`${p}_middle_name`] = "At least 2 characters";
+        } else if (s.middle_name.trim().length > 50) {
+          errors[`${p}_middle_name`] = "Maximum 50 characters";
+        } else if (!/^[A-Za-zÑñ\s'-]+$/.test(s.middle_name.trim())) {
+          errors[`${p}_middle_name`] = "Letters only";
+        }
+      }
+
+        // Last Name
+        if (!s.last_name || s.last_name.trim().length === 0) {
+          errors[`${p}_last_name`] = "Required";
+        } else if (s.last_name.trim().length < 2) {
+          errors[`${p}_last_name`] = "At least 2 characters";
+        } else if (s.last_name.trim().length > 50) {
+          errors[`${p}_last_name`] = "Maximum 50 characters";
+        }
+
+        // Status
+        if (!s.status || s.status === "") {
+          errors[`${p}_status`] = "Required";
+        }
+
+        // Location if arrested
+        if (
+          (s.status === "Arrested" ||
+            s.status === "In Custody" ||
+            s.status === "Detained") &&
+          (!s.location_if_arrested ||
+            s.location_if_arrested.trim().length === 0)
+        ) {
+          errors[`${p}_location_if_arrested`] = "Required when arrested";
+        } else if (
+          s.location_if_arrested &&
+          s.location_if_arrested.trim().length > 0
+        ) {
+          if (s.location_if_arrested.trim().length < 5) {
+            errors[`${p}_location_if_arrested`] = "At least 5 characters";
+          } else if (s.location_if_arrested.trim().length > 200) {
+            errors[`${p}_location_if_arrested`] = "Maximum 200 characters";
+          }
+        }
+
+        // Degree of Participation
+        if (!s.degree_participation || s.degree_participation === "") {
+          errors[`${p}_degree_participation`] = "Required";
+        }
+
+        // Gender
+        if (!s.gender) {
+          errors[`${p}_gender`] = "Required";
+        }
+
+       if (!s.region_code) {
+        errors[`${p}_region_code`] = "Required";
+      }
+      if (!s.province_code) {
+        errors[`${p}_province_code`] = "Required";
+      }
+      if (!s.municipality_code) {
+        errors[`${p}_municipality_code`] = "Required";
+      }
+      if (!s.barangay_code) {
+        errors[`${p}_barangay_code`] = "Required";
+      }
+
+        // House/Street
+        if (!s.house_street || s.house_street.trim().length === 0) {
+          errors[`${p}_house_street`] = "Required";
+        } else if (s.house_street.trim().length < 5) {
+          errors[`${p}_house_street`] = "At least 5 characters";
+        } else if (s.house_street.trim().length > 200) {
+          errors[`${p}_house_street`] = "Maximum 200 characters";
+        }
+
+        // Nationality
+        if (!s.nationality) {
+          errors[`${p}_nationality`] = "Required";
+        }
+
+        // Age (optional but validate if provided)
+        if (s.age && String(s.age).trim().length > 0) {
+          const age = parseInt(s.age);
+          if (isNaN(age) || age < 10 || age > 120) {
+            errors[`${p}_age`] = "Must be 10-120";
+          }
+        }
+
+        // Height (optional but validate if provided)
+        if (s.height_cm && String(s.height_cm).trim().length > 0) {
+          const height = parseInt(s.height_cm);
+          if (isNaN(height) || height < 50 || height > 250) {
+            errors[`${p}_height_cm`] = "Must be 50-250 cm";
+          }
+        }
+
+        // Birthday (optional but validate if provided)
+        if (s.birthday) {
+          const birthDate = new Date(s.birthday);
+          const today = new Date();
+          const age = today.getFullYear() - birthDate.getFullYear();
+
+          if (birthDate > today) {
+            errors[`${p}_birthday`] = "Cannot be future date";
+          } else if (age < 10) {
+            errors[`${p}_birthday`] = "Must be at least 10 years old";
+          }
+        }
+
+        if (typeof s.drug_used !== "boolean") {
+          errors[`suspect_${i}_drug_used`] = "Required";
+        }
+      });
+    }
+
+    if (currentStep === 3) {
+      // Incident Type
+      if (!caseDetail.incident_type || caseDetail.incident_type === "") {
+        errors.incident_type = "Required";
+      }
+
+      // COP
+      if (!caseDetail.cop || caseDetail.cop.trim().length === 0) {
+        errors.cop = "Required";
+      } else if (caseDetail.cop.trim().length < 5) {
+        errors.cop = "At least 5 characters";
+      } else if (caseDetail.cop.trim().length > 100) {
+        errors.cop = "Maximum 100 characters";
+      }
+
+      // Date & Time of Commission
+      if (!caseDetail.date_time_commission) {
+        errors.date_time_commission = "Required";
+      } else {
+        const commission = new Date(caseDetail.date_time_commission);
+        const now = new Date();
+
+        if (commission > now) {
+          errors.date_time_commission = "Cannot be future date";
+        }
+
+        if (caseDetail.date_time_reported) {
+          const reported = new Date(caseDetail.date_time_reported);
+          if (commission > reported) {
+            errors.date_time_commission = "Must be before report date";
+          }
+        }
+      }
+
+      // Date & Time Reported
+      if (!caseDetail.date_time_reported) {
+        errors.date_time_reported = "Required";
+      } else {
+        const reported = new Date(caseDetail.date_time_reported);
+        const now = new Date();
+
+        if (reported > now) {
+          errors.date_time_reported = "Cannot be future date";
+        }
+
+        if (caseDetail.date_time_commission) {
+          const commission = new Date(caseDetail.date_time_commission);
+          if (reported < commission) {
+            errors.date_time_reported = "Cannot be before commission";
+          }
+        }
+      }
+
+      // Place - Region
+      if (!caseDetail.place_region || caseDetail.place_region === "") {
+        errors.place_region = "Required";
+      }
+
+      // District/Province
+      if (
+        !caseDetail.place_district_province ||
+        caseDetail.place_district_province.trim().length === 0
+      ) {
+        errors.place_district_province = "Required";
+      } else if (caseDetail.place_district_province.trim().length < 3) {
+        errors.place_district_province = "At least 3 characters";
+      } else if (caseDetail.place_district_province.trim().length > 100) {
+        errors.place_district_province = "Maximum 100 characters";
+      }
+
+      // City/Municipality
+      if (
+        !caseDetail.place_city_municipality ||
+        caseDetail.place_city_municipality.trim().length === 0
+      ) {
+        errors.place_city_municipality = "Required";
+      } else if (caseDetail.place_city_municipality.trim().length < 3) {
+        errors.place_city_municipality = "At least 3 characters";
+      } else if (caseDetail.place_city_municipality.trim().length > 100) {
+        errors.place_city_municipality = "Maximum 100 characters";
+      }
+
+      // Barangay
+      if (
+        !caseDetail.place_barangay ||
+        caseDetail.place_barangay.trim().length === 0
+      ) {
+        errors.place_barangay = "Required";
+      } else if (
+        caseDetail.place_barangay === "Other" &&
+        (!caseDetail.place_barangay_other ||
+          caseDetail.place_barangay_other.trim().length === 0)
+      ) {
+        errors.place_barangay_other = "Please specify location";
+      }
+
+      // Street
+      if (
+        !caseDetail.place_street ||
+        caseDetail.place_street.trim().length === 0
+      ) {
+        errors.place_street = "Required";
+      } else if (caseDetail.place_street.trim().length < 3) {
+        errors.place_street = "At least 3 characters";
+      } else if (caseDetail.place_street.trim().length > 200) {
+        errors.place_street = "Maximum 200 characters";
+      }
+
+      // Narrative
+      if (!caseDetail.narrative || caseDetail.narrative.trim().length === 0) {
+        errors.narrative = "Required";
+      } else if (caseDetail.narrative.trim().length < 20) {
+        errors.narrative = "At least 20 characters";
+      } else if (caseDetail.narrative.trim().length > 5000) {
+        errors.narrative = "Maximum 5000 characters";
+      }
+
+      // Referred by barangay
+      if (
+        caseDetail.referred_by_barangay === undefined ||
+        caseDetail.referred_by_barangay === null
+      ) {
+        errors.referred_by_barangay = "Required";
+      }
+
+      // Referred by DILG
+      if (
+        caseDetail.referred_by_dilg === undefined ||
+        caseDetail.referred_by_dilg === null
+      ) {
+        errors.referred_by_dilg = "Required";
+      }
+
+      if (
+        caseDetail.amount_involved &&
+        caseDetail.amount_involved.trim().length > 0
+      ) {
+        const cleanAmount = caseDetail.amount_involved.replace(/[₱,]/g, "");
+        const amount = parseFloat(cleanAmount);
+
+        if (isNaN(amount)) {
+          errors.amount_involved = "Invalid amount";
+        } else if (amount < 0.01) {
+          errors.amount_involved = "Must be at least ₱0.01";
+        } else if (amount > 999999999.99) {
+          errors.amount_involved = "Amount too large";
+        }
+      }
+    }
+
+    if (currentStep === 4) {
+
+       if (!typeOfPlace || typeOfPlace === "") {
+        errors.type_of_place = "Type of Place is required";
+      }
+
+      offenses.forEach((o, i) => {
+        const p = `offense_${i}`;
+
+        // Principal offense check
+        if (
+          o.is_principal_offense === undefined ||
+          o.is_principal_offense === null
+        ) {
+          errors[`${p}_is_principal_offense`] = "Required";
+        }
+
+        // Offense name
+        if (!o.offense_name || o.offense_name === "") {
+          errors[`${p}_offense_name`] = "Required";
+        }
+
+        // Stage of felony
+        if (!o.stage_of_felony || o.stage_of_felony === "") {
+          errors[`${p}_stage_of_felony`] = "Required";
+        }
+
+        // Investigator on case
+        if (
+          !o.investigator_on_case ||
+          o.investigator_on_case.trim().length === 0
+        ) {
+          errors[`${p}_investigator_on_case`] = "Required";
+        } else if (o.investigator_on_case.trim().length < 5) {
+          errors[`${p}_investigator_on_case`] = "At least 5 characters";
+        }
+
+        // Most investigator
+        if (!o.most_investigator || o.most_investigator.trim().length === 0) {
+          errors[`${p}_most_investigator`] = "Required";
+        } else if (o.most_investigator.trim().length < 5) {
+          errors[`${p}_most_investigator`] = "At least 5 characters";
+        }
+
+      const hasModus = offenseModus[i] && offenseModus[i].length > 0;
+      if (hasModus && (!offenseSelectedModus[i] || offenseSelectedModus[i].length === 0)) {
+        errors[`${p}_modus`] = "At least one modus is required";
+      }
+      });
+
+     
+    }
+
+    return errors;
+  };
+
+  const changeStep = (direction) => {
+    if (direction === 1) {
+      const errors = validateCurrentStep();
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setTimeout(() => {
+          const firstError = document.querySelector(".eb-modal-input.error");
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+            firstError.focus();
+          }
+        }, 100);
+        return;
+      }
+    }
+    setFieldErrors({});
+    let newStep = currentStep + direction;
+    if (newStep < 1) newStep = 1;
+    if (newStep > totalSteps) newStep = totalSteps;
+    setCurrentStep(newStep);
+  };
+
+  const addComplainant = () =>
+    setComplainants([
+      ...complainants,
+      {
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        qualifier: "",
+        alias: "",
+        gender: "Male",
+        nationality: "FILIPINO",
+        contact_number: "",
+        region_code: "",
+        province_code: "",
+        municipality_code: "",
+        barangay_code: "",
+        house_street: "",
+        info_obtained: "PERSONAL",
+        occupation: "",
+      },
+    ]);
+
+  const removeComplainant = (i) =>
+    complainants.length > 1 &&
+    setComplainants(complainants.filter((_, idx) => idx !== i));
+
+  const updateComplainant = (i, field, value) => {
+    const updated = [...complainants];
+    updated[i][field] = value;
+    setComplainants(updated);
+  };
+
+  const addSuspect = () =>
+    setSuspects([
+      ...suspects,
+      {
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        qualifier: "",
+        alias: "",
+        gender: "Male",
+        birthday: "",
+        age: "",
+        birth_place: "",
+        nationality: "FILIPINO",
+        region_code: "",
+        province_code: "",
+        municipality_code: "",
+        barangay_code: "",
+        house_street: "",
+        status: "At Large",
+        location_if_arrested: "",
+        degree_participation: "Principal",
+        category_drug_case: "",
+        relation_to_victim: "",
+        educational_attainment: "",
+        height_cm: "",
+        drug_used: false,
+        motive: "",
+        occupation: "",
+      },
+    ]);
+
+  const removeSuspect = (i) =>
+    suspects.length > 1 && setSuspects(suspects.filter((_, idx) => idx !== i));
+
+  const updateSuspect = (i, field, value) => {
+    const updated = [...suspects];
+    updated[i][field] = value;
+    setSuspects(updated);
+  };
+
+const addOffense = () => {
+  const newIndex = offenses.length;
+  setOffenses([...offenses, {
+    is_principal_offense: false,
+    offense_type: "", offense_name: "", stage_of_felony: "",
+    index_type: "Non-Index", investigator_on_case: "", most_investigator: ""
+    // NO modus field
+  }]);
+  setOffenseModus(prev => ({ ...prev, [newIndex]: [] }));
+  setOffenseSelectedModus(prev => ({ ...prev, [newIndex]: [] }));
+};
+
+const removeOffense = (i) => {
+  if (offenses.length > 1) {
+    setOffenses(offenses.filter((_, idx) => idx !== i));
+    // Re-index modus state
+    const newModus = {}, newSelected = {};
+    offenses.forEach((_, idx) => {
+      if (idx !== i) {
+        const newIdx = idx > i ? idx - 1 : idx;
+        newModus[newIdx] = offenseModus[idx] || [];
+        newSelected[newIdx] = offenseSelectedModus[idx] || [];
+      }
+    });
+    setOffenseModus(newModus);
+    setOffenseSelectedModus(newSelected);
+  }
+};
+
+  const updateOffense = (i, field, value) => {
+    const updated = [...offenses];
+    updated[i][field] = value;
+    setOffenses(updated);
+  };
+
+  const updateCaseDetail = (field, value) =>
+    setCaseDetail((prev) => ({ ...prev, [field]: value }));
+  const resetForm = () => {
+    setComplainants([
+      {
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        qualifier: "",
+        alias: "",
+        gender: "Male",
+        nationality: "FILIPINO",
+        contact_number: "",
+        region_code: "",
+        province_code: "",
+        municipality_code: "",
+        barangay_code: "",
+        house_street: "",
+        info_obtained: "PERSONAL",
+        occupation: "",
+      },
+    ]);
+
+    setSuspects([
+      {
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        qualifier: "",
+        alias: "",
+        gender: "Male",
+        birthday: "",
+        age: "",
+        birth_place: "",
+        nationality: "FILIPINO",
+        region_code: "",
+        province_code: "",
+        municipality_code: "",
+        barangay_code: "",
+        house_street: "",
+        status: "At Large",
+        location_if_arrested: "",
+        degree_participation: "Principal",
+        category_drug_case: "",
+        relation_to_victim: "",
+        educational_attainment: "",
+        height_cm: "",
+        drug_used: false,
+        motive: "",
+        occupation: "",
+      },
+    ]);
+
+      setOffenses([
+          {
+            is_principal_offense: true,
+            offense_type: "",
+            offense_name: "",
+            stage_of_felony: "",
+            index_type: "Non-Index",
+            investigator_on_case: "",
+            most_investigator: "",
+          },
+        ]);
+        setOffenseModus({});
+        setOffenseSelectedModus({});
+        setTypeOfPlace("");
+        
+    setCaseDetail({
+      incident_type: "Theft",
+      cop: "",
+      date_time_commission: "",
+      date_time_reported: "",
+      is_crime: true,
+      place_region: "Region IV-A (CALABARZON)",
+      place_district_province: "Cavite",
+      place_city_municipality: "Bacoor City",
+      place_barangay: "",
+      place_barangay_other: "",
+      place_street: "",
+      is_private_place: "",
+      narrative: "",
+      amount_involved: "",
+      referred_by_barangay: false,
+      referred_to_barangay: false,
+      referred_by_dilg: false,
+    });
+  };
+  const handleModalClose = () => {
+    if (editMode && originalData) {
+      // Deep comparison for actual changes
+      const hasChanges =
+        JSON.stringify(complainants) !==
+          JSON.stringify(originalData.complainants) ||
+        JSON.stringify(suspects) !== JSON.stringify(originalData.suspects) ||
+        JSON.stringify(offenses) !== JSON.stringify(originalData.offenses) ||
+        caseDetail.incident_type !== originalData.caseDetail.incident_type ||
+        caseDetail.cop !== originalData.caseDetail.cop ||
+        caseDetail.date_time_commission !==
+          originalData.caseDetail.date_time_commission ||
+        caseDetail.date_time_reported !==
+          originalData.caseDetail.date_time_reported ||
+        caseDetail.is_crime !== originalData.caseDetail.is_crime ||
+        caseDetail.place_barangay !== originalData.caseDetail.place_barangay ||
+        caseDetail.place_barangay_other !==
+          originalData.caseDetail.place_barangay_other ||
+        caseDetail.place_street !== originalData.caseDetail.place_street ||
+        caseDetail.is_private_place !==
+          originalData.caseDetail.is_private_place ||
+        caseDetail.narrative !== originalData.caseDetail.narrative ||
+        caseDetail.amount_involved !==
+          originalData.caseDetail.amount_involved ||
+        caseDetail.referred_by_barangay !==
+          originalData.caseDetail.referred_by_barangay ||
+        caseDetail.referred_to_barangay !==
+          originalData.caseDetail.referred_to_barangay ||
+        caseDetail.referred_by_dilg !==
+          originalData.caseDetail.referred_by_dilg;
+
+      if (hasChanges) {
+        setShowConfirmClose(true);
+        return;
+      } else {
+        closeModal();
+        return;
+      }
+    }
+
+    if (viewMode) {
+      closeModal();
+      return;
+    }
+
+    const hasData =
+      complainants.some(
+        (c) =>
+          c.first_name ||
+          c.middle_name ||
+          c.last_name ||
+          c.contact_number ||
+          c.alias ||
+          c.qualifier ||
+          (c.region && c.region !== "NCR") ||
+          c.district_province ||
+          c.city_municipality ||
+          c.barangay ||
+          c.house_street,
+      ) ||
+      suspects.some(
+        (s) =>
+          s.first_name ||
+          s.middle_name ||
+          s.last_name ||
+          s.birthday ||
+          s.age ||
+          s.alias ||
+          s.qualifier ||
+          s.birth_place ||
+          s.relation_to_victim ||
+          s.height_cm ||
+          s.motive ||
+          (s.region && s.region !== "NCR") ||
+          s.district_province ||
+          s.city_municipality ||
+          s.barangay ||
+          s.house_street ||
+          s.location_if_arrested ||
+          s.educational_attainment,
+      ) ||
+      (caseDetail.incident_type && caseDetail.incident_type !== "Theft") ||
+      caseDetail.cop ||
+      caseDetail.date_time_commission ||
+      caseDetail.place_barangay ||
+      caseDetail.place_street ||
+      caseDetail.narrative ||
+      caseDetail.amount_involved ||
+      caseDetail.is_private_place ||
+      offenses.some(
+        (o) =>
+          (o.offense_type && o.offense_type !== "PROPERTY") ||
+          (o.offense_name && o.offense_name !== "ESTAFA") ||
+          (o.stage_of_felony && o.stage_of_felony !== "COMPLETED") ||
+          o.investigator_on_case ||
+          o.most_investigator,
+      );
+
+    if (hasData) {
+      setShowConfirmClose(true);
+    } else {
+      closeModal();
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setShowConfirmClose(false);
+    setCurrentStep(1);
+    setFieldErrors({});
+    setEditMode(false);
+    setViewMode(false);
+    setEditingBlotterId(null);
+    setOriginalData(null);
+    resetForm();
+  };
+
+  const cancelClose = () => {
+    setShowConfirmClose(false);
+  };
+
+  const handleSubmit = async () => {
+  // Validate Step 4 (Offenses) before submitting
+  let errors = {};
+  
+  
+  offenses.forEach((o, i) => {
+    const p = `offense_${i}`;
+    
+     if (!typeOfPlace || typeOfPlace === "") {
+        errors.type_of_place = "Type of Place is required";
+      }
+      
+    // Principal offense
+    if (o.is_principal_offense === undefined || o.is_principal_offense === null) {
+      errors[`${p}_is_principal_offense`] = "Required";
+    }
+    
+    // Offense Name - ALWAYS REQUIRED
+    if (!o.offense_name || o.offense_name === "") {
+      errors[`${p}_offense_name`] = "Required";
+    }
+    
+    // Stage of Felony - ALWAYS REQUIRED
+    if (!o.stage_of_felony || o.stage_of_felony === "") {
+      errors[`${p}_stage_of_felony`] = "Required";
+    }
+    
+    // Investigator on Case
+    if (!o.investigator_on_case || o.investigator_on_case.trim().length === 0) {
+      errors[`${p}_investigator_on_case`] = "Required";
+    } else if (o.investigator_on_case.trim().length < 5) {
+      errors[`${p}_investigator_on_case`] = "At least 5 characters";
+    } else if (o.investigator_on_case.trim().length > 100) {
+      errors[`${p}_investigator_on_case`] = "Maximum 100 characters";
+    }
+    
+    // Most Investigator
+    if (!o.most_investigator || o.most_investigator.trim().length === 0) {
+      errors[`${p}_most_investigator`] = "Required";
+    } else if (o.most_investigator.trim().length < 5) {
+      errors[`${p}_most_investigator`] = "At least 5 characters";
+    } else if (o.most_investigator.trim().length > 100) {
+      errors[`${p}_most_investigator`] = "Maximum 100 characters";
+    }
+    
+    const hasModus = offenseModus[i] && offenseModus[i].length > 0;
+    if (hasModus && (!offenseSelectedModus[i] || offenseSelectedModus[i].length === 0)) {
+      errors[`${p}_modus`] = "At least one modus is required";
+    }
+  });
+
+
+  if (Object.keys(errors).length > 0) {
+    setFieldErrors(errors);
+    setTimeout(() => {
+      const firstError = document.querySelector(
+        ".eb-modal-input.error, .eb-gender-buttons + .eb-field-error",
+      );
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
+    return;
+  }
+
+
+    try {
+      setLoading(true);
+
+      const finalCaseDetail = { ...caseDetail };
+      if (finalCaseDetail.amount_involved) {
+        finalCaseDetail.amount_involved = finalCaseDetail.amount_involved.replace(/,/g, '');
+      }
+      if (
+        finalCaseDetail.place_barangay === "Other" &&
+        finalCaseDetail.place_barangay_other
+      ) {
+        finalCaseDetail.place_barangay = finalCaseDetail.place_barangay_other;
+      }
+      delete finalCaseDetail.place_barangay_other;
+
+      finalCaseDetail.type_of_place = typeOfPlace;
+      finalCaseDetail.modus_reference_ids = Object.values(offenseSelectedModus).flat();
+
+      const offensesWithModus = offenses.map((o, i) => ({
+        ...o,
+        modus_reference_ids: offenseSelectedModus[i] || [],
+      }));
+
+      // Resolve PSGC codes to names for complainants
+const resolvedComplainants = complainants.map((c, i) => {
+  const regionName = (regions.find(r => r.code === c.region_code) || {}).name || c.region_code;
+  const provinceName = ((cProvinces[i] || []).find(p => p.code === c.province_code) || {}).name || c.province_code;
+  const cityName = ((cCities[i] || []).find(x => x.code === c.municipality_code) || {}).name || c.municipality_code;
+  const barangayName = ((cBarangays[i] || []).find(b => b.code === c.barangay_code) || {}).name || c.barangay_code;
+  return {
+    ...c,
+    region: regionName,
+    district_province: provinceName,
+    city_municipality: cityName,
+    barangay: barangayName,
+  };
+});
+
+const resolvedSuspects = suspects.map((s, i) => {
+  const regionName = (regions.find(r => r.code === s.region_code) || {}).name || s.region_code;
+  const provinceName = ((sProvinces[i] || []).find(p => p.code === s.province_code) || {}).name || s.province_code;
+  const cityName = ((sCities[i] || []).find(x => x.code === s.municipality_code) || {}).name || s.municipality_code;
+  const barangayName = ((sBarangays[i] || []).find(b => b.code === s.barangay_code) || {}).name || s.barangay_code;
+  return {
+    ...s,
+    region: regionName,
+    district_province: provinceName,
+    city_municipality: cityName,
+    barangay: barangayName,
+  };
+});
+
+const payload = {
+  blotterData: finalCaseDetail,
+  complainants: resolvedComplainants,
+  suspects: resolvedSuspects,
+  offenses: offensesWithModus,
+};
+
+      const url = editMode ? `${API_URL}/${editingBlotterId}` : API_URL;
+        const method = editMode ? "PUT" : "POST";
+
+        const rawResponse = await fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const response = handleApiResponse(rawResponse);
+      if (!response) return;
+      const data = await response.json();
+      if (data.success) {
+        const message = editMode
+        ? "Blotter updated successfully!"
+        : `Blotter created successfully!\nBlotter ID: ${data.data.blotter_entry_number}`;
+
+      // Show toast notification
+      const toast = document.createElement('div');
+      toast.className = 'eb-toast-success';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('show');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+        setOriginalData(null);
+        closeModal();
+        fetchBlotters();
+      } else {
+        let errorMsg = "Submission Failed:\n\n";
+        if (data.errors) errorMsg += data.errors.join("\n");
+        else if (data.error) errorMsg += data.error;
+        alert(errorMsg);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Failed to submit. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+  };
+
+  const getStatusClass = (status) => {
+    const map = {
+      Pending: "eb-status-pending",
+      "Under Investigation": "eb-status-investigating",
+      Resolved: "eb-status-resolved",
+      Urgent: "eb-status-urgent",
+    };
+    return map[status] || "eb-status-pending";
+  };
+
+  return (
+    <div className="eb-content-area">
+      <div className="eb-page-header">
+        <div className="eb-page-header-left">
+          <h1>Reporting Records</h1>
+          <p>Digital incident and blotter reporting system</p>
+        </div>
+        <div className="eb-page-header-right">
+        <button
+          className="eb-btn eb-btn-deleted"
+          onClick={() => { setShowTrash(true); fetchDeletedBlotters(); }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "8px", verticalAlign: "middle" }}>
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+          Deleted Records
+        </button>
+        <button
+          className="eb-btn eb-btn-primary"
+          onClick={() => setShowModal(true)}
+        >
+          + New Report
+        </button>
+      </div>
+      </div>
+
+      {showModal && (
+        <div className="eb-modal">
+          <div className="eb-modal-content">
+            <div className="eb-modal-header">
+              <h2>
+                {viewMode
+                  ? "View Blotter Entry"
+                  : editMode
+                    ? "Edit Blotter Entry"
+                    : "New Blotter Entry"}
+              </h2>
+              <span className="eb-modal-close" onClick={handleModalClose}>
+                &times;
+              </span>
+            </div>
+
+            {viewMode ? (
+              // ========== VIEW MODE - READ ONLY DISPLAY ==========
+              <div className="eb-view-content">
+                {/* Complainants */}
+                <div className="eb-view-section">
+                  <h3 className="eb-view-section-title">
+                    Complainant Information
+                  </h3>
+                  <div className="eb-view-section-body"> 
+                  {complainants.map((c, i) => (
+                    <div className="eb-view-card" key={i}>
+                      <h4 className="eb-view-card-title">
+                        Complainant #{i + 1}
+                      </h4>
+                      <div className="eb-view-grid">
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Name:</span>
+                          <span className="eb-view-value">
+                            {`${c.first_name} ${c.middle_name || ""} ${c.last_name} ${c.qualifier || ""}`.trim()}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Gender:</span>
+                          <span className="eb-view-value">{c.gender}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Nationality:</span>
+                          <span className="eb-view-value">{c.nationality}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Contact:</span>
+                          <span className="eb-view-value">
+                            {c.contact_number || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Alias:</span>
+                          <span className="eb-view-value">
+                            {c.alias || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                        <span className="eb-view-label">Occupation:</span>
+                        <span className="eb-view-value">{c.occupation || "N/A"}</span>
+                      </div>
+                        <div className="eb-view-item eb-view-full">
+                          <span className="eb-view-label">Address:</span>
+                          <span className="eb-view-value">{`${c.house_street}, ${c.barangay}, ${c.city_municipality}, ${c.district_province}, ${c.region}`}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Info Obtained:</span>
+                          <span className="eb-view-value">
+                            {c.info_obtained}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </div>
+
+                {/* Suspects */}
+                <div className="eb-view-section">
+                  <h3 className="eb-view-section-title">Suspect Information</h3>
+                  <div className="eb-view-section-body"> 
+                  {suspects.map((s, i) => (
+                    <div className="eb-view-card" key={i}>
+                      <h4 className="eb-view-card-title">Suspect #{i + 1}</h4>
+                      <div className="eb-view-grid">
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Name:</span>
+                          <span className="eb-view-value">
+                            {`${s.first_name} ${s.middle_name || ""} ${s.last_name} ${s.qualifier || ""}`.trim()}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Gender:</span>
+                          <span className="eb-view-value">{s.gender}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Status:</span>
+                          <span className="eb-view-value">{s.status}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Degree of Participation:
+                          </span>
+                          <span className="eb-view-value">
+                            {s.degree_participation}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Birthday:</span>
+                          <span className="eb-view-value">
+                            {s.birthday || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Age:</span>
+                          <span className="eb-view-value">
+                            {s.age || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Nationality:</span>
+                          <span className="eb-view-value">{s.nationality}</span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Alias:</span>
+                          <span className="eb-view-value">
+                            {s.alias || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                        <span className="eb-view-label">Occupation:</span>
+                        <span className="eb-view-value">{s.occupation || "N/A"}</span>
+                      </div>
+                        <div className="eb-view-item eb-view-full">
+                          <span className="eb-view-label">Address:</span>
+                          <span className="eb-view-value">{`${s.house_street}, ${s.barangay}, ${s.city_municipality}, ${s.district_province}, ${s.region}`}</span>
+                        </div>
+                        {s.location_if_arrested && (
+                          <div className="eb-view-item">
+                            <span className="eb-view-label">
+                              Arrest Location:
+                            </span>
+                            <span className="eb-view-value">
+                              {s.location_if_arrested}
+                            </span>
+                          </div>
+                        )}
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Birth Place:</span>
+                          <span className="eb-view-value">
+                            {s.birth_place || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Relation to Victim:
+                          </span>
+                          <span className="eb-view-value">
+                            {s.relation_to_victim || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Educational Attainment:
+                          </span>
+                          <span className="eb-view-value">
+                            {s.educational_attainment || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Height:</span>
+                          <span className="eb-view-value">
+                            {s.height_cm ? `${s.height_cm} cm` : "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Drug Used:</span>
+                          <span className="eb-view-value">
+                            {s.drug_used ? "Yes" : "No"}
+                          </span>
+                        </div>
+                       
+                        <div className="eb-view-item eb-view-full">
+                          <span className="eb-view-label">Motive:</span>
+                          <span className="eb-view-value">
+                            {s.motive || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </div>
+
+                {/* Case Details */}
+                <div className="eb-view-section">
+                  <h3 className="eb-view-section-title">Case Details</h3>
+                  <div className="eb-view-section-body">
+                  <div className="eb-view-card">
+                    <div className="eb-view-grid">
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">Incident Type:</span>
+                        <span className="eb-view-value">
+                          {caseDetail.incident_type}
+                        </span>
+                      </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">COP:</span>
+                        <span className="eb-view-value">{caseDetail.cop}</span>
+                      </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">
+                          Date & Time of Commission:
+                        </span>
+                        <span className="eb-view-value">
+                          {formatDate(caseDetail.date_time_commission)}
+                        </span>
+                      </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">
+                          Date & Time Reported:
+                        </span>
+                        <span className="eb-view-value">
+                          {formatDate(caseDetail.date_time_reported)}
+                        </span>
+                      </div>
+                      <div className="eb-view-item eb-view-full">
+                        <span className="eb-view-label">
+                          Place of Commission:
+                        </span>
+                        <span className="eb-view-value">{`${caseDetail.place_street}, ${caseDetail.place_barangay === "Other" && caseDetail.place_barangay_other ? caseDetail.place_barangay_other : caseDetail.place_barangay}, ${caseDetail.place_city_municipality}, ${caseDetail.place_district_province}, ${caseDetail.place_region}`}</span>
+                      </div>
+                      <div className="eb-view-item">
+                      <span className="eb-view-label">Type of Place:</span>
+                      <span className="eb-view-value">{typeOfPlace || "N/A"}</span>
+                    </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">Private Place?</span>
+                        <span className="eb-view-value">
+                          {caseDetail.is_private_place || "N/A"}
+                        </span>
+                      </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">Amount Involved:</span>
+                        <span className="eb-view-value">
+                          {caseDetail.amount_involved
+                            ? `₱${caseDetail.amount_involved}`
+                            : "N/A"}
+                        </span>
+                      </div>
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">
+                          Referred by Barangay?
+                        </span>
+                        <span className="eb-view-value">
+                          {caseDetail.referred_by_barangay ? "Yes" : "No"}
+                        </span>
+                      </div>
+                     
+                      <div className="eb-view-item">
+                        <span className="eb-view-label">Referred by DILG?</span>
+                        <span className="eb-view-value">
+                          {caseDetail.referred_by_dilg ? "Yes" : "No"}
+                        </span>
+                      </div>
+                      <div className="eb-view-item eb-view-full">
+                        <span className="eb-view-label">Narrative:</span>
+                        <span className="eb-view-value">
+                          {caseDetail.narrative}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Offenses */}
+                <div className="eb-view-section">
+                  <h3 className="eb-view-section-title">Offense Information</h3>
+                  <div className="eb-view-section-body"> 
+                  {offenses.map((o, i) => (
+                    <div className="eb-view-card" key={i}>
+                      <h4 className="eb-view-card-title">Offense #{i + 1}</h4>
+                      <div className="eb-view-grid">
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Offense Name:</span>
+                          <span className="eb-view-value">
+                            {o.offense_name}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Principal Offense?
+                          </span>
+                          <span className="eb-view-value">
+                            {o.is_principal_offense ? "Yes" : "No"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Stage:</span>
+                          <span className="eb-view-value">
+                            {o.stage_of_felony}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Index Type:</span>
+                          <span className="eb-view-value">{o.index_type}</span>
+                        </div>
+                        <div className="eb-view-item eb-view-full">
+                        <span className="eb-view-label">Modus Operandi:</span>
+                        <span className="eb-view-value">
+                          {(() => {
+                            const ids = offenseSelectedModus[i] || [];
+                            const names = (offenseModus[i] || [])
+                              .filter(m => ids.includes(m.id))
+                              .map(m => m.modus_name);
+                            return names.length > 0 ? names.join(", ") : "N/A";
+                          })()}
+                        </span>
+                      </div>
+
+                        
+
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Investigator on Case:
+                          </span>
+                          <span className="eb-view-value">
+                            {o.investigator_on_case}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Most Investigator:
+                          </span>
+                          <span className="eb-view-value">
+                            {o.most_investigator}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </div>   
+
+                {/* View Mode Footer */}
+                <div className="eb-modal-footer">
+                  <button
+                    type="button"
+                    className="eb-btn eb-btn-secondary"
+                    onClick={closeModal}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              </div>
+            ) : (
+              // ========== EDIT/CREATE MODE - ORIGINAL FORM ==========
+              <>
+                <div className="eb-step-indicator">
+                  <div
+                    className={`eb-step ${currentStep === 1 ? "active" : ""}`}
+                  >
+                    <div className="eb-step-number">1</div>
+                    <div className="eb-step-label">Complainant</div>
+                  </div>
+                  <div
+                    className={`eb-step ${currentStep === 2 ? "active" : ""}`}
+                  >
+                    <div className="eb-step-number">2</div>
+                    <div className="eb-step-label">Suspect</div>
+                  </div>
+                  <div
+                    className={`eb-step ${currentStep === 3 ? "active" : ""}`}
+                  >
+                    <div className="eb-step-number">3</div>
+                    <div className="eb-step-label">Case Detail</div>
+                  </div>
+                  <div
+                    className={`eb-step ${currentStep === 4 ? "active" : ""}`}
+                  >
+                    <div className="eb-step-number">4</div>
+                    <div className="eb-step-label">Offense</div>
+                  </div>
+                </div>
+
+                {currentStep === 1 && (
+                  <div className="eb-step-content">
+                    <h3 className="eb-section-title">
+                      1. Complainant Information
+                    </h3>
+                    {complainants.map((c, i) => (
+                      <div className="eb-complainant-entry" key={i}>
+                        <div className="eb-entry-header">
+                          <h4 className="eb-entry-title">
+                            Complainant #{i + 1}
+                          </h4>
+                          {complainants.length > 1 && (
+                            <button
+                              type="button"
+                              className="eb-btn-remove-entry"
+                              onClick={() => removeComplainant(i)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div className="eb-modal-form-grid">
+                        {/* Row 1 - Name */}
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">First Name *</label>
+                          <input
+                            type="text"
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_first_name`] ? "error" : ""}`}
+                            placeholder="First Name"
+                            value={c.first_name}
+                            maxLength="50"
+                            onChange={(e) => {
+                              const value = handleLettersOnly(e.target.value);
+                              updateComplainant(i, "first_name", value);
+                              if (value.trim().length > 0 && fieldErrors[`complainant_${i}_first_name`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_first_name`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          />
+                          <FieldError error={fieldErrors[`complainant_${i}_first_name`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Middle Name</label>
+                          <input
+                            type="text"
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_middle_name`] ? "error" : ""}`}
+                            placeholder="Middle Name"
+                            value={c.middle_name}
+                            maxLength="50"
+                            onChange={(e) => {
+                              const value = handleLettersOnly(e.target.value);
+                              updateComplainant(i, "middle_name", value);
+                              if (value.trim().length > 0 && fieldErrors[`complainant_${i}_middle_name`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_middle_name`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          />
+                          <FieldError error={fieldErrors[`complainant_${i}_middle_name`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Last Name *</label>
+                          <input
+                            type="text"
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_last_name`] ? "error" : ""}`}
+                            placeholder="Last Name"
+                            value={c.last_name}
+                            maxLength="50"
+                            onChange={(e) => {
+                              const value = handleLettersOnly(e.target.value);
+                              updateComplainant(i, "last_name", value);
+                              if (value.trim().length > 0 && fieldErrors[`complainant_${i}_last_name`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_last_name`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          />
+                          <FieldError error={fieldErrors[`complainant_${i}_last_name`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Qualifier</label>
+                          <select
+                            className="eb-modal-input"
+                            value={c.qualifier}
+                            onChange={(e) => updateComplainant(i, "qualifier", e.target.value)}
+                          >
+                            <option value="">None</option>
+                            <option>Jr.</option>
+                            <option>Sr.</option>
+                            <option>II</option>
+                            <option>III</option>
+                            <option>IV</option>
+                            <option>V</option>
+                          </select>
+                        </div>
+
+                        {/* Row 2 - Personal Info */}
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Alias</label>
+                          <input
+                            type="text"
+                            className="eb-modal-input"
+                            placeholder="Alias"
+                            value={c.alias}
+                            maxLength="50"
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ\s'-]/g, "");
+                              updateComplainant(i, "alias", value);
+                            }}
+                          />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Gender *</label>
+                          <div className="eb-gender-buttons">
+                            <button
+                              type="button"
+                              className={`eb-gender-btn ${c.gender === "Male" ? "active" : ""}`}
+                              onClick={() => {
+                                updateComplainant(i, "gender", "Male");
+                                if (fieldErrors[`complainant_${i}_gender`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`complainant_${i}_gender`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >Male</button>
+                            <button
+                              type="button"
+                              className={`eb-gender-btn ${c.gender === "Female" ? "active" : ""}`}
+                              onClick={() => {
+                                updateComplainant(i, "gender", "Female");
+                                if (fieldErrors[`complainant_${i}_gender`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`complainant_${i}_gender`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >Female</button>
+                          </div>
+                          <FieldError error={fieldErrors[`complainant_${i}_gender`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Nationality *</label>
+                          <select
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_nationality`] ? "error" : ""}`}
+                            value={c.nationality}
+                            onChange={(e) => {
+                              updateComplainant(i, "nationality", e.target.value);
+                              if (e.target.value && fieldErrors[`complainant_${i}_nationality`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_nationality`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          >
+                            <option value="">Select Nationality</option>
+                            <option>FILIPINO</option>
+                            <option>AMERICAN</option>
+                            <option>CHINESE</option>
+                            <option>JAPANESE</option>
+                            <option>KOREAN</option>
+                            <option>INDIAN</option>
+                            <option>BRITISH</option>
+                            <option>AUSTRALIAN</option>
+                            <option>CANADIAN</option>
+                            <option>GERMAN</option>
+                            <option>FRENCH</option>
+                            <option>SPANISH</option>
+                            <option>INDONESIAN</option>
+                            <option>MALAYSIAN</option>
+                            <option>SINGAPOREAN</option>
+                            <option>THAI</option>
+                            <option>VIETNAMESE</option>
+                            <option>Other</option>
+                          </select>
+                          <FieldError error={fieldErrors[`complainant_${i}_nationality`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Contact Number</label>
+                          <input
+                            type="text"
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_contact_number`] ? "error" : ""}`}
+                            placeholder="09XXXXXXXXX"
+                            maxLength="11"
+                            value={c.contact_number}
+                            onChange={(e) => {
+                              const value = handleNumbersOnly(e.target.value);
+                              updateComplainant(i, "contact_number", value);
+                              if (value.length > 0 && fieldErrors[`complainant_${i}_contact_number`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_contact_number`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          />
+                          <FieldError error={fieldErrors[`complainant_${i}_contact_number`]} />
+                        </div>
+
+                        {/* Row 3 - Address */}
+                        <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Region *</label>
+                        <select
+                          className={`eb-modal-input ${fieldErrors[`complainant_${i}_region_code`] ? "error" : ""}`}
+                          value={c.region_code}
+                          disabled={loadingRegions}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            updateComplainant(i, "region_code", val);
+                            updateComplainant(i, "province_code", "");
+                            updateComplainant(i, "municipality_code", "");
+                            updateComplainant(i, "barangay_code", "");
+                            setCProvinces(p => ({ ...p, [i]: [] }));
+                            setCCities(p => ({ ...p, [i]: [] }));
+                            setCBarangays(p => ({ ...p, [i]: [] }));
+                            if (val) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors[`complainant_${i}_region_code`];
+                              setFieldErrors(newErrors);
+                              setCLoadingProv(p => ({ ...p, [i]: true }));
+                              const data = await fetchProvinces(val);
+                              setCProvinces(p => ({ ...p, [i]: data }));
+                              setCLoadingProv(p => ({ ...p, [i]: false }));
+                            }
+                          }}
+                        >
+                          <option value="">{loadingRegions ? "Loading..." : "Select Region"}</option>
+                          {regions.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+                        </select>
+                        <FieldError error={fieldErrors[`complainant_${i}_region_code`]} />
+                      </div>
+
+                        {/* PROVINCE */}
+                      <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Province *</label>
+                        <select
+                          className={`eb-modal-input ${fieldErrors[`complainant_${i}_province_code`] ? "error" : ""}`}
+                          value={c.province_code}
+                          disabled={!c.region_code || cLoadingProv[i]}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            updateComplainant(i, "province_code", val);
+                            updateComplainant(i, "municipality_code", "");
+                            updateComplainant(i, "barangay_code", "");
+                            setCCities(p => ({ ...p, [i]: [] }));
+                            setCBarangays(p => ({ ...p, [i]: [] }));
+                            if (val) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors[`complainant_${i}_province_code`];
+                              setFieldErrors(newErrors);
+                              setCLoadingCity(p => ({ ...p, [i]: true }));
+                              const data = await fetchCities(val);
+                              setCCities(p => ({ ...p, [i]: data }));
+                              setCLoadingCity(p => ({ ...p, [i]: false }));
+                            }
+                          }}
+                        >
+                          <option value="">{cLoadingProv[i] ? "Loading..." : "Select Province"}</option>
+                          {(cProvinces[i] || []).map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                        </select>
+                        <FieldError error={fieldErrors[`complainant_${i}_province_code`]} />
+                      </div>
+
+                       {/* CITY/MUNICIPALITY */}
+                    <div className="eb-modal-form-group">
+                      <label className="eb-modal-label">City/Municipality *</label>
+                      <select
+                        className={`eb-modal-input ${fieldErrors[`complainant_${i}_municipality_code`] ? "error" : ""}`}
+                        value={c.municipality_code}
+                        disabled={!c.province_code || cLoadingCity[i]}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          updateComplainant(i, "municipality_code", val);
+                          updateComplainant(i, "barangay_code", "");
+                          setCBarangays(p => ({ ...p, [i]: [] }));
+                          if (val) {
+                            const newErrors = { ...fieldErrors };
+                            delete newErrors[`complainant_${i}_municipality_code`];
+                            setFieldErrors(newErrors);
+                            setCLoadingBrgy(p => ({ ...p, [i]: true }));
+                            const data = await fetchBarangays(val);
+                            setCBarangays(p => ({ ...p, [i]: data }));
+                            setCLoadingBrgy(p => ({ ...p, [i]: false }));
+                          }
+                        }}
+                      >
+                        <option value="">{cLoadingCity[i] ? "Loading..." : "Select City/Municipality"}</option>
+                        {(cCities[i] || []).map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                      <FieldError error={fieldErrors[`complainant_${i}_municipality_code`]} />
+                    </div>
+
+                        {/* BARANGAY */}
+                    <div className="eb-modal-form-group">
+                      <label className="eb-modal-label">Barangay *</label>
+                      <select
+                        className={`eb-modal-input ${fieldErrors[`complainant_${i}_barangay_code`] ? "error" : ""}`}
+                        value={c.barangay_code}
+                        disabled={!c.municipality_code || cLoadingBrgy[i]}
+                        onChange={(e) => {
+                          updateComplainant(i, "barangay_code", e.target.value);
+                          if (e.target.value) {
+                            const newErrors = { ...fieldErrors };
+                            delete newErrors[`complainant_${i}_barangay_code`];
+                            setFieldErrors(newErrors);
+                          }
+                        }}
+                      >
+                        <option value="">{cLoadingBrgy[i] ? "Loading..." : "Select Barangay"}</option>
+                        {(cBarangays[i] || []).map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                      </select>
+                      <FieldError error={fieldErrors[`complainant_${i}_barangay_code`]} />
+                    </div>
+
+                        {/* Row 4 */}
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">House No./Street Name *</label>
+                          <input
+                            type="text"
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_house_street`] ? "error" : ""}`}
+                            placeholder="Complete Address"
+                            value={c.house_street}
+                            maxLength="200"
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, "");
+                              updateComplainant(i, "house_street", value);
+                              if (value.trim().length > 0 && fieldErrors[`complainant_${i}_house_street`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_house_street`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          />
+                          <FieldError error={fieldErrors[`complainant_${i}_house_street`]} />
+                        </div>
+                        
+                        <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Occupation</label>
+                        <input
+                          type="text"
+                          className="eb-modal-input"
+                          placeholder="e.g., Teacher, Driver, Student"
+                          value={c.occupation || ""}
+                          maxLength="100"
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^A-Za-zÑñ0-9\s-]/g, "");
+                            updateComplainant(i, "occupation", value);
+                          }}
+                        />
+                      </div>
+
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Info Obtained *</label>
+                          <select
+                            className={`eb-modal-input ${fieldErrors[`complainant_${i}_info_obtained`] ? "error" : ""}`}
+                            value={c.info_obtained}
+                            onChange={(e) => {
+                              updateComplainant(i, "info_obtained", e.target.value);
+                              if (e.target.value && fieldErrors[`complainant_${i}_info_obtained`]) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`complainant_${i}_info_obtained`];
+                                setFieldErrors(newErrors);
+                              }
+                            }}
+                          >
+                            <option>Personal</option>
+                            <option>Telephone</option>
+                            <option>Walk-in</option>
+                            <option>Online</option>
+                            <option>Email</option>
+                            <option>Third Party</option>
+                          </select>
+                          <FieldError error={fieldErrors[`complainant_${i}_info_obtained`]} />
+                        </div>
+
+                        <div className="eb-modal-form-group"></div>
+                        <div className="eb-modal-form-group"></div>
+                      </div>
+                      </div>
+                    ))}
+                    <div className="eb-add-more-section">
+                      <button
+                        type="button"
+                        className="eb-btn-add-more"
+                        onClick={addComplainant}
+                      >
+                        Add Complainant
+                      </button>
+                      <p className="eb-add-more-text">
+                        Click to add another complainant.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 2 && (
+                  <div className="eb-step-content">
+                    <h3 className="eb-section-title">2. Suspect Information</h3>
+                    {suspects.map((s, i) => (
+                      <div className="eb-suspect-entry" key={i}>
+                        <div className="eb-entry-header">
+                          <h4 className="eb-entry-title">Suspect #{i + 1}</h4>
+                          {suspects.length > 1 && (
+                            <button
+                              type="button"
+                              className="eb-btn-remove-entry"
+                              onClick={() => removeSuspect(i)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                       <div className="eb-modal-form-grid">
+                          {/* Row 1 - Name */}
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">First Name *</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_first_name`] ? "error" : ""}`}
+                              placeholder="First Name"
+                              value={s.first_name}
+                              maxLength="50"
+                              onChange={(e) => {
+                                const value = handleLettersOnly(e.target.value);
+                                updateSuspect(i, "first_name", value);
+                                if (value.trim().length > 0 && fieldErrors[`suspect_${i}_first_name`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_first_name`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_first_name`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Middle Name</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_middle_name`] ? "error" : ""}`}
+                              placeholder="Middle Name"
+                              value={s.middle_name}
+                              maxLength="50"
+                              onChange={(e) => {
+                                const value = handleLettersOnly(e.target.value);
+                                updateSuspect(i, "middle_name", value);
+                                if (value.trim().length > 0 && fieldErrors[`suspect_${i}_middle_name`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_middle_name`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_middle_name`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Last Name *</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_last_name`] ? "error" : ""}`}
+                              placeholder="Last Name"
+                              value={s.last_name}
+                              maxLength="50"
+                              onChange={(e) => {
+                                const value = handleLettersOnly(e.target.value);
+                                updateSuspect(i, "last_name", value);
+                                if (value.trim().length > 0 && fieldErrors[`suspect_${i}_last_name`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_last_name`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_last_name`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Qualifier</label>
+                            <select
+                              className="eb-modal-input"
+                              value={s.qualifier}
+                              onChange={(e) => updateSuspect(i, "qualifier", e.target.value)}
+                            >
+                              <option value="">None</option>
+                              <option>Jr.</option>
+                              <option>Sr.</option>
+                              <option>II</option>
+                              <option>III</option>
+                              <option>IV</option>
+                              <option>V</option>
+                            </select>
+                          </div>
+
+                          {/* Row 2 - Personal Info */}
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Alias</label>
+                            <input
+                              type="text"
+                              className="eb-modal-input"
+                              placeholder="Alias"
+                              value={s.alias}
+                              maxLength="50"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ\s'-]/g, "");
+                                updateSuspect(i, "alias", value);
+                              }}
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Gender *</label>
+                            <div className="eb-gender-buttons">
+                              <button
+                                type="button"
+                                className={`eb-gender-btn ${s.gender === "Male" ? "active" : ""}`}
+                                onClick={() => {
+                                  updateSuspect(i, "gender", "Male");
+                                  if (fieldErrors[`suspect_${i}_gender`]) {
+                                    const newErrors = { ...fieldErrors };
+                                    delete newErrors[`suspect_${i}_gender`];
+                                    setFieldErrors(newErrors);
+                                  }
+                                }}
+                              >Male</button>
+                              <button
+                                type="button"
+                                className={`eb-gender-btn ${s.gender === "Female" ? "active" : ""}`}
+                                onClick={() => {
+                                  updateSuspect(i, "gender", "Female");
+                                  if (fieldErrors[`suspect_${i}_gender`]) {
+                                    const newErrors = { ...fieldErrors };
+                                    delete newErrors[`suspect_${i}_gender`];
+                                    setFieldErrors(newErrors);
+                                  }
+                                }}
+                              >Female</button>
+                            </div>
+                            <FieldError error={fieldErrors[`suspect_${i}_gender`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Birthday</label>
+                            <input
+                              type="date"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_birthday`] ? "error" : ""}`}
+                              value={s.birthday}
+                              max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0]}
+                              onKeyDown={(e) => e.preventDefault()}
+                              onChange={(e) => {
+                                updateSuspect(i, "birthday", e.target.value);
+                                if (e.target.value && fieldErrors[`suspect_${i}_birthday`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_birthday`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_birthday`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Age</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_age`] ? "error" : ""}`}
+                              placeholder="Age"
+                              maxLength="3"
+                              value={s.age}
+                              onChange={(e) => {
+                                const value = handleNumbersOnly(e.target.value);
+                                updateSuspect(i, "age", value);
+                                if (value.length > 0 && fieldErrors[`suspect_${i}_age`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_age`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_age`]} />
+                          </div>
+
+                          {/* Row 3 - Case Info */}
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Status *</label>
+                            <select
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_status`] ? "error" : ""}`}
+                              value={s.status}
+                              onChange={(e) => {
+                                updateSuspect(i, "status", e.target.value);
+                                if (e.target.value && fieldErrors[`suspect_${i}_status`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_status`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >
+                              <option value="">Select Status</option>
+                              <option>At Large</option>
+                              <option>In Custody</option>
+                              <option>Arrested</option>
+                              <option>Detained</option>
+                              <option>Released on Bail</option>
+                              <option>Deceased</option>
+                              <option>Unknown</option>
+                            </select>
+                            <FieldError error={fieldErrors[`suspect_${i}_status`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Location (if arrested)</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_location_if_arrested`] ? "error" : ""}`}
+                              placeholder="Arrest Location"
+                              value={s.location_if_arrested}
+                              maxLength="200"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, "");
+                                updateSuspect(i, "location_if_arrested", value);
+                                if (value.trim().length > 0 && fieldErrors[`suspect_${i}_location_if_arrested`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_location_if_arrested`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_location_if_arrested`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Degree of Participation *</label>
+                            <select
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_degree_participation`] ? "error" : ""}`}
+                              value={s.degree_participation}
+                              onChange={(e) => {
+                                updateSuspect(i, "degree_participation", e.target.value);
+                                if (e.target.value && fieldErrors[`suspect_${i}_degree_participation`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_degree_participation`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >
+                              <option value="">Select Degree</option>
+                              <option>Principal</option>
+                              <option>Accomplice</option>
+                              <option>Accessory</option>
+                            </select>
+                            <FieldError error={fieldErrors[`suspect_${i}_degree_participation`]} />
+                          </div>
+
+                      
+
+                          <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Occupation</label>
+                          <input
+                            type="text"
+                            className="eb-modal-input"
+                            placeholder="e.g., Teacher, Driver, Student"
+                            value={s.occupation || ""}
+                            maxLength="100"
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^A-Za-zÑñ0-9\s-]/g, "");
+                              updateSuspect(i, "occupation", value);
+                            }}
+                          />
+                        </div>
+
+                          {/* Row 4 - Address */}
+                         {/* REGION */}
+                        <div className="eb-modal-form-group">
+                          <label className="eb-modal-label">Region *</label>
+                          <select
+                            className={`eb-modal-input ${fieldErrors[`suspect_${i}_region_code`] ? "error" : ""}`}
+                            value={s.region_code}
+                            disabled={loadingRegions}
+                            onChange={async (e) => {
+                              const val = e.target.value;
+                              updateSuspect(i, "region_code", val);
+                              updateSuspect(i, "province_code", "");
+                              updateSuspect(i, "municipality_code", "");
+                              updateSuspect(i, "barangay_code", "");
+                              setSProvinces(p => ({ ...p, [i]: [] }));
+                              setSCities(p => ({ ...p, [i]: [] }));
+                              setSBarangays(p => ({ ...p, [i]: [] }));
+                              if (val) {
+                                const newErrors = { ...fieldErrors };
+                                delete newErrors[`suspect_${i}_region_code`];
+                                setFieldErrors(newErrors);
+                                setSLoadingProv(p => ({ ...p, [i]: true }));
+                                const data = await fetchProvinces(val);
+                                setSProvinces(p => ({ ...p, [i]: data }));
+                                setSLoadingProv(p => ({ ...p, [i]: false }));
+                              }
+                            }}
+                          >
+                            <option value="">{loadingRegions ? "Loading..." : "Select Region"}</option>
+                            {regions.map(r => <option key={r.code} value={r.code}>{r.name}</option>)}
+                          </select>
+                          <FieldError error={fieldErrors[`suspect_${i}_region_code`]} />
+                        </div>
+
+                          <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Province *</label>
+                        <select
+                          className={`eb-modal-input ${fieldErrors[`suspect_${i}_province_code`] ? "error" : ""}`}
+                          value={s.province_code}
+                          disabled={!s.region_code || sLoadingProv[i]}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            updateSuspect(i, "province_code", val);
+                            updateSuspect(i, "municipality_code", "");
+                            updateSuspect(i, "barangay_code", "");
+                            setSCities(p => ({ ...p, [i]: [] }));
+                            setSBarangays(p => ({ ...p, [i]: [] }));
+                            if (val) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors[`suspect_${i}_province_code`];
+                              setFieldErrors(newErrors);
+                              setSLoadingCity(p => ({ ...p, [i]: true }));
+                              const data = await fetchCities(val);
+                              setSCities(p => ({ ...p, [i]: data }));
+                              setSLoadingCity(p => ({ ...p, [i]: false }));
+                            }
+                          }}
+                        >
+                          <option value="">{sLoadingProv[i] ? "Loading..." : "Select Province"}</option>
+                          {(sProvinces[i] || []).map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+                        </select>
+                        <FieldError error={fieldErrors[`suspect_${i}_province_code`]} />
+                      </div>
+
+                       {/* CITY/MUNICIPALITY */}
+                  <div className="eb-modal-form-group">
+                    <label className="eb-modal-label">City/Municipality *</label>
+                    <select
+                      className={`eb-modal-input ${fieldErrors[`suspect_${i}_municipality_code`] ? "error" : ""}`}
+                      value={s.municipality_code}
+                      disabled={!s.province_code || sLoadingCity[i]}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        updateSuspect(i, "municipality_code", val);
+                        updateSuspect(i, "barangay_code", "");
+                        setSBarangays(p => ({ ...p, [i]: [] }));
+                        if (val) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors[`suspect_${i}_municipality_code`];
+                          setFieldErrors(newErrors);
+                          setSLoadingBrgy(p => ({ ...p, [i]: true }));
+                          const data = await fetchBarangays(val);
+                          setSBarangays(p => ({ ...p, [i]: data }));
+                          setSLoadingBrgy(p => ({ ...p, [i]: false }));
+                        }
+                      }}
+                    >
+                      <option value="">{sLoadingCity[i] ? "Loading..." : "Select City/Municipality"}</option>
+                      {(sCities[i] || []).map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    </select>
+                    <FieldError error={fieldErrors[`suspect_${i}_municipality_code`]} />
+                  </div>
+
+                          <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Barangay *</label>
+                  <select
+                    className={`eb-modal-input ${fieldErrors[`suspect_${i}_barangay_code`] ? "error" : ""}`}
+                    value={s.barangay_code}
+                    disabled={!s.municipality_code || sLoadingBrgy[i]}
+                    onChange={(e) => {
+                      updateSuspect(i, "barangay_code", e.target.value);
+                      if (e.target.value) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors[`suspect_${i}_barangay_code`];
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  >
+                    <option value="">{sLoadingBrgy[i] ? "Loading..." : "Select Barangay"}</option>
+                    {(sBarangays[i] || []).map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                  </select>
+                  <FieldError error={fieldErrors[`suspect_${i}_barangay_code`]} />
+                </div>
+
+                          {/* Row 5 - Remaining */}
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">House No./Street *</label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_house_street`] ? "error" : ""}`}
+                              placeholder="Complete Address"
+                              value={s.house_street}
+                              maxLength="200"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, "");
+                                updateSuspect(i, "house_street", value);
+                                if (value.trim().length > 0 && fieldErrors[`suspect_${i}_house_street`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_house_street`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError error={fieldErrors[`suspect_${i}_house_street`]} />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Birth Place</label>
+                            <input
+                              type="text"
+                              className="eb-modal-input"
+                              placeholder="Birth Place"
+                              value={s.birth_place}
+                              maxLength="100"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^A-Za-zÑñ,\s-]/g, "");
+                                updateSuspect(i, "birth_place", value);
+                              }}
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Relation to Victim</label>
+                            <input
+                              type="text"
+                              className="eb-modal-input"
+                              placeholder="Relation"
+                              value={s.relation_to_victim}
+                              maxLength="100"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^A-Za-zÑñ\s-]/g, "");
+                                updateSuspect(i, "relation_to_victim", value);
+                              }}
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Nationality *</label>
+                            <select
+                              className={`eb-modal-input ${fieldErrors[`suspect_${i}_nationality`] ? "error" : ""}`}
+                              value={s.nationality}
+                              onChange={(e) => {
+                                updateSuspect(i, "nationality", e.target.value);
+                                if (e.target.value && fieldErrors[`suspect_${i}_nationality`]) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`suspect_${i}_nationality`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >
+                              <option value="">Select Nationality</option>
+                              <option>FILIPINO</option>
+                              <option>AMERICAN</option>
+                              <option>CHINESE</option>
+                              <option>JAPANESE</option>
+                              <option>KOREAN</option>
+                              <option>INDIAN</option>
+                              <option>BRITISH</option>
+                              <option>AUSTRALIAN</option>
+                              <option>CANADIAN</option>
+                              <option>GERMAN</option>
+                              <option>FRENCH</option>
+                              <option>SPANISH</option>
+                              <option>INDONESIAN</option>
+                              <option>MALAYSIAN</option>
+                              <option>SINGAPOREAN</option>
+                              <option>THAI</option>
+                              <option>VIETNAMESE</option>
+                              <option>Other</option>
+                            </select>
+                            <FieldError error={fieldErrors[`suspect_${i}_nationality`]} />
+                          </div>
+                        </div>
+
+                        {/* Other Information Section */}
+                        <div className="eb-other-info-section">
+                          <h4 className="eb-subsection-title">
+                            Other Information
+                          </h4>
+                          <div className="eb-modal-form-grid">
+                            <div className="eb-modal-form-group">
+                              <label className="eb-modal-label">
+                                Educational Attainment
+                              </label>
+                              <select
+                                className="eb-modal-input"
+                                value={s.educational_attainment}
+                                onChange={(e) =>
+                                  updateSuspect(
+                                    i,
+                                    "educational_attainment",
+                                    e.target.value,
+                                  )
+                                }
+                              >
+                                <option value="">Select...</option>
+                                <option>No Formal Education</option>
+                                <option>Elementary Undergraduate</option>
+                                <option>Elementary Graduate</option>
+                                <option>High School Undergraduate</option>
+                                <option>High School Graduate</option>
+                                <option>Vocational</option>
+                                <option>College Undergraduate</option>
+                                <option>College Graduate</option>
+                                <option>Post Graduate</option>
+                              </select>
+                            </div>
+
+                            <div className="eb-modal-form-group">
+                              <label className="eb-modal-label">
+                                Height (cm)
+                              </label>
+                              <input
+                                type="text"
+                                className={`eb-modal-input ${fieldErrors[`suspect_${i}_height_cm`] ? "error" : ""}`}
+                                placeholder="Height in cm"
+                                maxLength="3"
+                                value={s.height_cm}
+                                onChange={(e) => {
+                                  const value = handleNumbersOnly(
+                                    e.target.value,
+                                  );
+                                  updateSuspect(i, "height_cm", value);
+                                  if (
+                                    value.length > 0 &&
+                                    fieldErrors[`suspect_${i}_height_cm`]
+                                  ) {
+                                    const newErrors = { ...fieldErrors };
+                                    delete newErrors[`suspect_${i}_height_cm`];
+                                    setFieldErrors(newErrors);
+                                  }
+                                }}
+                              />
+                              <FieldError
+                                error={fieldErrors[`suspect_${i}_height_cm`]}
+                              />
+                            </div>
+
+                            <div className="eb-modal-form-group">
+                              <label className="eb-modal-label">
+                                Drug Used *
+                              </label>
+                              <div className="eb-gender-buttons">
+                                <button
+                                  type="button"
+                                  className={`eb-gender-btn ${s.drug_used === true ? "active" : ""}`}
+                                  onClick={() => {
+                                    updateSuspect(i, "drug_used", true);
+                                    if (fieldErrors[`suspect_${i}_drug_used`]) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `suspect_${i}_drug_used`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                    }
+                                  }}
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`eb-gender-btn ${s.drug_used === false ? "active" : ""}`}
+                                  onClick={() => {
+                                    updateSuspect(i, "drug_used", false);
+                                    if (fieldErrors[`suspect_${i}_drug_used`]) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `suspect_${i}_drug_used`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                    }
+                                  }}
+                                >
+                                  No
+                                </button>
+                              </div>
+                              <FieldError
+                                error={fieldErrors[`suspect_${i}_drug_used`]}
+                              />
+                            </div>
+
+                            <div className="eb-modal-form-group">
+                              <label className="eb-modal-label">Motive</label>
+                              <input
+                                type="text"
+                                className="eb-modal-input"
+                                placeholder="Motive"
+                                value={s.motive}
+                                maxLength="500"
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(
+                                    /[^A-Za-z0-9ÑñĆ.,;:()\s-]/g,
+                                    "",
+                                  );
+                                  updateSuspect(i, "motive", value);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="eb-add-more-section">
+                      <button
+                        type="button"
+                        className="eb-btn-add-more"
+                        onClick={addSuspect}
+                      >
+                        Add Suspect
+                      </button>
+                      <p className="eb-add-more-text">
+                        Click to add another suspect.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 3 && (
+                  <div className="eb-step-content">
+                    <h3 className="eb-section-title">3. Case Detail</h3>
+                    <div className="eb-modal-form-grid">
+                {/* Row 1 */}
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Incident Type *</label>
+                  <select
+                    className={`eb-modal-input ${fieldErrors.incident_type ? "error" : ""}`}
+                    value={caseDetail.incident_type}
+                    onChange={(e) => {
+                      updateCaseDetail("incident_type", e.target.value);
+                      if (e.target.value && fieldErrors.incident_type) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.incident_type;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  >
+                    <option value="">Select Incident Type</option>
+                    <option>Murder</option>
+                    <option>Homicide</option>
+                    <option>Physical Injury</option>
+                    <option>Rape</option>
+                    <option>Robbery</option>
+                    <option>Theft</option>
+                    <option>Carnapping - MC</option>
+                    <option>Carnapping - MV</option>
+                    <option>Special Complex Crime</option>
+                  </select>
+                  <FieldError error={fieldErrors.incident_type} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">COP (Officer on Case) *</label>
+                  <input
+                    type="text"
+                    className={`eb-modal-input ${fieldErrors.cop ? "error" : ""}`}
+                    placeholder="Officer Name"
+                    value={caseDetail.cop}
+                    maxLength="100"
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^A-Za-zÑñ.\s-]/g, "");
+                      updateCaseDetail("cop", value);
+                      if (value.trim().length > 0 && fieldErrors.cop) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.cop;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  />
+                  <FieldError error={fieldErrors.cop} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Date & Time of Commission *</label>
+                  <input
+                    type="datetime-local"
+                    className={`eb-modal-input ${fieldErrors.date_time_commission ? "error" : ""}`}
+                    value={caseDetail.date_time_commission}
+                    max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onChange={(e) => {
+                      updateCaseDetail("date_time_commission", e.target.value);
+                      if (e.target.value && fieldErrors.date_time_commission) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.date_time_commission;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  />
+                  <FieldError error={fieldErrors.date_time_commission} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Date & Time Reported *</label>
+                  <input
+                    type="datetime-local"
+                    className={`eb-modal-input ${fieldErrors.date_time_reported ? "error" : ""}`}
+                    value={caseDetail.date_time_reported}
+                    max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onChange={(e) => {
+                      updateCaseDetail("date_time_reported", e.target.value);
+                      if (e.target.value && fieldErrors.date_time_reported) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.date_time_reported;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  />
+                  <FieldError error={fieldErrors.date_time_reported} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                <label className="eb-modal-label">Region *</label>
+                <select
+                  className="eb-modal-input"
+                  value="040000000"
+                  disabled
+                  style={{ background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" }}
+                >
+                  <option value="040000000">CALABARZON</option>
+                  {regions.filter(r => r.code !== "040000000").map(r => (
+                    <option key={r.code} value={r.code}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+                <div className="eb-modal-form-group">
+              <label className="eb-modal-label">District/Province *</label>
+              <select
+                className="eb-modal-input"
+                value="042100000"
+                disabled
+                style={{ background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" }}
+              >
+                <option value="042100000">Cavite</option>
+                {caseProvinces.filter(p => p.code !== "042100000").map(p => (
+                  <option key={p.code} value={p.code}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+
+                {/* Row 3 - Narrative Full Width */}
+                <div className="eb-modal-form-group" style={{ gridColumn: "span 4" }}>
+                  <label className="eb-modal-label">Narrative *</label>
+                  <textarea
+                    className={`eb-modal-input ${fieldErrors.narrative ? "error" : ""}`}
+                    rows="6"
+                    placeholder="Provide detailed narrative (minimum 20 characters, maximum 5000 characters)"
+                    value={caseDetail.narrative}
+                    maxLength="5000"
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,;:()\s-]/g, "");
+                      updateCaseDetail("narrative", value);
+                      if (value.trim().length > 0 && fieldErrors.narrative) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.narrative;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  ></textarea>
+                  <FieldError error={fieldErrors.narrative} />
+                  <small style={{ color: "#6b7280", fontSize: "12px" }}>
+                    {caseDetail.narrative.length}/5000 characters
+                  </small>
+                </div>
+
+                {/* Row 4 */}
+               <div className="eb-modal-form-group">
+              <label className="eb-modal-label">City/Municipality *</label>
+              <select
+                className="eb-modal-input"
+                value="042103000"
+                disabled
+                style={{ background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" }}
+              >
+                <option value="042103000">City of Bacoor</option>
+                {caseCities.filter(c => c.code !== "042103000").map(c => (
+                  <option key={c.code} value={c.code}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+               <div className="eb-modal-form-group">
+            <label className="eb-modal-label">Barangay *</label>
+            <select
+              className={`eb-modal-input ${fieldErrors.place_barangay ? "error" : ""}`}
+              value={caseDetail.place_barangay}
+              disabled={loadingBacoorBrgy}
+              onChange={(e) => {
+                updateCaseDetail("place_barangay", e.target.value);
+                if (e.target.value && fieldErrors.place_barangay) {
+                  const newErrors = { ...fieldErrors };
+                  delete newErrors.place_barangay;
+                  setFieldErrors(newErrors);
+                }
+              }}
+            >
+              <option value="">{loadingBacoorBrgy ? "Loading..." : "Select Barangay"}</option>
+              {bacoorBarangays.map(b => (
+                <option key={b.code} value={b.name}>{b.name}</option>
+              ))}
+              {/* <option value="Other">Other / Special Location</option> */}
+            </select>
+            <FieldError error={fieldErrors.place_barangay} />
+          </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Street *</label>
+                  <input
+                    type="text"
+                    className={`eb-modal-input ${fieldErrors.place_street ? "error" : ""}`}
+                    placeholder="Street Name"
+                    value={caseDetail.place_street}
+                    maxLength="200"
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, "");
+                      updateCaseDetail("place_street", value);
+                      if (value.trim().length > 0 && fieldErrors.place_street) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.place_street;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  />
+                  <FieldError error={fieldErrors.place_street} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Is it a private place?</label>
+                  <select
+                    className="eb-modal-input"
+                    value={caseDetail.is_private_place}
+                    onChange={(e) => updateCaseDetail("is_private_place", e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    <option>Yes</option>
+                    <option>No</option>
+                    <option>Unknown</option>
+                  </select>
+                </div>
+
+                {/* Row 5 */}
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Is it referred by barangay? *</label>
+                  <div className="eb-gender-buttons">
+                    <button
+                      type="button"
+                      className={`eb-gender-btn ${caseDetail.referred_by_barangay === true ? "active" : ""}`}
+                      onClick={() => {
+                        updateCaseDetail("referred_by_barangay", true);
+                        if (fieldErrors.referred_by_barangay) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors.referred_by_barangay;
+                          setFieldErrors(newErrors);
+                        }
+                      }}
+                    >Yes</button>
+                    <button
+                      type="button"
+                      className={`eb-gender-btn ${caseDetail.referred_by_barangay === false ? "active" : ""}`}
+                      onClick={() => {
+                        updateCaseDetail("referred_by_barangay", false);
+                        if (fieldErrors.referred_by_barangay) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors.referred_by_barangay;
+                          setFieldErrors(newErrors);
+                        }
+                      }}
+                    >No</button>
+                  </div>
+                  <FieldError error={fieldErrors.referred_by_barangay} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Is it referred by DILG? *</label>
+                  <div className="eb-gender-buttons">
+                    <button
+                      type="button"
+                      className={`eb-gender-btn ${caseDetail.referred_by_dilg === true ? "active" : ""}`}
+                      onClick={() => {
+                        updateCaseDetail("referred_by_dilg", true);
+                        if (fieldErrors.referred_by_dilg) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors.referred_by_dilg;
+                          setFieldErrors(newErrors);
+                        }
+                      }}
+                    >Yes</button>
+                    <button
+                      type="button"
+                      className={`eb-gender-btn ${caseDetail.referred_by_dilg === false ? "active" : ""}`}
+                      onClick={() => {
+                        updateCaseDetail("referred_by_dilg", false);
+                        if (fieldErrors.referred_by_dilg) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors.referred_by_dilg;
+                          setFieldErrors(newErrors);
+                        }
+                      }}
+                    >No</button>
+                  </div>
+                  <FieldError error={fieldErrors.referred_by_dilg} />
+                </div>
+
+                <div className="eb-modal-form-group">
+                  <label className="eb-modal-label">Amount Involved</label>
+                  <input
+                    type="text"
+                    className={`eb-modal-input ${fieldErrors.amount_involved ? "error" : ""}`}
+                    placeholder="0.00"
+                    value={caseDetail.amount_involved}
+                    maxLength="15"
+                    onChange={(e) => {
+                      const value = e.target.value
+                        .replace(/[^0-9.]/g, "")
+                        .replace(/(\..*)\./g, "$1")
+                        .replace(/(\.\d{2})\d+/g, "$1");
+                      updateCaseDetail("amount_involved", value);
+                      if (value.length > 0 && fieldErrors.amount_involved) {
+                        const newErrors = { ...fieldErrors };
+                        delete newErrors.amount_involved;
+                        setFieldErrors(newErrors);
+                      }
+                    }}
+                  />
+                  <FieldError error={fieldErrors.amount_involved} />
+                </div>
+
+                <div className="eb-modal-form-group"></div>
+
+                {/* Other Barangay Input */}
+                {caseDetail.place_barangay === "Other" && (
+                  <div className="eb-modal-form-group" style={{ gridColumn: "span 4" }}>
+                    <label className="eb-modal-label">Specify Location *</label>
+                    <input
+                      type="text"
+                      className={`eb-modal-input ${fieldErrors.place_barangay_other ? "error" : ""}`}
+                      placeholder="e.g., Highway, Open Area"
+                      value={caseDetail.place_barangay_other || ""}
+                      maxLength="100"
+                      onChange={(e) => {
+                        updateCaseDetail("place_barangay_other", e.target.value);
+                        if (e.target.value.trim().length > 0 && fieldErrors.place_barangay_other) {
+                          const newErrors = { ...fieldErrors };
+                          delete newErrors.place_barangay_other;
+                          setFieldErrors(newErrors);
+                        }
+                      }}
+                    />
+                    <FieldError error={fieldErrors.place_barangay_other} />
+                  </div>
+                )}
+              </div>
+                  </div>
+                )}
+
+                {currentStep === 4 && (
+                  <div className="eb-step-content">
+                    <h3 className="eb-section-title">4. Offense Information</h3>
+                    {offenses.map((o, i) => (
+                      <div className="eb-offense-entry" key={i}>
+                        <div className="eb-entry-header">
+                          <h4 className="eb-entry-title">Offense #{i + 1}</h4>
+                          {offenses.length > 1 && (
+                            <button
+                              type="button"
+                              className="eb-btn-remove-entry"
+                              onClick={() => removeOffense(i)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div className="eb-modal-form-grid">
+                        
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">
+                              Stage of Felony *
+                            </label>
+                            <select
+                              className={`eb-modal-input ${fieldErrors[`offense_${i}_stage_of_felony`] ? "error" : ""}`}
+                              value={o.stage_of_felony}
+                              onChange={(e) => {
+                                updateOffense(
+                                  i,
+                                  "stage_of_felony",
+                                  e.target.value,
+                                );
+                                if (
+                                  e.target.value &&
+                                  fieldErrors[`offense_${i}_stage_of_felony`]
+                                ) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[
+                                    `offense_${i}_stage_of_felony`
+                                  ];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >
+                              <option value="">Select Stage</option>
+                              <option>COMPLETED</option>
+                              <option>ATTEMPTED</option>
+                              <option>FRUSTRATED</option>
+                            </select>
+                            <FieldError
+                              error={
+                                fieldErrors[`offense_${i}_stage_of_felony`]
+                              }
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">
+                              Investigator on Case *
+                            </label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`offense_${i}_investigator_on_case`] ? "error" : ""}`}
+                              placeholder="e.g., PCO Roger Verano"
+                              value={o.investigator_on_case}
+                              maxLength="100"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(
+                                  /[^A-Za-z0-9ÑñĆ.\s-]/g,
+                                  "",
+                                );
+                                updateOffense(i, "investigator_on_case", value);
+                                if (
+                                  value.trim().length > 0 &&
+                                  fieldErrors[
+                                    `offense_${i}_investigator_on_case`
+                                  ]
+                                ) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[
+                                    `offense_${i}_investigator_on_case`
+                                  ];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError
+                              error={
+                                fieldErrors[`offense_${i}_investigator_on_case`]
+                              }
+                            />
+                          </div>
+
+                          {/* Row 2 */}
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Offense *</label>
+                            <select
+                              className={`eb-modal-input ${fieldErrors[`offense_${i}_offense_name`] ? "error" : ""}`}
+                              value={o.offense_name}
+                              onChange={(e) => {
+                                updateOffense(
+                                  i,
+                                  "offense_name",
+                                  e.target.value,
+                                );
+                                fetchModusForOffense(e.target.value, i);
+                                const indexCrimes = ["Murder", "Homicide", "Physical Injury", "Rape", "Robbery", "Theft", "Carnapping", "Special Complex Crime"];
+      
+                                  updateOffense(i, "index_type", "Index");
+
+                                if (
+                                  e.target.value &&
+                                  fieldErrors[`offense_${i}_offense_name`]
+                                ) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[`offense_${i}_offense_name`];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            >
+                              <option value="">Select Offense</option>
+                              <option>Murder</option>
+                              <option>Homicide</option>
+                              <option>Physical Injury</option>
+                              <option>Rape</option>
+                              <option>Robbery</option>
+                              <option>Theft</option>
+                              <option>Carnapping - MC</option>
+                              <option>Carnapping - MV</option>
+                              <option>Special Complex Crime</option>
+                            </select>
+                            <FieldError
+                              error={fieldErrors[`offense_${i}_offense_name`]}
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">Index Type</label>
+                            <input
+                              type="text"
+                              className="eb-modal-input"
+                              value={o.index_type}
+                              disabled
+                              style={{
+                                background: "#f3f4f6",
+                                cursor: "not-allowed",
+                              }}
+                            />
+                          </div>
+
+                          <div className="eb-modal-form-group">
+                            <label className="eb-modal-label">
+                              Most Investigator *
+                            </label>
+                            <input
+                              type="text"
+                              className={`eb-modal-input ${fieldErrors[`offense_${i}_most_investigator`] ? "error" : ""}`}
+                              placeholder="e.g., PI RANK John Doe"
+                              value={o.most_investigator}
+                              maxLength="100"
+                              onChange={(e) => {
+                                const value = e.target.value.replace(
+                                  /[^A-Za-z0-9ÑñĆ.\s-]/g,
+                                  "",
+                                );
+                                updateOffense(i, "most_investigator", value);
+                                if (
+                                  value.trim().length > 0 &&
+                                  fieldErrors[`offense_${i}_most_investigator`]
+                                ) {
+                                  const newErrors = { ...fieldErrors };
+                                  delete newErrors[
+                                    `offense_${i}_most_investigator`
+                                  ];
+                                  setFieldErrors(newErrors);
+                                }
+                              }}
+                            />
+                            <FieldError
+                              error={
+                                fieldErrors[`offense_${i}_most_investigator`]
+                              }
+                            />
+                          </div>
+                        </div>
+                      {/* MODUS OPERANDI BUTTONS - per offense */}
+                        {offenseModus[i] && offenseModus[i].length > 0 && (
+                          <div style={{ marginTop: "16px", padding: "16px", background: "#f0f4f8", borderRadius: "8px", border: "1px solid #d0dbe8" }}>
+                            <h5 style={{ marginBottom: "12px", color: "#1e3a5f", fontWeight: 600, fontSize: "14px" }}>
+                              Modus Operandi * — select all that apply
+                            </h5>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                              {offenseModus[i].map((m) => (
+                                <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOffenseSelectedModus(prev => {
+                                        const current = prev[i] || [];
+                                        return {
+                                          ...prev,
+                                          [i]: current.includes(m.id)
+                                            ? current.filter(x => x !== m.id)
+                                            : [...current, m.id]
+                                        };
+                                      });
+                                      if (fieldErrors[`offense_${i}_modus`]) {
+                                        const n = { ...fieldErrors };
+                                        delete n[`offense_${i}_modus`];
+                                        setFieldErrors(n);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: "8px 16px", borderRadius: "20px", border: "1px solid",
+                                      borderColor: (offenseSelectedModus[i] || []).includes(m.id) ? "#1e3a5f" : "#ced4da",
+                                      background: (offenseSelectedModus[i] || []).includes(m.id) ? "#1e3a5f" : "#fff",
+                                      color: (offenseSelectedModus[i] || []).includes(m.id) ? "#fff" : "#495057",
+                                      fontWeight: 500, fontSize: "13px", cursor: "pointer", transition: "all 0.2s"
+                                    }}
+                                  >
+                                    {(offenseSelectedModus[i] || []).includes(m.id) ? "✓ " : ""}{m.modus_name}
+                                  </button>
+                                  {(offenseSelectedModus[i] || []).includes(m.id) && m.description && (
+                                    <span style={{
+                                      fontSize: "11px", color: "#6b7280", fontStyle: "italic",
+                                      paddingLeft: "12px", lineHeight: "1.4"
+                                    }}>
+                                      {m.description}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            <FieldError error={fieldErrors[`offense_${i}_modus`]} />
+                          </div>
+                        )}
+
+                      </div>
+                    ))}
+
+                    
+                    
+                    {/* TYPE OF PLACE */}
+                    <div style={{ marginTop: "24px", padding: "24px", background: "#f8f9fa", borderRadius: "8px", border: "1px solid #dee2e6" }}>
+                      <h4 style={{ marginBottom: "16px", color: "#1e3a5f", fontWeight: 600 }}>Type of Place *</h4>
+                      <select
+                        className={`eb-modal-input ${fieldErrors.type_of_place ? "error" : ""}`}
+                        value={typeOfPlace}
+                        onChange={(e) => {
+                          setTypeOfPlace(e.target.value);
+                          if (fieldErrors.type_of_place) {
+                            const newErrors = { ...fieldErrors };
+                            delete newErrors.type_of_place;
+                            setFieldErrors(newErrors);
+                          }
+                        }}
+                        style={{ maxWidth: "400px" }}
+                      >
+                       <option value="">Select Type of Place</option>
+                        <option>Abandoned Structure (house, bldg, apartment/condo)</option>
+                        <option>Along the street</option>
+                        <option>Commercial/Business Establishment</option>
+                        <option>Construction/Industrial Barracks</option>
+                        <option>Farm/Ricefield</option>
+                        <option>Government Office/Establishment</option>
+                        <option>Onboard a vehicle (riding in/on)</option>
+                        <option>Parking Area (vacant lot, in bldg/structure, open parking)</option>
+                        <option>Recreational Place (resorts/parks)</option>
+                        <option>Residential (house/condo)</option>
+                        <option>River/Lake</option>
+                        <option>School (Grade/High School/College/University)</option>
+                        <option>Transportation Terminals (Tricycle, Jeep, FX, Bus, Train Station)</option>
+                        <option>Vacant Lot (unused/unoccupied open area)</option>
+                      </select>
+                      <FieldError error={fieldErrors.type_of_place} />
+                    </div>
+
+                    <div className="eb-add-more-section">
+                      <button
+                        type="button"
+                        className="eb-btn-add-more"
+                        onClick={addOffense}
+                      >
+                        Add Offense
+                      </button>
+                      <p className="eb-add-more-text">
+                        Click to add another offense.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="eb-modal-footer">
+                  {!viewMode && currentStep > 1 && (
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-secondary"
+                      onClick={() => changeStep(-1)}
+                    >
+                      Previous
+                    </button>
+                  )}
+                  {!viewMode && currentStep < totalSteps && (
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-primary"
+                      onClick={() => changeStep(1)}
+                    >
+                      Next
+                    </button>
+                  )}
+                  {!viewMode && currentStep === totalSteps && (
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-primary"
+                      onClick={handleSubmit}
+                      disabled={loading}
+                    >
+                      {loading
+                        ? "Submitting..."
+                        : editMode
+                          ? "Update Blotter Entry"
+                          : "Submit Blotter Entry"}
+                    </button>
+                  )}
+                  {viewMode && (
+                    <button
+                      type="button"
+                      className="eb-btn eb-btn-secondary"
+                      onClick={closeModal}
+                    >
+                      Close
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+    {showTrash && (
+  <div className="eb-modal" style={{ zIndex: 10001 }}>
+    <div className="eb-modal-content" style={{ maxWidth: "960px" }}>
+
+      {/* Modal Header */}
+      <div style={{
+        padding: "24px 32px",
+        borderBottom: "1px solid var(--gray-200)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: "var(--navy-primary)",
+        borderRadius: "8px 8px 0 0"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{
+            width: "36px", height: "36px", borderRadius: "8px",
+            background: "rgba(255,255,255,0.15)",
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "white" }}>Deleted Records</h2>
+            <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.7)", marginTop: "2px" }}>
+              Soft-deleted blotter entries — restore to recover
+            </p>
+          </div>
+        </div>
+        <span
+          onClick={() => setShowTrash(false)}
+          style={{ color: "white", fontSize: "24px", cursor: "pointer", opacity: 0.8, lineHeight: 1 }}
+        >&times;</span>
+      </div>
+
+      {/* Modal Body */}
+      <div style={{ padding: "28px 32px", background: "var(--gray-50)", minHeight: "200px" }}>
+        {trashLoading ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <div style={{ color: "var(--gray-400)", fontSize: "14px" }}>Loading deleted records...</div>
+          </div>
+        ) : deletedBlotters.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <div style={{
+              width: "56px", height: "56px", borderRadius: "50%",
+              background: "var(--gray-100)", margin: "0 auto 16px",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </div>
+            <p style={{ color: "var(--gray-400)", fontSize: "14px", margin: 0 }}>No deleted records found</p>
+            <p style={{ color: "var(--gray-300)", fontSize: "12px", marginTop: "4px" }}>Deleted blotter entries will appear here</p>
+          </div>
+        ) : (
+          <div style={{ background: "white", borderRadius: "8px", border: "1px solid var(--gray-200)", overflow: "hidden" }}>
+            <table className="eb-data-table">
+              <thead>
+                <tr style={{ background: "var(--gray-50)" }}>
+                  <th>Blotter ID</th>
+                  <th>Incident Type</th>
+                  <th>Location</th>
+                  <th>Date of Incident</th>
+                  <th>Date Deleted</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deletedBlotters.map((b) => (
+                  <tr key={b.blotter_id}>
+                    <td>
+                      <span style={{
+                        fontFamily: "monospace", fontWeight: 600,
+                        color: "var(--navy-primary)", fontSize: "13px"
+                      }}>
+                        {b.blotter_entry_number}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        display: "inline-block", padding: "3px 10px",
+                        borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                        background: "rgba(30,58,95,0.08)", color: "var(--navy-primary)"
+                      }}>
+                        {b.incident_type}
+                      </span>
+                    </td>
+                    <td style={{ color: "var(--gray-600)", fontSize: "13px" }}>
+                      {`${b.place_barangay}, ${b.place_city_municipality}`}
+                    </td>
+                    <td style={{ color: "var(--gray-600)", fontSize: "13px" }}>
+                      {formatDate(b.date_time_reported)}
+                    </td>
+                    <td style={{ color: "var(--gray-600)", fontSize: "13px" }}>
+                      {formatDate(b.deleted_at)}
+                    </td>
+                    <td>
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); handleRestore(b.blotter_id); }}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: "5px",
+                          color: "#16a34a", fontWeight: 600, fontSize: "13px",
+                          textDecoration: "none"
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                          <path d="M3 3v5h5"/>
+                        </svg>
+                        Restore
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Footer */}
+      <div style={{
+        padding: "16px 32px",
+        borderTop: "1px solid var(--gray-200)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: "white",
+        borderRadius: "0 0 8px 8px"
+      }}>
+        <span style={{ fontSize: "13px", color: "var(--gray-400)" }}>
+          {deletedBlotters.length} deleted {deletedBlotters.length === 1 ? "record" : "records"}
+        </span>
+        <button className="eb-btn eb-btn-secondary" onClick={() => setShowTrash(false)}>
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
+  {confirmModal.show && (
+  <div className="eb-modal" style={{ zIndex: 10002 }}>
+    <div className="eb-modal-content" style={{ maxWidth: "420px", padding: 0 }}>
+
+      <div style={{
+        padding: "20px 24px",
+        background: confirmModal.type === "delete"
+          ? "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)"
+          : "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+        borderRadius: "8px 8px 0 0",
+        display: "flex", alignItems: "center", gap: "12px"
+      }}>
+        <div style={{
+          width: "36px", height: "36px", borderRadius: "8px",
+          background: "rgba(255,255,255,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+        }}>
+          {confirmModal.type === "delete" ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          )}
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "white" }}>
+            {confirmModal.type === "delete" ? "Delete Record" : "Restore Record"}
+          </h3>
+          <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.7)", marginTop: "2px" }}>
+            {confirmModal.type === "delete" ? "This action cannot be undone" : "Record will be moved to active"}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ padding: "24px" }}>
+        <p style={{ margin: 0, fontSize: "14px", color: "var(--gray-700)", lineHeight: "1.6" }}>
+          {confirmModal.message}
+        </p>
+      </div>
+
+      <div style={{
+        padding: "16px 24px",
+        borderTop: "1px solid var(--gray-200)",
+        display: "flex", gap: "12px", justifyContent: "flex-end",
+        background: "var(--gray-50)", borderRadius: "0 0 8px 8px"
+      }}>
+        <button
+          className="eb-btn eb-btn-secondary"
+          onClick={() => setConfirmModal({ show: false, type: "", id: null, message: "" })}
+        >
+          Cancel
+        </button>
+        <button
+          className="eb-btn"
+          style={{
+            background: confirmModal.type === "delete" ? "#dc2626" : "var(--navy-primary)",
+            color: "white"
+          }}
+          onClick={handleConfirmAction}
+        >
+          {confirmModal.type === "delete" ? "Yes, Delete" : "Yes, Restore"}
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
+      {showConfirmClose && (
+        <div className="eb-modal" style={{ zIndex: 10001 }}>
+          <div
+            className="eb-modal-content"
+            style={{ maxWidth: "400px", padding: "0" }}
+          >
+            <div style={{ padding: "24px", borderBottom: "1px solid #e5e7eb" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "18px",
+                  fontWeight: 600,
+                  color: "#111827",
+                }}
+              >
+                Confirm Close
+              </h3>
+            </div>
+            <div style={{ padding: "24px" }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  color: "#6b7280",
+                  lineHeight: "1.5",
+                }}
+              >
+                Are you sure you want to close? All unsaved data will be lost.
+              </p>
+            </div>
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #e5e7eb",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                className="eb-btn eb-btn-secondary"
+                onClick={cancelClose}
+                style={{ minWidth: "80px" }}
+              >
+                Cancel
+              </button>
+              <button
+                className="eb-btn eb-btn-primary"
+                onClick={closeModal}
+                style={{ minWidth: "80px", background: "#dc2626" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="eb-filter-bar">
+  <div className="eb-filter-row">
+    <div className="eb-filter-group">
+      <label className="eb-filter-label">Search</label>
+      <input type="text" className="eb-filter-input" placeholder="Search by Report ID"
+        name="search" value={filters.search} onChange={handleFilterChange} />
+    </div>
+    <div className="eb-filter-group">
+      <label className="eb-filter-label">Status</label>
+      <select className="eb-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
+        <option value="">All Status</option>
+        <option>Under Investigation</option>
+        <option>Resolved</option>
+        <option>Pending</option>
+        <option>Urgent</option>
+      </select>
+    </div>
+    <div className="eb-filter-group">
+      <label className="eb-filter-label">Incident Type</label>
+      <select className="eb-filter-input" name="incident_type" value={filters.incident_type} onChange={handleFilterChange}>
+        <option value="">All Types</option>
+        <option>Murder</option>
+        <option>Homicide</option>
+        <option>Physical Injury</option>
+        <option>Rape</option>
+        <option>Robbery</option>
+        <option>Theft</option>
+        <option>Carnapping - MC</option>
+        <option>Carnapping - MV</option>
+        <option>Special Complex Crime</option>
+      </select>
+    </div>
+    <div className="eb-filter-group">
+      <label className="eb-filter-label">Barangay</label>
+      <select className="eb-filter-input" name="barangay" value={filters.barangay} onChange={handleFilterChange}>
+        <option value="">All Barangays</option>
+        <option>Aniban 1</option><option>Aniban 2</option><option>Banalo</option>
+        <option>Bayanan</option><option>Camposanto</option><option>Daang Bukid</option>
+        <option>Digman</option><option>Dulong Bayan</option><option>Habay I</option>
+        <option>Habay II</option><option>Kaingin Digman</option><option>Ligas 1</option>
+        <option>Mabolo</option><option>Maliksi 1</option><option>Maliksi 2</option>
+        <option>Mambog 1</option><option>Mambog 2</option><option>Molino I</option>
+        <option>Molino II</option><option>Molino III</option><option>Molino IV</option>
+        <option>Molino V</option><option>Molino VI</option><option>Molino VII</option>
+        <option>Niog</option><option>Panapaan 2</option><option>Panapaan 4</option>
+        <option>P.F. Espiritu 2</option><option>P.F. Espiritu 4</option>
+        <option>P.F. Espiritu 5</option><option>P.F. Espiritu 6</option>
+        <option>Poblacion</option><option>Real</option><option>Salinas 1</option>
+        <option>Salinas 2</option><option>San Nicolas 1</option><option>San Nicolas 2</option>
+        <option>San Nicolas 3</option><option>Sineguelasan</option><option>Talaba 1</option>
+        <option>Talaba 3</option><option>Zapote 1</option><option>Zapote 2</option>
+        <option>Zapote 3</option><option>Queens Row Central</option>
+        <option>Queens Row East</option><option>Queens Row West</option>
+      </select>
+    </div>
+  </div>
+
+  <div className="eb-filter-row eb-filter-row-2">
+    <div className="eb-filter-group eb-filter-group-sm">
+      <label className="eb-filter-label">Date From</label>
+      <input type="date" className="eb-filter-input" name="date_from" value={filters.date_from}
+        max={new Date().toISOString().split("T")[0]} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
+    </div>
+    <div className="eb-filter-group eb-filter-group-sm">
+      <label className="eb-filter-label">Date To</label>
+      <input type="date" className="eb-filter-input" name="date_to" value={filters.date_to}
+        max={new Date().toISOString().split("T")[0]} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
+    </div>
+    <div className="eb-filter-group eb-filter-group-btn">
+      <label className="eb-filter-label">&nbsp;</label>
+      <button className="eb-btn eb-btn-primary" onClick={fetchBlotters}>Apply Filters</button>
+    </div>
+    <div className="eb-filter-group eb-filter-group-btn">
+      <label className="eb-filter-label">&nbsp;</label>
+      <button className="eb-btn eb-btn-clear" onClick={clearFilters} title="Clear all filters">
+        <span className="eb-restart-icon">↻</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+      <div className="eb-table-card">
+        <div className="eb-table-container">
+          <table className="eb-data-table">
+            <thead>
+              <tr>
+                <th>Blotter ID</th>
+                <th>Incident Type</th>
+                <th>Location</th>
+                <th>Date Reported</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center" }}>
+                    Loading...
+                  </td>
+                </tr>
+              ) : blotters.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center" }}>
+                    No records found
+                  </td>
+                </tr>
+              ) : (
+                blotters.map((b) => (
+                  <tr key={b.blotter_id}>
+                    <td>
+                      <strong>{b.blotter_entry_number}</strong>
+                    </td>
+                    <td>{b.incident_type}</td>
+                    <td>{`${b.place_barangay}, ${b.place_city_municipality}`}</td>
+                    <td>{formatDate(b.date_time_reported)}</td>
+                    <td>
+                      <span
+                        className={`eb-status-badge ${getStatusClass(b.status)}`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="eb-table-actions">
+                        <button
+                          className="eb-action-btn eb-action-btn-view"
+                          onClick={(e) => { e.preventDefault(); handleView(b.blotter_id); }}
+                        >
+                          <ViewIcon /> View
+                        </button>
+                        <button
+                          className="eb-action-btn eb-action-btn-edit"
+                          onClick={(e) => { e.preventDefault(); handleEdit(b.blotter_id); }}
+                        >
+                          <EditIcon /> Edit
+                        </button>
+                        <button
+                          className="eb-action-btn eb-action-btn-danger"
+                          onClick={(e) => { e.preventDefault(); handleDelete(b.blotter_id); }}
+                        >
+                          <DeleteIcon /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="eb-pagination">
+          <div className="eb-pagination-info">
+            Showing 1-{blotters.length} of {blotters.length} records
+          </div>
+          <div className="eb-pagination-controls">
+            <button className="eb-pagination-btn">Previous</button>
+            <button className="eb-pagination-btn active">1</button>
+            <button className="eb-pagination-btn">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default EBlotter;
