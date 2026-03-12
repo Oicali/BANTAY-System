@@ -11,16 +11,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      
+      # Install dependencies
       - run: cd backend && npm install
 
-  # python:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.11'
-  #     - run: cd backend/features/ai-assessment && pip install -r requirements.txt && pytest test_main.py
+      # Check all entry point files for missing modules
+      - run: cd backend && node --check server.js
+      - run: cd backend && node --check config/database.js
+      - run: cd backend && node --check modules/auth/authRoutes.js
+      - run: cd backend && node --check modules/user/routes/profileRoutes.js
+      - run: cd backend && node --check modules/user/routes/userRoutes.js
+      - run: cd backend && node --check modules/blotter/routes/blotterRoutes.js
+      - run: cd backend && node --check modules/modus/routes/modusRoutes.js
+      - run: cd backend && node --check modules/cases/routes/casesRoutes.js
+      - run: cd backend && node --check modules/crime-map/routes/crimeMapRoutes.js
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd frontend && npm install && npm run build
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: cd backend/python && pip install -r requirements.txt && pytes
