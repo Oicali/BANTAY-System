@@ -11,24 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      
+
       # Install dependencies
       - run: cd backend && npm install
 
-      # Check all entry point files for missing modules
-      - run: cd backend && node --check server.js
-      - run: cd backend && node --check config/database.js
-      - run: cd backend && node --check modules/auth/authRoutes.js
-      - run: cd backend && node --check modules/user/routes/profileRoutes.js
-      - run: cd backend && node --check modules/user/routes/userRoutes.js
-      - run: cd backend && node --check modules/blotter/routes/blotterRoutes.js
-      - run: cd backend && node --check modules/modus/routes/modusRoutes.js
-      - run: cd backend && node --check modules/cases/routes/casesRoutes.js
-      - run: cd backend && node --check modules/crime-map/routes/crimeMapRoutes.js
+      # Check ALL .js files at once for missing modules & syntax errors
+      - run: find backend -name "*.js" -not -path "*/node_modules/*" | xargs -I {} node --check {}
 
   frontend:
     runs-on: ubuntu-latest
