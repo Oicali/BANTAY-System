@@ -8,22 +8,24 @@ const app = express();
 
 // ── 1. CORS ───────────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL,         // e.g. https://bantay-system.vercel.app
-  "http://localhost:5173",           // Vite dev server
+  process.env.FRONTEND_URL, // e.g. https://bantay-system.vercel.app
+  "http://localhost:5173", // Vite dev server
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked: ${origin}`));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 // ── 2. Body parsing ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
@@ -33,9 +35,9 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 require("./config/database");
 
 // ── 4. Routes ─────────────────────────────────────────────────────────────────
-app.use("/auth",             require("./features/auth/authRoutes"));
-// app.use("/users",            require("./features/user/routes/profileRoutes"));
-// app.use("/user-management",  require("./features/user/routes/userRoutes"));
+app.use("/auth", require("./features/auth/authRoutes"));
+app.use("/users", require("./features/user/routes/profileRoutes"));
+app.use("/user-management", require("./features/user/routes/userRoutes"));
 // app.use("/blotters",         require("./features/blotter/routes/blotterRoutes"));
 // app.use("/modus-management", require("./features/modus/routes/modusRoutes"));
 // app.use("/cases",            require("./features/cases/routes/casesRoutes"));
@@ -83,11 +85,14 @@ app.listen(PORT, () => {
   }
 });
 // ── 10. Token cleanup (every hour) ────────────────────────────────────────────
-setInterval(async () => {
-  try {
-    await tokenManager.cleanupExpiredTokens();
-  } catch (err) {
-    console.error("🧹 Token cleanup error:", err.message);
-  }
-}, 60 * 60 * 1000);
+setInterval(
+  async () => {
+    try {
+      await tokenManager.cleanupExpiredTokens();
+    } catch (err) {
+      console.error("🧹 Token cleanup error:", err.message);
+    }
+  },
+  60 * 60 * 1000,
+);
 console.log("🧹 Token cleanup scheduled (runs every hour)");
