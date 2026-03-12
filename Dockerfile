@@ -1,24 +1,25 @@
 FROM node:22-slim
 
-# Install Python (slim base = smaller image)
+# Install Python
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/backend
 
-# Copy and install Node deps first (layer caching)
-COPY backend/package*.json ./backend/
-RUN cd backend && npm install --omit=dev
+# Node dependencies
+COPY backend/package*.json ./
+RUN npm install --omit=dev
 
-# Copy Python requirements and install
-COPY backend/features/ai-assessment/requirements.txt ./backend/features/ai-assessment/
-RUN pip3 install --break-system-packages -r backend/features/ai-assessment/requirements.txt
+# Python dependencies
+COPY backend/features/ai-assessment/requirements.txt ./features/ai-assessment/
+RUN pip3 install --no-cache-dir -r features/ai-assessment/requirements.txt
 
-# Copy rest of backend
-COPY backend/ ./backend/
+# Copy backend code
+COPY backend/ .
 
-EXPOSE 10000
+# Expose port (match your server.js)
+EXPOSE 3000
 
-CMD ["node", "backend/server.js"]
+CMD ["node", "server.js"]

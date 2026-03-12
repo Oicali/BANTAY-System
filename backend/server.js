@@ -77,7 +77,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   if (process.env.NODE_ENV === "production") {
-    console.log(`✅ Server running on https://bantay-system.onrender.com`);
+    console.log(`✅ Server running on http://localhost:3000`);
   } else {
     console.log(`✅ Server running on http://localhost:${PORT}`);
   }
