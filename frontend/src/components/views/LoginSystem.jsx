@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import "./LoginSystem.css";
 import { jwtDecode } from "jwt-decode";
+import { useNavigate } from "react-router-dom"; // add this
 
 const LoginSystem = () => {
   const [currentView, setCurrentView] = useState("login");
