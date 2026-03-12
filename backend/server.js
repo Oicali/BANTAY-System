@@ -33,13 +33,13 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 require("./config/database");
 
 // ── 4. Routes ─────────────────────────────────────────────────────────────────
-app.use("/auth",             require("./modules/auth/authRoutes"));
-app.use("/users",            require("./modules/user/routes/profileRoutes"));
-app.use("/user-management",  require("./modules/user/routes/userRoutes"));
-app.use("/blotters",         require("./modules/blotter/routes/blotterRoutes"));
-app.use("/modus-management", require("./modules/modus/routes/modusRoutes"));
-app.use("/cases",            require("./modules/cases/routes/casesRoutes"));
-app.use("/crime-map",        require("./modules/crime-map/routes/crimeMapRoutes"));
+app.use("/auth",             require("./features/auth/authRoutes"));
+// app.use("/users",            require("./features/user/routes/profileRoutes"));
+// app.use("/user-management",  require("./features/user/routes/userRoutes"));
+// app.use("/blotters",         require("./features/blotter/routes/blotterRoutes"));
+// app.use("/modus-management", require("./features/modus/routes/modusRoutes"));
+// app.use("/cases",            require("./features/cases/routes/casesRoutes"));
+// app.use("/crime-map",        require("./features/crime-map/routes/crimeMapRoutes"));
 
 // ── 5. Static uploads ─────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

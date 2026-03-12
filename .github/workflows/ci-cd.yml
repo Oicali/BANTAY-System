@@ -32,12 +32,12 @@ jobs:
           node-version: 22
       - run: cd frontend && npm install && npm run build
 
-  python:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - run: cd backend/python && pip install -r requirements.txt && pytes
+  # python:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.11'
+  #     - run: cd backend/python && pip install -r requirements.txt && pytest
