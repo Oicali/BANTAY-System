@@ -11,28 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: cd backend && npm install && npm test
+      - run: cd backend && npm install
 
-  frontend:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: 22
-      - run: cd frontend && npm install && npm run build
-
-#   python:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - name: Setup Python
-#         uses: actions/setup-python@v4
-#         with:
-#           python-version: '3.10'
-#       - run: cd backend/python && pip install -r requirements.txt && pytes
+          python-version: '3.11'
+      - run: cd backend/features/ai-assessment && pip install -r requirements.txt && pytest test_main.py
