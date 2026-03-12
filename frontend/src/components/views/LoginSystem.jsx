@@ -182,11 +182,13 @@ const LoginSystem = () => {
       localStorage.setItem("username", decoded.username);
 
       setSuccess("Login successful!");
+      setSuccess("Login successful!");
       setFormData((prev) => ({
         ...prev,
         username: "",
         password: "",
       }));
+      setIsLoading(false); // add this
 
       setTimeout(() => {
         navigate("/crime-dashboard");
