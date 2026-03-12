@@ -31,7 +31,6 @@ const LoginSystem = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const navigate = useNavigate();
 
   const codeInputs = useRef([]);
 
@@ -148,29 +147,22 @@ const LoginSystem = () => {
     setError("");
     setSuccess("");
 
-    console.log("click");
-
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: formData.username.trim(),
-            password: formData.password.trim(),
-          }),
+      const response = await fetch("http://localhost:5000/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          password: formData.password.trim(),
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(
-          data.message || "Login failed! Please enter your credentials.",
-        );
+        setError(data.message || "Login failed! Please enter your credentials.");
         setIsLoading(false);
         return;
       }
@@ -183,16 +175,14 @@ const LoginSystem = () => {
       localStorage.setItem("username", decoded.username);
 
       setSuccess("Login successful!");
-      setSuccess("Login successful!");
       setFormData((prev) => ({
         ...prev,
         username: "",
         password: "",
       }));
-      setIsLoading(false); // add this
 
       setTimeout(() => {
-        navigate("/crime-dashboard");
+        window.location.href = "/crime-dashboard";
       }, 800);
     } catch (error) {
       console.error("Login error:", error);
@@ -211,16 +201,13 @@ const LoginSystem = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/otp/send`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: formData.email }),
+      const response = await fetch("http://localhost:5000/auth/otp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ email: formData.email }),
+      });
 
       const data = await response.json();
 
@@ -263,19 +250,16 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/otp/verify`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            code: code,
-          }),
+      const response = await fetch("http://localhost:5000/auth/otp/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          email: formData.email,
+          code: code,
+        }),
+      });
 
       const data = await response.json();
 
@@ -307,16 +291,13 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/otp/resend`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: formData.email }),
+      const response = await fetch("http://localhost:5000/auth/otp/resend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({ email: formData.email }),
+      });
 
       const data = await response.json();
 
@@ -371,7 +352,7 @@ const LoginSystem = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/auth/password/reset`,
+        "http://localhost:5000/auth/password/reset",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
