@@ -14,7 +14,7 @@ RUN npm install --omit=dev
 
 # Python dependencies
 COPY backend/features/ai-assessment/requirements.txt ./features/ai-assessment/
-RUN pip3 install --no-cache-dir -r features/ai-assessment/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r features/ai-assessment/requirements.txt
 
 # Copy backend code
 COPY backend/ .
