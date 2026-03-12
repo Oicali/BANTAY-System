@@ -34,8 +34,8 @@ require("./config/database");
 
 // ── 4. Routes ─────────────────────────────────────────────────────────────────
 app.use("/auth",             require("./features/auth/authRoutes"));
-// app.use("/users",            require("./features/user/routes/profileRoutes"));
-// app.use("/user-management",  require("./features/user/routes/userRoutes"));
+app.use("/users",            require("./features/user/routes/profileRoutes"));
+app.use("/user-management",  require("./features/user/routes/userRoutes"));
 // app.use("/blotters",         require("./features/blotter/routes/blotterRoutes"));
 // app.use("/modus-management", require("./features/modus/routes/modusRoutes"));
 // app.use("/cases",            require("./features/cases/routes/casesRoutes"));
