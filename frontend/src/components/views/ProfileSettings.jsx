@@ -5,9 +5,10 @@ import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
 
+
 const PSGC       = "https://psgc.gitlab.io/api";
-const BASE_URL   = "http://localhost:5000";
 const POLL_MS    = 15000;
+
 
 export default function ProfileSettings() {
   const [user, setUser]               = useState(null);
@@ -245,7 +246,7 @@ export default function ProfileSettings() {
       setLoading(true);
       const token = localStorage.getItem("token");
       if (!token) { setLoading(false); return; }
-      const res = await fetch(`${BASE_URL}/users/profile`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (!res.ok) { if (res.status === 401) logout(); return; }
@@ -274,7 +275,7 @@ export default function ProfileSettings() {
     try {
       const token = localStorage.getItem("token");
       if (!token) return;
-      const res = await fetch(`${BASE_URL}/users/profile`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) { logout(); return; }
@@ -380,7 +381,7 @@ export default function ProfileSettings() {
       const token = localStorage.getItem("token");
       const fd = new FormData();
       fd.append("profilePicture", file);
-      const res  = await fetch(`${BASE_URL}/users/profile/picture`, {
+      const res  = await fetch(`${import.meta.env.VITE_API_URL}/users/profile/picture`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
       });
       const data = await res.json();
@@ -466,7 +467,7 @@ export default function ProfileSettings() {
     if (origPhone && clean === origPhone.replace(/\D/g, "")) return null;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/check-phone`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/check-phone`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ phone: `+63${clean}`, excludeCurrent: true }),
@@ -586,7 +587,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
         );
         // FIX: Persist lock to backend so it survives logout/re-login
         const token = localStorage.getItem("token");
-        fetch(`${BASE_URL}/users/email/force-lock`, {
+        fetch(`${import.meta.env.VITE_API_URL}/users/email/force-lock`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ which: whichOtp }),
@@ -637,7 +638,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     // because it is keyed by userId, not by browser session.
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await res.json();
@@ -730,7 +731,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     setEmailModalLoading(true); setEmailModalErr(""); setEmailPasswordErr("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/verify-password`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/verify-password`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ password: emailPassword }),
@@ -763,7 +764,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     setEmailModalLoading(true); setEmailModalErr("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/request-old-otp`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/request-old-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -802,7 +803,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     setEmailModalLoading(true); setEmailModalErr("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/verify-old-otp`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/verify-old-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ otp: code }),
@@ -852,7 +853,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     setEmailModalLoading(true); setEmailModalErr("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/request-new-otp`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/request-new-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ newEmail: emailNewInput.trim() }),
@@ -893,7 +894,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
     setEmailModalLoading(true); setEmailModalErr("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/email/verify-new-otp`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/email/verify-new-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ otp: code }),
@@ -982,7 +983,7 @@ const startEmailOtpTimer = (expiresAt, setTimer, setOtpState, timerRef, resendsL
       ["first_name","last_name","middle_name","suffix","gender",
        "phone","alternate_phone","region_code","province_code","municipality_code","barangay_code","address_line",
       ].forEach(k => { if (fmt[k] !== null && fmt[k] !== undefined && fmt[k].toString().trim() !== "") fd.append(k, fmt[k]); });
-      const res = await fetch(`${BASE_URL}/users/profile/${profileData.user_id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/profile/${profileData.user_id}`, {
         method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: fd,
       });
       const d = await res.json();
