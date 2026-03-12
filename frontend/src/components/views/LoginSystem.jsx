@@ -147,8 +147,10 @@ const LoginSystem = () => {
     setError("");
     setSuccess("");
 
+    console.log("click")
+
     try {
-      const response = await fetch("http://localhost:5000/auth/login", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -201,7 +203,7 @@ const LoginSystem = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/auth/otp/send", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -250,7 +252,7 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/auth/otp/verify", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -291,7 +293,7 @@ const LoginSystem = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/auth/otp/resend", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/otp/resend`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -352,7 +354,7 @@ const LoginSystem = () => {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/auth/password/reset",
+        `${import.meta.env.VITE_API_URL}/auth/password/reset`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
