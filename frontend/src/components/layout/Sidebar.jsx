@@ -1,27 +1,27 @@
-import { useState } from "react"; // ← ADD THIS IMPORT
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { navItems } from "../../utils/navItems";
 import { roleAccess } from "../../utils/roleAccess";
 
-export default function Sidebar({ openSections, toggleSection, handleLogout }) {
+export default function Sidebar({ openSections, toggleSection, handleLogout, sidebarOpen, onClose }) {
   const role = localStorage.getItem("role");
   const allowedTabs = roleAccess[role] || [];
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   return (
     <>
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? "sidebar-mobile-open" : ""}`}>
         {/* HEADER */}
         <div className="sidebar-header">
           <div className="sidebar-logo">
-           <img 
-              src="/images/pnp.png" 
-              alt="PNP Logo" 
+            <img
+              src="/images/pnp.png"
+              alt="PNP Logo"
               className="logo-icon"
               style={{
-                width: '48px',
-                height: '48px',
-                objectFit: 'contain'
+                width: "48px",
+                height: "48px",
+                objectFit: "contain",
               }}
             />
             <div className="logo-text">
@@ -40,6 +40,30 @@ export default function Sidebar({ openSections, toggleSection, handleLogout }) {
 
             if (visibleItems.length === 0) return null;
 
+            // Flat items — no section header, no indent, no toggle
+            if (group.flat) {
+              return visibleItems.map((item) => (
+                <NavLink
+                  key={item.key}
+                  to={item.path}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    `nav-item nav-flat ${isActive ? "active" : ""}`
+                  }
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    dangerouslySetInnerHTML={{ __html: item.icon }}
+                  />
+                  {item.label}
+                </NavLink>
+              ));
+            }
+
+            // Sectioned items
             const isOpen = openSections[group.section];
 
             return (
@@ -59,10 +83,18 @@ export default function Sidebar({ openSections, toggleSection, handleLogout }) {
                     <NavLink
                       key={item.key}
                       to={item.path}
+                      onClick={onClose}
                       className={({ isActive }) =>
                         `nav-item sub-item ${isActive ? "active" : ""}`
                       }
                     >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        dangerouslySetInnerHTML={{ __html: item.icon }}
+                      />
                       {item.label}
                     </NavLink>
                   ))}
@@ -70,10 +102,22 @@ export default function Sidebar({ openSections, toggleSection, handleLogout }) {
             );
           })}
 
+          {/* LOGOUT */}
           <button
             onClick={() => setShowLogoutModal(true)}
             className="nav-item logout-btn"
           >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ width: "14px", height: "14px", flexShrink: 0, opacity: 0.7 }}
+            >
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16,17 21,12 16,7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
             Logout
           </button>
         </nav>
@@ -81,12 +125,15 @@ export default function Sidebar({ openSections, toggleSection, handleLogout }) {
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
-        <div className="eb-modal" style={{ 
-        zIndex: 10001,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
+        <div
+          className="eb-modal"
+          style={{
+            zIndex: 10001,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <div
             className="eb-modal-content"
             style={{ maxWidth: "400px", padding: "0" }}
