@@ -1,25 +1,23 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { logout, getUserFromToken } from "../../utils/auth";
-import AddUserModal from '../modals/AddUserModal';
-import EditUserModal from '../modals/EditUserModal';
-import DeleteUserModal from '../modals/DeleteUserModal';
-import RestoreUserModal from '../modals/RestoreUserModal';
+import AddUserModal from "../modals/AddUserModal";
+import EditUserModal from "../modals/EditUserModal";
+import DeleteUserModal from "../modals/DeleteUserModal";
+import RestoreUserModal from "../modals/RestoreUserModal";
 import "./UserManagement.css";
 import LoadingModal from "../modals/LoadingModal";
 
 const ITEMS_PER_PAGE = 15;
 const PSGC_BASE = "https://psgc.gitlab.io/api";
-const API_URL = import.meta.env.VITE_API_URL; // ← add here
+const API_URL = import.meta.env.VITE_API_URL;
 
-// ✅ Bacoor is a CITY — use /cities/{code}/barangays/
 const BACOOR_CITY_CODE = "042103000";
 
-// Map display label → API param value
 const STATUS_PARAM_MAP = {
-  Default:     null,
-  Active:      "active",
-  Unverified:  "unverified",
-  Locked:      "locked",
+  Default: null,
+  Active: "active",
+  Unverified: "unverified",
+  Locked: "locked",
   Deactivated: "deactivated",
 };
 
@@ -27,31 +25,55 @@ const STATUS_PARAM_MAP = {
 // ICON COMPONENTS
 // =====================================================
 const EditIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2"
-    strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
 
 const DeleteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2"
-    strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6"/>
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-    <path d="M10 11v6M14 11v6"/>
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 );
 
 const RestoreIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2"
-    strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 .49-3.24"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
   </svg>
 );
 
@@ -59,48 +81,43 @@ const RestoreIcon = () => (
 // MAIN COMPONENT
 // =====================================================
 const UserManagement = () => {
-  const [isAddModalOpen, setIsAddModalOpen]         = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen]       = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen]   = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser]             = useState(null);
-  const [user, setUser]                             = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [user, setUser] = useState(null);
 
-  // Users state (server-paginated)
-  const [users, setUsers]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
-  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1 });
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: ITEMS_PER_PAGE,
+    totalPages: 1,
+  });
 
-  // Police roles from backend
   const [policeRoles, setPoliceRoles] = useState([]);
-
-  // ALL Bacoor barangays from PSGC — { code, name }[]
-  const [allBarangays, setAllBarangays]         = useState([]);
+  const [allBarangays, setAllBarangays] = useState([]);
   const [barangaysLoading, setBarangaysLoading] = useState(false);
-
-  // For the table cell: { [code]: name } — populated from allBarangays
   const [barangayNameMap, setBarangayNameMap] = useState({});
 
-  // Toast
   const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage]     = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Filter states
-  const [searchTerm, setSearchTerm]         = useState('');
-  const [roleFilter, setRoleFilter]         = useState('all');
-  const [statusFilter, setStatusFilter]     = useState('Default');
-  const [barangayFilter, setBarangayFilter] = useState('all');
-  const [activeTab, setActiveTab]           = useState('police');
-  const [currentPage, setCurrentPage]       = useState(1);
-
- 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("Default");
+  const [barangayFilter, setBarangayFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("police");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ===================================================
   // HELPER: resolve barangay name from map
   // ===================================================
   const getBarangayName = (code) => {
-    if (!code) return 'N/A';
+    if (!code) return "N/A";
     return barangayNameMap[code] || code;
   };
 
@@ -110,7 +127,9 @@ const UserManagement = () => {
   const fetchAllBacoorBarangays = useCallback(async () => {
     try {
       setBarangaysLoading(true);
-      const res = await fetch(`${PSGC_BASE}/cities/${BACOOR_CITY_CODE}/barangays/`);
+      const res = await fetch(
+        `${PSGC_BASE}/cities/${BACOOR_CITY_CODE}/barangays/`,
+      );
       if (!res.ok) throw new Error(`PSGC returned ${res.status}`);
       const data = await res.json();
 
@@ -121,10 +140,12 @@ const UserManagement = () => {
       setAllBarangays(sorted);
 
       const nameMap = {};
-      sorted.forEach(({ code, name }) => { nameMap[code] = name; });
+      sorted.forEach(({ code, name }) => {
+        nameMap[code] = name;
+      });
       setBarangayNameMap(nameMap);
     } catch (err) {
-      console.error('Failed to load Bacoor barangays from PSGC:', err);
+      console.error("Failed to load Bacoor barangays from PSGC:", err);
       setAllBarangays([]);
     } finally {
       setBarangaysLoading(false);
@@ -132,20 +153,20 @@ const UserManagement = () => {
   }, []);
 
   // ===================================================
-  // FETCH FILTER OPTIONS (police roles only from backend)
+  // FETCH FILTER OPTIONS
   // ===================================================
   const fetchFilterOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/user-management/filter-options`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
         setPoliceRoles(data.roles || []);
       }
     } catch (err) {
-      console.error('Error fetching filter options:', err);
+      console.error("Error fetching filter options:", err);
     }
   };
 
@@ -160,76 +181,88 @@ const UserManagement = () => {
   }, []);
 
   // ===================================================
-  // FETCH USERS (server-side filtered + paginated)
+  // FETCH USERS
   // ===================================================
-  const fetchUsers = useCallback(async (page = 1) => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
+  const fetchUsers = useCallback(
+    async (page = 1) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
 
-      const params = new URLSearchParams();
-      params.set('userType', activeTab === 'police' ? 'police' : 'barangay');
-      params.set('page', page);
-      params.set('limit', ITEMS_PER_PAGE);
+        const params = new URLSearchParams();
+        params.set("userType", activeTab === "police" ? "police" : "barangay");
+        params.set("page", page);
+        params.set("limit", ITEMS_PER_PAGE);
 
-      const statusParam = STATUS_PARAM_MAP[statusFilter];
-      if (statusParam) params.set('status', statusParam);
+        const statusParam = STATUS_PARAM_MAP[statusFilter];
+        if (statusParam) params.set("status", statusParam);
 
-      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+        if (searchTerm.trim()) params.set("search", searchTerm.trim());
 
-      if (activeTab === 'police' && roleFilter !== 'all') {
-        params.set('role', roleFilter);
+        if (activeTab === "police" && roleFilter !== "all") {
+          params.set("role", roleFilter);
+        }
+        if (activeTab === "barangay" && barangayFilter !== "all") {
+          params.set("barangayCode", barangayFilter);
+        }
+
+        const res = await fetch(
+          `${API_URL}/user-management/users?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          setUsers(data.users || []);
+          setPagination(
+            data.pagination || {
+              total: 0,
+              page: 1,
+              limit: ITEMS_PER_PAGE,
+              totalPages: 1,
+            },
+          );
+          setError("");
+        } else {
+          setError("Failed to fetch users");
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError("Error connecting to server");
+      } finally {
+        setLoading(false);
       }
-      if (activeTab === 'barangay' && barangayFilter !== 'all') {
-        params.set('barangayCode', barangayFilter);
-      }
-
-      const res = await fetch(`${API_URL}/user-management/users?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
-        setPagination(data.pagination || { total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1 });
-        setError('');
-      } else {
-        setError('Failed to fetch users');
-      }
-    } catch (err) {
-      console.error('Error fetching users:', err);
-      setError('Error connecting to server');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, statusFilter, searchTerm, roleFilter, barangayFilter]);
+    },
+    [activeTab, statusFilter, searchTerm, roleFilter, barangayFilter],
+  );
 
   // ===================================================
-  // TAB SWITCH — immediately blank the table and show
-  // "Loading users..." before the filter-reset cascade
-  // fires. Prevents stale rows from the old tab flashing.
+  // TAB SWITCH
   // ===================================================
   const handleTabSwitch = (tab) => {
     if (tab === activeTab) return;
     setUsers([]);
     setLoading(true);
-    setError('');
+    setError("");
     setPagination({ total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1 });
     setCurrentPage(1);
-    setSearchTerm('');
-    setRoleFilter('all');
-    setBarangayFilter('all');
-    setStatusFilter('Default');
+    setSearchTerm("");
+    setRoleFilter("all");
+    setBarangayFilter("all");
+    setStatusFilter("Default");
     setActiveTab(tab);
   };
 
-  // Re-fetch when filters change (reset to page 1)
   useEffect(() => {
     setCurrentPage(1);
     fetchUsers(1);
   }, [activeTab, statusFilter, roleFilter, barangayFilter]);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -238,7 +271,6 @@ const UserManagement = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Toast auto-dismiss
   useEffect(() => {
     if (successMessage) {
       const t = setTimeout(() => setSuccessMessage(""), 5000);
@@ -257,22 +289,22 @@ const UserManagement = () => {
   // HANDLERS
   // ===================================================
   const handleUserAdded = (message) => {
-    setSuccessMessage(message || 'User added successfully!');
+    setSuccessMessage(message || "User added successfully!");
     fetchUsers(currentPage);
   };
 
   const handleUserUpdated = () => {
-    setSuccessMessage('User updated successfully!');
+    setSuccessMessage("User updated successfully!");
     fetchUsers(currentPage);
   };
 
   const handleUserDeleted = (message) => {
-    setSuccessMessage(message || 'User deactivated successfully!');
+    setSuccessMessage(message || "User deactivated successfully!");
     fetchUsers(currentPage);
   };
 
   const handleUserRestored = (message) => {
-    setSuccessMessage(message || 'User restored successfully!');
+    setSuccessMessage(message || "User restored successfully!");
     fetchUsers(currentPage);
   };
 
@@ -314,20 +346,30 @@ const UserManagement = () => {
   const isCurrentUser = (userData) => user && userData.user_id === user.user_id;
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
+    if (!dateString) return "Never";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getInitials = (firstName, lastName, username) => {
-    if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    if (firstName && lastName)
+      return `${firstName[0]}${lastName[0]}`.toUpperCase();
     if (username) return username.substring(0, 2).toUpperCase();
-    return 'NA';
+    return "NA";
   };
 
-  const formatDisplayName = (firstName, middleName, lastName, suffix, username) => {
+  const formatDisplayName = (
+    firstName,
+    middleName,
+    lastName,
+    suffix,
+    username,
+  ) => {
     if (firstName && lastName) {
       const parts = [firstName, middleName, lastName, suffix].filter(Boolean);
       const fullName = parts.join(" ");
@@ -340,45 +382,54 @@ const UserManagement = () => {
   };
 
   const getRoleBadgeClass = (role) => {
-    if (!role) return 'um-role-default';
+    if (!role) return "um-role-default";
     const r = role.toLowerCase();
-    if (r.includes('administrator')) return 'um-role-admin';
-    if (r.includes('investigator'))  return 'um-role-investigator';
-    if (r.includes('patrol'))        return 'um-role-patrol';
-    if (r.includes('barangay'))      return 'um-role-chairman';
-    return 'um-role-default';
+    if (r.includes("administrator")) return "um-role-admin";
+    if (r.includes("investigator")) return "um-role-investigator";
+    if (r.includes("patrol")) return "um-role-patrol";
+    if (r.includes("barangay")) return "um-role-chairman";
+    return "um-role-default";
   };
 
   const getStatusText = (userData) => {
     switch (userData.status) {
-      case 'deactivated': return 'Deactivated';
-      case 'locked':      return 'Locked';
-      case 'unverified':  return 'Unverified';
-      default:            return 'Active';
+      case "deactivated":
+        return "Deactivated";
+      case "locked":
+        return "Locked";
+      case "unverified":
+        return "Unverified";
+      default:
+        return "Active";
     }
   };
 
   const getStatusBadgeClass = (userData) => {
     switch (userData.status) {
-      case 'deactivated': return 'um-status-inactive';
-      case 'locked':      return 'um-status-locked';
-      case 'unverified':  return 'um-status-unverified';
-      default:            return 'um-status-active';
+      case "deactivated":
+        return "um-status-inactive";
+      case "locked":
+        return "um-status-locked";
+      case "unverified":
+        return "um-status-unverified";
+      default:
+        return "um-status-active";
     }
   };
 
-  const isUserDeactivated = (u) => u.status === 'deactivated';
+  const isUserDeactivated = (u) => u.status === "deactivated";
 
-  // ===================================================
-  // Sort users for display:
-  // - barangay tab → alphabetical by resolved barangay name
-  // - police tab   → as returned from server (created_at DESC)
-  // ===================================================
   const getSortedUsers = () => {
-    if (activeTab !== 'barangay') return users;
+    if (activeTab !== "barangay") return users;
     return [...users].sort((a, b) => {
-      const nameA = barangayNameMap[a.assigned_barangay_code] || a.assigned_barangay_code || '';
-      const nameB = barangayNameMap[b.assigned_barangay_code] || b.assigned_barangay_code || '';
+      const nameA =
+        barangayNameMap[a.assigned_barangay_code] ||
+        a.assigned_barangay_code ||
+        "";
+      const nameB =
+        barangayNameMap[b.assigned_barangay_code] ||
+        b.assigned_barangay_code ||
+        "";
       return nameA.localeCompare(nameB);
     });
   };
@@ -393,7 +444,10 @@ const UserManagement = () => {
           <h1>User Management</h1>
           <p>Manage system users and permissions</p>
         </div>
-        <button className="um-btn um-btn-primary" onClick={() => setIsAddModalOpen(true)}>
+        <button
+          className="um-btn um-btn-primary"
+          onClick={() => setIsAddModalOpen(true)}
+        >
           + Add New User
         </button>
       </div>
@@ -401,14 +455,14 @@ const UserManagement = () => {
       {/* Tab Navigation */}
       <div className="um-tabs">
         <button
-          className={`um-tab ${activeTab === 'police' ? 'um-tab-active' : ''}`}
-          onClick={() => handleTabSwitch('police')}
+          className={`um-tab ${activeTab === "police" ? "um-tab-active" : ""}`}
+          onClick={() => handleTabSwitch("police")}
         >
           Police Users
         </button>
         <button
-          className={`um-tab ${activeTab === 'barangay' ? 'um-tab-active' : ''}`}
-          onClick={() => handleTabSwitch('barangay')}
+          className={`um-tab ${activeTab === "barangay" ? "um-tab-active" : ""}`}
+          onClick={() => handleTabSwitch("barangay")}
         >
           Barangay Users
         </button>
@@ -416,7 +470,6 @@ const UserManagement = () => {
 
       {/* Filter Bar */}
       <div className="um-filter-bar">
-
         {/* Search */}
         <div className="um-filter-group">
           <label className="um-filter-label">Search</label>
@@ -430,7 +483,7 @@ const UserManagement = () => {
         </div>
 
         {/* Role filter — police tab only */}
-        {activeTab === 'police' && (
+        {activeTab === "police" && (
           <div className="um-filter-group">
             <label className="um-filter-label">Role</label>
             <select
@@ -440,14 +493,16 @@ const UserManagement = () => {
             >
               <option value="all">All Roles</option>
               {policeRoles.map((r) => (
-                <option key={r} value={r}>{r}</option>
+                <option key={r} value={r}>
+                  {r}
+                </option>
               ))}
             </select>
           </div>
         )}
 
-        {/* Barangay filter — ALL Bacoor barangays from PSGC, sorted A-Z */}
-        {activeTab === 'barangay' && (
+        {/* Barangay filter */}
+        {activeTab === "barangay" && (
           <div className="um-filter-group">
             <label className="um-filter-label">Barangay</label>
             <select
@@ -457,7 +512,7 @@ const UserManagement = () => {
               disabled={barangaysLoading}
             >
               <option value="all">
-                {barangaysLoading ? 'Loading barangays...' : 'All Barangays'}
+                {barangaysLoading ? "Loading barangays..." : "All Barangays"}
               </option>
               {allBarangays.map(({ code, name }) => (
                 <option key={code} value={code}>
@@ -472,19 +527,20 @@ const UserManagement = () => {
         <div className="um-filter-group">
           <label className="um-filter-label">Status</label>
           <select
-            className={`um-filter-input${statusFilter === 'Default' ? ' um-status-placeholder' : ''}`}
+            className={`um-filter-input${statusFilter === "Default" ? " um-status-placeholder" : ""}`}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={statusFilter === 'Default' ? { color: '#adb5bd' } : {}}
+            style={statusFilter === "Default" ? { color: "#adb5bd" } : {}}
           >
-            <option value="Default" style={{ color: '#adb5bd' }}>Select Status</option>
+            <option value="Default" style={{ color: "#adb5bd" }}>
+              Select Status
+            </option>
             <option value="Active">Active</option>
             <option value="Unverified">Unverified</option>
             <option value="Locked">Locked</option>
             <option value="Deactivated">Deactivated</option>
           </select>
         </div>
-
       </div>
 
       {/* Users Table */}
@@ -492,35 +548,39 @@ const UserManagement = () => {
         {error && <div className="um-error-message">{error}</div>}
 
         {loading ? (
-          <LoadingModal
-                isOpen={true}
-                message={"Loading users..."}
-              />
+          <LoadingModal isOpen={true} message={"Loading users..."} />
         ) : (
           <>
             <div className="um-table-container">
-              <table className="um-data-table">
+              <table
+                className={`um-data-table ${activeTab === "barangay" ? "um-table-barangay" : "um-table-police"}`}
+              >
                 <thead>
                   <tr>
                     <th>User</th>
-                    <th>Role</th>
-                    {activeTab === 'barangay' && <th>Barangay</th>}
-                    <th>Status</th>
-                    <th>Last Login</th>
+                    <th className="um-col-role">Role</th>
+                    {activeTab === "barangay" && (
+                      <th className="um-col-barangay">Barangay</th>
+                    )}
+                    <th className="um-col-status">Status</th>
+                    <th className="um-col-last-login">Last Login</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getSortedUsers().length === 0 ? (
                     <tr>
-                      <td colSpan={activeTab === 'barangay' ? 6 : 5} style={{ textAlign: 'center', padding: '40px' }}>
-                        No {activeTab === 'police' ? 'Police' : 'Barangay'} users found matching your filters.
+                      <td
+                        colSpan={activeTab === "barangay" ? 6 : 5}
+                        style={{ textAlign: "center", padding: "40px" }}
+                      >
+                        No {activeTab === "police" ? "Police" : "Barangay"}{" "}
+                        users found matching your filters.
                       </td>
                     </tr>
                   ) : (
                     getSortedUsers().map((userData) => (
                       <tr key={userData.user_id}>
-
                         {/* User cell */}
                         <td>
                           <div className="um-user-cell">
@@ -529,10 +589,19 @@ const UserManagement = () => {
                                 <img
                                   src={userData.profile_picture}
                                   alt="Profile"
-                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    borderRadius: "50%",
+                                    objectFit: "cover",
+                                  }}
                                 />
                               ) : (
-                                getInitials(userData.first_name, userData.last_name, userData.username)
+                                getInitials(
+                                  userData.first_name,
+                                  userData.last_name,
+                                  userData.username,
+                                )
                               )}
                             </div>
                             <div className="um-user-cell-info">
@@ -548,53 +617,66 @@ const UserManagement = () => {
                                   <span className="um-you-badge">( YOU )</span>
                                 )}
                               </div>
-                              <div className="um-user-cell-email">{userData.email}</div>
+                              <div className="um-user-cell-email">
+                                {userData.email}
+                              </div>
                             </div>
                           </div>
                         </td>
 
                         {/* Role */}
-                        <td>
-                          <span className={`um-role-badge ${getRoleBadgeClass(userData.role)}`}>
-                            {userData.role || 'N/A'}
+                        <td className="um-col-role">
+                          <span
+                            className={`um-role-badge ${getRoleBadgeClass(userData.role)}`}
+                          >
+                            {userData.role || "N/A"}
                           </span>
                         </td>
 
-                        {/* Barangay column — name from PSGC map */}
-                        {activeTab === 'barangay' && (
-                          <td>{getBarangayName(userData.assigned_barangay_code)}</td>
+                        {/* Barangay column */}
+                        {activeTab === "barangay" && (
+                          <td className="um-col-barangay">
+                            {getBarangayName(userData.assigned_barangay_code)}
+                          </td>
                         )}
 
                         {/* Status */}
-                        <td>
-                          <span className={`um-status-badge ${getStatusBadgeClass(userData)}`}>
+                        <td className="um-col-status">
+                          <span
+                            className={`um-status-badge ${getStatusBadgeClass(userData)}`}
+                          >
                             {getStatusText(userData)}
                           </span>
                         </td>
 
                         {/* Last login */}
-                        <td>{formatDate(userData.last_login)}</td>
+                        <td className="um-col-last-login">
+                          {formatDate(userData.last_login)}
+                        </td>
 
                         {/* Actions */}
                         <td>
                           <div className="um-action-links">
-
                             {/* EDIT */}
                             <button
                               onClick={() => handleEditUser(userData)}
-                              className={`um-action-btn um-action-btn-edit${isCurrentUser(userData) ? ' um-action-disabled' : ''}`}
+                              className={`um-action-btn um-action-btn-edit${isCurrentUser(userData) ? " um-action-disabled" : ""}`}
                               disabled={isCurrentUser(userData)}
-                              title={isCurrentUser(userData) ? "You cannot edit your own account" : "Edit user"}
+                              title={
+                                isCurrentUser(userData)
+                                  ? "You cannot edit your own account"
+                                  : "Edit user"
+                              }
                             >
                               <EditIcon />
                               Edit
                             </button>
 
-                            {/* RESTORE (deactivated) or DELETE (all other statuses) */}
+                            {/* RESTORE or DELETE */}
                             {isUserDeactivated(userData) ? (
                               <button
                                 onClick={() => handleRestoreUser(userData)}
-                                className={`um-action-btn um-action-btn-success${isCurrentUser(userData) ? ' um-action-disabled' : ''}`}
+                                className={`um-action-btn um-action-btn-success${isCurrentUser(userData) ? " um-action-disabled" : ""}`}
                                 disabled={isCurrentUser(userData)}
                                 title="Restore user"
                               >
@@ -604,7 +686,7 @@ const UserManagement = () => {
                             ) : (
                               <button
                                 onClick={() => handleDeleteUser(userData)}
-                                className={`um-action-btn um-action-btn-danger${isCurrentUser(userData) ? ' um-action-disabled' : ''}`}
+                                className={`um-action-btn um-action-btn-danger${isCurrentUser(userData) ? " um-action-disabled" : ""}`}
                                 disabled={isCurrentUser(userData)}
                                 title="Deactivate user"
                               >
@@ -612,10 +694,8 @@ const UserManagement = () => {
                                 Delete
                               </button>
                             )}
-
                           </div>
                         </td>
-
                       </tr>
                     ))
                   )}
@@ -627,8 +707,12 @@ const UserManagement = () => {
             {pagination.total > 0 && (
               <div className="um-pagination">
                 <div className="um-pagination-info">
-                  Showing {((pagination.page - 1) * pagination.limit) + 1}–
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} users
+                  Showing {(pagination.page - 1) * pagination.limit + 1}–
+                  {Math.min(
+                    pagination.page * pagination.limit,
+                    pagination.total,
+                  )}{" "}
+                  of {pagination.total} users
                 </div>
                 <div className="um-pagination-controls">
                   <button
@@ -684,8 +768,16 @@ const UserManagement = () => {
       {successMessage && (
         <div className="um-toast um-toast-success">
           <div className="um-toast-content">
-            <svg className="um-toast-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
             </svg>
             <span>{successMessage}</span>
           </div>
@@ -696,14 +788,21 @@ const UserManagement = () => {
       {errorMessage && (
         <div className="um-toast um-toast-error">
           <div className="um-toast-content">
-            <svg className="um-toast-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
             <span>{errorMessage}</span>
           </div>
         </div>
       )}
-
     </div>
   );
 };

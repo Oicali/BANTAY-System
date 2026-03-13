@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import "./DeleteUserModal.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
@@ -116,6 +117,8 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
   };
 
   return (
+    <>
+    <LoadingModal isOpen={isDeleting} message="Deactivating user..." />
     <div className="dum-modal-overlay" onClick={handleClose}>
       <div
         className="dum-modal-container"
@@ -210,6 +213,7 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
         </form>
       </div>
     </div>
+    </>
   );
 };
 

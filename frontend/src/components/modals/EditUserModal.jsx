@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { getUserFromToken } from "../../utils/auth";
 import "./EditUserModal.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
@@ -143,8 +144,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   useEffect(() => {
     if (!user || !isOpen) return;
 
-    const cleanPhone    = user.phone           ? user.phone.replace(/^\+63/, "")           : "";
-    const cleanAltPhone = user.alternate_phone ? user.alternate_phone.replace(/^\+63/, "") : "";
+    const cleanPhone = user.phone ? user.phone.replace(/^\+63/, "") : "";
+    const cleanAltPhone = user.alternate_phone
+      ? user.alternate_phone.replace(/^\+63/, "")
+      : "";
 
     setOriginalPhone(cleanPhone);
     setOriginalAltPhone(cleanAltPhone);
@@ -168,7 +171,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       address_line: user.address_line || "",
       role: user.role || "",
       rank: user.rank || "",
-      mobile_patrol: user.mobile_patrol != null ? String(user.mobile_patrol) : "",
+      mobile_patrol:
+        user.mobile_patrol != null ? String(user.mobile_patrol) : "",
       department: user.department || "",
       assigned_barangay_code: user.assigned_barangay_code || "",
     });
@@ -187,8 +191,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
 
     if (user.user_type === "police") {
       fetchRegions();
-      if (user.region_code)       fetchProvinces(user.region_code);
-      if (user.province_code)     fetchMunicipalities(user.province_code);
+      if (user.region_code) fetchProvinces(user.region_code);
+      if (user.province_code) fetchMunicipalities(user.province_code);
       if (user.municipality_code) fetchAddressBarangays(user.municipality_code);
     } else if (user.user_type === "barangay") {
       fetchBacoorBarangays();
@@ -298,13 +302,14 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     const firstField = FIELD_ORDER.find((f) => errors[f]);
     if (firstField && errorRefs.current[firstField]) {
       const container = modalContentRef.current;
-      const el        = errorRefs.current[firstField];
+      const el = errorRefs.current[firstField];
 
       if (container && el) {
         const containerRect = container.getBoundingClientRect();
-        const elRect        = el.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
         // Calculate offset relative to the modal's own scroll position
-        const scrollTarget  = elRect.top - containerRect.top + container.scrollTop - 80;
+        const scrollTarget =
+          elRect.top - containerRect.top + container.scrollTop - 80;
         container.scrollTo({ top: scrollTarget, behavior: "smooth" });
 
         setTimeout(() => {
@@ -318,9 +323,9 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
 
   if (!isOpen || !user) return null;
 
-  const isPNP      = user.user_type === "police";
+  const isPNP = user.user_type === "police";
   const isBarangay = user.user_type === "barangay";
-  const isLocked   = user.status === "locked";
+  const isLocked = user.status === "locked";
 
   // ── Masking helpers ────────────────────────────────────────────────────
   const maskPhone = (phone) => {
@@ -334,7 +339,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     if (!email) return "";
     const at = email.indexOf("@");
     if (at < 0) return email;
-    const local  = email.slice(0, at);
+    const local = email.slice(0, at);
     const domain = email.slice(at);
     if (local.length <= 3) return "*".repeat(local.length) + domain;
     return "*".repeat(local.length - 3) + local.slice(-3) + domain;
@@ -349,7 +354,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         ? `${API_URL}/user-management/users/${user.user_id}/unlock`
         : `${API_URL}/user-management/users/${user.user_id}/lock`;
 
-      const res  = await fetch(endpoint, {
+      const res = await fetch(endpoint, {
         method: "PUT",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -359,7 +364,9 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         onUserUpdated();
         handleClose();
       } else {
-        setServerError(data.message || `Failed to ${isLocked ? "unlock" : "lock"} user`);
+        setServerError(
+          data.message || `Failed to ${isLocked ? "unlock" : "lock"} user`,
+        );
       }
     } catch (err) {
       console.error("Lock/unlock error:", err);
@@ -406,20 +413,22 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const validatePassword = (pw) => {
     if (!pw) return "Password is required";
     if (pw.length < 8) return "Password must be at least 8 characters";
-    if (!/[a-z]/.test(pw)) return "Password must contain at least one lowercase letter";
-    if (!/[A-Z]/.test(pw)) return "Password must contain at least one uppercase letter";
-    if (!/\d/.test(pw))    return "Password must contain at least one number";
+    if (!/[a-z]/.test(pw))
+      return "Password must contain at least one lowercase letter";
+    if (!/[A-Z]/.test(pw))
+      return "Password must contain at least one uppercase letter";
+    if (!/\d/.test(pw)) return "Password must contain at least one number";
     if (!/[@$!%*?&#]/.test(pw))
       return "Password must contain at least one special character (@$!%*?&#)";
     return null;
   };
 
   const pwChecks = {
-    length:    passwordData.new_password.length >= 8,
+    length: passwordData.new_password.length >= 8,
     lowercase: /[a-z]/.test(passwordData.new_password),
     uppercase: /[A-Z]/.test(passwordData.new_password),
-    number:    /\d/.test(passwordData.new_password),
-    special:   /[@$!%*?&#]/.test(passwordData.new_password),
+    number: /\d/.test(passwordData.new_password),
+    special: /[@$!%*?&#]/.test(passwordData.new_password),
   };
 
   const validateForm = () => {
@@ -450,24 +459,30 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     }
 
     if (altPhoneChanged && formData.alternate_phone) {
-      const altErr = validatePhone(formData.alternate_phone, "Alternate phone number");
+      const altErr = validatePhone(
+        formData.alternate_phone,
+        "Alternate phone number",
+      );
       if (altErr) {
         e.alternate_phone = altErr;
       } else {
-        const effectivePhone = phoneChanged && formData.phone
-          ? formData.phone.replace(/\D/g, "")
-          : originalPhone.replace(/\D/g, "");
+        const effectivePhone =
+          phoneChanged && formData.phone
+            ? formData.phone.replace(/\D/g, "")
+            : originalPhone.replace(/\D/g, "");
         if (formData.alternate_phone.replace(/\D/g, "") === effectivePhone) {
-          e.alternate_phone = "Alternate phone cannot be the same as primary phone";
+          e.alternate_phone =
+            "Alternate phone cannot be the same as primary phone";
         }
       }
     }
 
     if (isPNP) {
-      if (!formData.region_code)       e.region_code       = "Region is required";
-      if (!formData.province_code)     e.province_code     = "Province is required";
-      if (!formData.municipality_code) e.municipality_code = "City/Municipality is required";
-      if (!formData.barangay_code)     e.barangay_code     = "Barangay is required";
+      if (!formData.region_code) e.region_code = "Region is required";
+      if (!formData.province_code) e.province_code = "Province is required";
+      if (!formData.municipality_code)
+        e.municipality_code = "City/Municipality is required";
+      if (!formData.barangay_code) e.barangay_code = "Barangay is required";
     }
 
     if (isBarangay && !formData.assigned_barangay_code) {
@@ -505,9 +520,9 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     if (name === "suffix") {
       const t = value.trim();
       let p = value;
-      if (t.toLowerCase() === "sr.")      p = "Sr.";
+      if (t.toLowerCase() === "sr.") p = "Sr.";
       else if (t.toLowerCase() === "jr.") p = "Jr.";
-      else if (/^[ivxlcdm]+$/i.test(t))  p = t.toUpperCase();
+      else if (/^[ivxlcdm]+$/i.test(t)) p = t.toUpperCase();
       else p = value.replace(/[^ivxlcdmjrsr.\s]/gi, "");
       setFormData((prev) => ({ ...prev, [name]: p.slice(0, 5) }));
       clearError(name);
@@ -661,11 +676,13 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         const picFd = new FormData();
         picFd.append("profilePicture", profilePicture);
 
-        const picRes  = await fetch(
+        const picRes = await fetch(
           `${API_URL}/users/profile/picture/${user.user_id}`,
           {
             method: "POST",
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
             body: picFd,
           },
         );
@@ -682,9 +699,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       let formattedSuffix = formData.suffix.trim();
       if (formattedSuffix) {
         const low = formattedSuffix.toLowerCase();
-        if (low === "sr.")                               formattedSuffix = "Sr.";
-        else if (low === "jr.")                          formattedSuffix = "Jr.";
-        else if (/^[ivxlcdm]+$/i.test(formattedSuffix)) formattedSuffix = formattedSuffix.toUpperCase();
+        if (low === "sr.") formattedSuffix = "Sr.";
+        else if (low === "jr.") formattedSuffix = "Jr.";
+        else if (/^[ivxlcdm]+$/i.test(formattedSuffix))
+          formattedSuffix = formattedSuffix.toUpperCase();
       }
 
       const fd = new FormData();
@@ -696,51 +714,59 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
           : originalEmail.toLowerCase(),
       );
 
-      fd.append("first_name",  formData.first_name.trim());
-      fd.append("last_name",   formData.last_name.trim());
+      fd.append("first_name", formData.first_name.trim());
+      fd.append("last_name", formData.last_name.trim());
       fd.append("middle_name", formData.middle_name?.trim() || "");
-      fd.append("suffix",      formattedSuffix || "");
-      fd.append("gender",      formData.gender);
+      fd.append("suffix", formattedSuffix || "");
+      fd.append("gender", formData.gender);
 
-      const effectivePhone = phoneChanged && formData.phone
-        ? `+63${formData.phone.replace(/\D/g, "")}`
-        : originalPhone ? `+63${originalPhone}` : "";
+      const effectivePhone =
+        phoneChanged && formData.phone
+          ? `+63${formData.phone.replace(/\D/g, "")}`
+          : originalPhone
+            ? `+63${originalPhone}`
+            : "";
       fd.append("phone", effectivePhone);
 
-      const effectiveAltPhone = altPhoneChanged && formData.alternate_phone
-        ? `+63${formData.alternate_phone.replace(/\D/g, "")}`
-        : originalAltPhone ? `+63${originalAltPhone}` : "";
+      const effectiveAltPhone =
+        altPhoneChanged && formData.alternate_phone
+          ? `+63${formData.alternate_phone.replace(/\D/g, "")}`
+          : originalAltPhone
+            ? `+63${originalAltPhone}`
+            : "";
       fd.append("alternate_phone", effectiveAltPhone);
 
-      if (formData.date_of_birth) fd.append("date_of_birth", formData.date_of_birth);
+      if (formData.date_of_birth)
+        fd.append("date_of_birth", formData.date_of_birth);
       fd.append("role", formData.role);
 
       if (isPNP) {
-        fd.append("region_code",       formData.region_code);
-        fd.append("province_code",     formData.province_code);
+        fd.append("region_code", formData.region_code);
+        fd.append("province_code", formData.province_code);
         fd.append("municipality_code", formData.municipality_code);
-        fd.append("barangay_code",     formData.barangay_code);
+        fd.append("barangay_code", formData.barangay_code);
       } else if (isBarangay) {
-        fd.append("region_code",            "040000000");
-        fd.append("province_code",          "042100000");
-        fd.append("municipality_code",      BACOOR_CITY_CODE);
-        fd.append("barangay_code",          formData.assigned_barangay_code);
+        fd.append("region_code", "040000000");
+        fd.append("province_code", "042100000");
+        fd.append("municipality_code", BACOOR_CITY_CODE);
+        fd.append("barangay_code", formData.assigned_barangay_code);
         fd.append("assigned_barangay_code", formData.assigned_barangay_code);
       }
 
       fd.append("address_line", formData.address_line?.trim() || "");
 
       if (isPNP) {
-        fd.append("rank",          formData.rank?.trim() || "");
+        fd.append("rank", formData.rank?.trim() || "");
         fd.append("mobile_patrol", formData.mobile_patrol || "");
-        fd.append("department",    formData.department?.trim() || "");
+        fd.append("department", formData.department?.trim() || "");
       }
 
       if (showPasswordFields && passwordData.new_password) {
         fd.append("new_password", passwordData.new_password);
       }
 
-      const res  = await fetch(`${API_URL}/user-management/users/${user.user_id}`,
+      const res = await fetch(
+        `${API_URL}/user-management/users/${user.user_id}`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -758,11 +784,19 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       } else {
         const newErrors = {};
         if (data.errors?.email || data.message?.toLowerCase().includes("email"))
-          newErrors.email = data.errors?.email || "This email is already registered to another user";
+          newErrors.email =
+            data.errors?.email ||
+            "This email is already registered to another user";
         if (data.errors?.phone || data.message?.toLowerCase().includes("phone"))
-          newErrors.phone = data.errors?.phone || "This phone number is already registered";
-        if (data.errors?.alternate_phone || data.message?.toLowerCase().includes("alternate"))
-          newErrors.alternate_phone = data.errors?.alternate_phone || "This phone number is already in use";
+          newErrors.phone =
+            data.errors?.phone || "This phone number is already registered";
+        if (
+          data.errors?.alternate_phone ||
+          data.message?.toLowerCase().includes("alternate")
+        )
+          newErrors.alternate_phone =
+            data.errors?.alternate_phone ||
+            "This phone number is already in use";
 
         if (Object.keys(newErrors).length > 0) {
           setErrors(newErrors);
@@ -781,626 +815,102 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="eum-modal-overlay">
-      <div
-        className="eum-modal-container eum-modal-large"
-        ref={modalContentRef}
-      >
-        {/* Header */}
-        <div className="eum-modal-header">
-          <h2>Edit {isPNP ? "PNP" : "Barangay"} User</h2>
-          <button
-            className="eum-modal-close"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            ×
-          </button>
-        </div>
+    <>
+      <LoadingModal
+        isOpen={isSubmitting || isLocking}
+        message={
+          isLocking
+            ? isLocked
+              ? "Unlocking account..."
+              : "Locking account..."
+            : "Updating user..."
+        }
+      />
+      <div className="eum-modal-overlay">
+        <div
+          className="eum-modal-container eum-modal-large"
+          ref={modalContentRef}
+        >
+          {/* Header */}
+          <div className="eum-modal-header">
+            <h2>Edit {isPNP ? "PNP" : "Barangay"} User</h2>
+            <button
+              className="eum-modal-close"
+              onClick={handleClose}
+              disabled={isSubmitting || isLocking}
+            >
+              ×
+            </button>
+          </div>
 
-        <form onSubmit={handleSubmit} className="eum-modal-form">
-
-          {/* ── Profile Picture ── */}
-          <div
-            className="eum-form-section"
-            ref={(el) => (errorRefs.current["profilePicture"] = el)}
-          >
-            <h3 className="eum-form-section-title">Profile Picture</h3>
-            <div className="eum-profile-picture-upload">
-              <div className="eum-profile-picture-preview">
-                {profilePicturePreview ? (
-                  <img src={profilePicturePreview} alt="Profile preview" />
-                ) : (
-                  <div className="eum-profile-picture-placeholder">
-                    <span>📷</span>
-                    <p>No image</p>
-                  </div>
-                )}
-              </div>
-              <div className="eum-profile-picture-actions">
-                <input
-                  type="file"
-                  id="editProfilePicture"
-                  ref={fileInputRef}
-                  accept="image/jpeg,image/jpg,image/png"
-                  onChange={handleProfilePictureChange}
-                  disabled={isSubmitting}
-                  style={{ display: "none" }}
-                />
-                <label
-                  htmlFor="editProfilePicture"
-                  className={`eum-btn eum-btn-secondary${isSubmitting ? " disabled" : ""}`}
-                  style={{
-                    pointerEvents: isSubmitting ? "none" : "auto",
-                    opacity: isSubmitting ? 0.6 : 1,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  <img
-                    src="/images/upload.png"
-                    alt="Upload"
+          <form onSubmit={handleSubmit} className="eum-modal-form">
+            {/* ── Profile Picture ── */}
+            <div
+              className="eum-form-section"
+              ref={(el) => (errorRefs.current["profilePicture"] = el)}
+            >
+              <h3 className="eum-form-section-title">Profile Picture</h3>
+              <div className="eum-profile-picture-upload">
+                <div className="eum-profile-picture-preview">
+                  {profilePicturePreview ? (
+                    <img src={profilePicturePreview} alt="Profile preview" />
+                  ) : (
+                    <div className="eum-profile-picture-placeholder">
+                      <span>📷</span>
+                      <p>No image</p>
+                    </div>
+                  )}
+                </div>
+                <div className="eum-profile-picture-actions">
+                  <input
+                    type="file"
+                    id="editProfilePicture"
+                    ref={fileInputRef}
+                    accept="image/jpeg,image/jpg,image/png"
+                    onChange={handleProfilePictureChange}
+                    disabled={isSubmitting}
+                    style={{ display: "none" }}
+                  />
+                  <label
+                    htmlFor="editProfilePicture"
+                    className={`eum-btn eum-btn-secondary${isSubmitting ? " disabled" : ""}`}
                     style={{
-                      width: 18,
-                      height: 18,
-                      filter: "brightness(0) saturate(0) opacity(0.5)",
+                      pointerEvents: isSubmitting ? "none" : "auto",
+                      opacity: isSubmitting ? 0.6 : 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      cursor: "pointer",
                     }}
-                  />
-                  Choose Picture
-                </label>
-                <p className="eum-upload-hint">JPEG or PNG, max 5MB</p>
-              </div>
-            </div>
-            {errors.profilePicture && (
-              <span className="eum-error-text">{errors.profilePicture}</span>
-            )}
-          </div>
-
-          {/* ── Account Information ── */}
-          <div className="eum-form-section">
-            <h3 className="eum-form-section-title">Account Information</h3>
-            <div className="eum-form-row">
-              <div className="eum-form-group">
-                <label className="eum-form-label">Username</label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  className="eum-form-input"
-                  disabled
-                  style={{ background: "#f8f9fa", cursor: "not-allowed" }}
-                />
-              </div>
-
-              {/* Email with masking + hint */}
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["email"] = el)}
-              >
-                <label className="eum-form-label">Email *</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className={`eum-form-input${errors.email ? " eum-error" : ""}${!emailChanged ? " eum-sensitive-idle" : " eum-sensitive-active"}`}
-                  placeholder={maskEmail(originalEmail) || "Enter email address"}
-                />
-                {!errors.email && (
-                  <div className={`eum-keep-hint${emailChanged ? " eum-keep-hint-changed" : ""}`}>
-                    <span className="eum-keep-dot" />
-                    {emailChanged
-                      ? "New email will replace the current one on save"
-                      : "Leave blank to keep current email address"}
-                  </div>
-                )}
-                {errors.email && (
-                  <span className="eum-error-text">{errors.email}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="eum-password-toggle">
-              <button
-                type="button"
-                className="eum-toggle-password-btn"
-                disabled={isSubmitting}
-                onClick={() => {
-                  setShowPasswordFields(!showPasswordFields);
-                  if (showPasswordFields) {
-                    setPasswordData({ new_password: "", confirm_password: "" });
-                    setErrors((prev) => ({ ...prev, new_password: "", confirm_password: "" }));
-                  }
-                }}
-              >
-                {showPasswordFields ? "✕ Cancel Password Change" : "Change Password"}
-              </button>
-            </div>
-
-            {showPasswordFields && (
-              <div className="eum-password-section">
-                <div className="eum-form-row">
-                  <div
-                    className="eum-form-group"
-                    ref={(el) => (errorRefs.current["new_password"] = el)}
                   >
-                    <label className="eum-form-label">New Password *</label>
-                    <div className="eum-password-input-wrapper">
-                      <input
-                        type={showNewPassword ? "text" : "password"}
-                        name="new_password"
-                        value={passwordData.new_password}
-                        onChange={handlePasswordChange}
-                        onPaste={handlePasswordPaste}
-                        onCopy={handlePasswordPaste}
-                        onCut={handlePasswordPaste}
-                        disabled={isSubmitting}
-                        className={`eum-form-input ${errors.new_password ? "eum-error" : ""}`}
-                        placeholder="Enter new password"
-                      />
-                      <button
-                        type="button"
-                        className="eum-password-toggle-icon"
-                        disabled={isSubmitting}
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                      >
-                        {showNewPassword ? <Eye size={20} /> : <EyeOff size={20} />}
-                      </button>
-                    </div>
-                    {errors.new_password && (
-                      <span className="eum-error-text">{errors.new_password}</span>
-                    )}
-                  </div>
-                  <div
-                    className="eum-form-group"
-                    ref={(el) => (errorRefs.current["confirm_password"] = el)}
-                  >
-                    <label className="eum-form-label">Confirm Password *</label>
-                    <div className="eum-password-input-wrapper">
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirm_password"
-                        value={passwordData.confirm_password}
-                        onChange={handlePasswordChange}
-                        onPaste={handlePasswordPaste}
-                        onCopy={handlePasswordPaste}
-                        onCut={handlePasswordPaste}
-                        disabled={isSubmitting}
-                        className={`eum-form-input ${errors.confirm_password ? "eum-error" : ""}`}
-                        placeholder="Confirm new password"
-                      />
-                      <button
-                        type="button"
-                        className="eum-password-toggle-icon"
-                        disabled={isSubmitting}
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? <Eye size={20} /> : <EyeOff size={20} />}
-                      </button>
-                    </div>
-                    {errors.confirm_password && (
-                      <span className="eum-error-text">{errors.confirm_password}</span>
-                    )}
-                  </div>
-                </div>
-                <div className="eum-password-requirements">
-                  <p className="eum-requirements-title">Password Requirements:</p>
-                  <ul className="eum-requirements-list">
-                    <li className={pwChecks.length    ? "eum-valid" : ""}>At least 8 characters long</li>
-                    <li className={pwChecks.uppercase ? "eum-valid" : ""}>Contains uppercase letter (A-Z)</li>
-                    <li className={pwChecks.lowercase ? "eum-valid" : ""}>Contains lowercase letter (a-z)</li>
-                    <li className={pwChecks.number    ? "eum-valid" : ""}>Contains at least one number (0-9)</li>
-                    <li className={pwChecks.special   ? "eum-valid" : ""}>Contains special character (@$!%*?&#)</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Personal Information ── */}
-          <div className="eum-form-section">
-            <h3 className="eum-form-section-title">Personal Information</h3>
-            <div className="eum-form-row-triple">
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["first_name"] = el)}
-              >
-                <label className="eum-form-label">First Name *</label>
-                <input
-                  type="text"
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  maxLength="50"
-                  placeholder="Enter first name"
-                  className={`eum-form-input ${errors.first_name ? "eum-error" : ""}`}
-                />
-                {errors.first_name && (
-                  <span className="eum-error-text">{errors.first_name}</span>
-                )}
-              </div>
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["middle_name"] = el)}
-              >
-                <label className="eum-form-label">Middle Name</label>
-                <input
-                  type="text"
-                  name="middle_name"
-                  value={formData.middle_name}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  maxLength="50"
-                  placeholder="(optional)"
-                  className={`eum-form-input ${errors.middle_name ? "eum-error" : ""}`}
-                />
-                {errors.middle_name && (
-                  <span className="eum-error-text">{errors.middle_name}</span>
-                )}
-              </div>
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["last_name"] = el)}
-              >
-                <label className="eum-form-label">Last Name *</label>
-                <input
-                  type="text"
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  maxLength="50"
-                  placeholder="Enter last name"
-                  className={`eum-form-input ${errors.last_name ? "eum-error" : ""}`}
-                />
-                {errors.last_name && (
-                  <span className="eum-error-text">{errors.last_name}</span>
-                )}
-              </div>
-            </div>
-            <div className="eum-form-row-triple">
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["suffix"] = el)}
-              >
-                <label className="eum-form-label">Suffix</label>
-                <input
-                  type="text"
-                  name="suffix"
-                  value={formData.suffix}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  maxLength="5"
-                  placeholder="Jr., Sr., III (optional)"
-                  className={`eum-form-input ${errors.suffix ? "eum-error" : ""}`}
-                />
-                {errors.suffix && (
-                  <span className="eum-error-text">{errors.suffix}</span>
-                )}
-              </div>
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["date_of_birth"] = el)}
-              >
-                <label className="eum-form-label">Date of Birth *</label>
-                <input
-                  type="date"
-                  name="date_of_birth"
-                  value={formData.date_of_birth}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="eum-form-input"
-                  max={(() => {
-                    const d = new Date();
-                    return new Date(d.getFullYear() - 18, d.getMonth(), d.getDate())
-                      .toISOString()
-                      .split("T")[0];
-                  })()}
-                />
-              </div>
-              <div className="eum-form-group">
-                <label className="eum-form-label">Gender</label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="eum-form-input"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Contact Information ── */}
-          <div className="eum-form-section">
-            <h3 className="eum-form-section-title">Contact Information</h3>
-            <div className="eum-form-row-triple">
-
-              {/* Phone */}
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["phone"] = el)}
-              >
-                <label className="eum-form-label">Mobile Number *</label>
-                <div
-                  className={`eum-phone-input-wrapper${errors.phone ? " eum-phone-error" : ""}${!phoneChanged ? " eum-sensitive-idle-phone" : " eum-sensitive-active-phone"}`}
-                >
-                  <span className="eum-phone-prefix">+63</span>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    maxLength="10"
-                    placeholder={maskPhone(originalPhone) || "9XXXXXXXXX"}
-                    className="eum-form-input eum-phone-input"
-                  />
-                </div>
-                {!errors.phone && (
-                  <div className={`eum-keep-hint${phoneChanged ? " eum-keep-hint-changed" : ""}`}>
-                    <span className="eum-keep-dot" />
-                    {phoneChanged
-                      ? "New number will replace the current one on save"
-                      : "Leave blank to keep current phone number"}
-                  </div>
-                )}
-                {errors.phone && (
-                  <span className="eum-error-text">{errors.phone}</span>
-                )}
-              </div>
-
-              {/* Alternate Phone */}
-              <div
-                className="eum-form-group"
-                ref={(el) => (errorRefs.current["alternate_phone"] = el)}
-              >
-                <label className="eum-form-label">Alternate Phone</label>
-                <div
-                  className={`eum-phone-input-wrapper${errors.alternate_phone ? " eum-phone-error" : ""}${!altPhoneChanged && originalAltPhone ? " eum-sensitive-idle-phone" : altPhoneChanged ? " eum-sensitive-active-phone" : ""}`}
-                >
-                  <span className="eum-phone-prefix">+63</span>
-                  <input
-                    type="tel"
-                    name="alternate_phone"
-                    value={formData.alternate_phone}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    maxLength="10"
-                    placeholder={
-                      originalAltPhone ? maskPhone(originalAltPhone) : "9XXXXXXXXX (optional)"
-                    }
-                    className="eum-form-input eum-phone-input"
-                  />
-                </div>
-                {originalAltPhone && !errors.alternate_phone && (
-                  <div className={`eum-keep-hint${altPhoneChanged ? " eum-keep-hint-changed" : ""}`}>
-                    <span className="eum-keep-dot" />
-                    {altPhoneChanged
-                      ? "New number will replace the current one on save"
-                      : "Leave blank to keep current alt. phone number"}
-                  </div>
-                )}
-                {errors.alternate_phone && (
-                  <span className="eum-error-text">{errors.alternate_phone}</span>
-                )}
-              </div>
-
-              <div className="eum-form-group">{/* spacer */}</div>
-            </div>
-          </div>
-
-          {/* ── Address — PNP ── */}
-          {isPNP && (
-            <div className="eum-form-section">
-              <h3 className="eum-form-section-title">Address</h3>
-              <div className="eum-form-row-quad">
-                <div
-                  className="eum-form-group"
-                  ref={(el) => (errorRefs.current["region_code"] = el)}
-                >
-                  <label className="eum-form-label">Region *</label>
-                  <select
-                    name="region_code"
-                    value={formData.region_code}
-                    onChange={handleChange}
-                    disabled={isSubmitting || loadingRegions}
-                    className={`eum-form-input ${errors.region_code ? "eum-error" : ""}`}
-                  >
-                    <option value="">{loadingRegions ? "Loading..." : "Select Region"}</option>
-                    {regions.map((r) => (
-                      <option key={r.code} value={r.code}>{r.name}</option>
-                    ))}
-                  </select>
-                  {errors.region_code && (
-                    <span className="eum-error-text">{errors.region_code}</span>
-                  )}
-                </div>
-                <div
-                  className="eum-form-group"
-                  ref={(el) => (errorRefs.current["province_code"] = el)}
-                >
-                  <label className="eum-form-label">Province *</label>
-                  <select
-                    name="province_code"
-                    value={formData.province_code}
-                    onChange={handleChange}
-                    disabled={isSubmitting || !formData.region_code || loadingProvinces}
-                    className={`eum-form-input ${errors.province_code ? "eum-error" : ""}`}
-                  >
-                    <option value="">{loadingProvinces ? "Loading..." : "Select Province"}</option>
-                    {provinces.map((p) => (
-                      <option key={p.code} value={p.code}>{p.name}</option>
-                    ))}
-                  </select>
-                  {errors.province_code && (
-                    <span className="eum-error-text">{errors.province_code}</span>
-                  )}
-                </div>
-                <div
-                  className="eum-form-group"
-                  ref={(el) => (errorRefs.current["municipality_code"] = el)}
-                >
-                  <label className="eum-form-label">City / Municipality *</label>
-                  <select
-                    name="municipality_code"
-                    value={formData.municipality_code}
-                    onChange={handleChange}
-                    disabled={isSubmitting || !formData.province_code || loadingMunicipalities}
-                    className={`eum-form-input ${errors.municipality_code ? "eum-error" : ""}`}
-                  >
-                    <option value="">{loadingMunicipalities ? "Loading..." : "Select City/Municipality"}</option>
-                    {municipalities.map((m) => (
-                      <option key={m.code} value={m.code}>{m.name}</option>
-                    ))}
-                  </select>
-                  {errors.municipality_code && (
-                    <span className="eum-error-text">{errors.municipality_code}</span>
-                  )}
-                </div>
-                <div
-                  className="eum-form-group"
-                  ref={(el) => (errorRefs.current["barangay_code"] = el)}
-                >
-                  <label className="eum-form-label">Barangay *</label>
-                  <select
-                    name="barangay_code"
-                    value={formData.barangay_code}
-                    onChange={handleChange}
-                    disabled={isSubmitting || !formData.municipality_code || loadingAddrBarangays}
-                    className={`eum-form-input ${errors.barangay_code ? "eum-error" : ""}`}
-                  >
-                    <option value="">{loadingAddrBarangays ? "Loading..." : "Select Barangay"}</option>
-                    {addressBarangays.map((b) => (
-                      <option key={b.code} value={b.code}>{b.name}</option>
-                    ))}
-                  </select>
-                  {errors.barangay_code && (
-                    <span className="eum-error-text">{errors.barangay_code}</span>
-                  )}
-                </div>
-              </div>
-              <div className="eum-form-row">
-                <div
-                  className="eum-form-group eum-full-width"
-                  ref={(el) => (errorRefs.current["address_line"] = el)}
-                >
-                  <label className="eum-form-label">
-                    House No. / Blk / Lot / Street / Subdivision
+                    <img
+                      src="/images/upload.png"
+                      alt="Upload"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        filter: "brightness(0) saturate(0) opacity(0.5)",
+                      }}
+                    />
+                    Choose Picture
                   </label>
-                  <input
-                    type="text"
-                    name="address_line"
-                    value={formData.address_line}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    maxLength="255"
-                    className="eum-form-input"
-                    placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
-                  />
-                  <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                    {formData.address_line.length}/255 characters
-                  </span>
+                  <p className="eum-upload-hint">JPEG or PNG, max 5MB</p>
                 </div>
               </div>
+              {errors.profilePicture && (
+                <span className="eum-error-text">{errors.profilePicture}</span>
+              )}
             </div>
-          )}
 
-          {/* ── Official Information — PNP ── */}
-          {isPNP && (
+            {/* ── Account Information ── */}
             <div className="eum-form-section">
-              <h3 className="eum-form-section-title">Official Information (PNP)</h3>
+              <h3 className="eum-form-section-title">Account Information</h3>
               <div className="eum-form-row">
                 <div className="eum-form-group">
-                  <label className="eum-form-label">Role *</label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className="eum-form-input"
-                  >
-                    {availableRoles.length > 0 ? (
-                      availableRoles.map((r) => (
-                        <option key={r.role_id} value={r.role_name}>{r.role_name}</option>
-                      ))
-                    ) : (
-                      <>
-                        <option value="Administrator">Administrator</option>
-                        <option value="Investigator">Investigator</option>
-                        <option value="Patrol">Patrol</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-                <div className="eum-form-group">
-                  <label className="eum-form-label">Rank</label>
+                  <label className="eum-form-label">Username</label>
                   <input
                     type="text"
-                    name="rank"
-                    value={formData.rank}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    maxLength="100"
-                    className="eum-form-input"
-                    placeholder="e.g., Police Officer III"
-                  />
-                </div>
-              </div>
-              <div className="eum-form-row">
-                <div className="eum-form-group">
-                  <label className="eum-form-label">
-                    Mobile Patrol No.
-                    {formData.role !== "Patrol" && (
-                      <span style={{ fontSize: 11, fontWeight: 400, color: "#6c757d" }}>
-                        {" "}(Patrol role only)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    name="mobile_patrol"
-                    value={formData.mobile_patrol}
-                    onChange={handleChange}
-                    disabled={isSubmitting || formData.role !== "Patrol"}
-                    maxLength="6"
-                    className="eum-form-input"
-                    placeholder="e.g., 101"
-                  />
-                </div>
-                <div className="eum-form-group">
-                  <label className="eum-form-label">Department</label>
-                  <input
-                    type="text"
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    maxLength="100"
-                    className="eum-form-input"
-                    placeholder="e.g., Investigation Division"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Official Information — Barangay ── */}
-          {isBarangay && (
-            <div className="eum-form-section">
-              <h3 className="eum-form-section-title">Official Information (Barangay)</h3>
-              <div className="eum-form-row">
-                <div className="eum-form-group">
-                  <label className="eum-form-label">Role</label>
-                  <input
-                    type="text"
-                    value={formData.role || "Barangay"}
+                    value={formData.username}
                     className="eum-form-input"
                     disabled
                     style={{ background: "#f8f9fa", cursor: "not-allowed" }}
@@ -1408,120 +918,766 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                 </div>
                 <div
                   className="eum-form-group"
-                  ref={(el) => (errorRefs.current["assigned_barangay_code"] = el)}
+                  ref={(el) => (errorRefs.current["email"] = el)}
                 >
-                  <label className="eum-form-label">Assigned Barangay *</label>
-                  <select
-                    name="assigned_barangay_code"
-                    value={formData.assigned_barangay_code}
-                    onChange={(e) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        assigned_barangay_code: e.target.value,
-                      }));
-                      clearError("assigned_barangay_code");
-                    }}
-                    disabled={isSubmitting || loadingBacoorBarangays}
-                    className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
-                  >
-                    {!formData.assigned_barangay_code && (
-                      <option value="">
-                        {loadingBacoorBarangays ? "Loading barangays..." : "Select Barangay"}
-                      </option>
-                    )}
-                    {loadingBacoorBarangays && formData.assigned_barangay_code && (
-                      <option value={formData.assigned_barangay_code}>
-                        Loading barangays...
-                      </option>
-                    )}
-                    {bacoorBarangays.map((b) => (
-                      <option key={b.code} value={b.code}>{b.name}</option>
-                    ))}
-                  </select>
-                  {errors.assigned_barangay_code && (
-                    <span className="eum-error-text">{errors.assigned_barangay_code}</span>
+                  <label className="eum-form-label">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    className={`eum-form-input${errors.email ? " eum-error" : ""}${!emailChanged ? " eum-sensitive-idle" : " eum-sensitive-active"}`}
+                    placeholder={
+                      maskEmail(originalEmail) || "Enter email address"
+                    }
+                  />
+                  {!errors.email && (
+                    <div
+                      className={`eum-keep-hint${emailChanged ? " eum-keep-hint-changed" : ""}`}
+                    >
+                      <span className="eum-keep-dot" />
+                      {emailChanged
+                        ? "New email will replace the current one on save"
+                        : "Leave blank to keep current email address"}
+                    </div>
+                  )}
+                  {errors.email && (
+                    <span className="eum-error-text">{errors.email}</span>
                   )}
                 </div>
               </div>
-              <div className="eum-form-row">
-                <div
-                  className="eum-form-group eum-full-width"
-                  ref={(el) => (errorRefs.current["address_line"] = el)}
+
+              <div className="eum-password-toggle">
+                <button
+                  type="button"
+                  className="eum-toggle-password-btn"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setShowPasswordFields(!showPasswordFields);
+                    if (showPasswordFields) {
+                      setPasswordData({
+                        new_password: "",
+                        confirm_password: "",
+                      });
+                      setErrors((prev) => ({
+                        ...prev,
+                        new_password: "",
+                        confirm_password: "",
+                      }));
+                    }
+                  }}
                 >
-                  <label className="eum-form-label">
-                    House No. / Blk / Lot / Street / Subdivision
-                  </label>
+                  {showPasswordFields
+                    ? "✕ Cancel Password Change"
+                    : "Change Password"}
+                </button>
+              </div>
+
+              {showPasswordFields && (
+                <div className="eum-password-section">
+                  <div className="eum-form-row">
+                    <div
+                      className="eum-form-group"
+                      ref={(el) => (errorRefs.current["new_password"] = el)}
+                    >
+                      <label className="eum-form-label">New Password *</label>
+                      <div className="eum-password-input-wrapper">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          name="new_password"
+                          value={passwordData.new_password}
+                          onChange={handlePasswordChange}
+                          onPaste={handlePasswordPaste}
+                          onCopy={handlePasswordPaste}
+                          onCut={handlePasswordPaste}
+                          disabled={isSubmitting}
+                          className={`eum-form-input ${errors.new_password ? "eum-error" : ""}`}
+                          placeholder="Enter new password"
+                        />
+                        <button
+                          type="button"
+                          className="eum-password-toggle-icon"
+                          disabled={isSubmitting}
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? (
+                            <Eye size={20} />
+                          ) : (
+                            <EyeOff size={20} />
+                          )}
+                        </button>
+                      </div>
+                      {errors.new_password && (
+                        <span className="eum-error-text">
+                          {errors.new_password}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className="eum-form-group"
+                      ref={(el) => (errorRefs.current["confirm_password"] = el)}
+                    >
+                      <label className="eum-form-label">
+                        Confirm Password *
+                      </label>
+                      <div className="eum-password-input-wrapper">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          name="confirm_password"
+                          value={passwordData.confirm_password}
+                          onChange={handlePasswordChange}
+                          onPaste={handlePasswordPaste}
+                          onCopy={handlePasswordPaste}
+                          onCut={handlePasswordPaste}
+                          disabled={isSubmitting}
+                          className={`eum-form-input ${errors.confirm_password ? "eum-error" : ""}`}
+                          placeholder="Confirm new password"
+                        />
+                        <button
+                          type="button"
+                          className="eum-password-toggle-icon"
+                          disabled={isSubmitting}
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                        >
+                          {showConfirmPassword ? (
+                            <Eye size={20} />
+                          ) : (
+                            <EyeOff size={20} />
+                          )}
+                        </button>
+                      </div>
+                      {errors.confirm_password && (
+                        <span className="eum-error-text">
+                          {errors.confirm_password}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="eum-password-requirements">
+                    <p className="eum-requirements-title">
+                      Password Requirements:
+                    </p>
+                    <ul className="eum-requirements-list">
+                      <li className={pwChecks.length ? "eum-valid" : ""}>
+                        At least 8 characters long
+                      </li>
+                      <li className={pwChecks.uppercase ? "eum-valid" : ""}>
+                        Contains uppercase letter (A-Z)
+                      </li>
+                      <li className={pwChecks.lowercase ? "eum-valid" : ""}>
+                        Contains lowercase letter (a-z)
+                      </li>
+                      <li className={pwChecks.number ? "eum-valid" : ""}>
+                        Contains at least one number (0-9)
+                      </li>
+                      <li className={pwChecks.special ? "eum-valid" : ""}>
+                        Contains special character (@$!%*?&#)
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Personal Information ── */}
+            <div className="eum-form-section">
+              <h3 className="eum-form-section-title">Personal Information</h3>
+              <div className="eum-form-row-triple">
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["first_name"] = el)}
+                >
+                  <label className="eum-form-label">First Name *</label>
                   <input
                     type="text"
-                    name="address_line"
-                    value={formData.address_line}
+                    name="first_name"
+                    value={formData.first_name}
                     onChange={handleChange}
                     disabled={isSubmitting}
-                    maxLength="255"
-                    className="eum-form-input"
-                    placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
+                    maxLength="50"
+                    placeholder="Enter first name"
+                    className={`eum-form-input ${errors.first_name ? "eum-error" : ""}`}
                   />
-                  <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                    {formData.address_line.length}/255 characters
-                  </span>
+                  {errors.first_name && (
+                    <span className="eum-error-text">{errors.first_name}</span>
+                  )}
+                </div>
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["middle_name"] = el)}
+                >
+                  <label className="eum-form-label">Middle Name</label>
+                  <input
+                    type="text"
+                    name="middle_name"
+                    value={formData.middle_name}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    maxLength="50"
+                    placeholder="(optional)"
+                    className={`eum-form-input ${errors.middle_name ? "eum-error" : ""}`}
+                  />
+                  {errors.middle_name && (
+                    <span className="eum-error-text">{errors.middle_name}</span>
+                  )}
+                </div>
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["last_name"] = el)}
+                >
+                  <label className="eum-form-label">Last Name *</label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={formData.last_name}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    maxLength="50"
+                    placeholder="Enter last name"
+                    className={`eum-form-input ${errors.last_name ? "eum-error" : ""}`}
+                  />
+                  {errors.last_name && (
+                    <span className="eum-error-text">{errors.last_name}</span>
+                  )}
+                </div>
+              </div>
+              <div className="eum-form-row-triple">
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["suffix"] = el)}
+                >
+                  <label className="eum-form-label">Suffix</label>
+                  <input
+                    type="text"
+                    name="suffix"
+                    value={formData.suffix}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    maxLength="5"
+                    placeholder="Jr., Sr., III (optional)"
+                    className={`eum-form-input ${errors.suffix ? "eum-error" : ""}`}
+                  />
+                  {errors.suffix && (
+                    <span className="eum-error-text">{errors.suffix}</span>
+                  )}
+                </div>
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["date_of_birth"] = el)}
+                >
+                  <label className="eum-form-label">Date of Birth *</label>
+                  <input
+                    type="date"
+                    name="date_of_birth"
+                    value={formData.date_of_birth}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    className="eum-form-input"
+                    max={(() => {
+                      const d = new Date();
+                      return new Date(
+                        d.getFullYear() - 18,
+                        d.getMonth(),
+                        d.getDate(),
+                      )
+                        .toISOString()
+                        .split("T")[0];
+                    })()}
+                  />
+                </div>
+                <div className="eum-form-group">
+                  <label className="eum-form-label">Gender</label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                    className="eum-form-input"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Server error banner — only shows for actual server-side errors */}
-          {serverError && <div className="eum-alert-error">{serverError}</div>}
-
-          {/* Success banner */}
-          {successMessage && (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "rgba(34,197,94,0.1)",
-                borderLeft: "3px solid #22c55e",
-                borderRadius: 4,
-                color: "#15803d",
-                fontSize: 14,
-                marginBottom: 24,
-                fontWeight: 500,
-              }}
-            >
-              {successMessage}
+            {/* ── Contact Information ── */}
+            <div className="eum-form-section">
+              <h3 className="eum-form-section-title">Contact Information</h3>
+              <div className="eum-form-row-triple">
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["phone"] = el)}
+                >
+                  <label className="eum-form-label">Mobile Number *</label>
+                  <div
+                    className={`eum-phone-input-wrapper${errors.phone ? " eum-phone-error" : ""}${!phoneChanged ? " eum-sensitive-idle-phone" : " eum-sensitive-active-phone"}`}
+                  >
+                    <span className="eum-phone-prefix">+63</span>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="10"
+                      placeholder={maskPhone(originalPhone) || "9XXXXXXXXX"}
+                      className="eum-form-input eum-phone-input"
+                    />
+                  </div>
+                  {!errors.phone && (
+                    <div
+                      className={`eum-keep-hint${phoneChanged ? " eum-keep-hint-changed" : ""}`}
+                    >
+                      <span className="eum-keep-dot" />
+                      {phoneChanged
+                        ? "New number will replace the current one on save"
+                        : "Leave blank to keep current phone number"}
+                    </div>
+                  )}
+                  {errors.phone && (
+                    <span className="eum-error-text">{errors.phone}</span>
+                  )}
+                </div>
+                <div
+                  className="eum-form-group"
+                  ref={(el) => (errorRefs.current["alternate_phone"] = el)}
+                >
+                  <label className="eum-form-label">Alternate Phone</label>
+                  <div
+                    className={`eum-phone-input-wrapper${errors.alternate_phone ? " eum-phone-error" : ""}${!altPhoneChanged && originalAltPhone ? " eum-sensitive-idle-phone" : altPhoneChanged ? " eum-sensitive-active-phone" : ""}`}
+                  >
+                    <span className="eum-phone-prefix">+63</span>
+                    <input
+                      type="tel"
+                      name="alternate_phone"
+                      value={formData.alternate_phone}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="10"
+                      placeholder={
+                        originalAltPhone
+                          ? maskPhone(originalAltPhone)
+                          : "9XXXXXXXXX (optional)"
+                      }
+                      className="eum-form-input eum-phone-input"
+                    />
+                  </div>
+                  {originalAltPhone && !errors.alternate_phone && (
+                    <div
+                      className={`eum-keep-hint${altPhoneChanged ? " eum-keep-hint-changed" : ""}`}
+                    >
+                      <span className="eum-keep-dot" />
+                      {altPhoneChanged
+                        ? "New number will replace the current one on save"
+                        : "Leave blank to keep current alt. phone number"}
+                    </div>
+                  )}
+                  {errors.alternate_phone && (
+                    <span className="eum-error-text">
+                      {errors.alternate_phone}
+                    </span>
+                  )}
+                </div>
+                <div className="eum-form-group">{/* spacer */}</div>
+              </div>
             </div>
-          )}
 
-          {/* ── Actions ── */}
-          <div className="eum-modal-actions">
-            {(user.status === "active" || user.status === "locked") && (
-              <button
-                type="button"
-                className={`eum-btn ${isLocked ? "eum-btn-unlock" : "eum-btn-lock"}`}
-                onClick={handleLockToggle}
-                disabled={isSubmitting || isLocking}
+            {/* ── Address — PNP ── */}
+            {isPNP && (
+              <div className="eum-form-section">
+                <h3 className="eum-form-section-title">Address</h3>
+                <div className="eum-form-row-quad">
+                  <div
+                    className="eum-form-group"
+                    ref={(el) => (errorRefs.current["region_code"] = el)}
+                  >
+                    <label className="eum-form-label">Region *</label>
+                    <select
+                      name="region_code"
+                      value={formData.region_code}
+                      onChange={handleChange}
+                      disabled={isSubmitting || loadingRegions}
+                      className={`eum-form-input ${errors.region_code ? "eum-error" : ""}`}
+                    >
+                      <option value="">
+                        {loadingRegions ? "Loading..." : "Select Region"}
+                      </option>
+                      {regions.map((r) => (
+                        <option key={r.code} value={r.code}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.region_code && (
+                      <span className="eum-error-text">
+                        {errors.region_code}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="eum-form-group"
+                    ref={(el) => (errorRefs.current["province_code"] = el)}
+                  >
+                    <label className="eum-form-label">Province *</label>
+                    <select
+                      name="province_code"
+                      value={formData.province_code}
+                      onChange={handleChange}
+                      disabled={
+                        isSubmitting ||
+                        !formData.region_code ||
+                        loadingProvinces
+                      }
+                      className={`eum-form-input ${errors.province_code ? "eum-error" : ""}`}
+                    >
+                      <option value="">
+                        {loadingProvinces ? "Loading..." : "Select Province"}
+                      </option>
+                      {provinces.map((p) => (
+                        <option key={p.code} value={p.code}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.province_code && (
+                      <span className="eum-error-text">
+                        {errors.province_code}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="eum-form-group"
+                    ref={(el) => (errorRefs.current["municipality_code"] = el)}
+                  >
+                    <label className="eum-form-label">
+                      City / Municipality *
+                    </label>
+                    <select
+                      name="municipality_code"
+                      value={formData.municipality_code}
+                      onChange={handleChange}
+                      disabled={
+                        isSubmitting ||
+                        !formData.province_code ||
+                        loadingMunicipalities
+                      }
+                      className={`eum-form-input ${errors.municipality_code ? "eum-error" : ""}`}
+                    >
+                      <option value="">
+                        {loadingMunicipalities
+                          ? "Loading..."
+                          : "Select City/Municipality"}
+                      </option>
+                      {municipalities.map((m) => (
+                        <option key={m.code} value={m.code}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.municipality_code && (
+                      <span className="eum-error-text">
+                        {errors.municipality_code}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="eum-form-group"
+                    ref={(el) => (errorRefs.current["barangay_code"] = el)}
+                  >
+                    <label className="eum-form-label">Barangay *</label>
+                    <select
+                      name="barangay_code"
+                      value={formData.barangay_code}
+                      onChange={handleChange}
+                      disabled={
+                        isSubmitting ||
+                        !formData.municipality_code ||
+                        loadingAddrBarangays
+                      }
+                      className={`eum-form-input ${errors.barangay_code ? "eum-error" : ""}`}
+                    >
+                      <option value="">
+                        {loadingAddrBarangays
+                          ? "Loading..."
+                          : "Select Barangay"}
+                      </option>
+                      {addressBarangays.map((b) => (
+                        <option key={b.code} value={b.code}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.barangay_code && (
+                      <span className="eum-error-text">
+                        {errors.barangay_code}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="eum-form-row">
+                  <div
+                    className="eum-form-group eum-full-width"
+                    ref={(el) => (errorRefs.current["address_line"] = el)}
+                  >
+                    <label className="eum-form-label">
+                      House No. / Blk / Lot / Street / Subdivision
+                    </label>
+                    <input
+                      type="text"
+                      name="address_line"
+                      value={formData.address_line}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="255"
+                      className="eum-form-input"
+                      placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
+                    />
+                    <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                      {formData.address_line.length}/255 characters
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Official Information — PNP ── */}
+            {isPNP && (
+              <div className="eum-form-section">
+                <h3 className="eum-form-section-title">
+                  Official Information (PNP)
+                </h3>
+                <div className="eum-form-row">
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">Role *</label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      className="eum-form-input"
+                    >
+                      {availableRoles.length > 0 ? (
+                        availableRoles.map((r) => (
+                          <option key={r.role_id} value={r.role_name}>
+                            {r.role_name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Administrator">Administrator</option>
+                          <option value="Investigator">Investigator</option>
+                          <option value="Patrol">Patrol</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">Rank</label>
+                    <input
+                      type="text"
+                      name="rank"
+                      value={formData.rank}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="100"
+                      className="eum-form-input"
+                      placeholder="e.g., Police Officer III"
+                    />
+                  </div>
+                </div>
+                <div className="eum-form-row">
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">
+                      Mobile Patrol No.
+                      {formData.role !== "Patrol" && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 400,
+                            color: "#6c757d",
+                          }}
+                        >
+                          {" "}
+                          (Patrol role only)
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      name="mobile_patrol"
+                      value={formData.mobile_patrol}
+                      onChange={handleChange}
+                      disabled={isSubmitting || formData.role !== "Patrol"}
+                      maxLength="6"
+                      className="eum-form-input"
+                      placeholder="e.g., 101"
+                    />
+                  </div>
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">Department</label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="100"
+                      className="eum-form-input"
+                      placeholder="e.g., Investigation Division"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Official Information — Barangay ── */}
+            {isBarangay && (
+              <div className="eum-form-section">
+                <h3 className="eum-form-section-title">
+                  Official Information (Barangay)
+                </h3>
+                <div className="eum-form-row">
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">Role</label>
+                    <input
+                      type="text"
+                      value={formData.role || "Barangay"}
+                      className="eum-form-input"
+                      disabled
+                      style={{ background: "#f8f9fa", cursor: "not-allowed" }}
+                    />
+                  </div>
+                  <div
+                    className="eum-form-group"
+                    ref={(el) =>
+                      (errorRefs.current["assigned_barangay_code"] = el)
+                    }
+                  >
+                    <label className="eum-form-label">
+                      Assigned Barangay *
+                    </label>
+                    <select
+                      name="assigned_barangay_code"
+                      value={formData.assigned_barangay_code}
+                      onChange={(e) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          assigned_barangay_code: e.target.value,
+                        }));
+                        clearError("assigned_barangay_code");
+                      }}
+                      disabled={isSubmitting || loadingBacoorBarangays}
+                      className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
+                    >
+                      {!formData.assigned_barangay_code && (
+                        <option value="">
+                          {loadingBacoorBarangays
+                            ? "Loading barangays..."
+                            : "Select Barangay"}
+                        </option>
+                      )}
+                      {loadingBacoorBarangays &&
+                        formData.assigned_barangay_code && (
+                          <option value={formData.assigned_barangay_code}>
+                            Loading barangays...
+                          </option>
+                        )}
+                      {bacoorBarangays.map((b) => (
+                        <option key={b.code} value={b.code}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.assigned_barangay_code && (
+                      <span className="eum-error-text">
+                        {errors.assigned_barangay_code}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="eum-form-row">
+                  <div
+                    className="eum-form-group eum-full-width"
+                    ref={(el) => (errorRefs.current["address_line"] = el)}
+                  >
+                    <label className="eum-form-label">
+                      House No. / Blk / Lot / Street / Subdivision
+                    </label>
+                    <input
+                      type="text"
+                      name="address_line"
+                      value={formData.address_line}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="255"
+                      className="eum-form-input"
+                      placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
+                    />
+                    <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                      {formData.address_line.length}/255 characters
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Server error banner */}
+            {serverError && (
+              <div className="eum-alert-error">{serverError}</div>
+            )}
+
+            {/* Success banner */}
+            {successMessage && (
+              <div
                 style={{
-                  marginRight: "auto",
-                  background: isLocked ? "#16a34a" : "#c76b2e",
-                  color: "white",
-                  border: "none",
+                  padding: "12px 16px",
+                  background: "rgba(34,197,94,0.1)",
+                  borderLeft: "3px solid #22c55e",
+                  borderRadius: 4,
+                  color: "#15803d",
+                  fontSize: 14,
+                  marginBottom: 24,
+                  fontWeight: 500,
                 }}
               >
-                {isLocking
-                  ? isLocked ? "Unlocking..." : "Locking..."
-                  : isLocked ? "🔓 Unlock Account" : "🔒 Lock Account"}
-              </button>
+                {successMessage}
+              </div>
             )}
-            <button
-              type="submit"
-              className="eum-btn eum-btn-primary"
-              disabled={isSubmitting || isLocking}
-            >
-              {isSubmitting ? "Updating..." : "Update User"}
-            </button>
-          </div>
 
-        </form>
+            {/* ── Actions ── */}
+            <div className="eum-modal-actions">
+              {(user.status === "active" || user.status === "locked") && (
+                <button
+                  type="button"
+                  className={`eum-btn ${isLocked ? "eum-btn-unlock" : "eum-btn-lock"}`}
+                  onClick={handleLockToggle}
+                  disabled={isSubmitting || isLocking}
+                  style={{
+                    marginRight: "auto",
+                    background: isLocked ? "#16a34a" : "#c76b2e",
+                    color: "white",
+                    border: "none",
+                  }}
+                >
+                  {isLocked ? "🔓 Unlock Account" : "🔒 Lock Account"}
+                </button>
+              )}
+              <button
+                type="submit"
+                className="eum-btn eum-btn-primary"
+                disabled={isSubmitting || isLocking}
+              >
+                {isSubmitting ? "Updating..." : "Update User"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

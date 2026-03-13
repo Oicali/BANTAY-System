@@ -95,6 +95,11 @@ body {
   justify-content: center;
 }
 
+.um-tab:focus,
+.um-tab:focus-visible {
+  outline: none;
+}
+
 .um-tab {
   padding: 10px 32px;
   background: var(--gray-100);
@@ -603,9 +608,57 @@ body {
 }
 
 /* === RESPONSIVE === */
+
+/* === RESPONSIVE COLUMN HIDING === */
+
+/* Barangay tab: hide Last Login at ≤1300px */
+@media (max-width: 1355px) {
+  .um-table-barangay .um-col-last-login {
+    display: none;
+  }
+}
+
+@media (max-width: 1280px) {
+  .um-table-police .um-col-last-login {
+    display: none;
+  }
+}
+
 @media (max-width: 1200px) {
   .um-content-area {
     padding: 24px;
+  }
+
+  
+
+  .um-table-barangay .um-col-status {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .um-table-police .um-col-status {
+    display: none;
+  }
+}
+
+/* Barangay: hide Barangay column at ≤1060px */
+@media (max-width: 1060px) {
+  .um-table-barangay .um-col-barangay {
+    display: none;
+  }
+}
+
+/* Police: hide Role column at ≤1024px */
+@media (max-width: 1024px) {
+  .um-table-police .um-col-role {
+    display: none;
+  }
+}
+
+@media (max-width: 945px) {
+  .um-table-barangay .um-col-role {
+    display: none;
   }
 }
 
