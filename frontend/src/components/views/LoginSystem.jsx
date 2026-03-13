@@ -35,7 +35,8 @@ const LoginSystem = () => {
 
   const codeInputs = useRef([]);
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  const API_URL = import.meta.env.BACKEND_URL;
+  const navigate = useNavigate();
 
   // Timer for verification code
   useEffect(() => {
@@ -165,7 +166,9 @@ const LoginSystem = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.message || "Login failed! Please enter your credentials.");
+        setError(
+          data.message || "Login failed! Please enter your credentials.",
+        );
         setIsLoading(false);
         return;
       }
@@ -185,7 +188,7 @@ const LoginSystem = () => {
       }));
 
       setTimeout(() => {
-        window.location.href = "/crime-dashboard";
+        navigate("/crime-dashboard");
       }, 800);
     } catch (error) {
       console.error("Login error:", error);
@@ -354,17 +357,14 @@ const LoginSystem = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/auth/password/reset`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: formData.email,
-            newPassword: formData.newPassword,
-          }),
-        },
-      );
+      const response = await fetch(`${API_URL}/auth/password/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          newPassword: formData.newPassword,
+        }),
+      });
 
       const data = await response.json();
 

@@ -75,7 +75,6 @@ app.use((err, req, res, next) => {
 });
 
 // ── 9. Start server ───────────────────────────────────────────────────────────
-// ── 9. Start server ───────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   if (process.env.NODE_ENV === "production") {
