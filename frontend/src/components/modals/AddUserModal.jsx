@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import "./AddUserModal.css";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
 // ✅ FIXED: Bacoor is a CITY with code "042103000"
 // "042105" was City of Cavite — wrong code entirely
@@ -611,7 +612,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       }
 
       const response = await fetch(
-        "http://localhost:5000/user-management/register",
+        `${API_URL}/user-management/register`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -628,7 +629,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             const picFd = new FormData();
             picFd.append("profilePicture", formData.profilePicture);
             await fetch(
-              `http://localhost:5000/users/profile/picture/${data.user.userId}`,
+              `${API_URL}/users/profile/picture/${data.user.userId}`,
               {
                 method: "POST",
                 headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

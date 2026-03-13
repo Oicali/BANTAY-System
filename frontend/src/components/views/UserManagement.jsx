@@ -5,9 +5,11 @@ import EditUserModal from '../modals/EditUserModal';
 import DeleteUserModal from '../modals/DeleteUserModal';
 import RestoreUserModal from '../modals/RestoreUserModal';
 import "./UserManagement.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const ITEMS_PER_PAGE = 15;
 const PSGC_BASE = "https://psgc.gitlab.io/api";
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
 // ✅ Bacoor is a CITY — use /cities/{code}/barangays/
 const BACOOR_CITY_CODE = "042103000";
@@ -92,6 +94,8 @@ const UserManagement = () => {
   const [activeTab, setActiveTab]           = useState('police');
   const [currentPage, setCurrentPage]       = useState(1);
 
+ 
+
   // ===================================================
   // HELPER: resolve barangay name from map
   // ===================================================
@@ -133,7 +137,7 @@ const UserManagement = () => {
   const fetchFilterOptions = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/user-management/filter-options', {
+      const res = await fetch(`${API_URL}/user-management/filter-options`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (res.ok) {
@@ -180,7 +184,7 @@ const UserManagement = () => {
         params.set('barangayCode', barangayFilter);
       }
 
-      const res = await fetch(`http://localhost:5000/user-management/users?${params.toString()}`, {
+      const res = await fetch(`${API_URL}/user-management/users?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
 
@@ -488,7 +492,10 @@ const UserManagement = () => {
         {error && <div className="um-error-message">{error}</div>}
 
         {loading ? (
-          <div className="um-loading-message">Loading users...</div>
+          <LoadingModal
+                isOpen={true}
+                message={"Loading users..."}
+              />
         ) : (
           <>
             <div className="um-table-container">

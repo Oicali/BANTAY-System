@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import './RestoreUserModal.css';
 import { Eye, EyeOff } from "lucide-react";
 
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
+
 const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +33,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     try {
       const token = localStorage.getItem('token');
 
-      const response = await fetch(`http://localhost:5000/user-management/users/${user.user_id}/restore`, {
+      const response = await fetch(`${API_URL}/user-management/users/${user.user_id}/restore`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

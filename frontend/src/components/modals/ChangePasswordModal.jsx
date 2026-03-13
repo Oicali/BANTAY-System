@@ -6,7 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { logout } from "../../utils/auth";
 import "./ChangePasswordModal.css";
 
-const BASE_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
 // ── Countdown helper — converts ms remaining into a readable string ───────────
 // e.g. 82800000ms → "23h 00m"  |  3600000ms → "1h 00m"  |  180000ms → "3m 00s"
@@ -104,7 +104,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
   const checkStatus = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/password/status`, {
+      const res = await fetch(`${API_URL}/users/password/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await res.json();
@@ -172,7 +172,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
           const lockUntil = Date.now() + lockMins * 60_000;
           localStorage.setItem("cpm_session_locked", JSON.stringify({ until: lockUntil }));
           const token = localStorage.getItem("token");
-          fetch(`${BASE_URL}/users/password/force-lock`, {
+          fetch(`${API_URL}/users/password/force-lock`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify({}),
@@ -227,7 +227,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setIsVerifying(true); setCurrentPwError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/password/verify-current`, {
+      const res = await fetch(`${API_URL}/users/password/verify-current`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: currentPw.trim() }),
@@ -274,7 +274,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setIsSubmitting(true); setPasswordErrors({}); setRateLimitMsg("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/password/request-otp`, {
+      const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -325,7 +325,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpLoading(true); setOtpError("");
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/password/verify-otp`, {
+      const res = await fetch(`${API_URL}/users/password/verify-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ otp: code }),
@@ -372,7 +372,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpError(""); setOtpBoxes(["","","","","",""]); setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/users/password/request-otp`, {
+      const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({

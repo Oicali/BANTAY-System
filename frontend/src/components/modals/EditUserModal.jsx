@@ -5,6 +5,7 @@ import "./EditUserModal.css";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
 const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -119,7 +120,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await fetch("http://localhost:5000/user-management/roles", {
+        const res = await fetch(`${API_URL}/user-management/roles`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         if (res.ok) {
@@ -345,8 +346,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     setServerError("");
     try {
       const endpoint = isLocked
-        ? `http://localhost:5000/user-management/users/${user.user_id}/unlock`
-        : `http://localhost:5000/user-management/users/${user.user_id}/lock`;
+        ? `${API_URL}/user-management/users/${user.user_id}/unlock`
+        : `${API_URL}/user-management/users/${user.user_id}/lock`;
 
       const res  = await fetch(endpoint, {
         method: "PUT",
@@ -661,7 +662,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         picFd.append("profilePicture", profilePicture);
 
         const picRes  = await fetch(
-          `http://localhost:5000/users/profile/picture/${user.user_id}`,
+          `${API_URL}/users/profile/picture/${user.user_id}`,
           {
             method: "POST",
             headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -739,8 +740,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         fd.append("new_password", passwordData.new_password);
       }
 
-      const res  = await fetch(
-        `http://localhost:5000/user-management/users/${user.user_id}`,
+      const res  = await fetch(`${API_URL}/user-management/users/${user.user_id}`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },

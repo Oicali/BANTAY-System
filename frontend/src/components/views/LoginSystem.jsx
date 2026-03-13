@@ -12,6 +12,8 @@ import "./LoginSystem.css";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom"; // add this
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const LoginSystem = () => {
   const [currentView, setCurrentView] = useState("login");
   const [formData, setFormData] = useState({
@@ -35,7 +37,7 @@ const LoginSystem = () => {
 
   const codeInputs = useRef([]);
 
-  const API_URL = import.meta.env.VITE_API_URL;
+  
   const navigate = useNavigate();
 
   // Timer for verification code

@@ -2,6 +2,8 @@ import React, { useState, useRef } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import "./DeleteUserModal.css";
 
+const API_URL = import.meta.env.VITE_API_URL; // ← add here
+
 const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,7 +57,7 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
       }
 
       const response = await fetch(
-        `http://localhost:5000/user-management/users/${user.user_id}`,
+        `${API_URL}/user-management/users/${user.user_id}`,
         {
           method: "DELETE",
           headers: {
