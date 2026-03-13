@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./AddUserModal.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
@@ -1142,6 +1143,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   // RENDER
   // =====================================================
   return (
+    <>
+    <LoadingModal isOpen={isSubmitting} message="Adding user..." />
     <div className="aum-modal-overlay">
       <div
         className={`aum-modal-container ${step === "select" ? "aum-modal-select" : "aum-modal-large"}`}
@@ -1337,6 +1340,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

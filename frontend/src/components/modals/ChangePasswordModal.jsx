@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { logout } from "../../utils/auth";
 import "./ChangePasswordModal.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
 

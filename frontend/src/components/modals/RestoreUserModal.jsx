@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './RestoreUserModal.css';
 import { Eye, EyeOff } from "lucide-react";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
@@ -67,6 +68,8 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     : user.username;
 
   return (
+    <>
+    <LoadingModal isOpen={isSubmitting} message="Restoring account..." />
     <div className="rum-modal-overlay" onClick={onClose}>
       <div className="rum-modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="rum-modal-header">
@@ -155,6 +158,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
         </form>
       </div>
     </div>
+    </>
   );
 };
 
