@@ -35,7 +35,7 @@ const LoginSystem = () => {
 
   const codeInputs = useRef([]);
 
-  const API_URL = import.meta.env.BACKEND_URL;
+  const API_URL = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
 
   // Timer for verification code
