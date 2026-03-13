@@ -9,7 +9,8 @@ const app = express();
 // ── 1. CORS ───────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   process.env.FRONTEND_URL, // e.g. https://bantay-system.vercel.app
-  "http://localhost:5173", // Vite dev server
+  "http://localhost:5173",// Vite dev server
+  "http://localhost:8081" // React Native Android emulator
 ].filter(Boolean);
 
 app.use(
