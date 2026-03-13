@@ -6,13 +6,13 @@ import { navItems } from "../../utils/navItems";
 import "./DashboardLayout.css";
 
 export default function DashboardLayout() {
-  // ✅ STATE LIVES HERE (PERSISTENT ACROSS VIEW CHANGES)
   const [openSections, setOpenSections] = useState(
     navItems.reduce((acc, group) => {
-      acc[group.section] = true; // all open by default
+      acc[group.section] = true;
       return acc;
     }, {})
   );
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSection = (section) => {
     setOpenSections((prev) => ({
@@ -22,27 +22,37 @@ export default function DashboardLayout() {
   };
 
   const handleLogout = () => {
-  localStorage.clear();
-  window.location.href = "/";
-};
+    localStorage.clear();
+    window.location.href = "/";
+  };
 
   return (
     <div className="dashboard-container">
+      {/* Mobile overlay — click outside to close sidebar */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR - Persistent, never unmounts */}
       <Sidebar
         openSections={openSections}
         toggleSection={toggleSection}
         handleLogout={handleLogout}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       {/* MAIN CONTENT AREA */}
       <div className="main-content">
-        {/* TOP BAR - Persistent, never unmounts, query runs once */}
-        <TopBar />
+        {/* TOP BAR */}
+        <TopBar onMenuClick={() => setSidebarOpen(true)} />
 
         {/* CONTENT AREA - This is where views change */}
         <div className="content-wrapper">
-          <Outlet /> {/* Dashboard, EBlotter, etc render here */}
+          <Outlet />
         </div>
       </div>
     </div>
