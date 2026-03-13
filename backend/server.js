@@ -79,7 +79,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   if (process.env.NODE_ENV === "production") {
-    console.log(`✅ Server running on http://localhost:3000`);
+    console.log(`✅ Server running on production`);
   } else {
     console.log(`✅ Server running on http://localhost:${PORT}`);
   }
