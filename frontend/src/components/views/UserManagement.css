@@ -662,6 +662,47 @@ body {
   }
 }
 
+/* At ≤860px: shrink name text and action buttons */
+@media (max-width: 860px) {
+  .um-data-table {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .um-table-container {
+    overflow-x: hidden;
+  }
+  
+  .um-role-badge {
+    width: auto;
+    min-width: unset;
+  }
+  
+  .um-user-cell-name {
+    font-size: 12px;
+  }
+
+  .um-user-cell-email {
+    font-size: 11px;
+  }
+
+  .um-user-cell-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+
+  .um-action-btn {
+    font-size: 11px;
+    padding: 7px 7px;
+  }
+
+  .um-action-btn svg {
+    width: 11px;
+    height: 11px;
+  }
+}
+
 @media (max-width: 768px) {
   .um-page-header {
     flex-direction: column;
