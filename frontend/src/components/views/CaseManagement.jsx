@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './CaseManagement.css';
 
-const API_URL = 'http://localhost:5000/cases';
-const BLOTTER_URL = 'http://localhost:5000/blotters';
+const API_URL = `${import.meta.env.VITE_API_URL}/cases`;
+const BLOTTER_URL = `${import.meta.env.VITE_API_URL}/blotters`;
 
 const getToken = () => localStorage.getItem('token');
 const getUser = () => ({
@@ -44,7 +44,8 @@ const showError = (message) => {
   const user = getUser();
   const isAdmin = user.role === 'Administrator';
   const isInvestigator = user.role === 'Investigator';
-
+const [currentPage, setCurrentPage] = useState(1);
+const ITEMS_PER_PAGE = 10;
   useEffect(() => {
   if (isInvestigator) {
     setActiveTab('my');
@@ -78,9 +79,12 @@ const showError = (message) => {
         if (tab === 'my') result = result.filter(c => c.assigned_io_id === user.user_id || c.assigned_io_name?.includes(user.first_name));
         if (tab === 'high') result = result.filter(c => c.priority === 'High');
         if (tab === 'unassigned') result = result.filter(c => !c.assigned_io_id || c.assigned_io_id === null || c.assigned_io_id === '');
+        if (f.search) result = result.filter(c => c.case_number?.toLowerCase().includes(f.search.toLowerCase()));
         
         setCases(result);
+        setCurrentPage(1);
       }
+      
     } catch (err) {
       console.error('Fetch cases error:', err);
     } finally {
@@ -120,7 +124,7 @@ const showError = (message) => {
 
   const fetchInvestigators = async () => {
   try {
-    const res = await fetch('http://localhost:5000/user-management/users?userType=police&role=Investigator&limit=100', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/user-management/users?userType=police&role=Investigator&limit=100`, {
       headers: { Authorization: `Bearer ${getToken()}` }
     });
     const data = await res.json();
@@ -299,7 +303,11 @@ const openPriorityModal = (c) => {
 
   const getPriorityClass = (p) => ({ High: 'cm-priority-high', Medium: 'cm-priority-medium', Low: 'cm-priority-low' }[p] || 'cm-priority-low');
   const getStatusClass = (s) => ({ 'Under Investigation': 'cm-status-active', Solved: 'cm-status-solved', Cleared: 'cm-status-cleared', Referred: 'cm-status-referred' }[s] || 'cm-status-active');
-
+const totalPages = Math.ceil(cases.length / ITEMS_PER_PAGE);
+const paginatedCases = cases.slice(
+  (currentPage - 1) * ITEMS_PER_PAGE,
+  currentPage * ITEMS_PER_PAGE
+);
   return (
     <div className="cm-content-area">
 
@@ -346,20 +354,28 @@ const openPriorityModal = (c) => {
 
       {/* FILTERS */}
       <div className="cm-filter-bar">
-        <select className="cm-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
-          <option value="">All Status</option>
-          <option>Under Investigation</option>
-          <option>Solved</option>
-          <option>Cleared</option>
-          <option>Referred</option>
-        </select>
-        <select className="cm-filter-input" name="priority" value={filters.priority} onChange={handleFilterChange}>
-          <option value="">All Priority</option>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
-      </div>
+      <input
+        type="text"
+        className="cm-filter-input"
+        placeholder="Search by Case No."
+        name="search"
+        value={filters.search || ''}
+        onChange={handleFilterChange}
+      />
+      <select className="cm-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
+        <option value="">All Status</option>
+        <option>Under Investigation</option>
+        <option>Solved</option>
+        <option>Cleared</option>
+        <option>Referred</option>
+      </select>
+      <select className="cm-filter-input" name="priority" value={filters.priority} onChange={handleFilterChange}>
+        <option value="">All Priority</option>
+        <option>High</option>
+        <option>Medium</option>
+        <option>Low</option>
+      </select>
+    </div>
 
       {/* TABS */}
       <div className="cm-tab-navigation">
@@ -379,7 +395,7 @@ const openPriorityModal = (c) => {
           <div className="cm-empty-state">Loading cases...</div>
         ) : cases.length === 0 ? (
           <div className="cm-empty-state">No cases found.</div>
-        ) : cases.map(c => (
+        ) : paginatedCases.map(c => (
           <div className="cm-case-card" key={c.id}>
             <div className="cm-case-header">
               <div>
@@ -404,20 +420,62 @@ const openPriorityModal = (c) => {
             </div>
             <div className="cm-case-footer">
               <span className={`cm-status-badge ${getStatusClass(c.status)}`}>{c.status}</span>
-              <div className="cm-case-actions">
-              <button className="cm-action-btn cm-action-btn-view" onClick={() => openViewDetail(c)}>View Details</button>
-              {isAdmin && (
-                <button className="cm-action-btn cm-action-btn-edit" onClick={() => openPriorityModal(c)}>
-                  Set Priority
-                </button>
-              )}
-              {(isAdmin || isInvestigator) && (
-                <button className="cm-action-btn cm-action-btn-success" onClick={() => openNoteModal(c)}>Add Notes</button>
-              )}
-            </div>
+             <div className="cm-case-actions">
+                <button className="cm-action-btn cm-action-btn-view" onClick={() => openViewDetail(c)}>View Details</button>
+                {isAdmin && (
+                  <>
+                    <button className="cm-action-btn cm-action-btn-edit" onClick={() => openPriorityModal(c)}>Set Priority</button>
+                    <button className="cm-action-btn cm-action-btn-edit" onClick={() => openAssignModal(c)}>Assign IO</button>
+                    <button className="cm-action-btn cm-action-btn-edit" onClick={() => openStatusModal(c)}>Update Status</button>
+                  </>
+                )}
+                {(isAdmin || isInvestigator) && (
+                  <button className="cm-action-btn cm-action-btn-success" onClick={() => openNoteModal(c)}>Add Notes</button>
+                )}
+              </div>
             </div>
           </div>
         ))}
+        {/* PAGINATION */}
+          {!loading && cases.length > 0 && (
+            <div className="cm-pagination">
+              <div className="cm-pagination-info">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, cases.length)} of {cases.length} cases
+              </div>
+              <div className="cm-pagination-controls">
+                <button
+                  className="cm-pagination-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                >Previous</button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                  .reduce((acc, page, idx, arr) => {
+                    if (idx > 0 && page - arr[idx - 1] > 1) acc.push('...');
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === '...' ? (
+                      <span key={`ellipsis-${idx}`} style={{ padding: '0 6px', color: '#6b7280' }}>...</span>
+                    ) : (
+                      <button
+                        key={item}
+                        className={`cm-pagination-btn ${currentPage === item ? 'cm-active' : ''}`}
+                        onClick={() => setCurrentPage(item)}
+                      >{item}</button>
+                    )
+                  )}
+
+                <button
+                  className="cm-pagination-btn"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                >Next</button>
+              </div>
+            </div>
+          )}
       </div>
 
       {/* ── CREATE CASE MODAL ── */}
@@ -606,15 +664,7 @@ const openPriorityModal = (c) => {
                 )}
               </div>
             </div>
-            <div className="cm-modal-footer">
-              {isAdmin && (
-                <>
-                  <button className="cm-btn cm-btn-secondary" onClick={() => { setShowDetailModal(false); openAssignModal(selectedCase); }}>Assign IO</button>
-                  <button className="cm-btn cm-btn-secondary" onClick={() => { setShowDetailModal(false); openStatusModal(selectedCase); }}>Update Status</button>
-                </>
-              )}
-              <button className="cm-btn cm-btn-primary" onClick={() => { setShowDetailModal(false); setSelectedCase(null); }}>Close</button>
-            </div>
+            <div className="cm-modal-footer" style={{ display: 'none' }}></div>
           </div>
         </div>
       )}
