@@ -214,7 +214,7 @@ body {
 .eb-table-card .eb-data-table th:nth-child(1) { width: 20%; } /* Blotter ID */
 .eb-table-card .eb-data-table th:nth-child(2) { width: 15%; } /* Incident Type */
 .eb-table-card .eb-data-table th:nth-child(3) { width: 20%; } /* Location */
-.eb-table-card .eb-data-table th:nth-child(4) { width: 19%; } /* Date Reported */
+.eb-table-card .eb-data-table th:nth-child(4) { width: 20%; } /* Date Reported */
 .eb-table-card .eb-data-table th:nth-child(5) { width: 16%;  } /* Status */
 .eb-table-card .eb-data-table th:nth-child(6) { width: 30%; } /* Actions */
 

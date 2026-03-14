@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { usePSGC } from "../../utils/usePSGC";
 import "./EBlotter.css";
+import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
 const OFFENSE_TO_CRIME_TYPE = {
   "Murder": "MURDER",
   "Homicide": "HOMICIDE",
@@ -12,8 +14,81 @@ const OFFENSE_TO_CRIME_TYPE = {
   "Carnapping - MV": "CARNAPPING - MV",
   "Special Complex Crime": "SPECIAL COMPLEX CRIME",
 };
+const BARANGAY_MIGRATION_MAP = {
+  // Roman numeral variants → GeoJSON exact names
+  "ANIBAN 1": "ANIBAN I",
+  "ANIBAN 2": "ANIBAN II",
+  "HABAY 1": "HABAY I",
+  "HABAY 2": "HABAY II",
+  "LIGAS 1": "LIGAS I",
+  "LIGAS 2": "LIGAS II",
+  "MABOLO 1": "MABOLO I",
+  "MABOLO 2": "MABOLO I",
+  "MABOLO 3": "MABOLO I",
+  "MALIKSI 1": "MALIKSI I",
+  "MALIKSI 2": "MALIKSI II",
+  "MALIKSI 3": "MALIKSI II",
+  "MAMBOG 1": "MAMBOG I",
+  "MAMBOG 2": "MAMBOG II",
+  "MAMBOG 3": "MAMBOG III",
+  "MAMBOG 4": "MAMBOG IV",
+  "MAMBOG 5": "MAMBOG II",
+  "MOLINO 1": "MOLINO I",
+  "MOLINO 2": "MOLINO II",
+  "MOLINO 3": "MOLINO III",
+  "MOLINO 4": "MOLINO IV",
+  "MOLINO 5": "MOLINO V",
+  "MOLINO 6": "MOLINO VI",
+  "MOLINO 7": "MOLINO VII",
+  "NIOG 1": "NIOG I",
+  "NIOG 2": "NIOG I",
+  "NIOG 3": "NIOG I",
+  "REAL 1": "REAL I",
+  "REAL 2": "REAL I",
+  "SALINAS 1": "SALINAS I",
+  "SALINAS 2": "SALINAS II",
+  "SALINAS 3": "SALINAS II",
+  "SALINAS 4": "SALINAS II",
+  "SAN NICOLAS 1": "SAN NICOLAS I",
+  "SAN NICOLAS 2": "SAN NICOLAS II",
+  "SAN NICOLAS 3": "SAN NICOLAS III",
+  "TALABA 1": "TALABA I",
+  "TALABA 2": "TALABA II",
+  "TALABA 3": "TALABA III",
+  "TALABA 4": "TALABA III",
+  "TALABA 5": "TALABA III",
+  "TALABA 6": "TALABA III",
+  "TALABA 7": "TALABA I",
+  "ZAPOTE 1": "ZAPOTE I",
+  "ZAPOTE 2": "ZAPOTE II",
+  "ZAPOTE 3": "ZAPOTE III",
+  "ZAPOTE 4": "ZAPOTE II",
+  "QUEENS ROW CENTRAL": "QUEENS ROW CENTRAL",
+  "QUEENS ROW EAST": "QUEENS ROW EAST",
+  "QUEENS ROW WEST": "QUEENS ROW WEST",
+  // Old names that were merged/renamed
+  "BANALO": "SINEGUELASAN",
+  "ALIMA": "SINEGUELASAN",
+  "SINBANALI": "SINEGUELASAN",
+  "CAMPOSANTO": "KAINGIN (POB.)",
+  "DAANG BUKID": "KAINGIN (POB.)",
+  "DIGMAN": "KAINGIN (POB.)",
+  "KAINGIN DIGMAN": "KAINGIN (POB.)",
+  "PANAPAAN": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 2": "P.F. ESPIRITU II",
+  "PANAPAAN 3": "P.F. ESPIRITU II",
+  "PANAPAAN 4": "P.F. ESPIRITU IV",
+  "PANAPAAN 5": "P.F. ESPIRITU V",
+  "PANAPAAN 6": "P.F. ESPIRITU VI",
+  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
+  "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
+  "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
+  "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
+  "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
+  "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
+};
 
-// Simple validation component
 const FieldError = ({ error }) => {
   if (!error) return null;
   return <span className="eb-field-error">{error}</span>;
@@ -53,6 +128,8 @@ function EBlotter() {
   const [currentStep, setCurrentStep] = useState(1);
   const [blotters, setBlotters] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
   const [originalData, setOriginalData] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [showConfirmClose, setShowConfirmClose] = useState(false);
@@ -112,6 +189,10 @@ const [trashLoading, setTrashLoading] = useState(false);
   const [caseCities, setCaseCities] = useState([]);
   const [bacoorBarangays, setBacoorBarangays] = useState([]);
 const [loadingBacoorBrgy, setLoadingBacoorBrgy] = useState(false);
+const [barangayGeoJSON, setBarangayGeoJSON] = useState(null);
+const [selectedBrgyFeature, setSelectedBrgyFeature] = useState(null);
+const mapRef = React.useRef(null);
+
   const [suspects, setSuspects] = useState([
     {
       first_name: "",
@@ -171,13 +252,21 @@ const [loadingBacoorBrgy, setLoadingBacoorBrgy] = useState(false);
     referred_by_barangay: false,
     referred_to_barangay: false,
     referred_by_dilg: false,
+    lat: "",
+    lng: "",
   });
 
   const totalSteps = 4;
-  const API_URL = "http://localhost:5000/blotters";
+  const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
 
   useEffect(() => {
   fetchBlotters();
+  // Auto-open from Crime Mapping "View Full Case"
+  const targetId = sessionStorage.getItem('openBlotterId');
+  if (targetId) {
+    sessionStorage.removeItem('openBlotterId');
+    setTimeout(() => handleView(targetId), 800);
+  }
 
   const CALABARZON_CODE = "040000000";
   const CAVITE_CODE = "042100000";
@@ -185,10 +274,18 @@ const [loadingBacoorBrgy, setLoadingBacoorBrgy] = useState(false);
 
   fetchProvinces(CALABARZON_CODE).then(data => setCaseProvinces(data));
   fetchCities(CAVITE_CODE).then(data => setCaseCities(data));
-  fetchBarangays(BACOOR_CODE).then(data => {
-    setBacoorBarangays(data);
-    setLoadingBacoorBrgy(false);
-  });
+ fetch("/bacoor_barangays.geojson")
+  .then(r => r.json())
+  .then(data => {
+    setBarangayGeoJSON(data);
+    const brgyList = data.features
+      .map(f => f.properties.name_db)
+      .filter(Boolean)
+      .filter((name, index, self) => self.indexOf(name) === index) // removes duplicate KAINGIN
+      .sort();
+    setBacoorBarangays(brgyList);
+  })
+  .catch(err => console.error("Failed to load barangay GeoJSON:", err));
 }, []);
 
   const fetchBlotters = async () => {
@@ -210,7 +307,10 @@ const [loadingBacoorBrgy, setLoadingBacoorBrgy] = useState(false);
     const response = handleApiResponse(rawResponse);
     if (!response) return;
     const data = await response.json();
-    if (data.success) setBlotters(data.data);
+    if (data.success) {
+          setBlotters(data.data);
+          setCurrentPage(1);
+        }
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -291,7 +391,7 @@ const handleConfirmAction = async () => {
   }
   try {
     const res = await fetch(
-      `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+      `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
       { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
     const data = await res.json();
@@ -328,7 +428,7 @@ const handleConfirmAction = async () => {
           if (crimeType) {
             try {
               const modusRes = await fetch(
-                `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+                `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
               );
               const modusData = await modusRes.json();
@@ -347,7 +447,8 @@ const handleConfirmAction = async () => {
         setOffenseModus(newOffenseModus);
         setOffenseSelectedModus(newOffenseSelectedModus);
         const isCustomBarangay = false;
-
+        const rawBrgy = data.data.place_barangay || "";
+        const resolvedBrgy = BARANGAY_MIGRATION_MAP[rawBrgy.toUpperCase()] || rawBrgy;
         setCaseDetail({
           incident_type: data.data.incident_type,
           cop: data.data.cop,
@@ -357,7 +458,7 @@ const handleConfirmAction = async () => {
           place_region: "Region IV-A (CALABARZON)",
           place_district_province: "Cavite",
           place_city_municipality: "Bacoor City",
-          place_barangay: data.data.place_barangay,
+          place_barangay: resolvedBrgy,
           place_barangay_other: "",
           place_street: data.data.place_street,
           is_private_place: data.data.is_private_place,
@@ -366,8 +467,17 @@ const handleConfirmAction = async () => {
           referred_by_barangay: data.data.referred_by_barangay,
           referred_to_barangay: data.data.referred_to_barangay,
           referred_by_dilg: data.data.referred_by_dilg,
+          lat: data.data.lat != null ? String(data.data.lat) : "",
+          lng: data.data.lng != null ? String(data.data.lng) : "",
         });
 
+        // Restore barangay boundary feature when editing
+if (resolvedBrgy && barangayGeoJSON) {
+  const feature = barangayGeoJSON.features.find(
+    f => f.properties.name_db === resolvedBrgy
+  );
+  setSelectedBrgyFeature(feature || null);
+}
         // Store original data for change detection
         setOriginalData({
           complainants: data.data.complainants,
@@ -395,6 +505,8 @@ const handleConfirmAction = async () => {
             referred_by_barangay: data.data.referred_by_barangay,
             referred_to_barangay: data.data.referred_to_barangay,
             referred_by_dilg: data.data.referred_by_dilg,
+            lat: data.data.lat != null ? String(data.data.lat) : "",
+          lng: data.data.lng != null ? String(data.data.lng) : "",
           },
         });
       const newCProvinces = {}, newCCities = {}, newCBarangays = {};
@@ -498,7 +610,7 @@ const handleConfirmAction = async () => {
           if (crimeType) {
             try {
               const modusRes = await fetch(
-                `http://localhost:5000/blotters/modus/${encodeURIComponent(crimeType)}`,
+                `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
                 { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
               );
               const modusData = await modusRes.json();
@@ -517,7 +629,9 @@ const handleConfirmAction = async () => {
         setOffenseModus(newOffenseModus);
         setOffenseSelectedModus(newOffenseSelectedModus);
         const isCustomBarangay = false;
-
+        const rawBrgy = data.data.place_barangay || "";
+        const resolvedBrgy = BARANGAY_MIGRATION_MAP[rawBrgy.toUpperCase()] || rawBrgy;
+        
         setCaseDetail({
           incident_type: data.data.incident_type,
           cop: data.data.cop,
@@ -527,7 +641,7 @@ const handleConfirmAction = async () => {
           place_region: "Region IV-A (CALABARZON)",
           place_district_province: "Cavite",
           place_city_municipality: "Bacoor City",
-          place_barangay: data.data.place_barangay,
+          place_barangay: resolvedBrgy,
           place_barangay_other: "",
           place_street: data.data.place_street,
           is_private_place: data.data.is_private_place,
@@ -536,7 +650,15 @@ const handleConfirmAction = async () => {
           referred_by_barangay: data.data.referred_by_barangay,
           referred_to_barangay: data.data.referred_to_barangay,
           referred_by_dilg: data.data.referred_by_dilg,
-        });
+          lat: data.data.lat != null ? String(data.data.lat) : "",
+          lng: data.data.lng != null ? String(data.data.lng) : "",
+        });// Restore barangay boundary feature when editing
+if (resolvedBrgy && barangayGeoJSON) {
+  const feature = barangayGeoJSON.features.find(
+    f => f.properties.name_db === resolvedBrgy
+  );
+  setSelectedBrgyFeature(feature || null);
+}
         setViewMode(true);
         setEditMode(false);
         setEditingBlotterId(null);
@@ -584,7 +706,10 @@ const handleConfirmAction = async () => {
       },
     });
     const data = await response.json();
-    if (data.success) setBlotters(data.data);
+    if (data.success) {
+  setBlotters(data.data);
+  setCurrentPage(1);
+}
   } catch (error) {
     console.error("Error:", error);
   } finally {
@@ -1019,7 +1144,18 @@ const handleConfirmAction = async () => {
 
     return errors;
   };
-
+const showWarningToast = (message) => {
+  const toast = document.createElement("div");
+  toast.className = "eb-toast-success";
+  toast.textContent = message;
+  toast.style.borderLeftColor = "#f59e0b";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add("show"), 10);
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+};
   const changeStep = (direction) => {
     if (direction === 1) {
       const errors = validateCurrentStep();
@@ -1236,7 +1372,10 @@ const removeOffense = (i) => {
       referred_by_barangay: false,
       referred_to_barangay: false,
       referred_by_dilg: false,
+      lat: "",
+      lng: "",
     });
+    setSelectedBrgyFeature(null);
   };
   const handleModalClose = () => {
     if (editMode && originalData) {
@@ -1353,6 +1492,7 @@ const removeOffense = (i) => {
     setEditingBlotterId(null);
     setOriginalData(null);
     resetForm();
+    setSelectedBrgyFeature(null);
   };
 
   const cancelClose = () => {
@@ -1440,6 +1580,9 @@ const removeOffense = (i) => {
       }
       delete finalCaseDetail.place_barangay_other;
 
+      finalCaseDetail.lat = caseDetail.lat ? parseFloat(caseDetail.lat) : null;
+      finalCaseDetail.lng = caseDetail.lng ? parseFloat(caseDetail.lng) : null;
+      
       finalCaseDetail.type_of_place = typeOfPlace;
       finalCaseDetail.modus_reference_ids = Object.values(offenseSelectedModus).flat();
 
@@ -1549,14 +1692,22 @@ const payload = {
 
   const getStatusClass = (status) => {
     const map = {
-      Pending: "eb-status-pending",
-      "Under Investigation": "eb-status-investigating",
-      Resolved: "eb-status-resolved",
-      Urgent: "eb-status-urgent",
-    };
+        Pending: "eb-status-pending",
+        "Under Investigation": "eb-status-investigating",
+        Resolved: "eb-status-resolved",
+        Solved: "eb-status-resolved",
+        Cleared: "eb-status-resolved",
+        "Referred to Case": "eb-status-pending",
+        Urgent: "eb-status-urgent",
+      };
     return map[status] || "eb-status-pending";
   };
 
+const totalPages = Math.ceil(blotters.length / ITEMS_PER_PAGE);
+const paginatedBlotters = blotters.slice(
+  (currentPage - 1) * ITEMS_PER_PAGE,
+  currentPage * ITEMS_PER_PAGE
+);
   return (
     <div className="eb-content-area">
       <div className="eb-page-header">
@@ -3025,8 +3176,8 @@ const payload = {
                     <option>Rape</option>
                     <option>Robbery</option>
                     <option>Theft</option>
-                    <option>Carnapping - MC</option>
-                    <option>Carnapping - MV</option>
+                    <option value="CARNAPPING - MC">Carnapping - MC</option>
+                    <option value="CARNAPPING - MV">Carnapping - MV</option>
                     <option>Special Complex Crime</option>
                   </select>
                   <FieldError error={fieldErrors.incident_type} />
@@ -3172,18 +3323,46 @@ const payload = {
               value={caseDetail.place_barangay}
               disabled={loadingBacoorBrgy}
               onChange={(e) => {
-                updateCaseDetail("place_barangay", e.target.value);
-                if (e.target.value && fieldErrors.place_barangay) {
-                  const newErrors = { ...fieldErrors };
-                  delete newErrors.place_barangay;
-                  setFieldErrors(newErrors);
-                }
-              }}
+  const selectedName = e.target.value;
+  updateCaseDetail("place_barangay", selectedName);
+  updateCaseDetail("lat", "");
+  updateCaseDetail("lng", "");
+
+  if (selectedName && fieldErrors.place_barangay) {
+    const newErrors = { ...fieldErrors };
+    delete newErrors.place_barangay;
+    setFieldErrors(newErrors);
+  }
+
+  // Find matching GeoJSON feature and fly map to it
+  if (selectedName && barangayGeoJSON) {
+    const feature = barangayGeoJSON.features.find(
+  f => f.properties.name_db === selectedName
+);
+    if (feature) {
+      setSelectedBrgyFeature(feature);
+      const { centroid_lat, centroid_lng } = feature.properties;
+      if (mapRef.current && centroid_lat && centroid_lng) {
+        mapRef.current.flyTo({
+          center: [parseFloat(centroid_lng), parseFloat(centroid_lat)],
+          zoom: 15,
+          duration: 1000,
+        });
+      }
+    } else {
+      setSelectedBrgyFeature(null);
+    }
+  } else {
+    setSelectedBrgyFeature(null);
+  }
+}}
             >
               <option value="">{loadingBacoorBrgy ? "Loading..." : "Select Barangay"}</option>
               {bacoorBarangays.map(b => (
-                <option key={b.code} value={b.name}>{b.name}</option>
-              ))}
+  <option key={b} value={b}>
+    {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+  </option>
+))}
               {/* <option value="Other">Other / Special Location</option> */}
             </select>
             <FieldError error={fieldErrors.place_barangay} />
@@ -3312,6 +3491,224 @@ const payload = {
                 </div>
 
                 <div className="eb-modal-form-group"></div>
+
+               {/* ── LOCATION PINPOINT ── */}
+<div className="eb-modal-form-group" style={{ gridColumn: "span 4" }}>
+  <label className="eb-modal-label">
+    📍 Pin Location on Map{" "}
+    <span style={{ color: "#6b7280", fontWeight: 400, fontSize: "12px" }}>
+      {caseDetail.place_barangay
+        ? "(click map to place pin inside the selected barangay)"
+        : "(select a barangay first to enable the map)"}
+    </span>
+  </label>
+
+  {/* Manual lat/lng inputs */}
+  <div style={{ display: "flex", gap: "12px", marginBottom: "10px", alignItems: "center" }}>
+    <div style={{ flex: 1 }}>
+      <label style={{ fontSize: "11px", color: "#6b7280", display: "block", marginBottom: "3px" }}>Latitude</label>
+      <input
+        type="text"
+        className="eb-modal-input"
+        placeholder="e.g. 14.4341"
+        value={caseDetail.lat}
+        disabled={!caseDetail.place_barangay}
+        style={!caseDetail.place_barangay ? { background: "#f3f4f6", cursor: "not-allowed" } : {}}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9.-]/g, "");
+          updateCaseDetail("lat", v);
+        }}
+      />
+    </div>
+    <div style={{ flex: 1 }}>
+      <label style={{ fontSize: "11px", color: "#6b7280", display: "block", marginBottom: "3px" }}>Longitude</label>
+      <input
+        type="text"
+        className="eb-modal-input"
+        placeholder="e.g. 120.9640"
+        value={caseDetail.lng}
+        disabled={!caseDetail.place_barangay}
+        style={!caseDetail.place_barangay ? { background: "#f3f4f6", cursor: "not-allowed" } : {}}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9.-]/g, "");
+          updateCaseDetail("lng", v);
+        }}
+      />
+    </div>
+    {(caseDetail.lat || caseDetail.lng) && (
+      <button
+        type="button"
+        style={{
+          alignSelf: "flex-end",
+          padding: "8px 14px",
+          background: "#fee2e2",
+          color: "#dc2626",
+          border: "1px solid #fca5a5",
+          borderRadius: "6px",
+          fontSize: "12px",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+        }}
+        onClick={() => { updateCaseDetail("lat", ""); updateCaseDetail("lng", ""); }}
+      >
+        Clear Pin
+      </button>
+    )}
+  </div>
+
+  {/* Map wrapper — overlay when no barangay selected */}
+  <div style={{ position: "relative", height: "450px", borderRadius: "8px", overflow: "hidden", border: "1px solid #d1d5db" }}>
+
+    {/* Gray overlay when no barangay selected */}
+    {!caseDetail.place_barangay && (
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 10,
+        background: "rgba(243,244,246,0.85)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: "10px", pointerEvents: "all", cursor: "not-allowed",
+        borderRadius: "8px",
+      }}>
+        <div style={{
+          width: "48px", height: "48px", borderRadius: "50%",
+          background: "#e5e7eb",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+            fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#6b7280" }}>
+          Select a barangay to enable the map
+        </p>
+        <p style={{ margin: 0, fontSize: "12px", color: "#9ca3af" }}>
+          The pin will be restricted to the selected barangay boundary
+        </p>
+      </div>
+    )}
+
+    <Map
+      ref={mapRef}
+      mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+      key={`map-${editingBlotterId || 'new'}`}
+      initialViewState={{
+        longitude: caseDetail.lng ? parseFloat(caseDetail.lng) : 120.9640,
+        latitude: caseDetail.lat ? parseFloat(caseDetail.lat) : 14.4341,
+        zoom: caseDetail.lat ? 15 : 12,
+      }}
+      style={{ width: "100%", height: "100%" }}
+      mapStyle="mapbox://styles/mapbox/streets-v12"
+      onClick={(e) => {
+        if (viewMode || !caseDetail.place_barangay) return;
+
+        const { lng, lat } = e.lngLat;
+
+        // Validate point is inside selected barangay boundary
+        if (selectedBrgyFeature) {
+          const point = { type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] } };
+          const polygon = selectedBrgyFeature;
+
+          // Manual point-in-polygon using ray casting
+          const isInside = (() => {
+            const coords = polygon.geometry.type === "Polygon"
+              ? polygon.geometry.coordinates
+              : polygon.geometry.coordinates[0]; // MultiPolygon: use first ring
+            const rings = polygon.geometry.type === "Polygon"
+              ? polygon.geometry.coordinates
+              : polygon.geometry.coordinates.flat(1);
+            
+            let inside = false;
+            for (const ring of rings) {
+              const n = ring.length;
+              let j = n - 1;
+              for (let i = 0; i < n; i++) {
+                const xi = ring[i][0], yi = ring[i][1];
+                const xj = ring[j][0], yj = ring[j][1];
+                const intersect = ((yi > lat) !== (yj > lat)) &&
+                  (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+                j = i;
+              }
+            }
+            return inside;
+          })();
+
+          if (!isInside) {
+            showWarningToast(`⚠️ Pin must be placed inside ${caseDetail.place_barangay}`);
+            return;
+          }
+        }
+
+        updateCaseDetail("lat", lat.toFixed(6));
+        updateCaseDetail("lng", lng.toFixed(6));
+      }}
+      cursor={!caseDetail.place_barangay || viewMode ? "default" : "crosshair"}
+    >
+      {/* Barangay boundary polygon */}
+      {selectedBrgyFeature && (
+        <Source id="brgy-boundary" type="geojson" data={selectedBrgyFeature}>
+          <Layer
+            id="brgy-fill"
+            type="fill"
+            paint={{
+              "fill-color": "#1e3a5f",
+              "fill-opacity": 0.08,
+            }}
+          />
+          <Layer
+            id="brgy-outline"
+            type="line"
+            paint={{
+              "line-color": "#1e3a5f",
+              "line-width": 2.5,
+              "line-dasharray": [2, 1],
+            }}
+          />
+        </Source>
+      )}
+
+      {/* Pin marker */}
+      {caseDetail.lat && caseDetail.lng && (
+        <Marker
+          longitude={parseFloat(caseDetail.lng)}
+          latitude={parseFloat(caseDetail.lat)}
+          anchor="bottom"
+        >
+          <div style={{
+            width: "26px",
+            height: "26px",
+            borderRadius: "50% 50% 50% 0",
+            background: (() => {
+              const colors = {
+                "Murder": "#7f1d1d",
+                "Homicide": "#991b1b",
+                "Rape": "#9333ea",
+                "Robbery": "#ea580c",
+                "Theft": "#d97706",
+                "Physical Injury": "#0369a1",
+                "Carnapping - MC": "#0f766e",
+                "Carnapping - MV": "#0f766e",
+                "Special Complex Crime": "#4338ca",
+              };
+              return colors[caseDetail.incident_type] || "#c1272d";
+            })(),
+            border: "2px solid white",
+            transform: "rotate(-45deg)",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+          }} />
+        </Marker>
+      )}
+    </Map>
+  </div>
+
+  <small style={{ color: "#6b7280", fontSize: "11px", display: "block", marginTop: "5px" }}>
+    {caseDetail.place_barangay
+      ? `Pinning inside ${caseDetail.place_barangay}. Click the map to drop a pin.`
+      : "Select a barangay above to activate the map."}
+  </small>
+</div>
 
                 {/* Other Barangay Input */}
                 {caseDetail.place_barangay === "Other" && (
@@ -3467,8 +3864,8 @@ const payload = {
                               <option>Rape</option>
                               <option>Robbery</option>
                               <option>Theft</option>
-                              <option>Carnapping - MC</option>
-                              <option>Carnapping - MV</option>
+                              <option value="CARNAPPING - MC">Carnapping - MC</option>
+                              <option value="CARNAPPING - MV">Carnapping - MV</option>
                               <option>Special Complex Crime</option>
                             </select>
                             <FieldError
@@ -3993,8 +4390,8 @@ const payload = {
         <option>Rape</option>
         <option>Robbery</option>
         <option>Theft</option>
-        <option>Carnapping - MC</option>
-        <option>Carnapping - MV</option>
+        <option value="CARNAPPING - MC">Carnapping - MC</option>
+        <option value="CARNAPPING - MV">Carnapping - MV</option>
         <option>Special Complex Crime</option>
       </select>
     </div>
@@ -4002,23 +4399,11 @@ const payload = {
       <label className="eb-filter-label">Barangay</label>
       <select className="eb-filter-input" name="barangay" value={filters.barangay} onChange={handleFilterChange}>
         <option value="">All Barangays</option>
-        <option>Aniban 1</option><option>Aniban 2</option><option>Banalo</option>
-        <option>Bayanan</option><option>Camposanto</option><option>Daang Bukid</option>
-        <option>Digman</option><option>Dulong Bayan</option><option>Habay I</option>
-        <option>Habay II</option><option>Kaingin Digman</option><option>Ligas 1</option>
-        <option>Mabolo</option><option>Maliksi 1</option><option>Maliksi 2</option>
-        <option>Mambog 1</option><option>Mambog 2</option><option>Molino I</option>
-        <option>Molino II</option><option>Molino III</option><option>Molino IV</option>
-        <option>Molino V</option><option>Molino VI</option><option>Molino VII</option>
-        <option>Niog</option><option>Panapaan 2</option><option>Panapaan 4</option>
-        <option>P.F. Espiritu 2</option><option>P.F. Espiritu 4</option>
-        <option>P.F. Espiritu 5</option><option>P.F. Espiritu 6</option>
-        <option>Poblacion</option><option>Real</option><option>Salinas 1</option>
-        <option>Salinas 2</option><option>San Nicolas 1</option><option>San Nicolas 2</option>
-        <option>San Nicolas 3</option><option>Sineguelasan</option><option>Talaba 1</option>
-        <option>Talaba 3</option><option>Zapote 1</option><option>Zapote 2</option>
-        <option>Zapote 3</option><option>Queens Row Central</option>
-        <option>Queens Row East</option><option>Queens Row West</option>
+        {bacoorBarangays.map(b => (
+          <option key={b} value={b}>
+            {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+          </option>
+        ))}
       </select>
     </div>
   </div>
@@ -4074,7 +4459,7 @@ const payload = {
                   </td>
                 </tr>
               ) : (
-                blotters.map((b) => (
+                paginatedBlotters.map((b) => (
                   <tr key={b.blotter_id}>
                     <td>
                       <strong>{b.blotter_entry_number}</strong>
@@ -4118,15 +4503,42 @@ const payload = {
           </table>
         </div>
         <div className="eb-pagination">
-          <div className="eb-pagination-info">
-            Showing 1-{blotters.length} of {blotters.length} records
-          </div>
-          <div className="eb-pagination-controls">
-            <button className="eb-pagination-btn">Previous</button>
-            <button className="eb-pagination-btn active">1</button>
-            <button className="eb-pagination-btn">Next</button>
-          </div>
+        <div className="eb-pagination-info">
+          Showing {blotters.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, blotters.length)} of {blotters.length} records
         </div>
+        <div className="eb-pagination-controls">
+          <button
+            className="eb-pagination-btn"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(p => p - 1)}
+          >Previous</button>
+
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+            .reduce((acc, page, idx, arr) => {
+              if (idx > 0 && page - arr[idx - 1] > 1) acc.push('...');
+              acc.push(page);
+              return acc;
+            }, [])
+            .map((item, idx) =>
+              item === '...' ? (
+                <span key={`ellipsis-${idx}`} style={{ padding: '0 6px', color: '#6b7280' }}>...</span>
+              ) : (
+                <button
+                  key={item}
+                  className={`eb-pagination-btn ${currentPage === item ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(item)}
+                >{item}</button>
+              )
+            )}
+
+          <button
+            className="eb-pagination-btn"
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => setCurrentPage(p => p + 1)}
+          >Next</button>
+        </div>
+      </div>
       </div>
     </div>
   );
