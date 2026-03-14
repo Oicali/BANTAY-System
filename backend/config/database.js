@@ -35,7 +35,7 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT, 10),
   database: process.env.DB_NAME,
   ssl: { rejectUnauthorized: true, ca: sslCert },
-  max: 5,
+  max: 7,
   min: 2,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
