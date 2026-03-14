@@ -3,7 +3,7 @@
 // ================================================================================
 
 const router = require("express").Router();
-const { authenticate } = require("../../shared/middleware/tokenMiddleware");
+const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 const {
   login,
   logout,
@@ -13,7 +13,7 @@ const {
   resendOTP,
   resetPassword,
   changePassword,
-} = require("./authController");
+} = require("../controller/authController");
 
 // ============================================================
 // PUBLIC ROUTES (no auth required)

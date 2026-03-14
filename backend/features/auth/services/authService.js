@@ -4,7 +4,7 @@
 
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
-const pool = require("../../config/database");
+const pool = require("../../../config/database");
 
 // Email transporter
 const transporter = nodemailer.createTransport({

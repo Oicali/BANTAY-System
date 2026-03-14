@@ -2,17 +2,17 @@
 // FILE: backend/modules/auth/authController.js
 // ================================================================================
 
-const pool = require("../../config/database");
+const pool = require("../../../config/database");
 const bcrypt = require("bcrypt");
-const tokenManager = require("../../shared/utils/tokenManager");
-const authService = require("./authService");
+const tokenManager = require("../../../shared/utils/tokenManager");
+const authService = require("../services/authService");
 const {
   validateLoginInput,
   validateEmail,
   validatePasswordChange,
   validateResetPassword,
   validateOTPCode,
-} = require("./authValidator");
+} = require("../validators/authValidator");
 
 // ============================================================
 // LOGIN

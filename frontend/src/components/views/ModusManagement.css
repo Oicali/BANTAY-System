@@ -204,3 +204,191 @@
 .mm-toast { position: fixed; top: 24px; right: 24px; padding: 16px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.15); min-width: 280px; }
 .mm-toast.success { background: var(--white); color: var(--gray-900); border: 1px solid var(--gray-200); border-left: 4px solid #10b981; }
 .mm-toast.error { background: var(--white); color: var(--gray-900); border: 1px solid var(--gray-200); border-left: 4px solid var(--red-primary); }
+
+/* ── PAGINATION ── */
+.mm-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.mm-pagination-info {
+  font-size: 13px;
+  color: var(--gray-600);
+}
+
+.mm-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mm-pagination-btn {
+  padding: 8px 18px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.mm-pagination-btn:hover:not(:disabled) {
+  background: var(--gray-50);
+  border-color: var(--navy-primary);
+  color: var(--navy-primary);
+}
+.mm-pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mm-pagination-current {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.mm-action-btn-disable {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.08);
+}
+.mm-action-btn-disable:hover {
+  background: rgba(217, 119, 6, 0.16);
+  color: #b45309;
+}
+
+.mm-action-btn-restore {
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.08);
+}
+.mm-action-btn-restore:hover {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+/* ── DISABLE / RESTORE BUTTONS ── */
+.mm-action-btn-disable {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+.mm-action-btn-disable:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #b91c1c;
+}
+
+.mm-action-btn-restore {
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.08);
+}
+.mm-action-btn-restore:hover {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+/* ── CONFIRM MODAL ── */
+.mm-confirm-modal {
+  max-width: 420px;
+}
+
+.mm-confirm-message {
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── CONFIRM MODAL ── */
+.mm-confirm-modal {
+  background: var(--white);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  animation: mm-modal-in 0.18s ease;
+}
+
+@keyframes mm-modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+.mm-confirm-icon-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 32px 24px 16px;
+}
+
+.mm-confirm-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mm-confirm-content {
+  padding: 8px 28px 24px;
+  text-align: center;
+}
+
+.mm-confirm-title {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0 0 10px;
+}
+
+.mm-confirm-message {
+  font-size: 14px;
+  color: var(--gray-600);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.mm-confirm-footer {
+  display: flex;
+  gap: 10px;
+  padding: 0 28px 28px;
+}
+
+.mm-confirm-cancel {
+  flex: 1;
+  padding: 11px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.mm-confirm-cancel:hover {
+  background: var(--gray-50);
+}
+
+.mm-confirm-action {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  border-radius: 8px;
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: all 0.18s;
+  opacity: 1;
+}
+.mm-confirm-action:hover {
+  opacity: 0.88;
+}
