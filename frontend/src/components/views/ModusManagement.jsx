@@ -1,75 +1,43 @@
 import React, { useState, useEffect } from "react";
 import "./ModusManagement.css";
-import LoadingModal from "../modals/LoadingModal";
 
-const ITEMS_PER_PAGE = 15;
 const API_URL = `${import.meta.env.VITE_API_URL}/modus-management`;
-
 const INDEX_CRIMES = [
-  "MURDER",
-  "HOMICIDE",
-  "PHYSICAL INJURIES",
-  "RAPE",
-  "ROBBERY",
-  "THEFT",
-  "CARNAPPING - MC",
-  "CARNAPPING - MV",
-  "SPECIAL COMPLEX CRIME",
+  "MURDER", "HOMICIDE", "PHYSICAL INJURIES", "RAPE",
+  "ROBBERY", "THEFT", "CARNAPPING - MC", "CARNAPPING - MV", "SPECIAL COMPLEX CRIME"
 ];
 
-const emptyForm = { crime_type: "", modus_name: "", description: "" };
-
+const emptyForm = { crime_type: "", modus_name: "", description: "", is_active: true };
 const EditIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="13"
-    height="13"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
   </svg>
 );
 
-const DisableIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="13"
-    height="13"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+const ToggleIcon = ({ active }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    {active
+      ? <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3" fill="currentColor"/></>
+      : <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="8" cy="12" r="3" fill="currentColor"/></>
+    }
   </svg>
 );
 
-const RestoreIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="13"
-    height="13"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="1 4 1 10 7 10" />
-    <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
+const DeleteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2"
+    strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
   </svg>
 );
-
 function ModusManagement() {
   const [modusList, setModusList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -77,85 +45,26 @@ function ModusManagement() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
-  const [filterCrime, setFilterCrime] = useState("");
-  const [filterStatus, setFilterStatus] = useState("active"); // default: active only
-  const [toast, setToast] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: ITEMS_PER_PAGE,
-    totalPages: 1,
-  });
-
-  // ── Confirm modal state ───────────────────────────────────────────────────
-  const [confirm, setConfirm] = useState({
-    visible: false,
-    title: "",
-    message: "",
-    onConfirm: null,
-    confirmText: "",
-    confirmColor: "",
-  });
-
-  const showConfirm = (title, message, onConfirm, confirmText, confirmColor) =>
-    setConfirm({
-      visible: true,
-      title,
-      message,
-      onConfirm,
-      confirmText,
-      confirmColor,
-    });
-  const hideConfirm = () =>
-    setConfirm({
-      visible: false,
-      title: "",
-      message: "",
-      onConfirm: null,
-      confirmText: "",
-      confirmColor: "",
-    });
-
+ const [filterCrime, setFilterCrime] = useState("");
+const [sortBy, setSortBy] = useState("");
+const [toast, setToast] = useState(null);
+const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: "" });
   const token = () => localStorage.getItem("token");
 
-  useEffect(() => {
-    fetchModus(1);
-  }, []);
-  useEffect(() => {
-    fetchModus(1);
-  }, [filterCrime, filterStatus]);
+  useEffect(() => { fetchModus(); }, [sortBy]);
 
-  const fetchModus = async (targetPage = page) => {
+  const fetchModus = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: targetPage,
-        limit: ITEMS_PER_PAGE,
-        ...(filterCrime && { crime_type: filterCrime }),
-        ...(filterStatus !== "all" && {
-          is_active: filterStatus === "active" ? "true" : "false",
-        }),
-      });
-      const res = await fetch(`${API_URL}?${params}`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
+      const url = sortBy ? `${API_URL}?sort_by=${sortBy}` : API_URL;
+const res = await fetch(url, { headers: { Authorization: `Bearer ${token()}` } });
       const data = await res.json();
-      if (data.success) {
-        setModusList(data.data);
-        setPage(data.pagination.page);
-        setPagination(data.pagination);
-      }
+      if (data.success) setModusList(data.data);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const goToPage = (p) => {
-    if (p < 1 || p > pagination.totalPages) return;
-    fetchModus(p);
   };
 
   const showToast = (msg, type = "success") => {
@@ -171,11 +80,7 @@ function ModusManagement() {
   };
 
   const openEdit = (m) => {
-    setForm({
-      crime_type: m.crime_type,
-      modus_name: m.modus_name,
-      description: m.description || "",
-    });
+    setForm({ crime_type: m.crime_type, modus_name: m.modus_name, description: m.description || "", is_active: m.is_active });
     setErrors({});
     setEditingId(m.id);
     setShowModal(true);
@@ -184,215 +89,92 @@ function ModusManagement() {
   const validate = () => {
     const e = {};
     if (!form.crime_type) e.crime_type = "Required";
-    if (!form.modus_name || form.modus_name.trim().length === 0)
-      e.modus_name = "Required";
-    else if (form.modus_name.trim().length < 2)
-      e.modus_name = "At least 2 characters";
+    if (!form.modus_name || form.modus_name.trim().length === 0) e.modus_name = "Required";
+    else if (form.modus_name.trim().length < 2) e.modus_name = "At least 2 characters";
     return e;
   };
 
   const handleSubmit = async () => {
     const e = validate();
-    if (Object.keys(e).length > 0) {
-      setErrors(e);
-      return;
-    }
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+
     try {
       const url = editingId ? `${API_URL}/${editingId}` : API_URL;
       const method = editingId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token()}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
         body: JSON.stringify(form),
       });
       const data = await res.json();
       if (data.success) {
         showToast(editingId ? "Modus updated!" : "Modus added!");
         setShowModal(false);
-        fetchModus(page);
+        fetchModus();
       } else {
         showToast(data.message || "Error", "error");
       }
-    } catch {
+    } catch (err) {
       showToast("Request failed", "error");
     }
   };
 
-  // ── Toggle with confirm modal ─────────────────────────────────────────────
-  const handleToggleClick = (m) => {
-    if (m.is_active) {
-      showConfirm(
-        "Disable Modus",
-        `Are you sure you want to disable "${m.modus_name}"? It will no longer appear in reports.`,
-        () => {
-          hideConfirm();
-          doToggle(m);
-        },
-        "Yes, Disable",
-        "#c1272d",
-      );
-    } else {
-      showConfirm(
-        "Restore Modus",
-        `Are you sure you want to restore "${m.modus_name}"? It will be available again in reports.`,
-        () => {
-          hideConfirm();
-          doToggle(m);
-        },
-        "Yes, Restore",
-        "#16a34a",
-      );
-    }
-  };
-
-  const doToggle = async (m) => {
+  const handleToggle = async (m) => {
     try {
       const res = await fetch(`${API_URL}/${m.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token()}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ is_active: !m.is_active }),
       });
       const data = await res.json();
-      if (data.success) {
-        showToast(`Modus ${!m.is_active ? "restored!" : "disabled!"}`);
-        fetchModus(page);
-      } else {
-        showToast(data.message || "Error", "error");
-      }
-    } catch {
-      showToast("Request failed", "error");
-    }
+      if (data.success) { showToast(`Modus ${!m.is_active ? "enabled" : "disabled"}!`); fetchModus(); }
+    } catch (err) { showToast("Request failed", "error"); }
   };
+
+  const handleDelete = (m) => {
+  setConfirmModal({ show: true, id: m.id, name: m.modus_name });
+};
+
+const confirmDelete = async () => {
+  const id = confirmModal.id;
+  setConfirmModal({ show: false, id: null, name: "" });
+  try {
+    const res = await fetch(`${API_URL}/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    const data = await res.json();
+    if (data.success) { showToast("Modus deleted!"); fetchModus(); }
+    else showToast(data.message || "Cannot delete", "error");
+  } catch (err) { showToast("Request failed", "error"); }
+};
+
+  const filtered = filterCrime ? modusList.filter(m => m.crime_type === filterCrime) : modusList;
 
   return (
     <div className="mm-container">
       {toast && <div className={`mm-toast ${toast.type}`}>{toast.msg}</div>}
 
-      {/* ── Confirm Modal ── */}
-      {confirm.visible && (
-        <div className="mm-modal-overlay">
-          <div className="mm-confirm-modal">
-            {/* Icon */}
-            <div
-              className="mm-confirm-icon-wrap"
-              style={{ background: confirm.confirmColor + "18" }}
-            >
-              <div
-                className="mm-confirm-icon"
-                style={{
-                  background: confirm.confirmColor + "22",
-                  color: confirm.confirmColor,
-                }}
-              >
-                {confirm.confirmColor === "#c1272d" ? (
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="1 4 1 10 7 10" />
-                    <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
-                  </svg>
-                )}
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="mm-confirm-content">
-              <h3 className="mm-confirm-title">{confirm.title}</h3>
-              <p className="mm-confirm-message">{confirm.message}</p>
-            </div>
-
-            {/* Actions */}
-            <div className="mm-confirm-footer">
-              <button className="mm-confirm-cancel" onClick={hideConfirm}>
-                Cancel
-              </button>
-              <button
-                className="mm-confirm-action"
-                style={{ background: confirm.confirmColor }}
-                onClick={confirm.onConfirm}
-              >
-                {confirm.confirmText}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Header ── */}
       <div className="mm-header">
         <div>
           <h1>Modus Management</h1>
           <p>Manage modus operandi classifications for index crimes</p>
         </div>
-        <button className="mm-btn-primary" onClick={openAdd}>
-          + Add Modus
-        </button>
+        <button className="mm-btn-primary" onClick={openAdd}>+ Add Modus</button>
       </div>
 
-      {/* ── Filter Bar ── */}
       <div className="mm-filter-bar">
-        {/* Crime type filter */}
-        <select
-          className="mm-filter-select"
-          value={filterCrime}
-          onChange={(e) => {
-            setFilterCrime(e.target.value);
-            setPage(1);
-          }}
-        >
+        <select className="mm-filter-select" value={filterCrime} onChange={e => setFilterCrime(e.target.value)}>
           <option value="">All Crime Types</option>
-          {INDEX_CRIMES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          {INDEX_CRIMES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-
-        {/* Status filter */}
-        <select
-          className="mm-filter-select"
-          value={filterStatus}
-          onChange={(e) => {
-            setFilterStatus(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="active">Active Only</option>
-          <option value="disabled">Disabled Only</option>
-          <option value="all">All Status</option>
-        </select>
-
-        <span className="mm-count">{pagination.total} record(s)</span>
+        <select className="mm-filter-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+  <option value="">Sort: Default</option>
+  <option value="created_at">Sort: Newest First</option>
+</select>
+<span className="mm-count">{filtered.length} record(s)</span>
       </div>
 
-      {/* ── Table ── */}
       <div className="mm-table-card">
         <table className="mm-table">
           <thead>
@@ -407,109 +189,42 @@ function ModusManagement() {
           </thead>
           <tbody>
             {loading ? (
-              <LoadingModal isOpen={true} message={"Loading all modi..."} />
-            ) : modusList.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="mm-center">
-                  No records found
+              <tr><td colSpan="6" className="mm-center">Loading...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan="6" className="mm-center">No records found</td></tr>
+            ) : filtered.map(m => (
+              <tr key={m.id}>
+                <td><span className="mm-crime-badge">{m.crime_type}</span></td>
+                <td><strong>{m.modus_name}</strong></td>
+                <td className="mm-desc">{m.description || "—"}</td>
+                <td>
+                  <span className={`mm-status ${m.is_active ? "active" : "inactive"}`}>
+                    {m.is_active ? "Active" : "Disabled"}
+                  </span>
+                </td>
+                <td>{m.created_at ? new Date(m.created_at).toLocaleDateString() : "—"}</td>
+                <td>
+                  <div className="mm-actions">
+                  <button className="mm-action-btn mm-action-btn-edit" onClick={() => openEdit(m)}>
+                    <EditIcon /> Edit
+                  </button>
+                  <button className="mm-action-btn mm-action-btn-delete" onClick={() => handleDelete(m)}>
+                    <DeleteIcon /> Delete
+                  </button>
+                </div>
                 </td>
               </tr>
-            ) : (
-              modusList.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    <span className="mm-crime-badge">{m.crime_type}</span>
-                  </td>
-                  <td>
-                    <strong>{m.modus_name}</strong>
-                  </td>
-                  <td className="mm-desc">{m.description || "—"}</td>
-                  <td>
-                    <span
-                      className={`mm-status ${m.is_active ? "active" : "inactive"}`}
-                    >
-                      {m.is_active ? "Active" : "Disabled"}
-                    </span>
-                  </td>
-                  <td>
-                    {m.created_at
-                      ? new Date(m.created_at).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td>
-                    <div className="mm-actions">
-                      <button
-                        className="mm-action-btn mm-action-btn-edit"
-                        onClick={() => openEdit(m)}
-                      >
-                        <EditIcon /> Edit
-                      </button>
-                      {m.is_active ? (
-                        <button
-                          className="mm-action-btn mm-action-btn-disable"
-                          onClick={() => handleToggleClick(m)}
-                        >
-                          <DisableIcon /> Disable
-                        </button>
-                      ) : (
-                        <button
-                          className="mm-action-btn mm-action-btn-restore"
-                          onClick={() => handleToggleClick(m)}
-                        >
-                          <RestoreIcon /> Restore
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
-
-        {/* ── Pagination ── */}
-        {pagination.total > 0 && (
-          <div className="mm-pagination">
-            <div className="mm-pagination-info">
-              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–
-              {Math.min(page * ITEMS_PER_PAGE, pagination.total)} of{" "}
-              {pagination.total} records
-            </div>
-            <div className="mm-pagination-controls">
-              <button
-                className="mm-pagination-btn"
-                onClick={() => goToPage(page - 1)}
-                disabled={page <= 1}
-              >
-                Previous
-              </button>
-              <span className="mm-pagination-current">
-                Page {page} of {pagination.totalPages}
-              </span>
-              <button
-                className="mm-pagination-btn"
-                onClick={() => goToPage(page + 1)}
-                disabled={page >= pagination.totalPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Add/Edit Modal ── */}
       {showModal && (
         <div className="mm-modal-overlay">
           <div className="mm-modal">
             <div className="mm-modal-header">
               <h2>{editingId ? "Edit Modus" : "Add New Modus"}</h2>
-              <span
-                className="mm-modal-close"
-                onClick={() => setShowModal(false)}
-              >
-                &times;
-              </span>
+              <span className="mm-modal-close" onClick={() => setShowModal(false)}>&times;</span>
             </div>
             <div className="mm-modal-body">
               <div className="mm-form-group">
@@ -517,21 +232,12 @@ function ModusManagement() {
                 <select
                   className={`mm-input ${errors.crime_type ? "error" : ""}`}
                   value={form.crime_type}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, crime_type: e.target.value }));
-                    setErrors((p) => ({ ...p, crime_type: "" }));
-                  }}
+                  onChange={e => { setForm(p => ({...p, crime_type: e.target.value})); setErrors(p => ({...p, crime_type: ""})); }}
                 >
                   <option value="">Select Crime Type</option>
-                  {INDEX_CRIMES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {INDEX_CRIMES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                {errors.crime_type && (
-                  <span className="mm-error">{errors.crime_type}</span>
-                )}
+                {errors.crime_type && <span className="mm-error">{errors.crime_type}</span>}
               </div>
 
               <div className="mm-form-group">
@@ -542,14 +248,9 @@ function ModusManagement() {
                   placeholder="e.g., Akyat Bahay"
                   value={form.modus_name}
                   maxLength="100"
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, modus_name: e.target.value }));
-                    setErrors((p) => ({ ...p, modus_name: "" }));
-                  }}
+                  onChange={e => { setForm(p => ({...p, modus_name: e.target.value})); setErrors(p => ({...p, modus_name: ""})); }}
                 />
-                {errors.modus_name && (
-                  <span className="mm-error">{errors.modus_name}</span>
-                )}
+                {errors.modus_name && <span className="mm-error">{errors.modus_name}</span>}
               </div>
 
               <div className="mm-form-group">
@@ -560,26 +261,70 @@ function ModusManagement() {
                   placeholder="Brief description of this modus..."
                   value={form.description}
                   maxLength="500"
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, description: e.target.value }))
-                  }
+                  onChange={e => setForm(p => ({...p, description: e.target.value}))}
                 />
+              </div>
+
+              <div className="mm-form-group">
+                <label>Status</label>
+                <div className="mm-toggle-group">
+                  <button type="button" className={`mm-toggle-btn ${form.is_active ? "active" : ""}`} onClick={() => setForm(p => ({...p, is_active: true}))}>Active</button>
+                  <button type="button" className={`mm-toggle-btn ${!form.is_active ? "active" : ""}`} onClick={() => setForm(p => ({...p, is_active: false}))}>Disabled</button>
+                </div>
               </div>
             </div>
             <div className="mm-modal-footer">
-              <button
-                className="mm-btn-secondary"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </button>
-              <button className="mm-btn-primary" onClick={handleSubmit}>
-                {editingId ? "Update" : "Add Modus"}
-              </button>
+              <button className="mm-btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="mm-btn-primary" onClick={handleSubmit}>{editingId ? "Update" : "Add Modus"}</button>
             </div>
           </div>
         </div>
       )}
+      {confirmModal.show && (
+  <div className="mm-modal-overlay" style={{ zIndex: 10000, alignItems: "flex-start", paddingTop: "80px" }}>
+    <div className="mm-modal" style={{ maxWidth: "420px", padding: 0 }}>
+      <div style={{
+        padding: "20px 24px",
+        background: "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)",
+        borderRadius: "8px 8px 0 0",
+        display: "flex", alignItems: "center", gap: "12px"
+      }}>
+        <div style={{
+          width: "36px", height: "36px", borderRadius: "8px",
+          background: "rgba(255,255,255,0.15)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "white" }}>Delete Modus</h3>
+          <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.7)", marginTop: "2px" }}>This action cannot be undone</p>
+        </div>
+        <span onClick={() => setConfirmModal({ show: false, id: null, name: "" })}
+          style={{ marginLeft: "auto", color: "white", fontSize: "24px", cursor: "pointer", opacity: 0.8, lineHeight: 1 }}>&times;</span>
+      </div>
+      <div style={{ padding: "24px" }}>
+        <p style={{ margin: 0, fontSize: "14px", color: "#374151", lineHeight: "1.6" }}>
+          Are you sure you want to delete <strong>"{confirmModal.name}"</strong>?<br/>
+          <span style={{ color: "#6b7280", fontSize: "13px" }}>Cannot delete if modus is used in existing reports. Disable it instead.</span>
+        </p>
+      </div>
+      <div style={{
+        padding: "16px 24px", borderTop: "1px solid #e5e7eb",
+        display: "flex", gap: "12px", justifyContent: "flex-end",
+        background: "#f9fafb", borderRadius: "0 0 8px 8px"
+      }}>
+        <button className="mm-btn-secondary" onClick={() => setConfirmModal({ show: false, id: null, name: "" })}>Cancel</button>
+        <button className="mm-btn-primary" onClick={confirmDelete}>Yes, Delete</button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
