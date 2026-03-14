@@ -92,6 +92,8 @@ const login = async (req, res) => {
       user.status = "active";
     }
 
+
+    
     // Permanent lock (lockout_until IS NULL but status = 'locked')
     if (user.status === "locked" && !user.lockout_until) {
       return res.status(403).json({
