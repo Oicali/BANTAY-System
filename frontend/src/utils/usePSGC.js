@@ -30,6 +30,15 @@ export function usePSGC() {
     } catch { return []; }
   };
 
+  // NEW — for NCR which has no province, fetch cities directly from region
+  const fetchCitiesByRegion = async (regionCode) => {
+    try {
+      const res = await fetch(`${BASE}/regions/${regionCode}/cities-municipalities/`);
+      const data = await res.json();
+      return data.sort((a,b) => a.name.localeCompare(b.name));
+    } catch { return []; }
+  };
+
   const fetchBarangays = async (cityCode) => {
     try {
       const res = await fetch(`${BASE}/cities-municipalities/${cityCode}/barangays/`);
@@ -38,5 +47,12 @@ export function usePSGC() {
     } catch { return []; }
   };
 
-  return { regions, loadingRegions, fetchProvinces, fetchCities, fetchBarangays };
+  return { 
+    regions, 
+    loadingRegions, 
+    fetchProvinces, 
+    fetchCities, 
+    fetchCitiesByRegion,  // NEW
+    fetchBarangays 
+  };
 }
