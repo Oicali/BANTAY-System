@@ -185,7 +185,7 @@ const [trashLoading, setTrashLoading] = useState(false);
       occupation: "",
     },
   ]);
-  const { regions, loadingRegions, fetchProvinces, fetchCities, fetchBarangays } = usePSGC();
+ const { regions, loadingRegions, fetchProvinces, fetchCities, fetchCitiesByRegion, fetchBarangays } = usePSGC();
 
   const [cProvinces, setCProvinces]   = useState({});
   const [cCities, setCCities]         = useState({});
@@ -309,8 +309,8 @@ const mapRef = React.useRef(null);
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("search", filters.search);
       if (filters.status) queryParams.append("status", filters.status);
-      if (filters.incident_type)
-        queryParams.append("incident_type", filters.incident_type);
+      // if (filters.incident_type)
+      //   queryParams.append("incident_type", filters.incident_type);
       if (filters.date_from) queryParams.append("date_from", filters.date_from);
       if (filters.date_to) queryParams.append("date_to", filters.date_to);
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
@@ -324,9 +324,15 @@ const mapRef = React.useRef(null);
     if (!response) return;
     const data = await response.json();
     if (data.success) {
-          setBlotters(data.data);
-          setCurrentPage(1);
-        }
+  let results = data.data;
+  if (filters.incident_type) {
+    results = results.filter(b =>
+      b.incident_type.toLowerCase() === filters.incident_type.toLowerCase()
+    );
+  }
+  setBlotters(results);
+  setCurrentPage(1);
+}
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -2375,10 +2381,10 @@ const paginatedBlotters = blotters.slice(
                               delete newErrors[`complainant_${i}_region_code`];
                               setFieldErrors(newErrors);
                               if (val === "130000000") {
-                                setCLoadingCity(p => ({ ...p, [i]: true }));
-                                const cities = await fetchCities(val);
-                                setCCities(p => ({ ...p, [i]: cities }));
-                                setCLoadingCity(p => ({ ...p, [i]: false }));
+  setCLoadingCity(p => ({ ...p, [i]: true }));
+  const cities = await fetchCitiesByRegion(val);
+  setCCities(p => ({ ...p, [i]: cities }));
+  setCLoadingCity(p => ({ ...p, [i]: false }));
                               } else {
                                 setCLoadingProv(p => ({ ...p, [i]: true }));
                                 const data = await fetchProvinces(val);
@@ -2853,10 +2859,10 @@ const paginatedBlotters = blotters.slice(
                                 delete newErrors[`suspect_${i}_region_code`];
                                 setFieldErrors(newErrors);
                                 if (val === "130000000") {
-                                  setSLoadingCity(p => ({ ...p, [i]: true }));
-                                  const cities = await fetchCities(val);
-                                  setSCities(p => ({ ...p, [i]: cities }));
-                                  setSLoadingCity(p => ({ ...p, [i]: false }));
+  setSLoadingCity(p => ({ ...p, [i]: true }));
+  const cities = await fetchCitiesByRegion(val);
+  setSCities(p => ({ ...p, [i]: cities }));
+  setSLoadingCity(p => ({ ...p, [i]: false }));
                                 } else {
                                   setSLoadingProv(p => ({ ...p, [i]: true }));
                                   const data = await fetchProvinces(val);
@@ -4438,10 +4444,10 @@ const paginatedBlotters = blotters.slice(
       <label className="eb-filter-label">Status</label>
       <select className="eb-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
         <option value="">All Status</option>
-        <option>Under Investigation</option>
-        <option>Resolved</option>
-        <option>Pending</option>
-        <option>Urgent</option>
+     <option>Under Investigation</option>
+<option>Pending</option>
+<option>Urgent</option>
+<option>Cleared</option>
       </select>
     </div>
     <div className="eb-filter-group">
