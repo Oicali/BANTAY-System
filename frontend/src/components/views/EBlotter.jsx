@@ -3,6 +3,7 @@ import { usePSGC } from "../../utils/usePSGC";
 import "./EBlotter.css";
 import Map, { Marker, Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { CURRENT_BARANGAYS, LEGACY_BARANGAY_OPTIONS } from "../../utils/barangayOptions";
 const OFFENSE_TO_CRIME_TYPE = {
   "Murder": "MURDER",
   "Homicide": "HOMICIDE",
@@ -22,9 +23,9 @@ const BARANGAY_MIGRATION_MAP = {
   "HABAY 2": "HABAY II",
   "LIGAS 1": "LIGAS I",
   "LIGAS 2": "LIGAS II",
-  "MABOLO 1": "MABOLO I",
-  "MABOLO 2": "MABOLO I",
-  "MABOLO 3": "MABOLO I",
+  "MABOLO 1": "MABOLO",
+  "MABOLO 2": "MABOLO",
+  "MABOLO 3": "MABOLO",
   "MALIKSI 1": "MALIKSI I",
   "MALIKSI 2": "MALIKSI II",
   "MALIKSI 3": "MALIKSI II",
@@ -40,11 +41,11 @@ const BARANGAY_MIGRATION_MAP = {
   "MOLINO 5": "MOLINO V",
   "MOLINO 6": "MOLINO VI",
   "MOLINO 7": "MOLINO VII",
-  "NIOG 1": "NIOG I",
-  "NIOG 2": "NIOG I",
-  "NIOG 3": "NIOG I",
-  "REAL 1": "REAL I",
-  "REAL 2": "REAL I",
+  "NIOG 1": "NIOG",
+  "NIOG 2": "NIOG",
+  "NIOG 3": "NIOG",
+  "REAL 1": "REAL",
+  "REAL 2": "REAL",
   "SALINAS 1": "SALINAS I",
   "SALINAS 2": "SALINAS II",
   "SALINAS 3": "SALINAS II",
@@ -72,8 +73,10 @@ const BARANGAY_MIGRATION_MAP = {
   "SINBANALI": "SINEGUELASAN",
   "CAMPOSANTO": "KAINGIN (POB.)",
   "DAANG BUKID": "KAINGIN (POB.)",
-  "DIGMAN": "KAINGIN (POB.)",
-  "KAINGIN DIGMAN": "KAINGIN (POB.)",
+  "TABING DAGAT": "KAINGIN (POB.)",
+  "DIGMAN": "KAINGIN DIGMAN",
+  "KAINGIN": "KAINGIN DIGMAN",
+  "KAINGIN DIGMAN": "KAINGIN DIGMAN",
   "PANAPAAN": "P.F. ESPIRITU I (PANAPAAN)",
   "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
   "PANAPAAN 2": "P.F. ESPIRITU II",
@@ -3357,12 +3360,19 @@ const paginatedBlotters = blotters.slice(
   }
 }}
             >
-              <option value="">{loadingBacoorBrgy ? "Loading..." : "Select Barangay"}</option>
-              {bacoorBarangays.map(b => (
-  <option key={b} value={b}>
-    {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
-  </option>
-))}
+             <option value="">{loadingBacoorBrgy ? "Loading..." : "Select Barangay"}</option>
+            {CURRENT_BARANGAYS.map(b => (
+              <option key={b} value={b}>
+                {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+              </option>
+            ))}
+            <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+              {LEGACY_BARANGAY_OPTIONS.map((b, idx) => (
+                <option key={`legacy-${idx}`} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
+            </optgroup>
               {/* <option value="Other">Other / Special Location</option> */}
             </select>
             <FieldError error={fieldErrors.place_barangay} />
@@ -4399,11 +4409,18 @@ const paginatedBlotters = blotters.slice(
       <label className="eb-filter-label">Barangay</label>
       <select className="eb-filter-input" name="barangay" value={filters.barangay} onChange={handleFilterChange}>
         <option value="">All Barangays</option>
-        {bacoorBarangays.map(b => (
+        {CURRENT_BARANGAYS.map(b => (
           <option key={b} value={b}>
             {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
           </option>
         ))}
+        <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+          {LEGACY_BARANGAY_OPTIONS.map((b, idx) => (
+            <option key={`legacy-${idx}`} value={b.value}>
+              {b.label}
+            </option>
+          ))}
+        </optgroup>
       </select>
     </div>
   </div>

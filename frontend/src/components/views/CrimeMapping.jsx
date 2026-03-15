@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Map, { Source, Layer, Marker, Popup } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./CrimeMapping.css";
+import { CURRENT_BARANGAYS, LEGACY_BARANGAY_OPTIONS } from "../../utils/barangayOptions";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-map`;
 const getToken = () => localStorage.getItem("token");
@@ -47,24 +48,6 @@ function CrimeMapping() {
   const [error, setError] = useState(null);
  const [filters, setFilters] = useState({ incident_type: "", date_from: "", date_to: "", barangay: "" });
 
-const BACOOR_BARANGAYS = [
-  "ALIMA","ANIBAN I","ANIBAN II","ANIBAN III","ANIBAN IV","ANIBAN V",
-  "BANALO","BAYANAN","CAMPO SANTO","DAGATAN","DIGMAN","DULONG BAYAN",
-  "HABAY I","HABAY II","KAINGIN (POB.)","LIGAS I","LIGAS II","LIGAS III",
-  "MABOLO I","MABOLO II","MABOLO III","MALIKSI I","MALIKSI II","MALIKSI III",
-  "MAMBOG I","MAMBOG II","MAMBOG III","MAMBOG IV","MAMBOG V",
-  "MOLINO I","MOLINO II","MOLINO III","MOLINO IV","MOLINO V","MOLINO VI","MOLINO VII",
-  "NIOG I","NIOG II","NIOG III",
-  "P.F. ESPIRITU I (PANAPAAN)","P.F. ESPIRITU II","P.F. ESPIRITU III",
-  "P.F. ESPIRITU IV","P.F. ESPIRITU V","P.F. ESPIRITU VI","P.F. ESPIRITU VII",
-  "QUEENS ROW CENTRAL","QUEENS ROW EAST","QUEENS ROW WEST",
-  "REAL I","REAL II",
-  "SALINAS I","SALINAS II","SALINAS III","SALINAS IV",
-  "SAN NICOLAS I","SAN NICOLAS II","SAN NICOLAS III",
-  "SINEGUELASAN","TALABA I","TALABA II","TALABA III","TALABA IV","TALABA V",
-  "TALABA VI","TALABA VII",
-  "ZAPOTE I","ZAPOTE II","ZAPOTE III","ZAPOTE IV","ZAPOTE V"
-];
   const [geoJSONData, setGeoJSONData] = useState(null);
   const [activeTab, setActiveTab] = useState("legend");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -75,22 +58,24 @@ const BACOOR_BARANGAYS = [
   const [showPins, setShowPins] = useState(true);
 const [showLabels, setShowLabels] = useState(true);
   const mapRef = React.useRef(null);
-  const totalBarangays = 47;
-  const buildGeoJSON = useCallback(() => {
-    if (!boundaries.length || !geoJSONData) return null;
-    const colorLookup = {};
-    boundaries.forEach(b => { colorLookup[b.name_kml] = b.color; });
-    return {
-      ...geoJSONData,
-      features: geoJSONData.features.map(f => ({
-        ...f,
-        properties: {
-          ...f.properties,
-          fillColor: colorLookup[f.properties.name_kml] || "#adb5bd",
-        }
-      }))
-    };
-  }, [boundaries, geoJSONData]);
+  const totalBarangays = geoJSONData ? new Set(geoJSONData.features.map(f => f.properties.name_db)).size : 47;
+const buildGeoJSON = useCallback(() => {
+  if (!boundaries.length || !geoJSONData) return null;
+
+  const colorLookup = {};
+  boundaries.forEach(b => { colorLookup[b.name_kml] = b.color; });
+
+  return {
+    ...geoJSONData,
+    features: geoJSONData.features.map(f => ({
+      ...f,
+      properties: {
+        ...f.properties,
+        fillColor: colorLookup[f.properties.name_kml] || "#adb5bd",
+      }
+    }))
+  };
+}, [boundaries, geoJSONData]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -285,9 +270,18 @@ const handleMapDblClick = useCallback((e) => {
               }
             }}>
             <option value="">All Barangays</option>
-            {BACOOR_BARANGAYS.map(b => (
-              <option key={b} value={b}>{b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</option>
+          {CURRENT_BARANGAYS.map(b => (
+            <option key={b} value={b}>
+              {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+            </option>
+          ))}
+          <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+            {LEGACY_BARANGAY_OPTIONS.map((b, idx) => (
+              <option key={`legacy-${idx}`} value={b.value}>
+                {b.label}
+              </option>
             ))}
+          </optgroup>
           </select>
           <div className="crmap-date-range">
             <input type="date" className="crmap-fsel crmap-fsel-date" value={filters.date_from}
