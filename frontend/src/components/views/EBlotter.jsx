@@ -4448,6 +4448,7 @@ const paginatedBlotters = blotters.slice(
 <option>Pending</option>
 <option>Urgent</option>
 <option>Cleared</option>
+<option>Solved</option>
       </select>
     </div>
     <div className="eb-filter-group">
