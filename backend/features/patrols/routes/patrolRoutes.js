@@ -1,0 +1,22 @@
+const express = require("express");
+const router = express.Router();
+const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
+const {
+  getPatrolStats,
+  getActivePatrollers,
+  getAvailablePatrollers,
+  getMobileUnits,
+  createMobileUnit,
+  updateMobileUnit,
+  deleteMobileUnit,
+} = require("../controllers/patrolController");
+
+router.get("/stats",                authenticate, getPatrolStats);
+router.get("/active",               authenticate, getActivePatrollers);
+router.get("/available-patrollers", authenticate, getAvailablePatrollers);
+router.get("/mobile-units",         authenticate, getMobileUnits);
+router.post("/mobile-units",        authenticate, createMobileUnit);
+router.put("/mobile-units/:id",     authenticate, updateMobileUnit);
+router.delete("/mobile-units/:id", authenticate, deleteMobileUnit);
+
+module.exports = router;
