@@ -211,8 +211,8 @@ body {
 
 /* Main blotter table column widths */
 /* Main blotter table column widths */
-.eb-table-card .eb-data-table th:nth-child(1) { width: 20%; } /* Blotter ID */
-.eb-table-card .eb-data-table th:nth-child(2) { width: 15%; } /* Incident Type */
+.eb-table-card .eb-data-table th:nth-child(1) { width: 22%; } /* Blotter ID */
+.eb-table-card .eb-data-table th:nth-child(2) { width: 14%; } /* Incident Type */
 .eb-table-card .eb-data-table th:nth-child(3) { width: 20%; } /* Location */
 .eb-table-card .eb-data-table th:nth-child(4) { width: 20%; } /* Date Reported */
 .eb-table-card .eb-data-table th:nth-child(5) { width: 16%;  } /* Status */

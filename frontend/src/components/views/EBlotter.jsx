@@ -15,6 +15,18 @@ const OFFENSE_TO_CRIME_TYPE = {
   "Carnapping - MV": "CARNAPPING - MV",
   "Special Complex Crime": "SPECIAL COMPLEX CRIME",
 };
+const formatBarangayLabel = (name) => {
+  const ROMAN = new Set(['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']);
+  return name
+    .toLowerCase()
+    .replace(/\b\w+/g, word => {
+      const upper = word.toUpperCase();
+      if (ROMAN.has(upper)) return upper;
+      // Handle P.F. — keep dots
+      if (upper === 'P' || upper === 'F') return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    });
+};
 const BARANGAY_MIGRATION_MAP = {
   // Roman numeral variants → GeoJSON exact names
   "ANIBAN 1": "ANIBAN I",
@@ -300,6 +312,7 @@ const mapRef = React.useRef(null);
       if (filters.incident_type)
         queryParams.append("incident_type", filters.incident_type);
       if (filters.date_from) queryParams.append("date_from", filters.date_from);
+      if (filters.date_to) queryParams.append("date_to", filters.date_to);
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
 
       const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
@@ -767,12 +780,14 @@ if (resolvedBrgy && barangayGeoJSON) {
        if (!c.region_code) {
           errors[`${p}_region_code`] = "Please select a region";
         }
-        if (!c.province_code) {
+        const isNCR_C = c.region_code === "130000000";
+        if (!c.province_code && !isNCR_C) {
           errors[`${p}_province_code`] = "Required";
         }
         if (!c.municipality_code) {
           errors[`${p}_municipality_code`] = "Required";
         }
+        
         if (!c.barangay_code) {
           errors[`${p}_barangay_code`] = "Required";
         }
@@ -883,7 +898,8 @@ if (resolvedBrgy && barangayGeoJSON) {
        if (!s.region_code) {
         errors[`${p}_region_code`] = "Required";
       }
-      if (!s.province_code) {
+      const isNCR_S = s.region_code === "130000000";
+      if (!s.province_code && !isNCR_S) {
         errors[`${p}_province_code`] = "Required";
       }
       if (!s.municipality_code) {
@@ -1075,6 +1091,9 @@ if (resolvedBrgy && barangayGeoJSON) {
         errors.referred_by_dilg = "Required";
       }
 
+      if (!caseDetail.lat || !caseDetail.lng) {
+        errors.pin_location = "Please drop a pin on the map to mark the exact location";
+      }
       if (
         caseDetail.amount_involved &&
         caseDetail.amount_involved.trim().length > 0
@@ -2355,10 +2374,17 @@ const paginatedBlotters = blotters.slice(
                               const newErrors = { ...fieldErrors };
                               delete newErrors[`complainant_${i}_region_code`];
                               setFieldErrors(newErrors);
-                              setCLoadingProv(p => ({ ...p, [i]: true }));
-                              const data = await fetchProvinces(val);
-                              setCProvinces(p => ({ ...p, [i]: data }));
-                              setCLoadingProv(p => ({ ...p, [i]: false }));
+                              if (val === "130000000") {
+                                setCLoadingCity(p => ({ ...p, [i]: true }));
+                                const cities = await fetchCities(val);
+                                setCCities(p => ({ ...p, [i]: cities }));
+                                setCLoadingCity(p => ({ ...p, [i]: false }));
+                              } else {
+                                setCLoadingProv(p => ({ ...p, [i]: true }));
+                                const data = await fetchProvinces(val);
+                                setCProvinces(p => ({ ...p, [i]: data }));
+                                setCLoadingProv(p => ({ ...p, [i]: false }));
+                              }
                             }
                           }}
                         >
@@ -2374,7 +2400,7 @@ const paginatedBlotters = blotters.slice(
                         <select
                           className={`eb-modal-input ${fieldErrors[`complainant_${i}_province_code`] ? "error" : ""}`}
                           value={c.province_code}
-                          disabled={!c.region_code || cLoadingProv[i]}
+                          disabled={!c.region_code || cLoadingProv[i] || c.region_code === "130000000"}
                           onChange={async (e) => {
                             const val = e.target.value;
                             updateComplainant(i, "province_code", val);
@@ -2393,7 +2419,7 @@ const paginatedBlotters = blotters.slice(
                             }
                           }}
                         >
-                          <option value="">{cLoadingProv[i] ? "Loading..." : "Select Province"}</option>
+                          <option value="">{cLoadingProv[i] ? "Loading..." : c.region_code === "130000000" ? "N/A (NCR has no province)" : "Select Province"}</option>
                           {(cProvinces[i] || []).map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                         </select>
                         <FieldError error={fieldErrors[`complainant_${i}_province_code`]} />
@@ -2405,7 +2431,7 @@ const paginatedBlotters = blotters.slice(
                       <select
                         className={`eb-modal-input ${fieldErrors[`complainant_${i}_municipality_code`] ? "error" : ""}`}
                         value={c.municipality_code}
-                        disabled={!c.province_code || cLoadingCity[i]}
+                        disabled={(!c.province_code && c.region_code !== "130000000") || cLoadingCity[i]}
                         onChange={async (e) => {
                           const val = e.target.value;
                           updateComplainant(i, "municipality_code", val);
@@ -2826,10 +2852,17 @@ const paginatedBlotters = blotters.slice(
                                 const newErrors = { ...fieldErrors };
                                 delete newErrors[`suspect_${i}_region_code`];
                                 setFieldErrors(newErrors);
-                                setSLoadingProv(p => ({ ...p, [i]: true }));
-                                const data = await fetchProvinces(val);
-                                setSProvinces(p => ({ ...p, [i]: data }));
-                                setSLoadingProv(p => ({ ...p, [i]: false }));
+                                if (val === "130000000") {
+                                  setSLoadingCity(p => ({ ...p, [i]: true }));
+                                  const cities = await fetchCities(val);
+                                  setSCities(p => ({ ...p, [i]: cities }));
+                                  setSLoadingCity(p => ({ ...p, [i]: false }));
+                                } else {
+                                  setSLoadingProv(p => ({ ...p, [i]: true }));
+                                  const data = await fetchProvinces(val);
+                                  setSProvinces(p => ({ ...p, [i]: data }));
+                                  setSLoadingProv(p => ({ ...p, [i]: false }));
+                                }
                               }
                             }}
                           >
@@ -2844,7 +2877,7 @@ const paginatedBlotters = blotters.slice(
                         <select
                           className={`eb-modal-input ${fieldErrors[`suspect_${i}_province_code`] ? "error" : ""}`}
                           value={s.province_code}
-                          disabled={!s.region_code || sLoadingProv[i]}
+                          disabled={!s.region_code || sLoadingProv[i] || s.region_code === "130000000"}
                           onChange={async (e) => {
                             const val = e.target.value;
                             updateSuspect(i, "province_code", val);
@@ -2863,7 +2896,7 @@ const paginatedBlotters = blotters.slice(
                             }
                           }}
                         >
-                          <option value="">{sLoadingProv[i] ? "Loading..." : "Select Province"}</option>
+                          <option value="">{sLoadingProv[i] ? "Loading..." : s.region_code === "130000000" ? "N/A (NCR has no province)" : "Select Province"}</option>
                           {(sProvinces[i] || []).map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                         </select>
                         <FieldError error={fieldErrors[`suspect_${i}_province_code`]} />
@@ -2875,7 +2908,7 @@ const paginatedBlotters = blotters.slice(
                     <select
                       className={`eb-modal-input ${fieldErrors[`suspect_${i}_municipality_code`] ? "error" : ""}`}
                       value={s.municipality_code}
-                      disabled={!s.province_code || sLoadingCity[i]}
+                      disabled={(!s.province_code && s.region_code !== "130000000") || sLoadingCity[i]}
                       onChange={async (e) => {
                         const val = e.target.value;
                         updateSuspect(i, "municipality_code", val);
@@ -3363,7 +3396,7 @@ const paginatedBlotters = blotters.slice(
              <option value="">{loadingBacoorBrgy ? "Loading..." : "Select Barangay"}</option>
             {CURRENT_BARANGAYS.map(b => (
               <option key={b} value={b}>
-                {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+                {formatBarangayLabel(b)}
               </option>
             ))}
             <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
@@ -3525,9 +3558,14 @@ const paginatedBlotters = blotters.slice(
         disabled={!caseDetail.place_barangay}
         style={!caseDetail.place_barangay ? { background: "#f3f4f6", cursor: "not-allowed" } : {}}
         onChange={(e) => {
-          const v = e.target.value.replace(/[^0-9.-]/g, "");
-          updateCaseDetail("lat", v);
-        }}
+        const v = e.target.value.replace(/[^0-9.-]/g, "");
+        updateCaseDetail("lat", v);
+        if (v && caseDetail.lng && fieldErrors.pin_location) {
+          const newErrors = { ...fieldErrors };
+          delete newErrors.pin_location;
+          setFieldErrors(newErrors);
+        }
+      }}
       />
     </div>
     <div style={{ flex: 1 }}>
@@ -3540,9 +3578,14 @@ const paginatedBlotters = blotters.slice(
         disabled={!caseDetail.place_barangay}
         style={!caseDetail.place_barangay ? { background: "#f3f4f6", cursor: "not-allowed" } : {}}
         onChange={(e) => {
-          const v = e.target.value.replace(/[^0-9.-]/g, "");
-          updateCaseDetail("lng", v);
-        }}
+        const v = e.target.value.replace(/[^0-9.-]/g, "");
+        updateCaseDetail("lng", v);
+        if (v && caseDetail.lat && fieldErrors.pin_location) {
+          const newErrors = { ...fieldErrors };
+          delete newErrors.pin_location;
+          setFieldErrors(newErrors);
+        }
+      }}
       />
     </div>
     {(caseDetail.lat || caseDetail.lng) && (
@@ -3653,6 +3696,12 @@ const paginatedBlotters = blotters.slice(
 
         updateCaseDetail("lat", lat.toFixed(6));
         updateCaseDetail("lng", lng.toFixed(6));
+        // Clear pin error once pin is placed
+        if (fieldErrors.pin_location) {
+          const newErrors = { ...fieldErrors };
+          delete newErrors.pin_location;
+          setFieldErrors(newErrors);
+        }
       }}
       cursor={!caseDetail.place_barangay || viewMode ? "default" : "crosshair"}
     >
@@ -3714,10 +3763,15 @@ const paginatedBlotters = blotters.slice(
   </div>
 
   <small style={{ color: "#6b7280", fontSize: "11px", display: "block", marginTop: "5px" }}>
-    {caseDetail.place_barangay
-      ? `Pinning inside ${caseDetail.place_barangay}. Click the map to drop a pin.`
-      : "Select a barangay above to activate the map."}
-  </small>
+  {caseDetail.place_barangay
+    ? `Pinning inside ${caseDetail.place_barangay}. Click the map to drop a pin.`
+    : "Select a barangay above to activate the map."}
+</small>
+{fieldErrors.pin_location && (
+  <span className="eb-field-error" style={{ marginTop: "6px", display: "block" }}>
+    {fieldErrors.pin_location}
+  </span>
+)}
 </div>
 
                 {/* Other Barangay Input */}
@@ -4411,7 +4465,7 @@ const paginatedBlotters = blotters.slice(
         <option value="">All Barangays</option>
         {CURRENT_BARANGAYS.map(b => (
           <option key={b} value={b}>
-            {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+            {formatBarangayLabel(b)}
           </option>
         ))}
         <optgroup label="── Pre-2023 Names (Auto-resolved) ──">

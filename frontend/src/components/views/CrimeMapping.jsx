@@ -47,7 +47,18 @@ function CrimeMapping() {
   const [zoom, setZoom] = useState(12);
   const [error, setError] = useState(null);
  const [filters, setFilters] = useState({ incident_type: "", date_from: "", date_to: "", barangay: "" });
-
+  const formatBarangayLabel = (name) => {
+  const ROMAN = new Set(['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']);
+  return name
+    .toLowerCase()
+    .replace(/\b\w+/g, word => {
+      const upper = word.toUpperCase();
+      if (ROMAN.has(upper)) return upper;
+      // Handle P.F. — keep dots
+      if (upper === 'P' || upper === 'F') return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    });
+};
   const [geoJSONData, setGeoJSONData] = useState(null);
   const [activeTab, setActiveTab] = useState("legend");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -147,9 +158,9 @@ const handleMapDblClick = useCallback((e) => {
       .catch(err => console.error("GeoJSON load error:", err));
   }, []); // runs once
 
-  useEffect(() => {
-    fetchAll();
-  }, []); // initial load only — filters applied manually via Apply button
+useEffect(() => {
+  fetchAll();
+}, [filters.incident_type, filters.barangay]);
 
   const geoJSON = buildGeoJSON();
 
@@ -272,7 +283,7 @@ const handleMapDblClick = useCallback((e) => {
             <option value="">All Barangays</option>
           {CURRENT_BARANGAYS.map(b => (
             <option key={b} value={b}>
-              {b.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+              {formatBarangayLabel(b)}
             </option>
           ))}
           <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
@@ -290,8 +301,11 @@ const handleMapDblClick = useCallback((e) => {
             <input type="date" className="crmap-fsel crmap-fsel-date" value={filters.date_to}
               onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))} />
           </div>
-          <button className="crmap-apply-btn" onClick={fetchAll}>Apply Filters</button>
-          <button className="crmap-clear-btn" onClick={() => setFilters({ incident_type: "", date_from: "", date_to: "", barangay: "" })}>Clear</button>
+          <button className="crmap-apply-btn" onClick={fetchAll}>Apply Dates</button>
+         <button className="crmap-clear-btn" onClick={() => {
+          setFilters({ incident_type: "", date_from: "", date_to: "", barangay: "" });
+          if (mapRef.current) mapRef.current.flyTo({ center: [120.9640, 14.4341], zoom: 12, duration: 800 });
+        }}>Clear</button>
         </div>
         <div className="crmap-risk-row">
           {RISK_LEVELS.map(r => (
