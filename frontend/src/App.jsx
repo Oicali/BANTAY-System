@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import LoginSystem from "./components/views/LoginSystem";
 import ModusManagement from "./components/views/ModusManagement";
 import CrimeDashboard from "./components/views/CrimeDashboard";
-import CrimeAnalytics from "./components/views/CrimeAnalytics";
 import EBlotter from "./components/views/EBlotter";
 import CaseManagement from "./components/views/CaseManagement";
 import CrimeMapping from "./components/views/CrimeMapping";
@@ -35,7 +34,6 @@ function App() {
           }
         >
           <Route path="/crime-dashboard" element={<CrimeDashboard />} />
-          <Route path="/crime-analytics" element={<CrimeAnalytics />} />
           <Route path="/e-blotter" element={<EBlotter />} />
           <Route path="/case-management" element={<CaseManagement />} />
           <Route path="/crime-mapping" element={<CrimeMapping />} />
