@@ -1,25 +1,8 @@
-// ================================================================================
-// FILE: backend/modules/auth/authService.js
-// ================================================================================
-
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const bcrypt = require("bcrypt");
 const pool = require("../../../config/database");
 
-// Email transporter
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  family: 4,              // ← force IPv4
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Generate 6-digit OTP
 function generateOTP() {
@@ -43,7 +26,7 @@ async function sendOTP(email) {
 
     const user = userCheck.rows[0];
 
-    // Check existing OTP record — PostgreSQL handles date comparison to avoid timezone issues
+    // Check existing OTP record
     const otpRow = await pool.query(
       `SELECT request_count,
               (last_request_at::date = CURRENT_DATE) AS is_same_day
@@ -55,11 +38,8 @@ async function sendOTP(email) {
 
     if (otpRow.rows.length > 0) {
       const record = otpRow.rows[0];
-
-      // Increment if same day, reset to 1 if new day
       requestCount = record.is_same_day ? record.request_count + 1 : 1;
 
-      // Enforce 10 sends per day
       if (requestCount > 10) {
         return {
           success: false,
@@ -85,9 +65,9 @@ async function sendOTP(email) {
       [email, otpHash, requestCount]
     );
 
-    // Send email
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    // Send email via Resend (HTTPS API — no SMTP port needed)
+    const { error } = await resend.emails.send({
+      from: "BANTAY System <onboarding@resend.dev>",
       to: email,
       subject: "BANTAY System - New Verification Code",
       html: `
@@ -122,6 +102,11 @@ async function sendOTP(email) {
         </html>
       `,
     });
+
+    if (error) {
+      console.error("Resend error:", error);
+      return { success: false, message: "Failed to send verification code" };
+    }
 
     return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
