@@ -107,7 +107,7 @@ const TopBar = ({ onMenuClick }) => {
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <h2>BANTAY System</h2>
+        <h2>B.A.N.T.A.Y. System</h2>
       </div>
 
       <div className="top-bar-right">
