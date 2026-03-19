@@ -1,476 +1,165 @@
-// ================================================================================
-// FILE: backend/modules/auth/authController.js
-// ================================================================================
-
-const pool = require("../../../config/database");
+const nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
-const tokenManager = require("../../../shared/utils/tokenManager");
-const authService = require("../services/authService");
-const {
-  validateLoginInput,
-  validateEmail,
-  validatePasswordChange,
-  validateResetPassword,
-  validateOTPCode,
-} = require("../validators/authValidator");
+const pool = require("../../../config/database");
 
-// ============================================================
-// LOGIN
-// ============================================================
-const login = async (req, res) => {
-  try {
-    const { username, password } = req.body;
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS,
+  },
+});
 
-    const errors = validateLoginInput(username, password);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
-    const result = await pool.query(
-      `SELECT
-        u.user_id, u.username, u.password, u.email,
-        u.first_name, u.last_name, u.user_type,
-        u.profile_picture,
-        u.status, u.lockout_until,
-        u.failed_login_attempts, u.last_login,
-        r.role_name
-       FROM users u
-       JOIN roles r ON u.role_id = r.role_id
-       WHERE u.username = $1`,
-      [username.trim()]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Account does not exist",
-      });
-    }
-
-    const user = result.rows[0];
-    const now = new Date();
-
-    // ── STATUS CHECKS ──────────────────────────────────────────
-
-    if (user.status === "deactivated") {
-      return res.status(403).json({
-        success: false,
-        message: "Account has been deactivated",
-      });
-    }
-
-    if (user.status === "unverified") {
-      return res.status(403).json({
-        success: false,
-        message: "Account is not yet verified",
-      });
-    }
-
-    // Timed lock — check lockout_until
-    if (user.status === "locked" && user.lockout_until) {
-      if (now < new Date(user.lockout_until)) {
-        const diffMs = new Date(user.lockout_until) - now;
-        const minutes = Math.floor(diffMs / 60000);
-        const seconds = Math.floor((diffMs % 60000) / 1000);
-
-        return res.status(403).json({
-          success: false,
-          message: `Account locked. Try again in ${minutes}m ${seconds}s`,
-          lockout_until: user.lockout_until,
-          remaining_minutes: minutes,
-          remaining_seconds: seconds,
-        });
-      }
-
-      // Timed lock expired — restore to active
-      await pool.query(
-        `UPDATE users
-         SET status = 'active', lockout_until = NULL, failed_login_attempts = 0
-         WHERE user_id = $1`,
-        [user.user_id]
-      );
-      user.status = "active";
-    }
-
-
-    
-    // Permanent lock (lockout_until IS NULL but status = 'locked')
-    if (user.status === "locked" && !user.lockout_until) {
-      return res.status(403).json({
-        success: false,
-        message: "Account is permanently locked. Please contact an administrator.",
-      });
-    }
-
-    // ── PASSWORD VERIFICATION ──────────────────────────────────
-
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      let attempts = user.failed_login_attempts + 1;
-      let lockMinutes = 0;
-
-      // 🔒 PROGRESSIVE LOCKOUT SYSTEM
-      // 3  attempts → 15 min lock
-      // 5  attempts → 1 hr lock
-      // 8 attempts → permanent lock (requires admin to unlock)
-      if (attempts >= 8)       lockMinutes = null;
-      else if (attempts === 5)  lockMinutes = 60;
-      else if (attempts === 3)  lockMinutes = 15;
-
-      if (attempts >= 8) {
-        await pool.query(
-          `UPDATE users
-           SET failed_login_attempts = $1, status = 'locked', lockout_until = NULL
-           WHERE user_id = $2`,
-          [attempts, user.user_id]
-        );
-
-        return res.status(403).json({
-          success: false,
-          message: "Account permanently locked due to too many failed attempts. Contact an administrator.",
-          attempts,
-        });
-      }
-
-      if (lockMinutes > 0) {
-        const lockUntil = new Date(Date.now() + lockMinutes * 60000);
-
-        await pool.query(
-          `UPDATE users
-           SET failed_login_attempts = $1, status = 'locked', lockout_until = $2
-           WHERE user_id = $3`,
-          [attempts, lockUntil, user.user_id]
-        );
-
-        return res.status(403).json({
-          success: false,
-          message: `Account locked for ${lockMinutes} minutes`,
-          lockout_until: lockUntil,
-          attempts,
-        });
-      }
-
-      // No lock yet — just increment counter
-      await pool.query(
-        `UPDATE users SET failed_login_attempts = $1 WHERE user_id = $2`,
-        [attempts, user.user_id]
-      );
-
-      const attemptsLeft = attempts < 5 ? 5 - attempts : null;
-
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-        ...(attemptsLeft !== null && { attempts_left: attemptsLeft }),
-      });
-    }
-
-    // ── SUCCESS — reset security counters ─────────────────────
-
-    await pool.query(
-      `UPDATE users
-       SET failed_login_attempts = 0,
-           status = 'active',
-           lockout_until = NULL,
-           last_login = NOW()
-       WHERE user_id = $1`,
-      [user.user_id]
-    );
-
-    const token = await tokenManager.createToken({
-      user_id:   user.user_id,
-      username:  user.username,
-      email:     user.email,
-      role:      user.role_name,
-      user_type: user.user_type,
-    });
-
-    return res.status(200).json({
-      success: true,
-      token,
-      user: {
-        user_id:         user.user_id,
-        username:        user.username,
-        role:            user.role_name,
-        user_type:       user.user_type,
-        first_name:      user.first_name,
-        last_name:       user.last_name,
-        profile_picture: user.profile_picture || null,
-      },
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ success: false, message: "Login failed" });
-  }
-};
-
-// ============================================================
-// LOGOUT
-// ============================================================
-const logout = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return res.status(400).json({ success: false, message: "No token provided" });
-    }
-
-    await tokenManager.revokeToken(token);
-    res.status(200).json({ success: true, message: "Logged out successfully" });
-  } catch (error) {
-    console.error("Logout error:", error);
-    res.status(500).json({ success: false, message: "Logout failed" });
-  }
-};
-
-// ============================================================
-// LOGOUT ALL DEVICES
-// ============================================================
-const logoutAll = async (req, res) => {
-  try {
-    await tokenManager.revokeAllUserTokens(req.user.user_id);
-    res.status(200).json({ success: true, message: "Logged out from all devices" });
-  } catch (error) {
-    console.error("Logout all error:", error);
-    res.status(500).json({ success: false, message: "Logout all failed" });
-  }
-};
+// Generate 6-digit OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // ============================================================
 // SEND OTP
 // ============================================================
-const sendOTP = async (req, res) => {
+async function sendOTP(email) {
   try {
-    const { email } = req.body;
-
-    const errors = validateEmail(email);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
+    // Check if user exists
     const userCheck = await pool.query(
-      "SELECT user_id, email, status FROM users WHERE LOWER(email) = LOWER($1)",
+      "SELECT email, first_name FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
     );
 
     if (userCheck.rows.length === 0) {
-      return res.status(200).json({ success: false, message: "Email not found" });
+      return { success: false, message: "No account found with this email address" };
     }
 
     const user = userCheck.rows[0];
 
-    if (user.status === "deactivated") {
-      return res.status(403).json({ success: false, message: "Account is deactivated" });
+    // Check existing OTP record
+    const otpRow = await pool.query(
+      `SELECT request_count,
+              (last_request_at::date = CURRENT_DATE) AS is_same_day
+       FROM otp_requests WHERE email = $1`,
+      [email]
+    );
+
+    let requestCount = 1;
+
+    if (otpRow.rows.length > 0) {
+      const record = otpRow.rows[0];
+      requestCount = record.is_same_day ? record.request_count + 1 : 1;
+
+      if (requestCount > 10) {
+        return {
+          success: false,
+          message: "Maximum OTP requests reached. Try again tomorrow or contact administrator.",
+        };
+      }
     }
 
-    if (user.status === "unverified") {
-      return res.status(403).json({ success: false, message: "Account is not yet verified" });
-    }
+    // Generate and hash OTP
+    const otp = generateOTP();
+    const otpHash = await bcrypt.hash(otp, 10);
 
-    const result = await authService.sendOTP(email);
-    res.status(result.success ? 200 : 429).json(result);
+    // Insert/update OTP record (expires in 2 minutes)
+    await pool.query(
+      `INSERT INTO otp_requests (email, otp_hash, expires_at, request_count, last_request_at)
+       VALUES ($1, $2, NOW() + INTERVAL '2 minutes', $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (email)
+       DO UPDATE SET
+         otp_hash = EXCLUDED.otp_hash,
+         expires_at = EXCLUDED.expires_at,
+         request_count = EXCLUDED.request_count,
+         last_request_at = EXCLUDED.last_request_at`,
+      [email, otpHash, requestCount]
+    );
+
+    // Send email via Brevo SMTP
+    await transporter.sendMail({
+      from: `"BANTAY System" <a56c42001@smtp-brevo.com>`,
+      to: email,
+      subject: "BANTAY System - New Verification Code",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-box { background: white; border: 3px solid #1e3a8a; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+            .otp-code { font-size: 36px; font-weight: bold; color: #1e3a8a; letter-spacing: 8px; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>BANTAY SYSTEM</h1>
+            </div>
+            <div class="content">
+              <h2>New Verification Code</h2>
+              <p>Hello ${user.first_name || "Officer"},</p>
+              <p>Here is your new verification code:</p>
+              <div class="otp-box">
+                <div class="otp-code">${otp}</div>
+              </div>
+              <p>This code will expire in <strong>2 minutes</strong>.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
-    console.error("Send OTP error:", error);
-    res.status(500).json({ success: false, message: "Failed to send OTP" });
+    console.error("Error sending OTP:", error);
+    return { success: false, message: "Failed to send verification code" };
   }
-};
+}
 
 // ============================================================
 // VERIFY OTP
 // ============================================================
-const verifyOTP = async (req, res) => {
+async function verifyOTP(email, code) {
   try {
-    const { email, code } = req.body;
+    const otpCheck = await pool.query(
+      `SELECT otp_hash,
+              (expires_at < NOW()) AS is_expired
+       FROM otp_requests
+       WHERE email = $1`,
+      [email]
+    );
 
-    const emailErrors = validateEmail(email);
-    if (emailErrors.length > 0) {
-      return res.status(400).json({ success: false, errors: emailErrors });
+    if (otpCheck.rows.length === 0) {
+      return { success: false, message: "No OTP found. Please request a new one." };
     }
 
-    const codeErrors = validateOTPCode(code);
-    if (codeErrors.length > 0) {
-      return res.status(400).json({ success: false, errors: codeErrors });
+    const otp = otpCheck.rows[0];
+
+    if (otp.is_expired) {
+      await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
+      return { success: false, message: "OTP expired. Please request a new one." };
     }
 
-    const result = await authService.verifyOTP(email, code);
-    res.status(result.success ? 200 : 400).json(result);
+    const valid = await bcrypt.compare(code, otp.otp_hash);
+    if (!valid) {
+      return { success: false, message: "Invalid OTP." };
+    }
+
+    await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
+    return { success: true, message: "OTP verified." };
   } catch (error) {
-    console.error("Verify OTP error:", error);
-    res.status(500).json({ success: false, message: "OTP verification failed" });
+    console.error("Error verifying OTP:", error);
+    return { success: false, message: "Verification failed." };
   }
-};
+}
 
 // ============================================================
 // RESEND OTP
 // ============================================================
-const resendOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
+async function resendOTP(email) {
+  return sendOTP(email);
+}
 
-    const errors = validateEmail(email);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
-    const result = await authService.resendOTP(email);
-    res.status(result.success ? 200 : 429).json(result);
-  } catch (error) {
-    console.error("Resend OTP error:", error);
-    res.status(500).json({ success: false, message: "Failed to resend OTP" });
-  }
-};
-
-// ============================================================
-// RESET PASSWORD
-// ============================================================
-const resetPassword = async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    let { email, newPassword } = req.body;
-    newPassword = newPassword?.trim();
-
-    const errors = validateResetPassword(email, newPassword);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
-    await client.query("BEGIN");
-
-    const userResult = await client.query(
-      "SELECT user_id, password, status FROM users WHERE LOWER(email) = LOWER($1)",
-      [email]
-    );
-
-    if (userResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const user = userResult.rows[0];
-
-    if (user.status === "deactivated") {
-      await client.query("ROLLBACK");
-      return res.status(403).json({ success: false, message: "Account is deactivated" });
-    }
-
-    const isSamePassword = await bcrypt.compare(newPassword, user.password);
-    if (isSamePassword) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        message: "New password cannot be the same as the old password",
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    await client.query(
-      `UPDATE users
-       SET password = $1,
-           failed_login_attempts = 0,
-           status = CASE WHEN status = 'locked' THEN 'active' ELSE status END,
-           lockout_until = NULL,
-           updated_at = NOW()
-       WHERE user_id = $2`,
-      [hashedPassword, user.user_id]
-    );
-
-    await client.query(
-      "DELETE FROM otp_requests WHERE LOWER(email) = LOWER($1)",
-      [email]
-    );
-
-    await client.query("COMMIT");
-
-    res.status(200).json({ success: true, message: "Password reset successfully" });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Reset password error:", error);
-    res.status(500).json({ success: false, message: "Password reset failed" });
-  } finally {
-    client.release();
-  }
-};
-
-// ============================================================
-// CHANGE PASSWORD
-// ============================================================
-const changePassword = async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    let { currentPassword, newPassword } = req.body;
-    currentPassword = currentPassword?.trim();
-    newPassword = newPassword?.trim();
-
-    const errors = validatePasswordChange(currentPassword, newPassword);
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, errors });
-    }
-
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      "SELECT password FROM users WHERE user_id = $1",
-      [req.user.user_id]
-    );
-
-    if (result.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const valid = await bcrypt.compare(currentPassword, result.rows[0].password);
-    if (!valid) {
-      await client.query("ROLLBACK");
-      return res.status(401).json({ success: false, message: "Current password is incorrect" });
-    }
-
-    const isSamePassword = await bcrypt.compare(newPassword, result.rows[0].password);
-    if (isSamePassword) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        message: "New password cannot be the same as the current password",
-      });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 12);
-
-    await client.query(
-      "UPDATE users SET password = $1, updated_at = NOW() WHERE user_id = $2",
-      [hashed, req.user.user_id]
-    );
-
-    await tokenManager.revokeAllUserTokens(req.user.user_id);
-
-    await client.query("COMMIT");
-
-    res.status(200).json({
-      success: true,
-      message: "Password changed successfully. Please log in again.",
-    });
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Change password error:", error);
-    res.status(500).json({ success: false, message: "Password change failed" });
-  } finally {
-    client.release();
-  }
-};
-
-// ============================================================
-// EXPORTS
-// ============================================================
-module.exports = {
-  login,
-  logout,
-  logoutAll,
-  sendOTP,
-  verifyOTP,
-  resendOTP,
-  resetPassword,
-  changePassword,
-};
+module.exports = { sendOTP, verifyOTP, resendOTP };
