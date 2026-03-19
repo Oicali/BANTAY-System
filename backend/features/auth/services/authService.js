@@ -1,20 +1,61 @@
-const nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
 const pool = require("../../../config/database");
-
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.BREVO_USER,
-    pass: process.env.BREVO_PASS,
-  },
-});
 
 // Generate 6-digit OTP
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Send email via Brevo HTTP API (port 443 — no SMTP, Railway safe)
+async function sendBrevoEmail({ to, firstName, otp }) {
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: { name: "BANTAY System", email: process.env.BREVO_SENDER_EMAIL },
+      to: [{ email: to }],
+      subject: "BANTAY System - New Verification Code",
+      htmlContent: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+            .otp-box { background: white; border: 3px solid #1e3a8a; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+            .otp-code { font-size: 36px; font-weight: bold; color: #1e3a8a; letter-spacing: 8px; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1>BANTAY SYSTEM</h1></div>
+            <div class="content">
+              <h2>New Verification Code</h2>
+              <p>Hello ${firstName || "Officer"},</p>
+              <p>Here is your new verification code:</p>
+              <div class="otp-box">
+                <div class="otp-code">${otp}</div>
+              </div>
+              <p>This code will expire in <strong>2 minutes</strong>.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(`Brevo API error: ${JSON.stringify(err)}`);
+  }
+
+  return true;
 }
 
 // ============================================================
@@ -22,7 +63,6 @@ function generateOTP() {
 // ============================================================
 async function sendOTP(email) {
   try {
-    // Check if user exists
     const userCheck = await pool.query(
       "SELECT email, first_name FROM users WHERE LOWER(email) = LOWER($1)",
       [email]
@@ -34,7 +74,6 @@ async function sendOTP(email) {
 
     const user = userCheck.rows[0];
 
-    // Check existing OTP record
     const otpRow = await pool.query(
       `SELECT request_count,
               (last_request_at::date = CURRENT_DATE) AS is_same_day
@@ -56,11 +95,9 @@ async function sendOTP(email) {
       }
     }
 
-    // Generate and hash OTP
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
 
-    // Insert/update OTP record (expires in 2 minutes)
     await pool.query(
       `INSERT INTO otp_requests (email, otp_hash, expires_at, request_count, last_request_at)
        VALUES ($1, $2, NOW() + INTERVAL '2 minutes', $3, CURRENT_TIMESTAMP)
@@ -73,42 +110,10 @@ async function sendOTP(email) {
       [email, otpHash, requestCount]
     );
 
-    // Send email via Brevo SMTP
-    await transporter.sendMail({
-      from: `"BANTAY System" <a56c42001@smtp-brevo.com>`,
+    await sendBrevoEmail({
       to: email,
-      subject: "BANTAY System - New Verification Code",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
-            .otp-box { background: white; border: 3px solid #1e3a8a; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
-            .otp-code { font-size: 36px; font-weight: bold; color: #1e3a8a; letter-spacing: 8px; margin: 10px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>BANTAY SYSTEM</h1>
-            </div>
-            <div class="content">
-              <h2>New Verification Code</h2>
-              <p>Hello ${user.first_name || "Officer"},</p>
-              <p>Here is your new verification code:</p>
-              <div class="otp-box">
-                <div class="otp-code">${otp}</div>
-              </div>
-              <p>This code will expire in <strong>2 minutes</strong>.</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
+      firstName: user.first_name,
+      otp,
     });
 
     return { success: true, message: "Verification code sent to your email" };
