@@ -1,8 +1,16 @@
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const bcrypt = require("bcrypt");
 const pool = require("../../../config/database");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS,
+  },
+});
 
 // Generate 6-digit OTP
 function generateOTP() {
@@ -65,9 +73,9 @@ async function sendOTP(email) {
       [email, otpHash, requestCount]
     );
 
-    // Send email via Resend (HTTPS API — no SMTP port needed)
-    const { error } = await resend.emails.send({
-      from: "BANTAY System <onboarding@resend.dev>",
+    // Send email via Brevo SMTP
+    await transporter.sendMail({
+      from: `"BANTAY System" <a56c42001@smtp-brevo.com>`,
       to: email,
       subject: "BANTAY System - New Verification Code",
       html: `
@@ -102,11 +110,6 @@ async function sendOTP(email) {
         </html>
       `,
     });
-
-    if (error) {
-      console.error("Resend error:", error);
-      return { success: false, message: "Failed to send verification code" };
-    }
 
     return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
@@ -144,7 +147,6 @@ async function verifyOTP(email, code) {
       return { success: false, message: "Invalid OTP." };
     }
 
-    // Success — delete OTP record
     await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
     return { success: true, message: "OTP verified." };
   } catch (error) {
