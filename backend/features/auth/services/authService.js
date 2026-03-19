@@ -50,6 +50,10 @@ async function sendBrevoEmail({ to, firstName, otp }) {
     }),
   });
 
+  if (response.status === 429) {
+    throw new Error("BREVO_RATE_LIMITED");
+  }
+
   if (!response.ok) {
     const err = await response.json();
     throw new Error(`Brevo API error: ${JSON.stringify(err)}`);
@@ -76,7 +80,9 @@ async function sendOTP(email) {
 
     const otpRow = await pool.query(
       `SELECT request_count,
-              (last_request_at::date = CURRENT_DATE) AS is_same_day
+              last_request_at,
+              (last_request_at::date = CURRENT_DATE) AS is_same_day,
+              EXTRACT(EPOCH FROM (NOW() - last_request_at)) AS seconds_since_last
        FROM otp_requests WHERE email = $1`,
       [email]
     );
@@ -85,6 +91,16 @@ async function sendOTP(email) {
 
     if (otpRow.rows.length > 0) {
       const record = otpRow.rows[0];
+
+      // Cooldown check: must wait 60 seconds between requests
+      if (record.seconds_since_last !== null && record.seconds_since_last < 60) {
+        const remaining = Math.ceil(60 - record.seconds_since_last);
+        return {
+          success: false,
+          message: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before requesting a new code.`,
+        };
+      }
+
       requestCount = record.is_same_day ? record.request_count + 1 : 1;
 
       if (requestCount > 10) {
@@ -110,11 +126,26 @@ async function sendOTP(email) {
       [email, otpHash, requestCount]
     );
 
-    await sendBrevoEmail({
-      to: email,
-      firstName: user.first_name,
-      otp,
-    });
+    try {
+      await sendBrevoEmail({
+        to: email,
+        firstName: user.first_name,
+        otp,
+      });
+    } catch (emailError) {
+      // Roll back the OTP record since the email was never delivered
+      await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
+
+      if (emailError.message === "BREVO_RATE_LIMITED") {
+        return {
+          success: false,
+          message: "Email service is temporarily busy. Please wait a moment and try again.",
+        };
+      }
+
+      console.error("Error sending OTP email:", emailError);
+      return { success: false, message: "Failed to send verification code. Please try again." };
+    }
 
     return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
