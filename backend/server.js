@@ -44,6 +44,7 @@ app.use("/modus-management", require("./features/modus/routes/modusRoutes"));
 app.use("/cases",            require("./features/cases/routes/casesRoutes"));
 app.use("/crime-map",        require("./features/crime-map/routes/crimeMapRoutes"));
 app.use("/crime-dashboard",        require("./features/dashboard/routes/crimeDashboardRoutes"));
+app.use("/patrol", require("./features/patrols/routes/patrolRoutes"));
 
 // ── 5. Static uploads ─────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
