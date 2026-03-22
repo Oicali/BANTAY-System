@@ -1,5 +1,9 @@
 const Blotter = require("../models/Blotter");
 const pool = require("../../../config/database");
+// import
+const xlsx = require("xlsx");
+const { normalizeOffense, normalizeBarangay, deriveFromDate } = require("../utils/importUtils");
+const { v4: uuidv4 } = require("uuid");
 
 // ============================================================
 // VALIDATION HELPERS
@@ -37,8 +41,8 @@ const validateAddress = (address, fieldName) => {
     return errors;
   }
   
-  if (address.length < 5 || address.length > 200) {
-    errors.push(`${fieldName} must be 5-200 characters`);
+  if (address.length < 2 || address.length > 200) {
+  errors.push(`${fieldName} must be 2-200 characters`);
   }
   
   return errors;
@@ -70,10 +74,10 @@ const validateComplainant = (complainant, index) => {
   errors.push(...validateName(complainant.middle_name, `${prefix} Middle Name`, false));
   errors.push(...validateName(complainant.last_name, `${prefix} Last Name`, true));
   
-  if (!complainant.region) errors.push(`${prefix} Region is required`);
-  if (!complainant.district_province) errors.push(`${prefix} District/Province is required`);
-  if (!complainant.city_municipality) errors.push(`${prefix} City/Municipality is required`);
-  if (!complainant.barangay) errors.push(`${prefix} Barangay is required`);
+  // if (!complainant.region) errors.push(`${prefix} Region is required`);
+  // if (!complainant.district_province) errors.push(`${prefix} District/Province is required`);
+  // if (!complainant.city_municipality) errors.push(`${prefix} City/Municipality is required`);
+  // if (!complainant.barangay) errors.push(`${prefix} Barangay is required`);
   if (!complainant.gender) errors.push(`${prefix} Gender is required`);
   if (!complainant.nationality) errors.push(`${prefix} Nationality is required`);
   if (!complainant.info_obtained) errors.push(`${prefix} Info obtained is required`);
@@ -92,17 +96,12 @@ const validateSuspect = (suspect, index) => {
   errors.push(...validateName(suspect.middle_name, `${prefix} Middle Name`, false));
   errors.push(...validateName(suspect.last_name, `${prefix} Last Name`, true));
   
-  if (!suspect.status) errors.push(`${prefix} Status is required`);
-  if (!suspect.degree_participation) errors.push(`${prefix} Degree of Participation is required`);
-  if (!suspect.gender) errors.push(`${prefix} Gender is required`);
-  if (!suspect.region) errors.push(`${prefix} Region is required`);
-  if (!suspect.district_province) errors.push(`${prefix} District/Province is required`);
-  if (!suspect.city_municipality) errors.push(`${prefix} City/Municipality is required`);
-  if (!suspect.barangay) errors.push(`${prefix} Barangay is required`);
-  if (!suspect.nationality) errors.push(`${prefix} Nationality is required`);
-  
-  errors.push(...validateAddress(suspect.house_street, `${prefix} House/Street`));
-  
+  // gender, nationality, house_street are optional
+  if (suspect.house_street && suspect.house_street.trim().length > 0) {
+  if (suspect.house_street.trim().length < 2 || suspect.house_street.trim().length > 200) {
+    errors.push(`${prefix} House/Street must be 2-200 characters`);
+  }
+}
   // Validate age if provided
   if (suspect.age) {
     const age = parseInt(suspect.age);
@@ -145,28 +144,25 @@ const validateSuspect = (suspect, index) => {
 const validateOffense = (offense, index) => {
   const errors = [];
   const prefix = `Offense #${index + 1}`;
-  
   if (offense.is_principal_offense === undefined || offense.is_principal_offense === null) {
     errors.push(`${prefix} Principal Offense indication is required`);
   }
   if (!offense.offense_name) errors.push(`${prefix} Offense name is required`);
   if (!offense.stage_of_felony) errors.push(`${prefix} Stage of Felony is required`);
   if (!offense.index_type) errors.push(`${prefix} Index Type is required`);
-  if (!offense.investigator_on_case) errors.push(`${prefix} Investigator on Case is required`);
-  if (!offense.most_investigator) errors.push(`${prefix} Most Investigator is required`);
-  
   return errors;
 };
+
 
 const validateBlotterData = (blotterData) => {
   const errors = [];
   
   // Case detail validations
   if (!blotterData.incident_type) errors.push("Incident Type is required");
-  if (!blotterData.cop) {
-    errors.push("COP is required");
-  } else if (blotterData.cop.length < 5 || blotterData.cop.length > 100) {
-    errors.push("COP must be 5-100 characters");
+  if (blotterData.cop && blotterData.cop.trim().length > 0) {
+    if (blotterData.cop.trim().length < 2 || blotterData.cop.trim().length > 100) {
+      errors.push("COP must be 2-100 characters");
+    }
   }
   
   if (!blotterData.date_time_commission) errors.push("Date & Time of Commission is required");
@@ -198,8 +194,8 @@ const validateBlotterData = (blotterData) => {
   if (!blotterData.place_barangay) errors.push("Barangay is required");
   if (!blotterData.place_street) {
     errors.push("Street is required");
-  } else if (blotterData.place_street.length < 3 || blotterData.place_street.length > 200) {
-    errors.push("Street must be 3-200 characters");
+  } else if (blotterData.place_street.length < 2 || blotterData.place_street.length > 200) {
+    errors.push("Street must be 2-200 characters");
   }
   
   // Narrative validation
@@ -209,9 +205,6 @@ const validateBlotterData = (blotterData) => {
     errors.push("Narrative must be 20-5000 characters");
   }
   
-  // Boolean validations
-  if (blotterData.referred_by_barangay === undefined) errors.push("Please select if referred by barangay");
-  if (blotterData.referred_by_dilg === undefined) errors.push("Please select if referred by DILG");
   
   // Amount validation - OPTIONAL (validate only if provided)
   if (blotterData.amount_involved) {
@@ -249,28 +242,15 @@ const createBlotter = async (req, res) => {
     }
     
     // Validate suspects
-    if (!suspects || suspects.length === 0) {
-      allErrors.push("At least one suspect is required");
-    } else {
+    if (suspects && suspects.length > 0) {
       suspects.forEach((suspect, index) => {
+        // skip validation for empty/removed suspects
+        if (!suspect.first_name || suspect.first_name.trim() === "") return;
         allErrors.push(...validateSuspect(suspect, index));
       });
     }
     
-    // Validate offenses
-    if (!offenses || offenses.length === 0) {
-      allErrors.push("At least one offense is required");
-    } else {
-      offenses.forEach((offense, index) => {
-        allErrors.push(...validateOffense(offense, index));
-      });
-      
-      // Check if at least one offense is principal
-      const hasPrincipal = offenses.some(o => o.is_principal_offense === true);
-      if (!hasPrincipal) {
-        allErrors.push("At least one offense must be marked as Principal Offense");
-      }
-    }
+   
     
     // If there are validation errors, return them
     if (allErrors.length > 0) {
@@ -308,6 +288,7 @@ const getAllBlotters = async (req, res) => {
       date_from: req.query.date_from,
       date_to: req.query.date_to,
       barangay: req.query.barangay,
+      data_source: req.query.data_source,
     };
     
     const blotters = await Blotter.getAll(filters);
@@ -442,19 +423,13 @@ const updateBlotter = async (req, res) => {
       complainants.forEach((c, i) => allErrors.push(...validateComplainant(c, i)));
     }
     
-    if (!suspects || suspects.length === 0) {
-      allErrors.push("At least one suspect is required");
-    } else {
-      suspects.forEach((s, i) => allErrors.push(...validateSuspect(s, i)));
+    if (suspects && suspects.length > 0) {
+      suspects.forEach((suspect, index) => {
+        if (!suspect.first_name || suspect.first_name.trim() === "") return;
+        allErrors.push(...validateSuspect(suspect, index));
+      });
     }
     
-    if (!offenses || offenses.length === 0) {
-      allErrors.push("At least one offense is required");
-    } else {
-      offenses.forEach((o, i) => allErrors.push(...validateOffense(o, i)));
-      const hasPrincipal = offenses.some(o => o.is_principal_offense === true);
-      if (!hasPrincipal) allErrors.push("At least one offense must be principal");
-    }
     
     if (allErrors.length > 0) {
       return res.status(400).json({ success: false, errors: allErrors });
@@ -516,6 +491,503 @@ const restoreBlotter = async (req, res) => {
   }
 };
 
+const importBlotters = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "No file uploaded" });
+  }
+
+  try {
+    const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: "File is empty" });
+    }
+
+    // Validate it's the Bantay template
+    const firstRow = rows[0];
+    const hasRequiredColumns =
+      "BLOTTER_ENTRY_NUMBER" in firstRow &&
+      "DATE_COMMITTED" in firstRow &&
+      "PLACE_BARANGAY" in firstRow &&
+      "INCIDENT_TYPE" in firstRow;
+
+    if (!hasRequiredColumns) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid file format. Please use the official Bantay System import template.",
+      });
+    }
+
+    const batchId = uuidv4();
+    const inserted = [];
+    const duplicates = [];
+    const errors = [];
+
+    // ── helpers ──────────────────────────────────────────
+    const str = (v) => (v === null || v === undefined || v === "" ? null : String(v).trim());
+    const num = (v) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+    const int = (v) => {
+      const n = parseInt(v);
+      return isNaN(n) ? 0 : n;
+    };
+    const bool = (v) => {
+      if (v === null || v === undefined || v === "") return false;
+      return String(v).trim().toUpperCase() === "YES" || v === true || v === 1;
+    };
+    const parseDate = (v) => {
+      if (!v || v === "") return null;
+      if (typeof v === "number") {
+        // Excel serial date
+        return new Date((v - 25569) * 86400 * 1000);
+      }
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const parseDateTime = (dateVal, timeVal) => {
+      const d = parseDate(dateVal);
+      if (!d) return null;
+      if (timeVal && timeVal !== "") {
+        const parts = String(timeVal).split(":");
+        if (parts.length >= 2) {
+          d.setHours(parseInt(parts[0]) || 0);
+          d.setMinutes(parseInt(parts[1]) || 0);
+          d.setSeconds(0);
+        }
+      }
+      return d;
+    };
+    const deriveQuarter = (d) => {
+      if (!d) return null;
+      return Math.ceil((d.getMonth() + 1) / 3);
+    };
+    const deriveDayOfWeek = (d) => {
+      if (!d) return null;
+      return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
+    };
+    const deriveMonth = (d) => {
+      if (!d) return null;
+      return ["January","February","March","April","May","June",
+              "July","August","September","October","November","December"][d.getMonth()];
+    };
+
+    // ── process rows ─────────────────────────────────────
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx];
+      const rowNum = idx + 2;
+
+      const blotterNo = str(row["BLOTTER_ENTRY_NUMBER"]);
+      if (!blotterNo) {
+        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Missing blotter number" });
+        continue;
+      }
+
+      const incidentType = str(row["INCIDENT_TYPE"]);
+      if (!incidentType) {
+        errors.push({ row: rowNum, field: "INCIDENT_TYPE", message: "Missing incident type" });
+        continue;
+      }
+
+      const rawBarangay = str(row["PLACE_BARANGAY"]);
+      if (!rawBarangay) {
+        errors.push({ row: rowNum, field: "PLACE_BARANGAY", message: "Missing barangay" });
+        continue;
+      }
+
+      const BARANGAY_MIGRATION_MAP = {
+        "ALIMA": "SINEGUELASAN", "BANALO": "SINEGUELASAN", "SINBANALI": "SINEGUELASAN",
+        "CAMPOSANTO": "KAINGIN (POB.)", "DAANG BUKID": "KAINGIN (POB.)", "TABING DAGAT": "KAINGIN (POB.)",
+        "DIGMAN": "KAINGIN DIGMAN", "KAINGIN": "KAINGIN DIGMAN",
+        "PANAPAAN": "P.F. ESPIRITU I (PANAPAAN)", "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
+        "PANAPAAN 2": "P.F. ESPIRITU II", "PANAPAAN 3": "P.F. ESPIRITU II",
+        "PANAPAAN 4": "P.F. ESPIRITU IV", "PANAPAAN 5": "P.F. ESPIRITU V", "PANAPAAN 6": "P.F. ESPIRITU VI",
+        "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
+        "P.F. ESPIRITU 2": "P.F. ESPIRITU II", "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
+        "P.F. ESPIRITU 4": "P.F. ESPIRITU IV", "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
+        "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
+        "ANIBAN 1": "ANIBAN I", "ANIBAN 2": "ANIBAN II",
+        "HABAY 1": "HABAY I", "HABAY 2": "HABAY II",
+        "LIGAS 1": "LIGAS I", "LIGAS 2": "LIGAS II",
+        "MABOLO 1": "MABOLO", "MABOLO 2": "MABOLO", "MABOLO 3": "MABOLO",
+        "MALIKSI 1": "MALIKSI I", "MALIKSI 2": "MALIKSI II", "MALIKSI 3": "MALIKSI II",
+        "MAMBOG 1": "MAMBOG I", "MAMBOG 2": "MAMBOG II", "MAMBOG 3": "MAMBOG III",
+        "MAMBOG 4": "MAMBOG IV", "MAMBOG 5": "MAMBOG II",
+        "MOLINO 1": "MOLINO I", "MOLINO 2": "MOLINO II", "MOLINO 3": "MOLINO III",
+        "MOLINO 4": "MOLINO IV", "MOLINO 5": "MOLINO V", "MOLINO 6": "MOLINO VI", "MOLINO 7": "MOLINO VII",
+        "NIOG 1": "NIOG", "NIOG 2": "NIOG", "NIOG 3": "NIOG",
+        "REAL 1": "REAL", "REAL 2": "REAL",
+        "SALINAS 1": "SALINAS I", "SALINAS 2": "SALINAS II", "SALINAS 3": "SALINAS II", "SALINAS 4": "SALINAS II",
+        "SAN NICOLAS 1": "SAN NICOLAS I", "SAN NICOLAS 2": "SAN NICOLAS II", "SAN NICOLAS 3": "SAN NICOLAS III",
+        "TALABA 1": "TALABA I", "TALABA 2": "TALABA II", "TALABA 3": "TALABA III",
+        "TALABA 4": "TALABA III", "TALABA 5": "TALABA III", "TALABA 6": "TALABA III", "TALABA 7": "TALABA I",
+        "ZAPOTE 1": "ZAPOTE I", "ZAPOTE 2": "ZAPOTE II", "ZAPOTE 3": "ZAPOTE III", "ZAPOTE 4": "ZAPOTE II",
+        "KAINGIN DIGMAN": "KAINGIN DIGMAN",
+      };
+
+      const barangay = BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] || rawBarangay;
+
+      const dateCommitted = parseDateTime(row["DATE_COMMITTED"], row["TIME_COMMITTED"]);
+      if (!dateCommitted) {
+        errors.push({ row: rowNum, field: "DATE_COMMITTED", message: "Missing or invalid date committed" });
+        continue;
+      }
+
+      // Duplicate check
+      const dup = await pool.query(
+        `SELECT 1 FROM blotter_entries WHERE blotter_entry_number = $1`,
+        [blotterNo]
+      );
+      if (dup.rows.length > 0) {
+        duplicates.push({ row: rowNum, blotter_entry_number: blotterNo });
+        continue;
+      }
+
+      const dateReported = parseDateTime(row["DATE_REPORTED"], row["TIME_REPORTED"]);
+
+      inserted.push({
+        rowNum,
+        // ── blotter fields ──
+        blotterNo,
+        incidentType,
+        barangay,
+        dateCommitted,
+        dateReported: dateReported || dateCommitted,
+        quarter: deriveQuarter(dateCommitted),
+        dayOfWeek: deriveDayOfWeek(dateCommitted),
+        monthName: deriveMonth(dateCommitted),
+        placeStreet: str(row["PLACE_STREET"]) || "N/A",
+        typeOfPlace: str(row["TYPE_OF_PLACE"]),
+        placeCommission: str(row["PLACE_COMMISSION"]),
+        stageOfFelony: str(row["STAGE_OF_FELONY"]),
+        modus: str(row["MODUS"]),
+        narrative: str(row["NARRATIVE"]) || "Imported from Bantay template",
+        caseStatus: str(row["CASE_STATUS"]) || "Under Investigation",
+        caseSolveType: str(row["CASE_SOLVE_TYPE"]),
+        drugInvolved: bool(row["DRUG_INVOLVED"]),
+        amount: num(row["AMOUNT"]),
+        lat: num(row["LAT"]),
+        lng: num(row["LNG"]),
+        // robbery
+        robEstablishmentType: str(row["ROB_ESTABLISHMENT_TYPE"]),
+        robEstablishmentName: str(row["ROB_ESTABLISHMENT_NAME"]),
+        // vehicle
+        vehiclePlateNo: str(row["VEHICLE_PLATE_NO"]),
+        vehicleKind: str(row["VEHICLE_KIND"]),
+        vehicleMake: str(row["VEHICLE_MAKE"]),
+        vehicleModel: str(row["VEHICLE_MODEL"]),
+        vehicleStatus: str(row["VEHICLE_STATUS"]),
+        // firearm
+        faCaliber: str(row["FA_CALIBER"]),
+        faKind: str(row["FA_KIND"]),
+        faMake: str(row["FA_MAKE"]),
+        faStatus: str(row["FA_STATUS"]),
+        // gambling
+        gamblingKind: str(row["GAMBLING_KIND"]),
+
+        // ── complainant fields ──
+        complainant: {
+          first_name: str(row["C_FIRST_NAME"]),
+          middle_name: str(row["C_MIDDLE_NAME"]),
+          last_name: str(row["C_LAST_NAME"]),
+          qualifier: str(row["C_QUALIFIER"]),
+          alias: str(row["C_ALIAS"]),
+          gender: str(row["C_GENDER"]) || "Male",
+          nationality: str(row["C_NATIONALITY"]) || "FILIPINO",
+          contact_number: str(row["C_CONTACT_NUMBER"]),
+          region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
+          district_province: str(row["C_PROVINCE"]) || "Cavite",
+          city_municipality: str(row["C_CITY_MUNICIPALITY"]) || "Bacoor City",
+          barangay: str(row["C_BARANGAY"]),
+          house_street: str(row["C_HOUSE_STREET"]) || "N/A",
+          info_obtained: str(row["C_INFO_OBTAINED"]) || "Walk-in",
+          occupation: str(row["C_OCCUPATION"]),
+        },
+
+        // ── suspect fields ──
+        suspect: {
+          first_name: str(row["S_FIRST_NAME"]) || "UNKNOWN",
+          middle_name: str(row["S_MIDDLE_NAME"]),
+          last_name: str(row["S_LAST_NAME"]) || "UNKNOWN",
+          qualifier: str(row["S_QUALIFIER"]),
+          alias: str(row["S_ALIAS"]),
+          gender: str(row["S_GENDER"]) || "Male",
+          birthday: parseDate(row["S_BIRTHDAY"]),
+          age: int(row["S_AGE"]) || null,
+          birth_place: str(row["S_BIRTH_PLACE"]),
+          nationality: str(row["S_NATIONALITY"]) || "FILIPINO",
+          region: str(row["S_REGION"]) || "",
+          district_province: str(row["S_PROVINCE"]) || "",
+          city_municipality: str(row["S_CITY_MUNICIPALITY"]) || "",
+          barangay: str(row["S_BARANGAY"]) || "",
+          house_street: str(row["S_HOUSE_STREET"]) || "N/A",
+          status: str(row["S_STATUS"]) || "At Large",
+          location_if_arrested: str(row["S_LOCATION_IF_ARRESTED"]),
+          degree_participation: str(row["S_DEGREE_PARTICIPATION"]) || "Principal",
+          relation_to_victim: str(row["S_RELATION_TO_VICTIM"]),
+          educational_attainment: str(row["S_EDUCATIONAL_ATTAINMENT"]),
+          height_cm: int(row["S_HEIGHT_CM"]) || null,
+          drug_used: bool(row["S_DRUG_USED"]),
+          motive: str(row["S_MOTIVE"]),
+          occupation: str(row["S_OCCUPATION"]),
+        },
+
+        // ── offense fields ──
+        offense: {
+          offense_name: str(row["O_OFFENSE_NAME"]) || incidentType,
+          stage_of_felony: str(row["O_STAGE_OF_FELONY"]) || str(row["STAGE_OF_FELONY"]) || "COMPLETED",
+          index_type: str(row["O_INDEX_TYPE"]) || "Index",
+          is_principal_offense: true,
+          investigator_on_case: str(row["O_INVESTIGATOR_ON_CASE"]) || "N/A",
+          most_investigator: str(row["O_MOST_INVESTIGATOR"]) || "N/A",
+          modus: str(row["O_MODUS"]) || str(row["MODUS"]),
+        },
+      });
+    }
+
+    // ── bulk insert in transaction ────────────────────────
+    const client = await pool.connect();
+    let actualInserted = 0;
+
+    try {
+      await client.query("BEGIN");
+
+      for (const r of inserted) {
+        // 1. Insert blotter_entry
+        const blotterResult = await client.query(
+          `INSERT INTO blotter_entries (
+            blotter_entry_number, incident_type,
+            place_region, place_district_province, place_city_municipality,
+            place_barangay, place_street, type_of_place, place_commission,
+            narrative, stage_of_felony, modus,
+            date_time_commission, date_time_reported,
+            referred_by_barangay, referred_by_dilg,
+            day_of_incident, month_of_incident,
+            status, case_solve_type,
+            lat, lng, amount_involved,
+            victim, suspect_text,
+            data_source, import_batch_id, is_deleted
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+            $11,$12,$13,$14,$15,$16,$17,$18,
+            $19,$20,$21,$22,$23,$24,$25,$26,$27,$28
+          ) RETURNING blotter_id`,
+          [
+            r.blotterNo, r.incidentType,
+            "Region IV-A (CALABARZON)", "Cavite", "Bacoor City",
+            r.barangay, r.placeStreet, r.typeOfPlace, r.placeCommission,
+            r.narrative, r.stageOfFelony, r.modus,
+            r.dateCommitted, r.dateReported,
+            false, false,
+            r.dayOfWeek, r.monthName,
+            r.caseStatus, r.caseSolveType,
+            r.lat, r.lng, r.amount,
+            r.complainant.first_name
+              ? `${r.complainant.first_name} ${r.complainant.last_name || ""}`.trim()
+              : null,
+            r.suspect.first_name
+              ? `${r.suspect.first_name} ${r.suspect.last_name || ""}`.trim()
+              : null,
+            "bantay_import", r.batchId || batchId, false,
+          ]
+        );
+
+        const blotterId = blotterResult.rows[0].blotter_id;
+
+        // 2. Insert complainant (only if first name exists)
+        if (r.complainant.first_name) {
+          await client.query(
+            `INSERT INTO complainants (
+              blotter_id, first_name, middle_name, last_name, qualifier, alias,
+              gender, nationality, contact_number,
+              region, district_province, city_municipality, barangay, house_street,
+              info_obtained, occupation
+            ) VALUES (
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
+            )`,
+            [
+              blotterId,
+              r.complainant.first_name || null,
+              r.complainant.middle_name || null,
+              r.complainant.last_name || null,
+              r.complainant.qualifier || null,
+              r.complainant.alias || null,
+              r.complainant.gender || "Male",
+              r.complainant.nationality || "FILIPINO",
+              r.complainant.contact_number || null,
+              r.complainant.region || null,
+              r.complainant.district_province || null,
+              r.complainant.city_municipality || null,
+              r.complainant.barangay || null,
+              r.complainant.house_street || null,
+              r.complainant.info_obtained || null,
+              r.complainant.occupation || null,
+            ]
+          );
+        }
+
+        // 3. Insert suspect
+        await client.query(
+          `INSERT INTO suspects (
+            blotter_id, first_name, middle_name, last_name, qualifier, alias,
+            gender, birthday, age, birth_place, nationality,
+            region, district_province, city_municipality, barangay, house_street,
+            status, location_if_arrested, degree_participation,
+            relation_to_victim, educational_attainment,
+            height_cm, drug_used, motive, occupation
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+            $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+          )`,
+          [
+            blotterId,
+            r.suspect.first_name,
+            r.suspect.middle_name,
+            r.suspect.last_name,
+            r.suspect.qualifier,
+            r.suspect.alias,
+            r.suspect.gender,
+            r.suspect.birthday,
+            r.suspect.age || null,
+            r.suspect.birth_place,
+            r.suspect.nationality,
+            r.suspect.region,
+            r.suspect.district_province,
+            r.suspect.city_municipality,
+            r.suspect.barangay,
+            r.suspect.house_street,
+            r.suspect.status,
+            r.suspect.location_if_arrested,
+            r.suspect.degree_participation,
+            r.suspect.relation_to_victim,
+            r.suspect.educational_attainment,
+            r.suspect.height_cm || null,
+            r.suspect.drug_used,
+            r.suspect.motive,
+            r.suspect.occupation,
+          ]
+        );
+
+        // 4. Insert offense
+       // 4. Insert offense
+        await client.query(
+          `INSERT INTO offenses (
+            blotter_id, offense_name, stage_of_felony, index_type,
+            is_principal_offense, investigator_on_case, most_investigator, modus
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            blotterId,
+            r.offense.offense_name,
+            r.offense.stage_of_felony,
+            r.offense.index_type,
+            r.offense.is_principal_offense,
+            r.offense.investigator_on_case,
+            r.offense.most_investigator,
+            r.offense.modus,
+          ]
+        );
+
+        // 5. Auto-link or auto-create modus in crime_modus_reference
+        if (r.offense.modus) {
+          const OFFENSE_TO_CRIME_TYPE = {
+            "Murder": "MURDER",
+            "Homicide": "HOMICIDE",
+            "Physical Injury": "PHYSICAL INJURIES",
+            "Rape": "RAPE",
+            "Robbery": "ROBBERY",
+            "Theft": "THEFT",
+            "Carnapping - MC": "CARNAPPING - MC",
+            "Carnapping - MV": "CARNAPPING - MV",
+            "Special Complex Crime": "SPECIAL COMPLEX CRIME",
+            "CARNAPPING - MC": "CARNAPPING - MC",
+            "CARNAPPING - MV": "CARNAPPING - MV",
+          };
+
+          const crimeType = OFFENSE_TO_CRIME_TYPE[r.offense.offense_name];
+
+          if (crimeType) {
+            // Split modus by comma in case multiple are stored as one string
+            const modusList = r.offense.modus.split(",").map(m => m.trim()).filter(Boolean);
+
+            for (const modusName of modusList) {
+              // Check if modus already exists for this crime type
+              const existing = await client.query(
+                `SELECT id FROM crime_modus_reference
+                 WHERE UPPER(crime_type) = $1 AND LOWER(modus_name) = LOWER($2)`,
+                [crimeType, modusName]
+              );
+
+              let modusRefId;
+
+              if (existing.rows.length > 0) {
+                // Already exists — use it
+                modusRefId = existing.rows[0].id;
+
+                // Make sure it's active
+                await client.query(
+                  `UPDATE crime_modus_reference SET is_active = true WHERE id = $1`,
+                  [modusRefId]
+                );
+              } else {
+                // Doesn't exist — auto-create it
+                const created = await client.query(
+                  `INSERT INTO crime_modus_reference (crime_type, modus_name, is_active)
+                   VALUES ($1, $2, true) RETURNING id`,
+                  [crimeType, modusName]
+                );
+                modusRefId = created.rows[0].id;
+              }
+
+              // Link to this blotter via crime_modus table
+              await client.query(
+                `INSERT INTO crime_modus (blotter_id, modus_reference_id)
+                 VALUES ($1, $2)
+                 ON CONFLICT DO NOTHING`,
+                [blotterId, modusRefId]
+              );
+            }
+          }
+        }
+
+        actualInserted++;
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Import transaction error:", err);
+      return res.status(500).json({ 
+        success: false, 
+        message: err.message,
+        detail: err.detail || null,
+        column: err.column || null,
+        table: err.table || null,
+      });
+    } finally {
+      client.release();
+    }
+
+    return res.status(200).json({
+      success: true,
+      summary: {
+        inserted: actualInserted,
+        skipped_duplicates: duplicates.length,
+        skipped_errors: errors.length,
+        errors,
+        duplicates,
+        batch_id: batchId,
+      },
+    });
+  } catch (error) {
+    console.error("Import error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createBlotter,
   getAllBlotters,
@@ -525,5 +997,6 @@ module.exports = {
   updateBlotter,
   getModus,
   getDeletedBlotters,
-  restoreBlotter
+  restoreBlotter,
+  importBlotters
 };
