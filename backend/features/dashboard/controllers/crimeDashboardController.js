@@ -268,21 +268,18 @@ const queryHourly = async (where, params, nextP) => {
 const queryByDay = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
-      be.day_of_incident AS day,
+      TRIM(TO_CHAR(be.date_time_commission, 'Day')) AS day,
       COUNT(*) AS count
      FROM blotter_entries be
      ${where}
        AND UPPER(be.incident_type) = ANY($${nextP}::text[])
-       AND be.day_of_incident IS NOT NULL
-     GROUP BY be.day_of_incident
+     GROUP BY TRIM(TO_CHAR(be.date_time_commission, 'Day'))
      ORDER BY count DESC`,
     [...params, INDEX_CRIMES],
   );
 
-  // Map results into the fixed 7-day order so the chart always shows all days
   const map = {};
   result.rows.forEach((r) => { map[r.day] = parseInt(r.count); });
-
   return DAYS_OF_WEEK.map((day) => ({ day, count: map[day] || 0 }));
 };
 
