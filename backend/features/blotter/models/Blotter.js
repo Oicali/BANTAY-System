@@ -57,14 +57,14 @@ static async generateImportNumber(year) {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         RETURNING blotter_id`,
         [
-          blotterNumber, blotterData.incident_type, blotterData.cop,
+          blotterNumber, blotterData.incident_type, blotterData.cop || null,
           blotterData.date_time_commission, blotterData.date_time_reported,
           blotterData.place_region,
           blotterData.place_district_province, blotterData.place_city_municipality,
           blotterData.place_barangay, blotterData.place_street,
           blotterData.is_private_place || null, blotterData.narrative,
-          blotterData.amount_involved || null, blotterData.referred_by_barangay,
-          blotterData.referred_by_dilg, 'Pending',
+          blotterData.amount_involved || null, false,
+          false, 'Pending',
           blotterData.lat || null, blotterData.lng || null
         ]
       );
@@ -94,8 +94,8 @@ static async generateImportNumber(year) {
         );
       }
       
-      // Insert suspects
       for (const suspect of suspects) {
+        if (!suspect.first_name || suspect.first_name.trim() === "") continue;
         await client.query(
           `INSERT INTO suspects (
               blotter_id, first_name, middle_name, last_name, qualifier, alias,
@@ -134,7 +134,7 @@ static async generateImportNumber(year) {
           [
             blotterId, offense.is_principal_offense,
             offense.offense_name, offense.stage_of_felony, offense.index_type,
-            offense.investigator_on_case, offense.most_investigator
+            offense.investigator_on_case || null, offense.most_investigator || null
           ]
         );
       }
@@ -213,7 +213,12 @@ static async generateImportNumber(year) {
   paramCount++;
 }
 
-    query += ` ORDER BY created_at DESC`;
+if (filters.data_source) {
+  query += ` AND data_source = $${paramCount}`;
+  params.push(filters.data_source);
+  paramCount++;
+}
+    query += ` ORDER BY GREATEST(updated_at, created_at) DESC`;
 
     const result = await pool.query(query, params);
     return result.rows;
@@ -295,8 +300,8 @@ static async generateImportNumber(year) {
         blotterData.place_district_province, blotterData.place_city_municipality,
         blotterData.place_barangay, blotterData.place_street,
         blotterData.is_private_place || null, blotterData.narrative,
-        blotterData.amount_involved || null, blotterData.referred_by_barangay,
-        blotterData.referred_by_dilg,
+        blotterData.amount_involved || null, false,
+        false,
         blotterData.lat || null, blotterData.lng || null,
         blotterId
       ]
@@ -382,19 +387,19 @@ static async generateImportNumber(year) {
     
     // Re-insert offenses
     for (const o of offenses) {
-      await client.query(
-        `INSERT INTO offenses (
-            blotter_id, is_principal_offense, offense_name,
-            stage_of_felony, index_type, investigator_on_case,
-            most_investigator
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            blotterId, o.is_principal_offense,
-            o.offense_name, o.stage_of_felony, o.index_type,
-            o.investigator_on_case, o.most_investigator
-          ]
-      );
-    }
+  await client.query(
+    `INSERT INTO offenses (
+        blotter_id, is_principal_offense, offense_name,
+        stage_of_felony, index_type, investigator_on_case,
+        most_investigator
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        blotterId, o.is_principal_offense,
+        o.offense_name, o.stage_of_felony, o.index_type,
+        o.investigator_on_case || null, o.most_investigator || null
+      ]
+  );
+}
     
     await client.query('COMMIT');
     return { blotter_id: blotterId };
@@ -438,6 +443,7 @@ static async getByIdRaw(blotterId) {
       place_street,
       is_private_place,
       type_of_place,
+      modus,
       narrative,
       amount_involved,
       referred_by_barangay,
@@ -514,7 +520,8 @@ static async getByIdRaw(blotterId) {
     complainants: complainants.rows,
     suspects: suspects.rows,
     offenses: offenses.rows,
-    modus: modus.rows
+    modus_refs: modus.rows,
+    modus_text: blotter.rows[0].modus,
   };
 }
 }
