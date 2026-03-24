@@ -1,7 +1,7 @@
 const pool = require("../../../config/database");
 
 const INDEX_CRIMES = [
-  "MURDER", "HOMICIDE", "PHYSICAL INJURIES", "RAPE",
+  "MURDER", "HOMICIDE", "PHYSICAL INJURY", "RAPE",
   "ROBBERY", "THEFT", "CARNAPPING - MC", "CARNAPPING - MV", "SPECIAL COMPLEX CRIME",
 ];
 

@@ -5323,7 +5323,7 @@ function EBlotter() {
             >
               <option value="">All Records</option>
               <option value="manual">Manual Entry</option>
-              <option value="ciras_import">Imported</option>
+              <option value="bantay_import">Imported</option>
             </select>
           </div>
         </div>
