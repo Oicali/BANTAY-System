@@ -9,6 +9,10 @@ const {
   createMobileUnit,
   updateMobileUnit,
   deleteMobileUnit,
+  getPatrols,
+  createPatrol,
+  updatePatrol,
+  deletePatrol,
 } = require("../controllers/patrolController");
 
 router.get("/stats",                authenticate, getPatrolStats);
@@ -18,5 +22,9 @@ router.get("/mobile-units",         authenticate, getMobileUnits);
 router.post("/mobile-units",        authenticate, createMobileUnit);
 router.put("/mobile-units/:id",     authenticate, updateMobileUnit);
 router.delete("/mobile-units/:id", authenticate, deleteMobileUnit);
+router.get("/patrols",        authenticate, getPatrols);
+router.post("/patrols",       authenticate, createPatrol);
+router.put("/patrols/:id",    authenticate, updatePatrol);
+router.delete("/patrols/:id", authenticate, deletePatrol);
 
 module.exports = router;
