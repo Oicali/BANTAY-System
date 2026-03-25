@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./AddUserModal.css";
 import LoadingModal from "../modals/LoadingModal";
+import { CURRENT_BARANGAYS } from "../../utils/barangayOptions";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
@@ -72,8 +73,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       fetchBacoorBarangays();
       setFormData((prev) => ({
         ...prev,
-        region_code: "040000000",      // CALABARZON
-        province_code: "042100000",    // Cavite
+        region_code: "040000000", // CALABARZON
+        province_code: "042100000", // Cavite
         municipality_code: BACOOR_CITY_CODE,
       }));
     }
@@ -587,7 +588,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       submitData.append("regionCode", formData.region_code);
       submitData.append("provinceCode", formData.province_code);
       submitData.append("municipalityCode", formData.municipality_code);
-      submitData.append("barangayCode", formData.barangay_code);
+      submitData.append("barangay", formData.barangay_code);
       if (formData.address_line.trim())
         submitData.append("addressLine", formData.address_line.trim());
 
@@ -612,14 +613,11 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
           submitData.append("department", formData.department.trim());
       }
 
-      const response = await fetch(
-        `${API_URL}/user-management/register`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          body: submitData,
-        },
-      );
+      const response = await fetch(`${API_URL}/user-management/register`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: submitData,
+      });
 
       const data = await response.json();
 
@@ -633,9 +631,11 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
               `${API_URL}/users/profile/picture/${data.user.userId}`,
               {
                 method: "POST",
-                headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
                 body: picFd,
-              }
+              },
             );
           } catch (picErr) {
             console.error("Profile picture upload failed:", picErr);
@@ -1040,9 +1040,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             <option value="">
               {loadingBarangays ? "Loading..." : "Select Barangay"}
             </option>
-            {barangays.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
+            {CURRENT_BARANGAYS.map((b) => (
+              <option key={b} value={b}>
+                {b}
               </option>
             ))}
           </select>
@@ -1098,9 +1098,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
               {loadingBarangays ? "Loading barangays..." : "Select Barangay"}
             </option>
             {/* ✅ Already sorted A-Z by fetchBacoorBarangays */}
-            {barangays.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
+            {CURRENT_BARANGAYS.map((b) => (
+              <option key={b} value={b}>
+                {b}
               </option>
             ))}
           </select>
@@ -1131,7 +1131,10 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
           </span>
         </div>
       </div>
-      <div className="aum-info-box aum-info-box-note" style={{ marginTop: "12px" }}>
+      <div
+        className="aum-info-box aum-info-box-note"
+        style={{ marginTop: "12px" }}
+      >
         <strong>📌 Note:</strong> The barangay assignment is automatically taken
         from the Barangay selected above. Each barangay can only have one
         designated account.
@@ -1144,202 +1147,204 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   // =====================================================
   return (
     <>
-    <LoadingModal isOpen={isSubmitting} message="Adding user..." />
-    <div className="aum-modal-overlay">
-      <div
-        className={`aum-modal-container ${step === "select" ? "aum-modal-select" : "aum-modal-large"}`}
-        ref={modalContentRef}
-      >
-        {/* USER TYPE SELECTION */}
-        {step === "select" && (
-          <div className="aum-user-type-selection">
-            <h2 className="aum-selection-title">Select User Type</h2>
-            <p className="aum-selection-subtitle">
-              Choose the type of user you want to add
-            </p>
-            <div className="aum-user-type-cards">
-              <div
-                className="aum-user-type-card"
-                onClick={() => handleUserTypeSelect("pnp")}
-              >
-                <div className="aum-user-type-icon">🚔</div>
-                <h4>PNP User</h4>
-                <p>Add a police officer to the system</p>
-              </div>
-              <div
-                className="aum-user-type-card"
-                onClick={() => handleUserTypeSelect("barangay")}
-              >
-                <div className="aum-user-type-icon">🏘️</div>
-                <h4>Barangay User</h4>
-                <p>Add a barangay official to the system</p>
-              </div>
-            </div>
-            <div className="aum-modal-actions">
-              <button
-                className="aum-btn aum-btn-secondary"
-                onClick={handleClose}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* PNP USER FORM */}
-        {step === "pnp" && (
-          <>
-            <div className="aum-modal-header">
-              <div className="aum-header-with-back">
-                <button
-                  type="button"
-                  className="aum-back-button"
-                  onClick={handleBack}
+      <LoadingModal isOpen={isSubmitting} message="Adding user..." />
+      <div className="aum-modal-overlay">
+        <div
+          className={`aum-modal-container ${step === "select" ? "aum-modal-select" : "aum-modal-large"}`}
+          ref={modalContentRef}
+        >
+          {/* USER TYPE SELECTION */}
+          {step === "select" && (
+            <div className="aum-user-type-selection">
+              <h2 className="aum-selection-title">Select User Type</h2>
+              <p className="aum-selection-subtitle">
+                Choose the type of user you want to add
+              </p>
+              <div className="aum-user-type-cards">
+                <div
+                  className="aum-user-type-card"
+                  onClick={() => handleUserTypeSelect("pnp")}
                 >
-                  ← Back
-                </button>
-                <h2>Add PNP User</h2>
+                  <div className="aum-user-type-icon">🚔</div>
+                  <h4>PNP User</h4>
+                  <p>Add a police officer to the system</p>
+                </div>
+                <div
+                  className="aum-user-type-card"
+                  onClick={() => handleUserTypeSelect("barangay")}
+                >
+                  <div className="aum-user-type-icon">🏘️</div>
+                  <h4>Barangay User</h4>
+                  <p>Add a barangay official to the system</p>
+                </div>
+              </div>
+              <div className="aum-modal-actions">
                 <button
-                  type="button"
-                  className="aum-modal-close"
+                  className="aum-btn aum-btn-secondary"
                   onClick={handleClose}
                 >
-                  ×
+                  Cancel
                 </button>
               </div>
             </div>
+          )}
 
-            <form onSubmit={handleSubmit} className="aum-modal-form">
-              {renderInfoBox()}
-              {renderProfilePicture("profilePicturePnp")}
-              {renderPersonalInfo()}
-              {renderContactInfo()}
-              {renderAddressInfo()}
-
-              {/* PNP Official Information */}
-              <div className="aum-form-section">
-                <h3 className="aum-form-section-title">Official Information</h3>
-                <div className="aum-form-row">
-                  <div className="aum-form-group">
-                    <label className="aum-form-label">Role *</label>
-                    <select
-                      name="role"
-                      value={formData.role}
-                      onChange={handleChange}
-                      className="aum-form-input"
-                    >
-                      <option value="Administrator">Administrator</option>
-                      <option value="Investigator">Investigator</option>
-                      <option value="Patrol">Patrol</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="aum-form-row-triple">
-                  <div className="aum-form-group">
-                    <label className="aum-form-label">Rank</label>
-                    <input
-                      type="text"
-                      name="rank"
-                      value={formData.rank}
-                      onChange={handleChange}
-                      className="aum-form-input"
-                      placeholder="e.g., Police Officer III"
-                      maxLength="100"
-                    />
-                  </div>
-                  <div className="aum-form-group">
-                    <label className="aum-form-label">
-                      Mobile Patrol No.
-                      {formData.role !== "Patrol" && (
-                        <span className="aum-field-note">
-                          {" "}
-                          (Patrol role only)
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      name="mobile_patrol"
-                      value={formData.mobile_patrol}
-                      onChange={handleChange}
-                      className="aum-form-input"
-                      placeholder="e.g., 101"
-                      maxLength="6"
-                      disabled={formData.role !== "Patrol"}
-                    />
-                  </div>
-                  <div className="aum-form-group">
-                    <label className="aum-form-label">Department</label>
-                    <input
-                      type="text"
-                      name="department"
-                      value={formData.department}
-                      onChange={handleChange}
-                      className="aum-form-input"
-                      placeholder="e.g., Investigation Division"
-                      maxLength="100"
-                    />
-                  </div>
+          {/* PNP USER FORM */}
+          {step === "pnp" && (
+            <>
+              <div className="aum-modal-header">
+                <div className="aum-header-with-back">
+                  <button
+                    type="button"
+                    className="aum-back-button"
+                    onClick={handleBack}
+                  >
+                    ← Back
+                  </button>
+                  <h2>Add PNP User</h2>
+                  <button
+                    type="button"
+                    className="aum-modal-close"
+                    onClick={handleClose}
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
 
-              <div className="aum-modal-actions">
-                <button
-                  type="submit"
-                  className="aum-btn aum-btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Adding User..." : "Add PNP User"}
-                </button>
-              </div>
-            </form>
-          </>
-        )}
+              <form onSubmit={handleSubmit} className="aum-modal-form">
+                {renderInfoBox()}
+                {renderProfilePicture("profilePicturePnp")}
+                {renderPersonalInfo()}
+                {renderContactInfo()}
+                {renderAddressInfo()}
 
-        {/* BARANGAY USER FORM */}
-        {step === "barangay" && (
-          <>
-            <div className="aum-modal-header">
-              <div className="aum-header-with-back">
-                <button
-                  type="button"
-                  className="aum-back-button"
-                  onClick={handleBack}
-                >
-                  ← Back
-                </button>
-                <h2>Add Barangay User</h2>
-                <button
-                  type="button"
-                  className="aum-modal-close"
-                  onClick={handleClose}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+                {/* PNP Official Information */}
+                <div className="aum-form-section">
+                  <h3 className="aum-form-section-title">
+                    Official Information
+                  </h3>
+                  <div className="aum-form-row">
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Role *</label>
+                      <select
+                        name="role"
+                        value={formData.role}
+                        onChange={handleChange}
+                        className="aum-form-input"
+                      >
+                        <option value="Administrator">Administrator</option>
+                        <option value="Investigator">Investigator</option>
+                        <option value="Patrol">Patrol</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="aum-form-row-triple">
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Rank</label>
+                      <input
+                        type="text"
+                        name="rank"
+                        value={formData.rank}
+                        onChange={handleChange}
+                        className="aum-form-input"
+                        placeholder="e.g., Police Officer III"
+                        maxLength="100"
+                      />
+                    </div>
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">
+                        Mobile Patrol No.
+                        {formData.role !== "Patrol" && (
+                          <span className="aum-field-note">
+                            {" "}
+                            (Patrol role only)
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        type="text"
+                        name="mobile_patrol"
+                        value={formData.mobile_patrol}
+                        onChange={handleChange}
+                        className="aum-form-input"
+                        placeholder="e.g., 101"
+                        maxLength="6"
+                        disabled={formData.role !== "Patrol"}
+                      />
+                    </div>
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Department</label>
+                      <input
+                        type="text"
+                        name="department"
+                        value={formData.department}
+                        onChange={handleChange}
+                        className="aum-form-input"
+                        placeholder="e.g., Investigation Division"
+                        maxLength="100"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-            <form onSubmit={handleSubmit} className="aum-modal-form">
-              {renderInfoBox()}
-              {renderProfilePicture("profilePictureBarangay")}
-              {renderPersonalInfo()}
-              {renderContactInfo()}
-              {renderBarangayAddressInfo()}
+                <div className="aum-modal-actions">
+                  <button
+                    type="submit"
+                    className="aum-btn aum-btn-primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Adding User..." : "Add PNP User"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
 
-              <div className="aum-modal-actions">
-                <button
-                  type="submit"
-                  className="aum-btn aum-btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Adding User..." : "Add Barangay User"}
-                </button>
+          {/* BARANGAY USER FORM */}
+          {step === "barangay" && (
+            <>
+              <div className="aum-modal-header">
+                <div className="aum-header-with-back">
+                  <button
+                    type="button"
+                    className="aum-back-button"
+                    onClick={handleBack}
+                  >
+                    ← Back
+                  </button>
+                  <h2>Add Barangay User</h2>
+                  <button
+                    type="button"
+                    className="aum-modal-close"
+                    onClick={handleClose}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            </form>
-          </>
-        )}
+
+              <form onSubmit={handleSubmit} className="aum-modal-form">
+                {renderInfoBox()}
+                {renderProfilePicture("profilePictureBarangay")}
+                {renderPersonalInfo()}
+                {renderContactInfo()}
+                {renderBarangayAddressInfo()}
+
+                <div className="aum-modal-actions">
+                  <button
+                    type="submit"
+                    className="aum-btn aum-btn-primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Adding User..." : "Add Barangay User"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 };

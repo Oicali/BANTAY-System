@@ -184,7 +184,7 @@ const registerUser = async (req, res) => {
       userType, email, firstName, lastName, role,
       middleName, suffix, phone, alternatePhone,
       gender, dateOfBirth,
-      regionCode, provinceCode, municipalityCode, barangayCode, addressLine,
+      regionCode, provinceCode, municipalityCode, barangayCode, barangay, addressLine,
       rank, mobilePatrol, department,
     } = req.body;
 
@@ -201,7 +201,7 @@ const registerUser = async (req, res) => {
     const trimmedRegionCode       = regionCode?.trim() || null;
     const trimmedProvinceCode     = provinceCode?.trim() || null;
     const trimmedMunicipalityCode = municipalityCode?.trim() || null;
-    const trimmedBarangayCode     = barangayCode?.trim() || null;
+    const trimmedBarangayCode = barangay?.trim() || barangayCode?.trim() || null;
     const trimmedAddressLine      = addressLine?.trim() || null;
     const trimmedRank             = cap(rank?.trim() || "");
     const trimmedDepartment       = cap(department?.trim() || "");

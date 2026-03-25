@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { logout, getUserFromToken } from "../../utils/auth";
+import { CURRENT_BARANGAYS } from "../../utils/barangayOptions";
 import AddUserModal from "../modals/AddUserModal";
 import EditUserModal from "../modals/EditUserModal";
 import DeleteUserModal from "../modals/DeleteUserModal";
@@ -514,9 +515,9 @@ const UserManagement = () => {
               <option value="all">
                 {barangaysLoading ? "Loading barangays..." : "All Barangays"}
               </option>
-              {allBarangays.map(({ code, name }) => (
-                <option key={code} value={code}>
-                  {name}
+              {CURRENT_BARANGAYS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
                 </option>
               ))}
             </select>

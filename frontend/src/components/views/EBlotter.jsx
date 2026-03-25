@@ -359,6 +359,7 @@ function EBlotter() {
   const fetchBlotters = async () => {
     try {
       setLoading(true);
+      setBlotters([]);
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("search", filters.search);
       if (filters.status) queryParams.append("status", filters.status);
