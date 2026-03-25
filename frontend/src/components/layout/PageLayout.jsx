@@ -3,9 +3,9 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./Topbar";
 import { navItems } from "../../utils/navItems";
-import "./DashboardLayout.css";
+import "./PageLayout.css";
 
-export default function DashboardLayout() {
+export default function PageLayout() {
   const [openSections, setOpenSections] = useState(
     navItems.reduce((acc, group) => {
       acc[group.section] = true;

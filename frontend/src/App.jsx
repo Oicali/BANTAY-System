@@ -18,7 +18,7 @@ import BrgyReport from "./components/views/BrgyReport";
 import VerificationSuccess from "./components/views/VerificationSucess";
 
 import ProtectedRoute from "./components/ProtectedRoute";
-import DashboardLayout from "./components/layout/DashboardLayout";
+import PageLayout from "./components/layout/PageLayout.jsx";
 
 function App() {
   return (
@@ -32,7 +32,7 @@ function App() {
         <Route
           element={
             <ProtectedRoute>
-              <DashboardLayout />
+              <PageLayout />
             </ProtectedRoute>
           }
         >

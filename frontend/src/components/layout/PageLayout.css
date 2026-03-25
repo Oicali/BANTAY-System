@@ -80,6 +80,26 @@
 /* === SIDEBAR === */
 .sidebar {
   background: #010035;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2d6e #010035;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: #010035;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #2a2d6e;
+  border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #3d42a0;
 }
 
 .nav-item {

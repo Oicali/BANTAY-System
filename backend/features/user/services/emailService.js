@@ -1,19 +1,40 @@
 // ================================================================================
-// FILE: backend/features/user/services/emailService.js [COMPLETE VERSION]
-// Key changes: "5 minutes" → "2 minutes" in OTP emails
+// FILE: backend/features/user/services/emailService.js
+// CHANGE: Replaced Nodemailer/Gmail with Brevo HTTP API (matches auth folder)
 // ================================================================================
 
-const nodemailer = require("nodemailer");
 const pool = require("../../../config/database");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// ============================================================
+// BREVO HTTP EMAIL HELPER
+// Replaces nodemailer transporter — no SMTP, Railway-safe
+// ============================================================
+async function sendBrevoEmail({ to, subject, html }) {
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: { name: "BANTAY System", email: process.env.BREVO_SENDER_EMAIL },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  });
 
+  if (response.status === 429) throw new Error("BREVO_RATE_LIMITED");
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(`Brevo API error: ${JSON.stringify(err)}`);
+  }
+  return true;
+}
+
+// ============================================================
+// GENERATE USERNAME
+// ============================================================
 async function generateUsername(firstName, middleName, lastName, userType, client) {
   const yy = String(new Date().getFullYear()).slice(-2);
   const li = lastName.charAt(0).toUpperCase();
@@ -32,6 +53,9 @@ async function generateUsername(firstName, middleName, lastName, userType, clien
   return `${initials}${yy}${seq}_${userType}`;
 }
 
+// ============================================================
+// GENERATE PASSWORD
+// ============================================================
 function generatePassword() {
   const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const lowercase = "abcdefghijklmnopqrstuvwxyz";
@@ -49,10 +73,12 @@ function generatePassword() {
   return password.split("").sort(() => Math.random() - 0.5).join("");
 }
 
+// ============================================================
+// SEND VERIFICATION EMAIL
+// ============================================================
 async function sendVerificationEmail(email, firstName, lastName, verificationUrl) {
   try {
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: email,
       subject: "BANTAY System – Verify Your Account",
       html: `
@@ -88,11 +114,13 @@ async function sendVerificationEmail(email, firstName, lastName, verificationUrl
   }
 }
 
+// ============================================================
+// SEND WELCOME EMAIL (credentials after account verification)
+// ============================================================
 async function sendWelcomeEmail(email, firstName, lastName, username, password, userType, role) {
   try {
     const userTypeLabel = userType === "police" ? "PNP" : "Barangay";
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: email,
       subject: "BANTAY System – Your Account is Now Active",
       html: `
@@ -137,6 +165,9 @@ async function sendWelcomeEmail(email, firstName, lastName, username, password, 
   }
 }
 
+// ============================================================
+// SEND OTP EMAIL (email change — current or new address)
+// ============================================================
 async function sendOtpEmail(newEmail, otp, type = "new") {
   const isCurrentEmail = type === "current";
   const subject = isCurrentEmail
@@ -149,8 +180,7 @@ async function sendOtpEmail(newEmail, otp, type = "new") {
     ? "Someone requested an email address change on your account. Enter this code to confirm you own your current email:"
     : "You are changing your email address on the <strong>BANTAY System</strong>. Enter this code to verify your new email:";
   try {
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: newEmail,
       subject,
       html: `
@@ -198,10 +228,12 @@ async function sendOtpEmail(newEmail, otp, type = "new") {
   }
 }
 
+// ============================================================
+// SEND PASSWORD OTP EMAIL
+// ============================================================
 async function sendPasswordOtpEmail(email, firstName, otp) {
   try {
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: email,
       subject: "BANTAY System – Password Change Verification Code",
       html: `
@@ -242,13 +274,15 @@ async function sendPasswordOtpEmail(email, firstName, otp) {
   }
 }
 
+// ============================================================
+// SEND PASSWORD CHANGED NOTIFICATION
+// ============================================================
 async function sendPasswordChangedNotification(email, firstName) {
   try {
     const now = new Date().toLocaleString("en-PH", {
       timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short"
     });
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: email,
       subject: "BANTAY System – Your Password Was Changed",
       html: `
@@ -280,10 +314,12 @@ async function sendPasswordChangedNotification(email, firstName) {
   }
 }
 
+// ============================================================
+// SEND EMAIL CHANGED NOTIFICATION (to both old and new email)
+// ============================================================
 async function sendEmailChangedNotification(oldEmail, newEmail) {
   try {
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+    await sendBrevoEmail({
       to: oldEmail,
       subject: "BANTAY System – Your Account Email Has Been Changed",
       html: `
@@ -308,8 +344,8 @@ async function sendEmailChangedNotification(oldEmail, newEmail) {
         </body></html>
       `,
     });
-    await transporter.sendMail({
-      from: `"BANTAY System" <${process.env.EMAIL_USER}>`,
+
+    await sendBrevoEmail({
       to: newEmail,
       subject: "BANTAY System – Your Email Has Been Successfully Updated",
       html: `
@@ -333,6 +369,7 @@ async function sendEmailChangedNotification(oldEmail, newEmail) {
         </body></html>
       `,
     });
+
     return { success: true };
   } catch (error) {
     console.error("sendEmailChangedNotification error:", error);
