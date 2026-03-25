@@ -2,8 +2,10 @@ const pool = require("../../../config/database");
 
 class Blotter {
   // Generate blotter entry number
-  static async generateBlotterNumber() {
-  const year = new Date().getFullYear();
+  static async generateBlotterNumber(incidentDate) {
+  const year = incidentDate 
+    ? new Date(incidentDate).getFullYear() 
+    : new Date().getFullYear();
   
   // Only count REAL manual entries
   // Excludes: SEED-XXXX (dev data) and IMP-XXXX (excel imports)
@@ -43,7 +45,7 @@ static async generateImportNumber(year) {
       await client.query('BEGIN');
       
       // Generate blotter number
-      const blotterNumber = await this.generateBlotterNumber();
+      const blotterNumber = await this.generateBlotterNumber(blotterData.date_time_commission);
       
       // Insert blotter entry
       const blotterResult = await client.query(
@@ -53,8 +55,8 @@ static async generateImportNumber(year) {
           place_region, place_district_province, place_city_municipality,
           place_barangay, place_street, is_private_place,
           narrative, amount_involved, referred_by_barangay,
-          referred_by_dilg, status, lat, lng
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          referred_by_dilg, status, lat, lng, day_of_incident, month_of_incident
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
         RETURNING blotter_id`,
         [
           blotterNumber, blotterData.incident_type, blotterData.cop || null,
@@ -64,8 +66,11 @@ static async generateImportNumber(year) {
           blotterData.place_barangay, blotterData.place_street,
           blotterData.is_private_place || null, blotterData.narrative,
           blotterData.amount_involved || null, false,
-          false, 'Pending',
-          blotterData.lat || null, blotterData.lng || null
+          false, 'Under Investigation',
+          blotterData.lat || null, blotterData.lng || null,
+          new Date(blotterData.date_time_commission).toLocaleDateString('en-US', {weekday:'long'}),
+          new Date(blotterData.date_time_commission).toLocaleDateString('en-US', {month:'long'})
+          
         ]
       );
       

@@ -155,6 +155,7 @@ const getCases = async (req, res) => {
         c.assigned_io_id,
         CONCAT(u.first_name, ' ', u.last_name) AS assigned_io_name,
         b.incident_type, b.place_barangay AS barangay,
+        b.blotter_entry_number,
         CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
  FROM cases c
        LEFT JOIN users u ON c.assigned_io_id = u.user_id

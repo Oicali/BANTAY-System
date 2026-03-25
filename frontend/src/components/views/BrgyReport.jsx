@@ -51,6 +51,19 @@ function BrgyReport() {
 
   useEffect(() => {
     fetchMyReports();
+    fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("profile data:", data.user); // ← ADD THIS
+        if (data?.user?.assigned_barangay_code) {
+          setForm((prev) => ({
+            ...prev,
+            place_barangay: data.user.assigned_barangay_code,
+          }));
+        }
+      });
   }, []);
 
   const fetchMyReports = async () => {

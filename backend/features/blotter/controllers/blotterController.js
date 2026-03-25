@@ -82,7 +82,11 @@ const validateComplainant = (complainant, index) => {
   if (!complainant.nationality) errors.push(`${prefix} Nationality is required`);
   if (!complainant.info_obtained) errors.push(`${prefix} Info obtained is required`);
   
-  errors.push(...validateAddress(complainant.house_street, `${prefix} House/Street`));
+  if (complainant.house_street && complainant.house_street.trim().length > 0) {
+  if (complainant.house_street.trim().length < 2 || complainant.house_street.trim().length > 200) {
+    errors.push(`${prefix} House/Street must be 2-200 characters`);
+  }
+}
   errors.push(...validatePhoneNumber(complainant.contact_number, false));
   
   return errors;
@@ -265,7 +269,7 @@ const createBlotter = async (req, res) => {
 
 // Auto-create case
 try {
-  const year = new Date().getFullYear();
+  const year = new Date(blotterData.date_time_commission).getFullYear();
   const countResult = await pool.query(
     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
   );
@@ -973,7 +977,7 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
         // Auto-create case for imported blotter
 try {
-  const year = new Date().getFullYear();
+  const year = new Date(r.dateCommitted).getFullYear();
   const countResult = await client.query(
     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
   );
@@ -1052,7 +1056,7 @@ const acceptReferral = async (req, res) => {
     // Auto-create case
     const existing = await pool.query(`SELECT id FROM cases WHERE blotter_id = $1`, [id]);
     if (existing.rows.length === 0) {
-      const year = new Date().getFullYear();
+      const year = new Date(blotter.rows[0].date_time_commission).getFullYear();
       const countResult = await pool.query(
         "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
       );
@@ -1096,7 +1100,7 @@ const createBrgyReport = async (req, res) => {
       await client.query("BEGIN");
 
       // Generate blotter number
-      const year = new Date().getFullYear();
+      const year = new Date(date_time_commission).getFullYear();
       const countResult = await client.query(
         `SELECT COUNT(*) FROM blotter_entries WHERE EXTRACT(YEAR FROM created_at) = $1
          AND blotter_entry_number NOT LIKE 'SEED-%' AND blotter_entry_number NOT LIKE 'IMP-%'`,
