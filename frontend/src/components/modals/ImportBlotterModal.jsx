@@ -36,7 +36,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
           method: "POST",
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           body: formData,
-        }
+        },
       );
       const data = await res.json();
       if (data.success) {
@@ -73,9 +73,13 @@ function ImportBlotterModal({ onClose, onSuccess }) {
         <div className="im-header">
           <div>
             <h2 className="im-title">Import CIRAS Data</h2>
-            <p className="im-subtitle">Upload .xlsx or .csv exported from CIRAS</p>
+            <p className="im-subtitle">
+              Upload .xlsx or .csv exported from CIRAS
+            </p>
           </div>
-          <span className="im-close" onClick={onClose}>&times;</span>
+          <span className="im-close" onClick={onClose}>
+            &times;
+          </span>
         </div>
 
         {/* Body */}
@@ -85,7 +89,10 @@ function ImportBlotterModal({ onClose, onSuccess }) {
               {/* Drop Zone */}
               <div
                 className={`im-dropzone ${dragOver ? "dragover" : ""} ${file ? "has-file" : ""}`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileRef.current.click()}
@@ -99,15 +106,50 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                 />
                 {file ? (
                   <>
-                    <div className="im-file-icon">📄</div>
+                    <div className="im-file-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#16a34a"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="12" y1="18" x2="12" y2="12" />
+                        <line x1="9" y1="15" x2="15" y2="15" />
+                      </svg>
+                    </div>
                     <p className="im-file-name">{file.name}</p>
                     <p className="im-file-hint">Click to change file</p>
                   </>
                 ) : (
                   <>
-                    <div className="im-file-icon">📁</div>
+                    <div className="im-file-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#6b7280"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </div>
                     <p className="im-drop-text">Drag & drop your file here</p>
-                    <p className="im-file-hint">or click to browse — .xlsx, .csv only</p>
+                    <p className="im-file-hint">
+                      or click to browse — .xlsx, .csv only
+                    </p>
                   </>
                 )}
               </div>
@@ -121,7 +163,9 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                   <span className="im-result-label">Imported</span>
                 </div>
                 <div className="im-result-card warn">
-                  <span className="im-result-num">{result.skipped_duplicates}</span>
+                  <span className="im-result-num">
+                    {result.skipped_duplicates}
+                  </span>
                   <span className="im-result-label">Duplicates Skipped</span>
                 </div>
                 <div className="im-result-card error">
@@ -134,7 +178,11 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                 <div className="im-error-table-wrap">
                   <table className="im-error-table">
                     <thead>
-                      <tr><th>Row</th><th>Field</th><th>Value</th></tr>
+                      <tr>
+                        <th>Row</th>
+                        <th>Field</th>
+                        <th>Value</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {result.errors.slice(0, 10).map((e, i) => (
@@ -148,7 +196,8 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                   </table>
                   {result.errors.length > 10 && (
                     <p className="im-more-errors">
-                      +{result.errors.length - 10} more — download CSV to see all
+                      +{result.errors.length - 10} more — download CSV to see
+                      all
                     </p>
                   )}
                 </div>
@@ -161,10 +210,18 @@ function ImportBlotterModal({ onClose, onSuccess }) {
         <div className="im-footer">
           {!result ? (
             <>
-              <button className="im-btn-secondary" onClick={onClose} disabled={loading}>
+              <button
+                className="im-btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+              >
                 Cancel
               </button>
-              <button className="im-btn-primary" onClick={handleSubmit} disabled={!file || loading}>
+              <button
+                className="im-btn-primary"
+                onClick={handleSubmit}
+                disabled={!file || loading}
+              >
                 {loading ? "Importing..." : "Upload & Import"}
               </button>
             </>

@@ -43,18 +43,10 @@ export const roleAccess = {
   // BARANGAY ROLES
   // ============================================
   
-  BarangayAdmin: [
-    "dashboard",           // Can create blotter entries
-    "crime-mapping",          // View crimes in their barangay
-    //"barangay-reports",       // View barangay-specific reports
-    // "user-management",        // Manage barangay users
-    "profile-settings",
-  ],
-
-  BarangayUser: [
-    "dashboard",            // Can create blotter entries
-    "crime-mapping",          // View crimes in their barangay
-    //"barangay-reports",       // View barangay reports
-    "profile-settings",
-  ],
+  Barangay: [
+  "dashboard",
+  "crime-mapping",
+  "brgy-report",
+  "profile-settings",
+],
 };

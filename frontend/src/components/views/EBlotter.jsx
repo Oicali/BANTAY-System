@@ -184,7 +184,8 @@ function EBlotter() {
   const [blotters, setBlotters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const [activeReportTab, setActiveReportTab] = useState("reports");
+  const ITEMS_PER_PAGE = 15;
   const [originalData, setOriginalData] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [showConfirmClose, setShowConfirmClose] = useState(false);
@@ -353,7 +354,7 @@ function EBlotter() {
         setBacoorBarangays(brgyList);
       })
       .catch((err) => console.error("Failed to load barangay GeoJSON:", err));
-  }, []);
+  }, [activeReportTab]);
 
   const fetchBlotters = async () => {
     try {
@@ -368,6 +369,11 @@ function EBlotter() {
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
       if (filters.data_source)
         queryParams.append("data_source", filters.data_source);
+      if (activeReportTab === "referred") {
+        queryParams.append("referred", "true");
+      } else {
+        queryParams.append("referred", "false");
+      }
 
       const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
         headers: {
@@ -506,9 +512,16 @@ function EBlotter() {
   };
 
   useEffect(() => {
-    if (currentStep === 3 && caseDetail.incident_type) {
-      const crimeType = OFFENSE_TO_CRIME_TYPE[caseDetail.incident_type];
-      if (crimeType && (!offenseModus[0] || offenseModus[0].length === 0)) {
+    if (currentStep === 3) {
+      // Sync offense_name with incident_type if empty
+      if (!offenses[0]?.offense_name && caseDetail.incident_type) {
+        updateOffense(0, "offense_name", caseDetail.incident_type);
+        updateOffense(0, "index_type", "Index");
+      }
+      if (
+        caseDetail.incident_type &&
+        (!offenseModus[0] || offenseModus[0].length === 0)
+      ) {
         fetchModusForIncidentType(caseDetail.incident_type, true);
       }
     }
@@ -671,7 +684,7 @@ function EBlotter() {
           const toast = document.createElement("div");
           toast.className = "eb-toast-success";
           toast.textContent =
-            "⚠️ Some address dropdowns failed to load. Please re-select.";
+            "Some address dropdowns failed to load. Please re-select.";
           toast.style.background = "#b45309";
           document.body.appendChild(toast);
           setTimeout(() => toast.classList.add("show"), 10);
@@ -719,7 +732,7 @@ function EBlotter() {
           const toast = document.createElement("div");
           toast.className = "eb-toast-success";
           toast.textContent =
-            "⚠️ Some address dropdowns failed to load. Please re-select.";
+            "Some address dropdowns failed to load. Please re-select.";
           toast.style.background = "#b45309";
           document.body.appendChild(toast);
           setTimeout(() => toast.classList.add("show"), 10);
@@ -841,7 +854,37 @@ function EBlotter() {
       alert("Failed to load blotter data");
     }
   };
-
+  const handleAcceptReferral = async (blotterId) => {
+    if (
+      !window.confirm(
+        "Accept this barangay referral? This will create a case automatically.",
+      )
+    )
+      return;
+    try {
+      const res = await fetch(`${API_URL}/${blotterId}/accept`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        const toast = document.createElement("div");
+        toast.className = "eb-toast-success";
+        toast.textContent = "Referral accepted! Case created automatically.";
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add("show"), 10);
+        setTimeout(() => {
+          toast.classList.remove("show");
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
+        fetchBlotters();
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      alert("Failed to accept referral.");
+    }
+  };
   const handleApiResponse = (response) => {
     if (response.status === 401) {
       alert("Your session has expired. Please log in again.");
@@ -1232,18 +1275,18 @@ function EBlotter() {
         errors.type_of_place = "Type of Place is required";
       }
       const hasModus = offenseModus[0] && offenseModus[0].length > 0;
-      const noOffense =
-        !offenses[0] ||
-        !offenses[0].offense_name ||
-        offenses[0].offense_name === "";
-      if (noOffense) {
-        errors.modus = "Please select an Incident Type first";
-      } else if (
-        hasModus &&
-        (!offenseSelectedModus[0] || offenseSelectedModus[0].length === 0)
-      ) {
-        errors.modus = "At least one modus is required";
-      }
+      // const noOffense =
+      //   !offenses[0] ||
+      //   !offenses[0].offense_name ||
+      //   offenses[0].offense_name === "";
+      // if (noOffense) {
+      //   errors.modus = "Please select an Incident Type first";
+      // } else if (
+      //   hasModus &&
+      //   (!offenseSelectedModus[0] || offenseSelectedModus[0].length === 0)
+      // ) {
+      //   errors.modus = "At least one modus is required";
+      // }
     }
 
     return errors;
@@ -1825,7 +1868,23 @@ function EBlotter() {
           <button
             className="eb-btn eb-btn-secondary"
             onClick={() => setShowImport(true)}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
           >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
             Import
           </button>
           <button
@@ -3713,7 +3772,7 @@ function EBlotter() {
                   <div className="eb-step-content">
                     <h3 className="eb-section-title">3. Case Detail</h3>
                     <div className="eb-modal-form-grid">
-                      {/* Row 1 */}
+                      {/* ── ROW 1: OFFENSE CLASSIFICATION ── */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
                           Incident Type *
@@ -3723,7 +3782,6 @@ function EBlotter() {
                           value={caseDetail.incident_type}
                           onChange={(e) => {
                             updateCaseDetail("incident_type", e.target.value);
-                            // Auto-sync offense name with incident type
                             updateOffense(0, "offense_name", e.target.value);
                             updateOffense(0, "index_type", "Index");
                             fetchModusForIncidentType(e.target.value);
@@ -3752,6 +3810,89 @@ function EBlotter() {
                         <FieldError error={fieldErrors.incident_type} />
                       </div>
 
+                      <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">
+                          Stage of Felony *
+                        </label>
+                        <select
+                          className={`eb-modal-input ${fieldErrors.stage_of_felony ? "error" : ""}`}
+                          value={offenses[0]?.stage_of_felony || ""}
+                          onChange={(e) => {
+                            updateOffense(0, "stage_of_felony", e.target.value);
+                            if (e.target.value && fieldErrors.stage_of_felony) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors.stage_of_felony;
+                              setFieldErrors(newErrors);
+                            }
+                          }}
+                        >
+                          <option value="">Select Stage</option>
+                          <option>COMPLETED</option>
+                          <option>ATTEMPTED</option>
+                          <option>FRUSTRATED</option>
+                        </select>
+                        <FieldError error={fieldErrors.stage_of_felony} />
+                      </div>
+
+                      <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Index Type</label>
+                        <input
+                          type="text"
+                          className="eb-modal-input"
+                          value={offenses[0]?.index_type || "Non-Index"}
+                          disabled
+                          style={{
+                            background: "#f3f4f6",
+                            cursor: "not-allowed",
+                          }}
+                        />
+                      </div>
+
+                      <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">Modus Operandi</label>
+                        {offenseModus[0] && offenseModus[0].length > 0 ? (
+                          <>
+                            <select
+                              className={`eb-modal-input ${fieldErrors.modus ? "error" : ""}`}
+                              value={String(offenseSelectedModus[0]?.[0] || "")}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOffenseSelectedModus((prev) => ({
+                                  ...prev,
+                                  [0]: val ? [parseInt(val)] : [],
+                                }));
+                                if (fieldErrors.modus) {
+                                  const n = { ...fieldErrors };
+                                  delete n.modus;
+                                  setFieldErrors(n);
+                                }
+                              }}
+                            >
+                              <option value="">Select Modus</option>
+                              {offenseModus[0].map((m) => (
+                                <option key={m.id} value={String(m.id)}>
+                                  {m.modus_name}
+                                </option>
+                              ))}
+                            </select>
+                            <FieldError error={fieldErrors.modus} />
+                          </>
+                        ) : (
+                          <input
+                            type="text"
+                            className="eb-modal-input"
+                            value="Select Incident Type first"
+                            disabled
+                            style={{
+                              background: "#f3f4f6",
+                              cursor: "not-allowed",
+                              color: "#9ca3af",
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* ── ROW 2: CASE ADMIN ── */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
                           COP (Officer on Case)
@@ -3842,6 +3983,17 @@ function EBlotter() {
                         <FieldError error={fieldErrors.date_time_reported} />
                       </div>
 
+                      <div className="eb-modal-form-group"></div>
+
+                      {/* ── LOCATION DIVIDER ── */}
+                      <div
+                        className="eb-group-divider"
+                        style={{ margin: "4px 0 8px 0" }}
+                      >
+                        Place of Commission
+                      </div>
+
+                      {/* ── ROW 3: LOCATION ── */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">Region *</label>
                         <select
@@ -3855,13 +4007,6 @@ function EBlotter() {
                           }}
                         >
                           <option value="040000000">CALABARZON</option>
-                          {regions
-                            .filter((r) => r.code !== "040000000")
-                            .map((r) => (
-                              <option key={r.code} value={r.code}>
-                                {r.name}
-                              </option>
-                            ))}
                         </select>
                       </div>
 
@@ -3880,51 +4025,9 @@ function EBlotter() {
                           }}
                         >
                           <option value="042100000">Cavite</option>
-                          {caseProvinces
-                            .filter((p) => p.code !== "042100000")
-                            .map((p) => (
-                              <option key={p.code} value={p.code}>
-                                {p.name}
-                              </option>
-                            ))}
                         </select>
                       </div>
 
-                      {/* Row 3 - Narrative Full Width */}
-                      <div
-                        className="eb-modal-form-group"
-                        style={{ gridColumn: "span 4" }}
-                      >
-                        <label className="eb-modal-label">Narrative *</label>
-                        <textarea
-                          className={`eb-modal-input ${fieldErrors.narrative ? "error" : ""}`}
-                          rows="6"
-                          placeholder="Provide detailed narrative (minimum 20 characters, maximum 5000 characters)"
-                          value={caseDetail.narrative}
-                          maxLength="5000"
-                          onChange={(e) => {
-                            const value = e.target.value.replace(
-                              /[^A-Za-z0-9ÑñĆ.,;:()\s-]/g,
-                              "",
-                            );
-                            updateCaseDetail("narrative", value);
-                            if (
-                              value.trim().length > 0 &&
-                              fieldErrors.narrative
-                            ) {
-                              const newErrors = { ...fieldErrors };
-                              delete newErrors.narrative;
-                              setFieldErrors(newErrors);
-                            }
-                          }}
-                        ></textarea>
-                        <FieldError error={fieldErrors.narrative} />
-                        <small style={{ color: "#6b7280", fontSize: "12px" }}>
-                          {caseDetail.narrative.length}/5000 characters
-                        </small>
-                      </div>
-
-                      {/* Row 4 */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
                           City/Municipality *
@@ -3940,13 +4043,6 @@ function EBlotter() {
                           }}
                         >
                           <option value="042103000">City of Bacoor</option>
-                          {caseCities
-                            .filter((c) => c.code !== "042103000")
-                            .map((c) => (
-                              <option key={c.code} value={c.code}>
-                                {c.name}
-                              </option>
-                            ))}
                         </select>
                       </div>
 
@@ -3961,14 +4057,11 @@ function EBlotter() {
                             updateCaseDetail("place_barangay", selectedName);
                             updateCaseDetail("lat", "");
                             updateCaseDetail("lng", "");
-
                             if (selectedName && fieldErrors.place_barangay) {
                               const newErrors = { ...fieldErrors };
                               delete newErrors.place_barangay;
                               setFieldErrors(newErrors);
                             }
-
-                            // Find matching GeoJSON feature and fly map to it
                             if (selectedName && barangayGeoJSON) {
                               const feature = barangayGeoJSON.features.find(
                                 (f) => f.properties.name_db === selectedName,
@@ -4016,11 +4109,11 @@ function EBlotter() {
                               </option>
                             ))}
                           </optgroup>
-                          {/* <option value="Other">Other / Special Location</option> */}
                         </select>
                         <FieldError error={fieldErrors.place_barangay} />
                       </div>
 
+                      {/* ── ROW 4: ADDRESS DETAILS ── */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
                           House No./Street *
@@ -4048,6 +4141,53 @@ function EBlotter() {
                           }}
                         />
                         <FieldError error={fieldErrors.place_street} />
+                      </div>
+
+                      <div className="eb-modal-form-group">
+                        <label className="eb-modal-label">
+                          Type of Place *
+                        </label>
+                        <select
+                          className={`eb-modal-input ${fieldErrors.type_of_place ? "error" : ""}`}
+                          value={typeOfPlace}
+                          onChange={(e) => {
+                            setTypeOfPlace(e.target.value);
+                            if (fieldErrors.type_of_place) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors.type_of_place;
+                              setFieldErrors(newErrors);
+                            }
+                          }}
+                        >
+                          <option value="">Select Type of Place</option>
+                          <option>
+                            Abandoned Structure (house, bldg, apartment/condo)
+                          </option>
+                          <option>Along the street</option>
+                          <option>Commercial/Business Establishment</option>
+                          <option>Construction/Industrial Barracks</option>
+                          <option>Farm/Ricefield</option>
+                          <option>Government Office/Establishment</option>
+                          <option>Onboard a vehicle (riding in/on)</option>
+                          <option>
+                            Parking Area (vacant lot, in bldg/structure, open
+                            parking)
+                          </option>
+                          <option>Recreational Place (resorts/parks)</option>
+                          <option>Residential (house/condo)</option>
+                          <option>River/Lake</option>
+                          <option>
+                            School (Grade/High School/College/University)
+                          </option>
+                          <option>
+                            Transportation Terminals (Tricycle, Jeep, FX, Bus,
+                            Train Station)
+                          </option>
+                          <option>
+                            Vacant Lot (unused/unoccupied open area)
+                          </option>
+                        </select>
+                        <FieldError error={fieldErrors.type_of_place} />
                       </div>
 
                       <div className="eb-modal-form-group">
@@ -4097,29 +4237,80 @@ function EBlotter() {
                         <FieldError error={fieldErrors.amount_involved} />
                       </div>
 
-                      <div className="eb-modal-form-group"></div>
-
-                      {/* ── LOCATION PINPOINT ── */}
+                      {/* ── ROW 5: NARRATIVE ── */}
                       <div
                         className="eb-modal-form-group"
                         style={{ gridColumn: "span 4" }}
                       >
-                        <label className="eb-modal-label">
-                          📍 Pin Location on Map{" "}
+                        <label className="eb-modal-label">Narrative *</label>
+                        <textarea
+                          className={`eb-modal-input ${fieldErrors.narrative ? "error" : ""}`}
+                          rows="6"
+                          placeholder="Provide detailed narrative (minimum 20 characters, maximum 5000 characters)"
+                          value={caseDetail.narrative}
+                          maxLength="5000"
+                          onChange={(e) => {
+                            const value = e.target.value.replace(
+                              /[^A-Za-z0-9ÑñĆ.,;:()\s-]/g,
+                              "",
+                            );
+                            updateCaseDetail("narrative", value);
+                            if (
+                              value.trim().length > 0 &&
+                              fieldErrors.narrative
+                            ) {
+                              const newErrors = { ...fieldErrors };
+                              delete newErrors.narrative;
+                              setFieldErrors(newErrors);
+                            }
+                          }}
+                        ></textarea>
+                        <FieldError error={fieldErrors.narrative} />
+                        <small style={{ color: "#6b7280", fontSize: "12px" }}>
+                          {caseDetail.narrative.length}/5000 characters
+                        </small>
+                      </div>
+
+                      {/* ── ROW 6: MAP ── */}
+                      <div
+                        className="eb-modal-form-group"
+                        style={{ gridColumn: "span 4" }}
+                      >
+                        <div
+                          style={{
+                            background:
+                              "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
+                            padding: "10px 16px",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                          }}
+                        >
                           <span
                             style={{
-                              color: "#6b7280",
-                              fontWeight: 400,
+                              color: "white",
+                              fontWeight: 700,
                               fontSize: "12px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.8px",
+                            }}
+                          >
+                            Crime Location Pin
+                          </span>
+                          <span
+                            style={{
+                              color: "rgba(255,255,255,0.6)",
+                              fontSize: "11px",
                             }}
                           >
                             {caseDetail.place_barangay
-                              ? "(click map to place pin inside the selected barangay)"
-                              : "(select a barangay first to enable the map)"}
+                              ? `Restricted to ${caseDetail.place_barangay} boundary`
+                              : "Select a barangay first"}
                           </span>
-                        </label>
+                        </div>
 
-                        {/* Manual lat/lng inputs */}
                         <div
                           style={{
                             display: "flex",
@@ -4238,17 +4429,15 @@ function EBlotter() {
                           )}
                         </div>
 
-                        {/* Map wrapper — overlay when no barangay selected */}
                         <div
                           style={{
                             position: "relative",
-                            height: "450px",
+                            height: "600px",
                             borderRadius: "8px",
                             overflow: "hidden",
                             border: "1px solid #d1d5db",
                           }}
                         >
-                          {/* Gray overlay when no barangay selected */}
                           {!caseDetail.place_barangay && (
                             <div
                               style={{
@@ -4335,63 +4524,42 @@ function EBlotter() {
                             onClick={(e) => {
                               if (viewMode || !caseDetail.place_barangay)
                                 return;
-
                               const { lng, lat } = e.lngLat;
-
-                              // Validate point is inside selected barangay boundary
                               if (selectedBrgyFeature) {
-                                const point = {
-                                  type: "Feature",
-                                  geometry: {
-                                    type: "Point",
-                                    coordinates: [lng, lat],
-                                  },
-                                };
-                                const polygon = selectedBrgyFeature;
-
-                                // Manual point-in-polygon using ray casting
-                                const isInside = (() => {
-                                  const coords =
-                                    polygon.geometry.type === "Polygon"
-                                      ? polygon.geometry.coordinates
-                                      : polygon.geometry.coordinates[0]; // MultiPolygon: use first ring
-                                  const rings =
-                                    polygon.geometry.type === "Polygon"
-                                      ? polygon.geometry.coordinates
-                                      : polygon.geometry.coordinates.flat(1);
-
-                                  let inside = false;
-                                  for (const ring of rings) {
-                                    const n = ring.length;
-                                    let j = n - 1;
-                                    for (let i = 0; i < n; i++) {
-                                      const xi = ring[i][0],
-                                        yi = ring[i][1];
-                                      const xj = ring[j][0],
-                                        yj = ring[j][1];
-                                      const intersect =
-                                        yi > lat !== yj > lat &&
-                                        lng <
-                                          ((xj - xi) * (lat - yi)) / (yj - yi) +
-                                            xi;
-                                      if (intersect) inside = !inside;
-                                      j = i;
-                                    }
+                                const rings =
+                                  selectedBrgyFeature.geometry.type ===
+                                  "Polygon"
+                                    ? selectedBrgyFeature.geometry.coordinates
+                                    : selectedBrgyFeature.geometry.coordinates.flat(
+                                        1,
+                                      );
+                                let inside = false;
+                                for (const ring of rings) {
+                                  const n = ring.length;
+                                  let j = n - 1;
+                                  for (let i = 0; i < n; i++) {
+                                    const xi = ring[i][0],
+                                      yi = ring[i][1];
+                                    const xj = ring[j][0],
+                                      yj = ring[j][1];
+                                    const intersect =
+                                      yi > lat !== yj > lat &&
+                                      lng <
+                                        ((xj - xi) * (lat - yi)) / (yj - yi) +
+                                          xi;
+                                    if (intersect) inside = !inside;
+                                    j = i;
                                   }
-                                  return inside;
-                                })();
-
-                                if (!isInside) {
+                                }
+                                if (!inside) {
                                   showWarningToast(
-                                    `⚠️ Pin must be placed inside ${caseDetail.place_barangay}`,
+                                    `Pin must be placed inside ${caseDetail.place_barangay}`,
                                   );
                                   return;
                                 }
                               }
-
                               updateCaseDetail("lat", lat.toFixed(6));
                               updateCaseDetail("lng", lng.toFixed(6));
-                              // Clear pin error once pin is placed
                               if (fieldErrors.pin_location) {
                                 const newErrors = { ...fieldErrors };
                                 delete newErrors.pin_location;
@@ -4404,7 +4572,6 @@ function EBlotter() {
                                 : "crosshair"
                             }
                           >
-                            {/* Barangay boundary polygon */}
                             {selectedBrgyFeature && (
                               <Source
                                 id="brgy-boundary"
@@ -4430,8 +4597,6 @@ function EBlotter() {
                                 />
                               </Source>
                             )}
-
-                            {/* Pin marker */}
                             {caseDetail.lat && caseDetail.lng && (
                               <Marker
                                 longitude={parseFloat(caseDetail.lng)}
@@ -4492,8 +4657,6 @@ function EBlotter() {
                         )}
                       </div>
 
-                      {/* Other Barangay Input */}
-                      {/* Other Barangay Input */}
                       {caseDetail.place_barangay === "Other" && (
                         <div
                           className="eb-modal-form-group"
@@ -4526,166 +4689,6 @@ function EBlotter() {
                           <FieldError
                             error={fieldErrors.place_barangay_other}
                           />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ── OFFENSE SECTION (merged into Case Detail) ── */}
-                    <div
-                      style={{
-                        marginTop: "28px",
-                        borderTop: "2px solid #e5e7eb",
-                        paddingTop: "24px",
-                      }}
-                    >
-                      <h4
-                        style={{
-                          margin: "0 0 20px 0",
-                          color: "#1e3a5f",
-                          fontWeight: 700,
-                          fontSize: "16px",
-                        }}
-                      >
-                        Offense Information
-                      </h4>
-                      <div
-                        className="eb-modal-form-grid"
-                        style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
-                      >
-                        <div className="eb-modal-form-group">
-                          <label className="eb-modal-label">
-                            Stage of Felony *
-                          </label>
-
-                          <select
-                            className={`eb-modal-input ${fieldErrors.stage_of_felony ? "error" : ""}`}
-                            value={offenses[0]?.stage_of_felony || ""}
-                            onChange={(e) => {
-                              updateOffense(
-                                0,
-                                "stage_of_felony",
-                                e.target.value,
-                              );
-                              if (
-                                e.target.value &&
-                                fieldErrors.stage_of_felony
-                              ) {
-                                const newErrors = { ...fieldErrors };
-                                delete newErrors.stage_of_felony;
-                                setFieldErrors(newErrors);
-                              }
-                            }}
-                          >
-                            <option value="">Select Stage</option>
-                            <option>COMPLETED</option>
-                            <option>ATTEMPTED</option>
-                            <option>FRUSTRATED</option>
-                          </select>
-                          <FieldError error={fieldErrors.stage_of_felony} />
-                        </div>
-
-                        <div className="eb-modal-form-group">
-                          <label className="eb-modal-label">Index Type</label>
-                          <input
-                            type="text"
-                            className="eb-modal-input"
-                            value={offenses[0]?.index_type || "Non-Index"}
-                            disabled
-                            style={{
-                              background: "#f3f4f6",
-                              cursor: "not-allowed",
-                            }}
-                          />
-                        </div>
-
-                        <div className="eb-modal-form-group">
-                          <label className="eb-modal-label">
-                            Type of Place *
-                          </label>
-                          <select
-                            className={`eb-modal-input ${fieldErrors.type_of_place ? "error" : ""}`}
-                            value={typeOfPlace}
-                            onChange={(e) => {
-                              setTypeOfPlace(e.target.value);
-                              if (fieldErrors.type_of_place) {
-                                const newErrors = { ...fieldErrors };
-                                delete newErrors.type_of_place;
-                                setFieldErrors(newErrors);
-                              }
-                            }}
-                          >
-                            <option value="">Select Type of Place</option>
-                            <option>
-                              Abandoned Structure (house, bldg, apartment/condo)
-                            </option>
-                            <option>Along the street</option>
-                            <option>Commercial/Business Establishment</option>
-                            <option>Construction/Industrial Barracks</option>
-                            <option>Farm/Ricefield</option>
-                            <option>Government Office/Establishment</option>
-                            <option>Onboard a vehicle (riding in/on)</option>
-                            <option>
-                              Parking Area (vacant lot, in bldg/structure, open
-                              parking)
-                            </option>
-                            <option>Recreational Place (resorts/parks)</option>
-                            <option>Residential (house/condo)</option>
-                            <option>River/Lake</option>
-                            <option>
-                              School (Grade/High School/College/University)
-                            </option>
-                            <option>
-                              Transportation Terminals (Tricycle, Jeep, FX, Bus,
-                              Train Station)
-                            </option>
-                            <option>
-                              Vacant Lot (unused/unoccupied open area)
-                            </option>
-                          </select>
-                          <FieldError error={fieldErrors.type_of_place} />
-                        </div>
-                      </div>
-
-                      {/* MODUS OPERANDI — driven by incident type */}
-                      {/* MODUS OPERANDI — dropdown driven by incident type */}
-                      {/* MODUS OPERANDI — dropdown driven by incident type */}
-                      {offenseModus[0] && offenseModus[0].length > 0 && (
-                        <div
-                          className="eb-modal-form-grid"
-                          style={{
-                            marginTop: "0",
-                            gridTemplateColumns: "repeat(4, 1fr)",
-                          }}
-                        >
-                          <div className="eb-modal-form-group">
-                            <label className="eb-modal-label">
-                              Modus Operandi *
-                            </label>
-                            <select
-                              className={`eb-modal-input ${fieldErrors.modus ? "error" : ""}`}
-                              value={String(offenseSelectedModus[0]?.[0] || "")}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setOffenseSelectedModus((prev) => ({
-                                  ...prev,
-                                  [0]: val ? [parseInt(val)] : [],
-                                }));
-                                if (fieldErrors.modus) {
-                                  const n = { ...fieldErrors };
-                                  delete n.modus;
-                                  setFieldErrors(n);
-                                }
-                              }}
-                            >
-                              <option value="">Select Modus Operandi</option>
-                              {offenseModus[0].map((m) => (
-                                <option key={m.id} value={String(m.id)}>
-                                  {m.modus_name}
-                                </option>
-                              ))}
-                            </select>
-                            <FieldError error={fieldErrors.modus} />
-                          </div>
                         </div>
                       )}
                     </div>
@@ -5372,6 +5375,27 @@ function EBlotter() {
         </div>
       </div>
 
+      <div className="eb-report-tabs">
+        <button
+          className={`eb-report-tab ${activeReportTab === "reports" ? "active" : ""}`}
+          onClick={() => {
+            setActiveReportTab("reports");
+            setCurrentPage(1);
+          }}
+        >
+          Reports
+        </button>
+        <button
+          className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
+          onClick={() => {
+            setActiveReportTab("referred");
+            setCurrentPage(1);
+          }}
+        >
+          Referred (Brgy)
+        </button>
+      </div>
+
       <div className="eb-table-card">
         <div className="eb-table-container">
           <table className="eb-data-table">
@@ -5432,6 +5456,15 @@ function EBlotter() {
                     </td>
                     <td>
                       <div className="eb-table-actions">
+                        {activeReportTab === "referred" && (
+                          <button
+                            className="eb-action-btn"
+                            style={{ background: "#16a34a", color: "white" }}
+                            onClick={() => handleAcceptReferral(b.blotter_id)}
+                          >
+                            ✓ Accept
+                          </button>
+                        )}
                         <button
                           className="eb-action-btn eb-action-btn-view"
                           onClick={(e) => {

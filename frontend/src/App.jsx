@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import LoginSystem from "./components/views/LoginSystem";
 import ModusManagement from "./components/views/ModusManagement";
 import CrimeDashboard from "./components/views/CrimeDashboard";
@@ -9,13 +14,11 @@ import PatrolDashboard from "./components/views/PatrolDashboard";
 import PatrolScheduling from "./components/views/PatrolScheduling";
 import UserManagement from "./components/views/UserManagement";
 import ProfileSettings from "./components/views/ProfileSettings";
-
+import BrgyReport from "./components/views/BrgyReport";
 import VerificationSuccess from "./components/views/VerificationSucess";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
-
-
 
 function App() {
   return (
@@ -41,9 +44,8 @@ function App() {
           <Route path="/patrol-scheduling" element={<PatrolScheduling />} />
           <Route path="/user-management" element={<UserManagement />} />
           <Route path="/profile" element={<ProfileSettings />} />
-          <Route path="/modus-management" element={<ModusManagement />} /> 
-
-          
+          <Route path="/modus-management" element={<ModusManagement />} />
+          <Route path="/brgy-report" element={<BrgyReport />} />
         </Route>
 
         {/* Fallback */}

@@ -149,13 +149,23 @@ static async generateImportNumber(year) {
 
     // Save modus selections
     if (blotterData.modus_reference_ids && blotterData.modus_reference_ids.length > 0) {
-      for (const modusId of blotterData.modus_reference_ids) {
-        await client.query(
-          `INSERT INTO crime_modus (blotter_id, modus_reference_id) VALUES ($1, $2)`,
-          [blotterId, modusId]
-        );
-      }
-    }
+  for (const modusId of blotterData.modus_reference_ids) {
+    await client.query(
+      `INSERT INTO crime_modus (blotter_id, modus_reference_id) VALUES ($1, $2)`,
+      [blotterId, modusId]
+    );
+  }
+  // Backfill text column so import + manual are consistent
+  const modusNames = await client.query(
+    `SELECT modus_name FROM crime_modus_reference WHERE id = ANY($1::int[])`,
+    [blotterData.modus_reference_ids]
+  );
+  const modusText = modusNames.rows.map(r => r.modus_name).join(", ");
+  await client.query(
+    `UPDATE blotter_entries SET modus = $1 WHERE blotter_id = $2`,
+    [modusText, blotterId]
+  );
+}
 
       await client.query('COMMIT');
       
@@ -218,7 +228,12 @@ if (filters.data_source) {
   params.push(filters.data_source);
   paramCount++;
 }
-    query += ` ORDER BY GREATEST(updated_at, created_at) DESC`;
+if (filters.referred === "true") {
+  query += ` AND referred_by_barangay = true AND status = 'Pending'`;
+} else if (filters.referred === "false") {
+  query += ` AND (referred_by_barangay = false OR referred_by_barangay IS NULL OR status != 'Pending')`;
+}
+    query += ` ORDER BY date_time_reported DESC`;
 
     const result = await pool.query(query, params);
     return result.rows;
@@ -325,13 +340,23 @@ if (filters.data_source) {
 
     // Re-insert modus
     if (blotterData.modus_reference_ids && blotterData.modus_reference_ids.length > 0) {
-      for (const modusId of blotterData.modus_reference_ids) {
-        await client.query(
-          `INSERT INTO crime_modus (blotter_id, modus_reference_id) VALUES ($1, $2)`,
-          [blotterId, modusId]
-        );
-      }
-    }
+  for (const modusId of blotterData.modus_reference_ids) {
+    await client.query(
+      `INSERT INTO crime_modus (blotter_id, modus_reference_id) VALUES ($1, $2)`,
+      [blotterId, modusId]
+    );
+  }
+  // Backfill text column so import + manual are consistent
+  const modusNames = await client.query(
+    `SELECT modus_name FROM crime_modus_reference WHERE id = ANY($1::int[])`,
+    [blotterData.modus_reference_ids]
+  );
+  const modusText = modusNames.rows.map(r => r.modus_name).join(", ");
+  await client.query(
+    `UPDATE blotter_entries SET modus = $1 WHERE blotter_id = $2`,
+    [modusText, blotterId]
+  );
+}
 
     // Re-insert complainants
     for (const c of complainants) {
