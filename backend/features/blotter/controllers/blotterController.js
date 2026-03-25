@@ -262,12 +262,29 @@ const createBlotter = async (req, res) => {
     
     // Create blotter
     const result = await Blotter.create(blotterData, complainants, suspects, offenses);
-    
-    res.status(201).json({
-      success: true,
-      message: "Blotter entry created successfully",
-      data: result
-    });
+
+// Auto-create case
+try {
+  const year = new Date().getFullYear();
+  const countResult = await pool.query(
+    "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
+  );
+  const count = parseInt(countResult.rows[0].count) + 1;
+  const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
+  await pool.query(
+    `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
+    [result.blotter_id, case_number, req.user.user_id]
+  );
+} catch (caseErr) {
+  console.error("Auto-case creation failed:", caseErr.message);
+  // Non-fatal — blotter still saved
+}
+
+res.status(201).json({
+  success: true,
+  message: "Blotter entry created successfully",
+  data: result
+});
     
   } catch (error) {
     console.error("Create blotter error:", error);
@@ -289,6 +306,7 @@ const getAllBlotters = async (req, res) => {
       date_to: req.query.date_to,
       barangay: req.query.barangay,
       data_source: req.query.data_source,
+      referred: req.query.referred,
     };
     
     const blotters = await Blotter.getAll(filters);
@@ -953,7 +971,25 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
           }
         }
 
-        actualInserted++;
+        // Auto-create case for imported blotter
+try {
+  const year = new Date().getFullYear();
+  const countResult = await client.query(
+    "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
+  );
+  const caseCount = parseInt(countResult.rows[0].count) + 1;
+  const case_number = `CASE-${year}-${String(caseCount).padStart(4, "0")}`;
+  await client.query(
+    `INSERT INTO cases (blotter_id, case_number, created_by)
+     VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING`,
+    [blotterId, case_number, req.user.user_id]
+  );
+} catch (caseErr) {
+  console.error("Auto-case (import) failed:", caseErr.message);
+}
+
+actualInserted++;
       }
 
       await client.query("COMMIT");
@@ -988,6 +1024,161 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
   }
 };
 
+const acceptReferral = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check blotter exists and is a brgy referral
+    const blotter = await pool.query(
+      `SELECT * FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
+      [id]
+    );
+    if (blotter.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Blotter not found" });
+    }
+    if (!blotter.rows[0].referred_by_barangay) {
+      return res.status(400).json({ success: false, message: "Not a barangay referral" });
+    }
+    if (blotter.rows[0].status !== "Pending") {
+      return res.status(400).json({ success: false, message: "Already accepted" });
+    }
+
+    // Update status
+    await pool.query(
+      `UPDATE blotter_entries SET status = 'Under Investigation', updated_at = NOW() WHERE blotter_id = $1`,
+      [id]
+    );
+
+    // Auto-create case
+    const existing = await pool.query(`SELECT id FROM cases WHERE blotter_id = $1`, [id]);
+    if (existing.rows.length === 0) {
+      const year = new Date().getFullYear();
+      const countResult = await pool.query(
+        "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
+      );
+      const count = parseInt(countResult.rows[0].count) + 1;
+      const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
+      await pool.query(
+        `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
+        [id, case_number, req.user.user_id]
+      );
+    }
+
+    return res.status(200).json({ success: true, message: "Referral accepted successfully" });
+  } catch (error) {
+    console.error("Accept referral error:", error);
+    res.status(500).json({ success: false, message: "Error accepting referral" });
+  }
+};
+const createBrgyReport = async (req, res) => {
+  try {
+    const { incident_type, date_time_commission, date_time_reported,
+            place_barangay, place_street, narrative,
+            victim_first_name, victim_last_name, victim_gender, victim_contact } = req.body;
+
+    // Simple validation
+    const errors = [];
+    if (!incident_type) errors.push("Incident type is required");
+    if (!date_time_commission) errors.push("Date & time of commission is required");
+    if (!date_time_reported) errors.push("Date & time reported is required");
+    if (!place_barangay) errors.push("Barangay is required");
+    if (!place_street) errors.push("Street is required");
+    if (!narrative || narrative.trim().length < 10) errors.push("Narrative must be at least 10 characters");
+    if (!victim_first_name) errors.push("Victim first name is required");
+    if (!victim_last_name) errors.push("Victim last name is required");
+
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Generate blotter number
+      const year = new Date().getFullYear();
+      const countResult = await client.query(
+        `SELECT COUNT(*) FROM blotter_entries WHERE EXTRACT(YEAR FROM created_at) = $1
+         AND blotter_entry_number NOT LIKE 'SEED-%' AND blotter_entry_number NOT LIKE 'IMP-%'`,
+        [year]
+      );
+      const count = parseInt(countResult.rows[0].count) + 1;
+      const seq = count.toString().padStart(6, "0");
+      const rand = Math.floor(Math.random() * 99999 + 1).toString().padStart(5, "0");
+      const blotterNumber = `BRGY-${year}-${seq}-${rand}`;
+
+      // Insert blotter
+      const blotterResult = await client.query(
+        `INSERT INTO blotter_entries (
+          blotter_entry_number, incident_type,
+          date_time_commission, date_time_reported,
+          place_region, place_district_province, place_city_municipality,
+          place_barangay, place_street,
+          narrative, referred_by_barangay, status, submitted_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        RETURNING blotter_id`,
+        [
+          blotterNumber, incident_type,
+          date_time_commission, date_time_reported,
+          "Region IV-A (CALABARZON)", "Cavite", "Bacoor City",
+          place_barangay, place_street,
+          narrative, true, "Pending", req.user.user_id
+        ]
+      );
+
+      const blotterId = blotterResult.rows[0].blotter_id;
+
+      // Insert victim as complainant
+      await client.query(
+        `INSERT INTO complainants (
+          blotter_id, first_name, last_name, gender, nationality,
+          house_street, info_obtained
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          blotterId,
+          victim_first_name, victim_last_name,
+          victim_gender || "Male", "FILIPINO",
+          "N/A", "Walk-in"
+        ]
+      );
+
+      await client.query("COMMIT");
+      return res.status(201).json({
+        success: true,
+        message: "Report submitted successfully! Awaiting police review.",
+        data: { blotter_entry_number: blotterNumber }
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Brgy report error:", error);
+    res.status(500).json({ success: false, message: "Error submitting report" });
+  }
+};
+
+const getBrgyReports = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT blotter_id, blotter_entry_number, incident_type,
+              place_barangay, place_street, date_time_commission,
+              date_time_reported, status, created_at
+       FROM blotter_entries
+       WHERE referred_by_barangay = true
+         AND submitted_by = $1
+         AND is_deleted = false
+       ORDER BY created_at DESC`,
+      [req.user.user_id]
+    );
+    return res.status(200).json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error("Get brgy reports error:", error);
+    res.status(500).json({ success: false, message: "Error fetching reports" });
+  }
+};
 module.exports = {
   createBlotter,
   getAllBlotters,
@@ -998,5 +1189,8 @@ module.exports = {
   getModus,
   getDeletedBlotters,
   restoreBlotter,
-  importBlotters
+  importBlotters,
+  acceptReferral,
+  createBrgyReport,
+  getBrgyReports,
 };

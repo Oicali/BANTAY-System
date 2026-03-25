@@ -371,27 +371,31 @@ body {
 
 .eb-modal-content {
   background-color: var(--white);
-  margin: 40px auto;
+  margin: 20px auto;
   width: 90%;
-  max-width: 1200px;
+  max-width: 1400px;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .eb-modal-header {
-  padding: 24px 32px;
-  border-bottom: 1px solid var(--gray-200);
+  padding: 20px 32px;
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%);
+  border-bottom: 3px solid var(--red-primary);
+  border-radius: 8px 8px 0 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  align-items: flex-start; 
 }
-
 .eb-modal-header h2 {
   font-family: 'Inter', sans-serif;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
-  color: var(--navy-dark);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: 0.3px;
 }
 
 .eb-modal-close {
@@ -406,34 +410,42 @@ body {
   color: var(--gray-900);
 }
 
-/* === STEP INDICATOR === */
 .eb-step-indicator {
   display: flex;
-  padding: 24px 32px;
-  background: var(--gray-50);
+  align-items: center;
+  padding: 20px 40px;
+  background: #f0f3f8;
   border-bottom: 1px solid var(--gray-200);
+  position: relative;
 }
-
+.eb-step-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 80px;
+  right: 80px;
+  height: 2px;
+  background: var(--gray-300);
+  transform: translateY(-50%);
+  z-index: 0;
+}
 .eb-step {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--white);
-  border-radius: 6px;
-  margin-right: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.eb-step:last-child {
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border-radius: 0;
   margin-right: 0;
+  cursor: default;
+  position: relative;
+  z-index: 1;
 }
-
 .eb-step-number {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--gray-300);
   color: var(--white);
@@ -442,24 +454,28 @@ body {
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px var(--gray-300);
+  transition: all 0.3s ease;
 }
-
 .eb-step-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-600);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
 }
-
-.eb-step.active {
-  background: var(--navy-primary);
-}
-
 .eb-step.active .eb-step-number {
-  background: var(--red-primary);
+  background: var(--navy-primary);
+  box-shadow: 0 0 0 2px var(--navy-primary);
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
 }
-
 .eb-step.active .eb-step-label {
-  color: var(--white);
+  color: var(--navy-primary);
+  font-size: 12px;
 }
 
 /* === STEP CONTENT === */
@@ -469,12 +485,15 @@ body {
 
 .eb-section-title {
   font-family: 'Inter', sans-serif;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--navy-dark);
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--gray-200);
+  color: var(--navy-primary);
+  background: none;
+  margin: 0 0 20px 0;
+  padding: 8px 0 8px 14px;
+  border-left: 3px solid var(--red-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
 }
 
 .eb-subsection-title {
@@ -652,40 +671,61 @@ textarea.eb-modal-input {
 
 /* === MODAL FOOTER === */
 .eb-modal-footer {
-  padding: 20px 32px;
-  border-top: 1px solid var(--gray-200);
+  padding: 16px 32px;
+  border-top: 2px solid var(--gray-200);
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
-  background: var(--gray-50);
+  background: #f0f3f8;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
+.eb-modal-footer .eb-btn-primary {
+  padding: 12px 32px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 
 /* === ENTRY STYLES === */
 .eb-complainant-entry,
 .eb-suspect-entry,
 .eb-offense-entry {
-  margin-bottom: 32px;
-  padding: 24px;
-  background: var(--gray-50);
+  margin-bottom: 24px;
+  padding: 0;
+  background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: 8px;
   position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-
 .eb-entry-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--gray-300);
+  margin-bottom: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--gray-200);
+  background: linear-gradient(to right, rgba(30,58,95,0.06), transparent);
 }
-
 .eb-entry-title {
   font-family: 'Inter', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--navy-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.eb-complainant-entry .eb-modal-form-grid,
+.eb-suspect-entry .eb-modal-form-grid,
+.eb-other-info-section {
+  padding: 20px 20px 4px 20px;
 }
 
 .eb-btn-remove-entry {
@@ -791,7 +831,7 @@ textarea.eb-modal-input {
 .eb-modal-close {
   font-size: 28px;
   font-weight: 300;
-  color: var(--gray-600);
+  color: rgba(255,255,255,0.7);
   cursor: pointer;
   line-height: 1;
   display: flex;
@@ -1050,4 +1090,62 @@ textarea.eb-modal-input {
 .eb-action-btn-danger:hover {
   background: rgba(239, 68, 68, 0.16);
   color: #b91c1c;
+}
+/* === FORM GROUP DIVIDER LABEL === */
+.eb-group-divider {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 0 4px 0;
+  border-bottom: 1px dashed var(--gray-200);
+  margin-bottom: 4px;
+}
+
+/* Prevent long select options from stretching row height */
+.eb-modal-input[type="text"],
+select.eb-modal-input {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 42px;
+}
+.eb-modal-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0; /* prevents overflow breaking grid */
+}
+.eb-modal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: start; /* each column starts at top, doesn't stretch */
+}
+.eb-report-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.eb-report-tab {
+  padding: 10px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.eb-report-tab.active {
+  color: var(--navy-primary);
+  border-bottom-color: var(--navy-primary);
 }
