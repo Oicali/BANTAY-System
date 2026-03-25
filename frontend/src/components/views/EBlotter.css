@@ -290,6 +290,11 @@ body {
   color: #dc2626;
 }
 
+.eb-status-cleared {
+  background: rgba(99,102,241,0.1);
+  color: #4f46e5;
+}
+
 /* === TABLE ACTIONS === */
 .eb-table-actions {
   display: flex;

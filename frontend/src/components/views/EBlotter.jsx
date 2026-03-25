@@ -1438,6 +1438,7 @@ function EBlotter() {
 
   const updateOffense = (i, field, value) => {
     const updated = [...offenses];
+    if (!updated[i]) return;
     updated[i][field] = value;
     setOffenses(updated);
   };
@@ -1819,7 +1820,7 @@ function EBlotter() {
       "Under Investigation": "eb-status-investigating",
       Resolved: "eb-status-resolved",
       Solved: "eb-status-resolved",
-      Cleared: "eb-status-resolved",
+      Cleared: "eb-status-cleared",
       "Referred to Case": "eb-status-pending",
       Urgent: "eb-status-urgent",
     };
