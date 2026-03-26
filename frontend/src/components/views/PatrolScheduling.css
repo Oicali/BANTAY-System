@@ -651,3 +651,10 @@ body {
 .psch-sub-row td { border-top: 1px dashed var(--gray-200) !important; }
 .psch-duration-text { font-size: 12px; font-weight: 600; color: var(--navy-primary); white-space: nowrap; }
 .psch-date-chip { display: inline-block; padding: 3px 10px; background: var(--gray-100); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--gray-700); white-space: nowrap; }
+
+/* === AREA SUMMARY === */
+.psch-area-summary { font-size: 13px; color: var(--gray-700); line-height: 1.6; }
+.psch-duration-text { font-size: 12px; font-weight: 600; color: var(--navy-primary); white-space: nowrap; }
+
+.psch-view-btn { padding: 6px 16px; background: var(--navy-primary); color: var(--white); border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s ease; font-family: inherit; }
+.psch-view-btn:hover { background: var(--navy-dark); }

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolScheduling.css";
-
+import BeatCard from "../modals/BeatCard";
 const API_BASE = import.meta.env.VITE_API_URL;
 
 const SHIFTS = ["Morning", "Afternoon", "Night"];
@@ -31,19 +31,6 @@ const labelLayer   = {
   paint:  { "text-color": "#0a1628", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.5 },
 };
 
-// ── Helper: generate array of dates between start and end ──
-const generateDateRange = (start, end) => {
-  if (!start || !end) return [];
-  const dates = [];
-  const cur = new Date(start);
-  const last = new Date(end);
-  while (cur <= last) {
-    dates.push(cur.toISOString().split("T")[0]);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-};
-
 const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
 
@@ -61,19 +48,19 @@ const PatrolScheduling = () => {
   const [modalMode, setModalMode]           = useState("add");
   const [step, setStep]                     = useState(1);
   const [selectedPatrol, setSelectedPatrol] = useState(null);
+  const [showBeatCard, setShowBeatCard]       = useState(false);
+const [beatCardPatrol, setBeatCardPatrol]   = useState(null);
 
   // Step 1
-  const [form, setForm]                                     = useState(emptyForm);
-  const [selectedPatrollerIds, setSelectedPatrollerIds]     = useState([]);
-  const [patrollerSearch, setPatrollerSearch]               = useState("");
+  const [form, setForm]                                 = useState(emptyForm);
+  const [selectedPatrollerIds, setSelectedPatrollerIds] = useState([]);
+  const [patrollerSearch, setPatrollerSearch]           = useState("");
 
-  // Step 2 — per-day stops
-  // stopsPerDay: { "2024-03-25": [{barangay, notes, time_start, time_end}], ... }
-  const [stopsPerDay, setStopsPerDay]             = useState({});
-  const [activeDateTab, setActiveDateTab]         = useState(null);
-  const [barangaySearches, setBarangaySearches]   = useState([""]);
-  const [barangayOpenIdx, setBarangayOpenIdx]     = useState(null);
-  const barangayRefs                              = useRef([]);
+  // Step 2 — simple stops (no date tabs)
+  const [stops, setStops]                       = useState([{ ...emptyStop }]);
+  const [barangaySearches, setBarangaySearches] = useState([""]);
+  const [barangayOpenIdx, setBarangayOpenIdx]   = useState(null);
+  const barangayRefs                            = useRef([]);
 
   // ── Map modal ──────────────────────────────────────────
   const [showMapModal, setShowMapModal]           = useState(false);
@@ -95,7 +82,7 @@ const PatrolScheduling = () => {
       .catch((err) => console.error("GeoJSON load error:", err));
   }, []);
 
-  // ── Close dropdowns on outside click ──────────────────
+  // ── Close map dropdown on outside click ────────────────
   useEffect(() => {
     const handler = (e) => {
       if (mapDropdownRef.current && !mapDropdownRef.current.contains(e.target))
@@ -105,6 +92,7 @@ const PatrolScheduling = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ── Close barangay dropdown on outside click ───────────
   useEffect(() => {
     const handler = (e) => {
       if (
@@ -117,45 +105,27 @@ const PatrolScheduling = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, [barangayOpenIdx]);
 
-  // ── When dates change, initialize stopsPerDay ─────────
-  useEffect(() => {
-    if (!form.start_date || !form.end_date) return;
-    const dates = generateDateRange(form.start_date, form.end_date);
-    if (dates.length === 0) return;
 
-    setStopsPerDay((prev) => {
-      const updated = {};
-      dates.forEach((d) => {
-        updated[d] = prev[d] || [{ ...emptyStop }];
-      });
-      return updated;
-    });
-
-    setActiveDateTab((prev) => {
-      if (prev && dates.includes(prev)) return prev;
-      return dates[0];
-    });
-  }, [form.start_date, form.end_date]);
-
-  // ── Current day's stops ────────────────────────────────
-  const currentStops = (activeDateTab && stopsPerDay[activeDateTab]) || [{ ...emptyStop }];
-
+  //BeatCard open handler -------------------------
+  const openBeatCard = (patrol) => {
+  setBeatCardPatrol(patrol);
+  setShowBeatCard(true);
+};
   // ── Build GeoJSON ──────────────────────────────────────
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData) return null;
-    const otherStopBrgys = currentStops
+    const otherStopBrgys = stops
       .filter((_, i) => i !== mapTargetIdx)
-      .map((s) => s.barangay)
-      .filter(Boolean);
+      .map((s) => s.barangay).filter(Boolean);
 
     const highlighted = mapMode === "single"
       ? (mapSelectedBrgy ? [mapSelectedBrgy] : [])
-      : currentStops.map((s) => s.barangay).filter(Boolean);
+      : stops.map((s) => s.barangay).filter(Boolean);
 
     return {
       ...geoJSONData,
       features: geoJSONData.features.map((f) => {
-        const name = f.properties.name_db;
+        const name      = f.properties.name_db;
         const isSelected = highlighted.includes(name);
         const isLocked   = mapMode === "single" && otherStopBrgys.includes(name);
         return {
@@ -167,7 +137,7 @@ const PatrolScheduling = () => {
         };
       }),
     };
-  }, [geoJSONData, currentStops, mapMode, mapSelectedBrgy, mapTargetIdx]);
+  }, [geoJSONData, stops, mapMode, mapSelectedBrgy, mapTargetIdx]);
 
   // ── Map click ──────────────────────────────────────────
   const handleMapClick = useCallback((e) => {
@@ -185,7 +155,7 @@ const PatrolScheduling = () => {
     };
 
     for (const feature of geoJSONData.features) {
-      const geom = feature.geometry;
+      const geom  = feature.geometry;
       const rings = geom.type === "Polygon"
         ? [geom.coordinates[0]]
         : geom.coordinates.map((p) => p[0]);
@@ -194,62 +164,29 @@ const PatrolScheduling = () => {
         if (inside([lng, lat], ring)) {
           const name = feature.properties.name_db;
           if (mapMode === "single") {
-            const otherBrgys = currentStops
+            const otherBrgys = stops
               .filter((_, i) => i !== mapTargetIdx)
               .map((s) => s.barangay).filter(Boolean);
             if (otherBrgys.includes(name)) return;
             setMapSelectedBrgy(name);
             setMapDropdownSearch(name);
           } else {
-            if (currentStops.some((s) => s.barangay === name)) return;
-            updateStopsForDay(activeDateTab, (prev) => [...prev, { ...emptyStop, barangay: name }]);
+            if (stops.some((s) => s.barangay === name)) return;
+            setStops((prev) => [...prev, { ...emptyStop, barangay: name }]);
             setBarangaySearches((prev) => [...prev, ""]);
           }
           return;
         }
       }
     }
-  }, [geoJSONData, currentStops, mapMode, mapTargetIdx, activeDateTab]);
-
-  // ── Stops per day helpers ──────────────────────────────
-  const updateStopsForDay = (date, updater) => {
-    setStopsPerDay((prev) => ({
-      ...prev,
-      [date]: typeof updater === "function" ? updater(prev[date] || []) : updater,
-    }));
-  };
-
-  const addStopForDay = (date) => {
-    updateStopsForDay(date, (prev) => [...prev, { ...emptyStop }]);
-    setBarangaySearches((prev) => [...prev, ""]);
-  };
-
-  const removeStopForDay = (date, idx) => {
-    updateStopsForDay(date, (prev) => prev.filter((_, i) => i !== idx));
-    setBarangaySearches((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const updateStopFieldForDay = (date, idx, field, value) => {
-    updateStopsForDay(date, (prev) =>
-      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
-    );
-  };
-
-  const updateBarangaySearch = (idx, value) =>
-    setBarangaySearches((prev) => prev.map((s, i) => (i === idx ? value : s)));
-
-  const selectBarangay = (date, idx, brgy) => {
-    updateStopFieldForDay(date, idx, "barangay", brgy);
-    updateBarangaySearch(idx, "");
-    setBarangayOpenIdx(null);
-  };
+  }, [geoJSONData, stops, mapMode, mapTargetIdx]);
 
   // ── Map open helpers ───────────────────────────────────
   const openMapForStop = (idx) => {
     setMapMode("single");
     setMapTargetIdx(idx);
-    setMapSelectedBrgy(currentStops[idx]?.barangay || null);
-    setMapDropdownSearch(currentStops[idx]?.barangay || "");
+    setMapSelectedBrgy(stops[idx]?.barangay || null);
+    setMapDropdownSearch(stops[idx]?.barangay || "");
     setMapDropdownOpen(false);
     setShowMapModal(true);
   };
@@ -265,7 +202,7 @@ const PatrolScheduling = () => {
 
   const confirmMapSelection = () => {
     if (mapMode === "single" && mapTargetIdx !== null && mapSelectedBrgy) {
-      updateStopFieldForDay(activeDateTab, mapTargetIdx, "barangay", mapSelectedBrgy);
+      updateStop(mapTargetIdx, "barangay", mapSelectedBrgy);
     }
     setShowMapModal(false);
     setMapSelectedBrgy(null);
@@ -308,8 +245,7 @@ const PatrolScheduling = () => {
     setForm(emptyForm);
     setSelectedPatrollerIds([]);
     setPatrollerSearch("");
-    setStopsPerDay({});
-    setActiveDateTab(null);
+    setStops([{ ...emptyStop }]);
     setBarangaySearches([""]);
     setStep(1);
     fetchAvailablePatrollers();
@@ -323,32 +259,33 @@ const PatrolScheduling = () => {
       patrol_name:    patrol.patrol_name    || "",
       mobile_unit_id: patrol.mobile_unit_id || "",
       shift:          patrol.shift          || "",
-      start_date: patrol.start_date ? new Date(patrol.start_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }) : new Date().toISOString().split("T")[0],
-end_date:   patrol.end_date   ? new Date(patrol.end_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }) : new Date().toISOString().split("T")[0],
+      start_date:     patrol.start_date
+        ? new Date(patrol.start_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })
+        : new Date().toISOString().split("T")[0],
+      end_date:       patrol.end_date
+        ? new Date(patrol.end_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })
+        : new Date().toISOString().split("T")[0],
     });
     setSelectedPatrollerIds((patrol.patrollers || []).map((p) => p.active_patroller_id));
     setPatrollerSearch("");
 
-    // Rebuild stopsPerDay from existing routes
-    const built = {};
-    (patrol.routes || []).forEach((r) => {
-      const d = r.route_date?.split("T")[0] || r.route_date;
-      if (!built[d]) built[d] = [];
-      built[d].push({
-        barangay:   r.barangay,
-        notes:      r.notes || "",
-        time_start: r.time_start,
-        time_end:   r.time_end,
-      });
-    });
-    setStopsPerDay(built);
+    // Deduplicate stops by barangay (since same stop repeats per route_date)
+    const seen = new Set();
+    const uniqueStops = (patrol.routes || []).reduce((acc, r) => {
+      if (!seen.has(r.barangay)) {
+        seen.add(r.barangay);
+        acc.push({
+          barangay:   r.barangay,
+          notes:      r.notes      || "",
+          time_start: r.time_start || "",
+          time_end:   r.time_end   || "",
+        });
+      }
+      return acc;
+    }, []);
 
-    const dates = generateDateRange(
-      patrol.start_date?.split("T")[0],
-      patrol.end_date?.split("T")[0]
-    );
-    setActiveDateTab(dates[0] || null);
-    setBarangaySearches([""]);
+    setStops(uniqueStops.length > 0 ? uniqueStops : [{ ...emptyStop }]);
+    setBarangaySearches(uniqueStops.map(() => ""));
     setStep(1);
     fetchAvailablePatrollers();
     setShowModal(true);
@@ -359,8 +296,7 @@ end_date:   patrol.end_date   ? new Date(patrol.end_date).toLocaleDateString("en
     setSelectedPatrol(null);
     setStep(1);
     setSelectedPatrollerIds([]);
-    setStopsPerDay({});
-    setActiveDateTab(null);
+    setStops([{ ...emptyStop }]);
     setBarangaySearches([""]);
     setBarangayOpenIdx(null);
   };
@@ -386,26 +322,33 @@ end_date:   patrol.end_date   ? new Date(patrol.end_date).toLocaleDateString("en
     setStep(2);
   };
 
+  // ── Stop handlers ──────────────────────────────────────
+  const addStop = () => {
+    setStops((prev) => [...prev, { ...emptyStop }]);
+    setBarangaySearches((prev) => [...prev, ""]);
+  };
+
+  const removeStop = (idx) => {
+    setStops((prev) => prev.filter((_, i) => i !== idx));
+    setBarangaySearches((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateStop = (idx, field, value) =>
+    setStops((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
+
+  const updateBarangaySearch = (idx, value) =>
+    setBarangaySearches((prev) => prev.map((s, i) => (i === idx ? value : s)));
+
+  const selectBarangay = (idx, brgy) => {
+    updateStop(idx, "barangay", brgy);
+    updateBarangaySearch(idx, "");
+    setBarangayOpenIdx(null);
+  };
+
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async () => {
-    // Flatten all stops across all days into routes array
-    const routes = [];
-    Object.entries(stopsPerDay).forEach(([date, dayStops]) => {
-      dayStops.forEach((stop, idx) => {
-        if (stop.barangay && stop.time_start && stop.time_end) {
-          routes.push({
-            route_date: date,
-            barangay:   stop.barangay,
-            notes:      stop.notes || null,
-            time_start: stop.time_start,
-            time_end:   stop.time_end,
-            stop_order: idx + 1,
-          });
-        }
-      });
-    });
-
-    if (routes.length === 0) {
+    const validStops = stops.filter((s) => s.barangay && s.time_start && s.time_end);
+    if (validStops.length === 0) {
       alert("Please add at least one route stop with barangay and times.");
       return;
     }
@@ -415,10 +358,19 @@ end_date:   patrol.end_date   ? new Date(patrol.end_date).toLocaleDateString("en
         ? `${API_BASE}/patrol/patrols`
         : `${API_BASE}/patrol/patrols/${selectedPatrol.patrol_id}`;
 
-      const res  = await fetch(url, {
+      const res = await fetch(url, {
         method: modalMode === "add" ? "POST" : "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify({ ...form, patroller_ids: selectedPatrollerIds, routes }),
+        body: JSON.stringify({
+          ...form,
+          patroller_ids: selectedPatrollerIds,
+          // route_date = start_date for now; beat card view will handle per-day display later
+          routes: validStops.map((s, i) => ({
+            ...s,
+            route_date: form.start_date,
+            stop_order: i + 1,
+          })),
+        }),
       });
       const data = await res.json();
       if (data.success) { closeModal(); fetchPatrols(); }
@@ -440,10 +392,10 @@ end_date:   patrol.end_date   ? new Date(patrol.end_date).toLocaleDateString("en
   };
 
   // ── Helpers ────────────────────────────────────────────
-  const getInitials  = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
-  const formatDate    = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }) : "—";
-const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }) : "—";
-  const formatTime   = (t)    => t ? t.substring(0, 5) : "—";
+  const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
+  const formatDate  = (d)    => d
+    ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" })
+    : "—";
 
   const getShiftClass = (shift) => {
     if (shift === "Morning")   return "shift-morning";
@@ -476,19 +428,11 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
     ? geoJSONData.features.map((f) => f.properties.name_db).filter(Boolean)
     : [];
 
-  const dateRange = generateDateRange(form.start_date, form.end_date);
-
-  // Group routes by date for table display
-  const groupRoutesByDate = (routes) => {
-    const grouped = {};
-    (routes || []).forEach((r) => {
-      const d = r.route_date 
-  ? new Date(r.route_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })
-  : null;
-      if (!grouped[d]) grouped[d] = [];
-      grouped[d].push(r);
-    });
-    return grouped;
+  // Get unique barangays from routes for table display
+  const getAreaSummary = (routes) => {
+    if (!routes || routes.length === 0) return null;
+    const unique = [...new Set(routes.map((r) => r.barangay).filter(Boolean))];
+    return unique.join(", ");
   };
 
   // ── Render ─────────────────────────────────────────────
@@ -526,7 +470,6 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
                   <th>Mobile Unit</th>
                   <th>Shift</th>
                   <th>Duration</th>
-                  <th>Date</th>
                   <th>Assigned Patrollers</th>
                   <th>Area of Responsibility</th>
                   <th>Actions</th>
@@ -534,107 +477,43 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
               </thead>
               <tbody>
                 {filteredPatrols.length === 0 ? (
-                  <tr><td colSpan={8} className="psch-empty-row">No patrols found.</td></tr>
+                  <tr><td colSpan={7} className="psch-empty-row">No patrols found.</td></tr>
                 ) : (
-                  filteredPatrols.map((patrol) => {
-                    const grouped   = groupRoutesByDate(patrol.routes);
-                    const dates     = Object.keys(grouped).sort();
-                    const rowCount  = Math.max(dates.length, 1);
-
-                    return dates.length === 0 ? (
-                      <tr key={patrol.patrol_id}>
-                        <td><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
-                        <td><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
-                        <td><span className={`psch-shift-badge ${getShiftClass(patrol.shift)}`}>{patrol.shift}</span></td>
-                        <td><span className="psch-date-text">{formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}</span></td>
-                        <td><span className="psch-date-text">—</span></td>
-                        <td>
-                          {patrol.patrollers?.length > 0 ? (
-                            <div className="psch-patroller-stack">
-                              {patrol.patrollers.map((p) => (
-                                <div key={p.active_patroller_id} className="psch-patroller-row">
-                                  <div className="psch-avatar">{getInitials(p.officer_name)}</div>
-                                  <span className="psch-officer-name">{p.officer_name}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : <span className="psch-none-text">No patrollers</span>}
-                        </td>
-                        <td><span className="psch-none-text">No route set</span></td>
-                        <td>
-                          <div className="psch-action-btns">
-                            <button className="psch-edit-btn" onClick={() => openEditModal(patrol)}>Edit</button>
-                            <button className="psch-delete-btn" onClick={() => handleDelete(patrol.patrol_id)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      dates.map((date, dateIdx) => (
-                        <tr key={`${patrol.patrol_id}-${date}`} className={dateIdx > 0 ? "psch-sub-row" : ""}>
-
-                          {/* Merged cells — only on first row */}
-                          {dateIdx === 0 && (
-                            <>
-                              <td rowSpan={rowCount}><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
-                              <td rowSpan={rowCount}><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
-                              <td rowSpan={rowCount}><span className={`psch-shift-badge ${getShiftClass(patrol.shift)}`}>{patrol.shift}</span></td>
-                              <td rowSpan={rowCount}>
-                                <span className="psch-duration-text">
-                                  {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
-                                </span>
-                              </td>
-                            </>
-                          )}
-
-                          {/* Per-day date */}
-                          <td>
-                            <span className="psch-date-chip">{formatTabDate(date)}</span>
-                          </td>
-
-                          {/* Patrollers — merged */}
-                          {dateIdx === 0 && (
-                            <td rowSpan={rowCount}>
-                              {patrol.patrollers?.length > 0 ? (
-                                <div className="psch-patroller-stack">
-                                  {patrol.patrollers.map((p) => (
-                                    <div key={p.active_patroller_id} className="psch-patroller-row">
-                                      <div className="psch-avatar">{getInitials(p.officer_name)}</div>
-                                      <span className="psch-officer-name">{p.officer_name}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : <span className="psch-none-text">No patrollers</span>}
-                            </td>
-                          )}
-
-                          {/* Routes for this date */}
-                          <td>
-                            <div className="psch-route-stack">
-                              {(grouped[date] || []).map((r, i) => (
-                                <div key={i} className="psch-route-row">
-                                  <span className="psch-route-time">{formatTime(r.time_start)} - {formatTime(r.time_end)}</span>
-                                  <div className="psch-route-details">
-                                    <span className="psch-route-brgy">{r.barangay}</span>
-                                    {r.notes && <span className="psch-route-notes">{r.notes}</span>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-
-                          {/* Actions — merged */}
-                          {dateIdx === 0 && (
-                            <td rowSpan={rowCount}>
-                              <div className="psch-action-btns">
-                                <button className="psch-edit-btn" onClick={() => openEditModal(patrol)}>Edit</button>
-                                <button className="psch-delete-btn" onClick={() => handleDelete(patrol.patrol_id)}>Delete</button>
+                  filteredPatrols.map((patrol) => (
+                    <tr key={patrol.patrol_id}>
+                      <td><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
+                      <td><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
+                      <td><span className={`psch-shift-badge ${getShiftClass(patrol.shift)}`}>{patrol.shift || "—"}</span></td>
+                      <td>
+                        <span className="psch-duration-text">
+                          {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
+                        </span>
+                      </td>
+                      <td>
+                        {patrol.patrollers?.length > 0 ? (
+                          <div className="psch-patroller-stack">
+                            {patrol.patrollers.map((p) => (
+                              <div key={p.active_patroller_id} className="psch-patroller-row">
+                                <div className="psch-avatar">{getInitials(p.officer_name)}</div>
+                                <span className="psch-officer-name">{p.officer_name}</span>
                               </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))
-                    );
-                  })
+                            ))}
+                          </div>
+                        ) : <span className="psch-none-text">No patrollers</span>}
+                      </td>
+                      <td>
+                        {getAreaSummary(patrol.routes)
+                          ? <span className="psch-area-summary">{getAreaSummary(patrol.routes)}</span>
+                          : <span className="psch-none-text">No route set</span>
+                        }
+                      </td>
+                      <td>
+  <button className="psch-view-btn" onClick={() => openBeatCard(patrol)}>
+    View
+  </button>
+</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -645,7 +524,7 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
       {/* ── MAIN MODAL ── */}
       {showModal && (
         <div className="psch-modal-overlay" onClick={closeModal}>
-          <div className="psch-modal psch-modal-wide" onClick={(e) => e.stopPropagation()}>
+          <div className="psch-modal" onClick={(e) => e.stopPropagation()}>
 
             <div className="psch-modal-header">
               <div className="psch-modal-title">
@@ -726,6 +605,7 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
                 <div className="psch-modal-footer">
                   <button className="psch-btn-cancel" onClick={closeModal}>Cancel</button>
                   <button className="psch-btn psch-btn-primary" onClick={goToStep2}>Next: Route Stops</button>
+                
                 </div>
               </>
             )}
@@ -733,98 +613,78 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
             {/* STEP 2 */}
             {step === 2 && (
               <>
-                <div className="psch-modal-body psch-step2-body">
+                <div className="psch-modal-body">
+                  <p className="psch-step-hint">
+                    Add barangay stops for this patrol. Use search or click Map to select. Notes and times are required.
+                  </p>
 
-                  {/* Date tabs */}
-                  <div className="psch-date-tabs">
-                    {dateRange.map((date) => (
-                      <button
-                        key={date}
-                        className={`psch-date-tab ${activeDateTab === date ? "psch-date-tab-active" : ""}`}
-                        onClick={() => { setActiveDateTab(date); setBarangayOpenIdx(null); }}
-                      >
-                        {formatTabDate(date)}
-                        {stopsPerDay[date]?.some((s) => s.barangay) && (
-                          <span className="psch-date-tab-dot" />
+                  {stops.map((stop, idx) => (
+                    <div key={idx} className="psch-stop-card">
+                      <div className="psch-stop-card-header">
+                        <div className="psch-stop-number">{idx + 1}</div>
+                        {stops.length > 1 && (
+                          <button className="psch-remove-stop" onClick={() => removeStop(idx)}>×</button>
                         )}
-                      </button>
-                    ))}
-                  </div>
+                      </div>
 
-                  {/* Stops for active date */}
-                  <div className="psch-stops-area">
-                    <p className="psch-step-hint">
-                      Adding stops for <strong>{formatDate(activeDateTab)}</strong>. Use search or click Map to select barangay.
-                    </p>
-
-                    {currentStops.map((stop, idx) => (
-                      <div key={idx} className="psch-stop-card">
-                        <div className="psch-stop-card-header">
-                          <div className="psch-stop-number">{idx + 1}</div>
-                          {currentStops.length > 1 && (
-                            <button className="psch-remove-stop" onClick={() => removeStopForDay(activeDateTab, idx)}>×</button>
-                          )}
-                        </div>
-
-                        {/* Barangay */}
-                        <div className="psch-form-group">
-                          <label>Barangay</label>
-                          <div className="psch-barangay-row">
-                            <div className="psch-stop-barangay" ref={(el) => (barangayRefs.current[idx] = el)}>
-                              <input
-                                type="text"
-                                placeholder="Search barangay..."
-                                value={stop.barangay || barangaySearches[idx] || ""}
-                                onChange={(e) => {
-                                  updateStopFieldForDay(activeDateTab, idx, "barangay", "");
-                                  updateBarangaySearch(idx, e.target.value);
-                                }}
-                                onFocus={() => setBarangayOpenIdx(idx)}
-                              />
-                              {stop.barangay && (
-                                <div className="psch-selected-brgy-tag">
-                                  {stop.barangay}
-                                  <button onClick={() => updateStopFieldForDay(activeDateTab, idx, "barangay", "")}>×</button>
-                                </div>
-                              )}
-                              {barangayOpenIdx === idx && !stop.barangay && (
-                                <div className="psch-brgy-dropdown">
-                                  {brgyList
-                                    .filter((b) => b.toLowerCase().includes((barangaySearches[idx] || "").toLowerCase()))
-                                    .map((brgy) => (
-                                      <div key={brgy} className="psch-brgy-option" onMouseDown={() => selectBarangay(activeDateTab, idx, brgy)}>
-                                        {brgy}
-                                      </div>
-                                    ))}
-                                </div>
-                              )}
-                            </div>
-                            <button className="psch-map-icon-btn" onClick={() => openMapForStop(idx)}>Map</button>
+                      {/* Barangay */}
+                      <div className="psch-form-group">
+                        <label>Barangay</label>
+                        <div className="psch-barangay-row">
+                          <div className="psch-stop-barangay" ref={(el) => (barangayRefs.current[idx] = el)}>
+                            <input
+                              type="text"
+                              placeholder="Search barangay..."
+                              value={stop.barangay || barangaySearches[idx] || ""}
+                              onChange={(e) => {
+                                updateStop(idx, "barangay", "");
+                                updateBarangaySearch(idx, e.target.value);
+                              }}
+                              onFocus={() => setBarangayOpenIdx(idx)}
+                            />
+                            {stop.barangay && (
+                              <div className="psch-selected-brgy-tag">
+                                {stop.barangay}
+                                <button onClick={() => updateStop(idx, "barangay", "")}>×</button>
+                              </div>
+                            )}
+                            {barangayOpenIdx === idx && !stop.barangay && (
+                              <div className="psch-brgy-dropdown">
+                                {brgyList
+                                  .filter((b) => b.toLowerCase().includes((barangaySearches[idx] || "").toLowerCase()))
+                                  .map((brgy) => (
+                                    <div key={brgy} className="psch-brgy-option" onMouseDown={() => selectBarangay(idx, brgy)}>
+                                      {brgy}
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-
-                        {/* Notes */}
-                        <div className="psch-form-group">
-                          <label>Notes <span className="psch-optional">(optional)</span></label>
-                          <input type="text" placeholder="e.g. Check the market area" value={stop.notes} onChange={(e) => updateStopFieldForDay(activeDateTab, idx, "notes", e.target.value)} />
-                        </div>
-
-                        {/* Time */}
-                        <div className="psch-form-row">
-                          <div className="psch-form-group">
-                            <label>Time Start</label>
-                            <input type="time" value={stop.time_start} onChange={(e) => updateStopFieldForDay(activeDateTab, idx, "time_start", e.target.value)} />
-                          </div>
-                          <div className="psch-form-group">
-                            <label>Time End</label>
-                            <input type="time" value={stop.time_end} onChange={(e) => updateStopFieldForDay(activeDateTab, idx, "time_end", e.target.value)} />
-                          </div>
+                          <button className="psch-map-icon-btn" onClick={() => openMapForStop(idx)}>Map</button>
                         </div>
                       </div>
-                    ))}
 
-                    <button className="psch-add-stop-btn" onClick={openMapForAddStop}>+ Add Stop</button>
-                  </div>
+                      {/* Notes */}
+                      <div className="psch-form-group">
+                        <label>Notes <span className="psch-optional">(optional)</span></label>
+                        <input type="text" placeholder="e.g. Check the market area near the main road" value={stop.notes} onChange={(e) => updateStop(idx, "notes", e.target.value)} />
+                      </div>
+
+                      {/* Time */}
+                      <div className="psch-form-row">
+                        <div className="psch-form-group">
+                          <label>Time Start</label>
+                          <input type="time" value={stop.time_start} onChange={(e) => updateStop(idx, "time_start", e.target.value)} />
+                        </div>
+                        <div className="psch-form-group">
+                          <label>Time End</label>
+                          <input type="time" value={stop.time_end} onChange={(e) => updateStop(idx, "time_end", e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button className="psch-add-stop-btn" onClick={openMapForAddStop}>+ Add Stop</button>
                 </div>
                 <div className="psch-modal-footer">
                   <button className="psch-btn-cancel" onClick={() => setStep(1)}>Back</button>
@@ -842,6 +702,7 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
       {showMapModal && (
         <div className="psch-map-overlay" onClick={confirmMapSelection}>
           <div className="psch-map-modal" onClick={(e) => e.stopPropagation()}>
+
             <div className="psch-map-modal-header">
               <div>
                 <h3>{mapMode === "single" ? "Select Barangay" : "Add Stops from Map"}</h3>
@@ -862,10 +723,11 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
                 <div className="psch-map-search-dropdown">
                   {brgyList.filter((b) => b.toLowerCase().includes(mapDropdownSearch.toLowerCase())).map((brgy) => {
                     const alreadyAdded = mapMode === "multi"
-                      ? currentStops.some((s) => s.barangay === brgy)
-                      : currentStops.filter((_, i) => i !== mapTargetIdx).some((s) => s.barangay === brgy);
+                      ? stops.some((s) => s.barangay === brgy)
+                      : stops.filter((_, i) => i !== mapTargetIdx).some((s) => s.barangay === brgy);
                     return (
-                      <div key={brgy} className={`psch-map-search-item ${alreadyAdded ? "psch-map-search-disabled" : ""}`}
+                      <div key={brgy}
+                        className={`psch-map-search-item ${alreadyAdded ? "psch-map-search-disabled" : ""}`}
                         onMouseDown={() => {
                           if (alreadyAdded) return;
                           if (mapMode === "single") {
@@ -873,7 +735,7 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
                             setMapDropdownSearch(brgy);
                             setMapDropdownOpen(false);
                           } else {
-                            updateStopsForDay(activeDateTab, (prev) => [...prev, { ...emptyStop, barangay: brgy }]);
+                            setStops((prev) => [...prev, { ...emptyStop, barangay: brgy }]);
                             setBarangaySearches((prev) => [...prev, ""]);
                             setMapDropdownSearch("");
                             setMapDropdownOpen(false);
@@ -891,14 +753,15 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
             {mapMode === "single" && mapSelectedBrgy && (
               <div className="psch-map-single-selected">Selected: <strong>{mapSelectedBrgy}</strong></div>
             )}
-            {mapMode === "multi" && currentStops.filter((s) => s.barangay).length > 0 && (
+
+            {mapMode === "multi" && stops.filter((s) => s.barangay).length > 0 && (
               <div className="psch-map-tags">
-                {currentStops.filter((s) => s.barangay).map((s, i) => (
+                {stops.filter((s) => s.barangay).map((s, i) => (
                   <span key={i} className="psch-map-tag">
                     {s.barangay}
                     <button onClick={() => {
-                      const idx = currentStops.findIndex((st) => st.barangay === s.barangay);
-                      if (idx !== -1) removeStopForDay(activeDateTab, idx);
+                      const idx = stops.findIndex((st) => st.barangay === s.barangay);
+                      if (idx !== -1) removeStop(idx);
                     }}>×</button>
                   </span>
                 ))}
@@ -910,9 +773,9 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
                 <div className="psch-map-tooltip">
                   <strong>{hoveredBrgy.name}</strong>
                   {(() => {
-                    const otherBrgys = currentStops.filter((_, i) => i !== mapTargetIdx).map((s) => s.barangay).filter(Boolean);
+                    const otherBrgys = stops.filter((_, i) => i !== mapTargetIdx).map((s) => s.barangay).filter(Boolean);
                     if (mapMode === "single" && otherBrgys.includes(hoveredBrgy.name)) return " — Already used";
-                    if (mapMode === "multi" && currentStops.some((s) => s.barangay === hoveredBrgy.name)) return " — Already added";
+                    if (mapMode === "multi" && stops.some((s) => s.barangay === hoveredBrgy.name)) return " — Already added";
                     return " — Click to select";
                   })()}
                 </div>
@@ -948,12 +811,31 @@ const formatTabDate = (d) => d ? new Date(d).toLocaleDateString("en-PH", { month
             </div>
 
             <div className="psch-map-modal-footer">
-              <p className="psch-map-hint">{mapMode === "single" ? "Dark blue = selected. Click Done to confirm." : "Dark blue = added stops. Click Done when finished."}</p>
+              <p className="psch-map-hint">{mapMode === "single" ? "Dark blue = selected. Click Done to confirm." : "Dark blue = added. Click Done when finished."}</p>
               <button className="psch-btn psch-btn-primary" onClick={confirmMapSelection}>Done</button>
             </div>
           </div>
         </div>
       )}
+      {showBeatCard && (
+  <BeatCard
+    patrol={beatCardPatrol}
+    geoJSONData={geoJSONData}
+    onClose={() => { setShowBeatCard(false); setBeatCardPatrol(null); }}
+    onEdit={() => { setShowBeatCard(false); openEditModal(beatCardPatrol); }}
+    onDelete={async () => {
+      if (!confirm("Are you sure you want to delete this patrol?")) return;
+      try {
+        const res  = await fetch(`${API_BASE}/patrol/patrols/${beatCardPatrol.patrol_id}`, {
+          method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
+        });
+        const data = await res.json();
+        if (data.success) { setShowBeatCard(false); fetchPatrols(); }
+        else alert(data.message || "Something went wrong.");
+      } catch (err) { console.error("Delete error:", err); }
+    }}
+  />
+)}
     </div>
   );
 };

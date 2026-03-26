@@ -1,5 +1,16 @@
 import { useState, useEffect } from "react";
 import "./PatrolDashboard.css";
+import {
+  ShieldCheck,
+  AlertTriangle,
+  Car,
+  Users,
+  Search,
+  Pencil,
+  Trash2,
+  User,
+  Truck
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -9,6 +20,7 @@ const PatrollerDashboard = () => {
   const token = () => localStorage.getItem("token");
 
   // ── Main state ─────────────────────────────────────────
+  const [loading, setLoading] = useState(true);
   const [activeTable, setActiveTable]   = useState("patrollers");
   const [patrollers, setPatrollers]     = useState([]);
   const [mobileUnits, setMobileUnits]   = useState([]);
@@ -64,11 +76,22 @@ const PatrollerDashboard = () => {
   };
 
   useEffect(() => {
-    fetchPatrolStats();
-    fetchPatrollers();
-    fetchMobileUnits();
-  }, []);
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchPatrolStats(),
+      fetchPatrollers(),
+      fetchMobileUnits()
+    ]);
+    setLoading(false);
+  };
 
+  loadData();
+
+  // ✅ Auto refresh every 10 seconds
+  const interval = setInterval(loadData, 10000);
+  return () => clearInterval(interval);
+}, []);
   // ── Modal handlers ─────────────────────────────────────
   const openAddModal = () => {
     setModalMode("add");
@@ -174,29 +197,48 @@ const PatrollerDashboard = () => {
           <p>Real-time Patroller status and monitoring</p>
         </div>
 
-        {/* STATS */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-card-icon icon-green">🛡️</div>
-            <div className="stat-value">{stats.active_patrols_today}</div>
-            <div className="stat-label">Active Patrols Today</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-icon icon-yellow">⚠️</div>
-            <div className="stat-value">{stats.unassigned_patrollers}</div>
-            <div className="stat-label">Unassigned Patrollers</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-icon icon-gray">🚓</div>
-            <div className="stat-value">{stats.mobile_units}</div>
-            <div className="stat-label">Total Mobile Units</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-icon icon-blue">👮</div>
-            <div className="stat-value">{stats.total_officers}</div>
-            <div className="stat-label">Total Officers</div>
-          </div>
-        </div>
+       {/* STATS */}
+<div className="stats-grid">
+  <div className="stat-card">
+    <div className="stat-card-header">
+      <div className="stat-icon green">
+        <ShieldCheck size={20} />
+      </div>
+    </div>
+    <div className="stat-value">{stats.active_patrols_today}</div>
+    <div className="stat-label">Active Patrols Today</div>
+  </div>
+
+  <div className="stat-card">
+    <div className="stat-card-header">
+      <div className="stat-icon yellow">
+        <AlertTriangle size={20} />
+      </div>
+    </div>
+    <div className="stat-value">{stats.unassigned_patrollers}</div>
+    <div className="stat-label">Unassigned Patrollers</div>
+  </div>
+
+  <div className="stat-card">
+    <div className="stat-card-header">
+      <div className="stat-icon gray">
+        <Car size={20} />
+      </div>
+    </div>
+    <div className="stat-value">{stats.mobile_units}</div>
+    <div className="stat-label">Total Mobile Units</div>
+  </div>
+
+  <div className="stat-card">
+    <div className="stat-card-header">
+      <div className="stat-icon blue">
+        <Users size={20} />
+      </div>
+    </div>
+    <div className="stat-value">{stats.total_officers}</div>
+    <div className="stat-label">Total Officers</div>
+  </div>
+</div>
 
         {/* TABLE CARD */}
         <div className="table-card">
@@ -206,20 +248,20 @@ const PatrollerDashboard = () => {
                 className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`}
                 onClick={() => setActiveTable("patrollers")}
               >
-                👮 Active Patrollers
+                Active Patrollers
               </button>
               <button
                 className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`}
                 onClick={() => setActiveTable("mobile")}
               >
-                🚓 Mobile Units
+                Mobile Units
               </button>
             </div>
 
             <div className="table-header-right">
               {activeTable === "patrollers" && (
                 <div className="search-box">
-                  <span className="search-icon">🔍</span>
+                 <Search size={16} />
                   <input
                     type="text"
                     placeholder="Search officer..."
@@ -262,7 +304,7 @@ const PatrollerDashboard = () => {
                         </td>
                         <td>
                           {officer.mobile_unit_assigned
-                            ? <span className="unit-badge">🚓 {officer.mobile_unit_assigned}</span>
+                            ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
                             : <span className="unassigned-badge">Unassigned</span>
                           }
                         </td>
@@ -302,11 +344,11 @@ const PatrollerDashboard = () => {
                     mobileUnits.map((unit, index) => (
                       <tr key={unit.mobile_unit_id || index}>
                         <td>
-                          <span className="unit-badge">🚓 {unit.mobile_unit_name}</span>
+                          <span className="unit-badge">{unit.mobile_unit_name}</span>
                         </td>
                         <td>
                           <span className={`vehicle-badge ${unit.vehicle_type === "Car/Sedan" ? "vehicle-car" : "vehicle-suv"}`}>
-                            {unit.vehicle_type === "Car/Sedan" ? "🚗" : "🚙"} {unit.vehicle_type}
+                            {unit.vehicle_type === "Car/Sedan" ? "" : ""} {unit.vehicle_type}
                           </span>
                         </td>
                         <td>
@@ -318,10 +360,10 @@ const PatrollerDashboard = () => {
                         <td>
                           <div className="action-btns">
                             <button className="edit-btn" onClick={() => openEditModal(unit)}>
-                              ✏️ Edit
+                               Edit
                             </button>
                             <button className="delete-btn" onClick={() => handleDelete(unit.mobile_unit_id)}>
-                              🗑️ Delete
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -341,7 +383,7 @@ const PatrollerDashboard = () => {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
 
             <div className="modal-header">
-              <h3>{modalMode === "add" ? "➕ Add Mobile Unit" : "✏️ Edit Mobile Unit"}</h3>
+              <h3>{modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}</h3>
               <button className="modal-close" onClick={closeModal}>✕</button>
             </div>
 
