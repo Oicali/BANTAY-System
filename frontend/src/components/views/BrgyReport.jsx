@@ -34,7 +34,7 @@ function BrgyReport() {
     incident_type: "",
     date_time_commission: "",
     date_time_reported: "",
-    place_barangay: localStorage.getItem("barangay") || "",
+    place_barangay: "",
     place_street: "",
     narrative: "",
     victim_first_name: "",
@@ -49,6 +49,8 @@ function BrgyReport() {
   const [loadingReports, setLoadingReports] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [barangayName, setBarangayName] = useState("Loading...");
+
   useEffect(() => {
     fetchMyReports();
     fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
@@ -56,13 +58,28 @@ function BrgyReport() {
     })
       .then((res) => res.json())
       .then((data) => {
-        console.log("profile data:", data.user); // ← ADD THIS
-        if (data?.user?.assigned_barangay_code) {
-          setForm((prev) => ({
-            ...prev,
-            place_barangay: data.user.assigned_barangay_code,
-          }));
+        if (data?.user?.barangay_code) {
+          const code = data.user.barangay_code;
+          // If it's already a name string (not a numeric PSGC code), use directly
+          if (!/^\d+$/.test(code)) {
+            setForm((prev) => ({ ...prev, place_barangay: code }));
+            setBarangayName(code);
+            return null;
+          }
+          // Otherwise it's a PSGC number — resolve to name
+          return fetch(`https://psgc.gitlab.io/api/barangays/${code}.json`);
         }
+      })
+      .then((res) => res?.json())
+      .then((brgyData) => {
+        if (brgyData?.name) {
+          setBarangayName(brgyData.name);
+          // Also store resolved name (not numeric code) in form
+          setForm((prev) => ({ ...prev, place_barangay: brgyData.name }));
+        }
+      })
+      .catch(() => {
+        setBarangayName("Your assigned barangay");
       });
   }, []);
 
@@ -94,12 +111,25 @@ function BrgyReport() {
   const validate = () => {
     const e = {};
     if (!form.incident_type) e.incident_type = "Required";
-    if (!form.date_time_commission) e.date_time_commission = "Required";
-    if (!form.date_time_reported) e.date_time_reported = "Required";
+    if (!form.date_time_commission) {
+      e.date_time_commission = "Required";
+    } else if (new Date(form.date_time_commission) > new Date()) {
+      e.date_time_commission = "Cannot be in the future";
+    }
+    if (!form.date_time_reported) {
+      e.date_time_reported = "Required";
+    } else if (new Date(form.date_time_reported) > new Date()) {
+      e.date_time_reported = "Cannot be in the future";
+    } else if (
+      form.date_time_commission &&
+      new Date(form.date_time_commission) > new Date(form.date_time_reported)
+    ) {
+      e.date_time_reported = "Cannot be before incident date";
+    }
     if (!form.place_barangay) e.place_barangay = "Required";
     if (!form.place_street) e.place_street = "Required";
-    if (!form.narrative || form.narrative.trim().length < 10)
-      e.narrative = "At least 10 characters";
+    if (!form.narrative || form.narrative.trim().length < 20)
+      e.narrative = "At least 20 characters";
     if (!form.victim_first_name) e.victim_first_name = "Required";
     if (!form.victim_last_name) e.victim_last_name = "Required";
     return e;
@@ -132,7 +162,7 @@ function BrgyReport() {
           incident_type: "",
           date_time_commission: "",
           date_time_reported: "",
-          place_barangay: localStorage.getItem("barangay") || "",
+          place_barangay: form.place_barangay,
           place_street: "",
           narrative: "",
           victim_first_name: "",
@@ -292,7 +322,7 @@ function BrgyReport() {
                   ...inputStyle("place_barangay"),
                   background: "#f9fafb",
                 }}
-                value={form.place_barangay}
+                value={barangayName}
                 readOnly
                 placeholder="Auto-filled from your account"
               />
@@ -361,7 +391,7 @@ function BrgyReport() {
                 rows={5}
                 value={form.narrative}
                 maxLength={3000}
-                placeholder="Describe what happened in detail (minimum 10 characters)"
+                placeholder="Describe what happened in detail (minimum 20 characters)"
                 onChange={(e) => update("narrative", e.target.value)}
               />
               {errors.narrative && (

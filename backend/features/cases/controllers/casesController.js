@@ -88,7 +88,7 @@ const updateStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowed = ["Under Investigation", "Solved", "Cleared", "Referred"];
+    const allowed = ["Under Investigation", "Solved", "Cleared"];
     if (!status || !allowed.includes(status)) return res.status(400).json({ success: false, message: "Invalid status value" });
 
     const caseResult = await pool.query("SELECT * FROM cases WHERE id = $1", [id]);
@@ -107,7 +107,6 @@ const blotterStatusMap = {
   'Under Investigation': 'Under Investigation',
   'Solved': 'Solved',
   'Cleared': 'Cleared',
-  'Referred': 'Referred to Case'
 };
 await pool.query(
   `UPDATE blotter_entries SET status = $1 WHERE blotter_id = $2`,
@@ -133,15 +132,16 @@ const getCases = async (req, res) => {
     let paramCount = 1;
 
     // Role-based filtering
-    if (role === "Investigator") {
-      whereConditions.push(`c.assigned_io_id = $${paramCount++}`);
-      params.push(userId);
-    } else if (role === "Patrol") {
-      whereConditions.push(`b.submitted_by = $${paramCount++}`);
-      params.push(userId);
-    } else if (role === "Barangay") {
-      return res.status(200).json({ success: true, data: [] });
-    }
+    // Role-based filtering
+if (role === "Investigator") {
+  whereConditions.push(`c.assigned_io_id = $${paramCount++}`);
+  params.push(userId);
+} else if (role === "Patrol") {
+  return res.status(200).json({ success: true, data: [] });
+} else if (role === "Barangay") {
+  // ✅ Barangay users can't access Case Management at all
+  return res.status(200).json({ success: true, data: [] });
+}
 
     if (status) { whereConditions.push(`c.status = $${paramCount++}`); params.push(status); }
     if (priority) { whereConditions.push(`c.priority = $${paramCount++}`); params.push(priority); }
@@ -151,19 +151,27 @@ const getCases = async (req, res) => {
     const where = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
     const result = await pool.query(
-      `SELECT c.id, c.case_number, c.status, c.priority, c.created_at, c.updated_at,
-        c.assigned_io_id,
-        CONCAT(u.first_name, ' ', u.last_name) AS assigned_io_name,
-        b.incident_type, b.place_barangay AS barangay,
-        b.blotter_entry_number,
-        CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
+  `SELECT c.id, c.case_number, c.status, c.priority, c.created_at, c.updated_at,
+    c.assigned_io_id,
+    CONCAT(u.first_name, ' ', u.last_name) AS assigned_io_name,
+   b.incident_type,
+    b.place_barangay AS barangay,
+    b.blotter_entry_number,
+    CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
  FROM cases c
-       LEFT JOIN users u ON c.assigned_io_id = u.user_id
-       LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
-       ${where}
-       ORDER BY c.created_at DESC`,
-      params
-    );
+   LEFT JOIN users u ON c.assigned_io_id = u.user_id
+   LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
+   ${where}
+   ORDER BY 
+     CASE c.status 
+       WHEN 'Under Investigation' THEN 1 
+       WHEN 'Cleared' THEN 2 
+       WHEN 'Solved' THEN 3 
+       ELSE 4 
+     END,
+     c.created_at DESC`,
+  params
+);
 
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error) {

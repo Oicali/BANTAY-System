@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./AddUserModal.css";
 import LoadingModal from "../modals/LoadingModal";
-import { CURRENT_BARANGAYS } from "../../utils/barangayOptions";
+import {
+  CURRENT_BARANGAYS,
+  LEGACY_BARANGAY_OPTIONS,
+} from "../../utils/barangayOptions";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
@@ -1040,9 +1043,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             <option value="">
               {loadingBarangays ? "Loading..." : "Select Barangay"}
             </option>
-            {CURRENT_BARANGAYS.map((b) => (
-              <option key={b} value={b}>
-                {b}
+            {barangays.map((b) => (
+              <option key={b.code} value={b.code}>
+                {b.name}
               </option>
             ))}
           </select>
@@ -1103,6 +1106,13 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                 {b}
               </option>
             ))}
+            <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+              {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+                <option key={i} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
           {errors.barangay_code && (
             <span className="aum-error-text">{errors.barangay_code}</span>

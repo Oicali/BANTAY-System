@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { logout, getUserFromToken } from "../../utils/auth";
-import { CURRENT_BARANGAYS } from "../../utils/barangayOptions";
+import {
+  CURRENT_BARANGAYS,
+  LEGACY_BARANGAY_OPTIONS,
+} from "../../utils/barangayOptions";
 import AddUserModal from "../modals/AddUserModal";
 import EditUserModal from "../modals/EditUserModal";
 import DeleteUserModal from "../modals/DeleteUserModal";
@@ -520,6 +523,13 @@ const UserManagement = () => {
                   {b}
                 </option>
               ))}
+              <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+                {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+                  <option key={i} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
         )}

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { getUserFromToken } from "../../utils/auth";
+import {
+  CURRENT_BARANGAYS,
+  LEGACY_BARANGAY_OPTIONS,
+} from "../../utils/barangayOptions";
 import "./EditUserModal.css";
 import LoadingModal from "../modals/LoadingModal";
 
@@ -70,6 +74,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   // PSGC — Bacoor barangays for assigned barangay
   const [bacoorBarangays, setBacoorBarangays] = useState([]);
   const [loadingBacoorBarangays, setLoadingBacoorBarangays] = useState(false);
+  // replaced by CURRENT_BARANGAYS static list
 
   // Lock/Unlock
   const [isLocking, setIsLocking] = useState(false);
@@ -195,7 +200,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       if (user.province_code) fetchMunicipalities(user.province_code);
       if (user.municipality_code) fetchAddressBarangays(user.municipality_code);
     } else if (user.user_type === "barangay") {
-      fetchBacoorBarangays();
+      // barangay list is static — no fetch needed
     }
   }, [user, isOpen]);
 
@@ -1570,7 +1575,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                         }));
                         clearError("assigned_barangay_code");
                       }}
-                      disabled={isSubmitting || loadingBacoorBarangays}
+                      disabled={isSubmitting}
                       className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
                     >
                       {!formData.assigned_barangay_code && (
@@ -1586,11 +1591,18 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                             Loading barangays...
                           </option>
                         )}
-                      {bacoorBarangays.map((b) => (
-                        <option key={b.code} value={b.code}>
-                          {b.name}
+                      {CURRENT_BARANGAYS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
                         </option>
                       ))}
+                      <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+                        {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+                          <option key={i} value={b.value}>
+                            {b.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                     {errors.assigned_barangay_code && (
                       <span className="eum-error-text">

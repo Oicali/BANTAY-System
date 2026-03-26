@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import "./CaseManagement.css";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/cases`;
-const BLOTTER_URL = `${import.meta.env.VITE_API_URL}/blotters`;
 
 const getToken = () => localStorage.getItem("token");
 const getUser = () => ({
@@ -27,17 +26,14 @@ function CaseManagement() {
   const [filters, setFilters] = useState({ status: "", priority: "" });
 
   // Modals
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
 
   // Data
-  const [blotters, setBlotters] = useState([]);
   const [investigators, setInvestigators] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [selectedBlotterId, setSelectedBlotterId] = useState("");
   const [selectedInvestigatorId, setSelectedInvestigatorId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [noteText, setNoteText] = useState("");
@@ -133,30 +129,6 @@ function CaseManagement() {
     }
   };
 
-  const fetchBlotters = async () => {
-    try {
-      const res = await fetch(BLOTTER_URL, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        // Filter out blotters that already have a case
-        const caseRes = await fetch(API_URL, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
-        const caseData = await caseRes.json();
-        const usedBlotterIds = caseData.success
-          ? caseData.data.map((c) => c.blotter_id)
-          : [];
-        setBlotters(
-          data.data.filter((b) => !usedBlotterIds.includes(b.blotter_id)),
-        );
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const fetchInvestigators = async () => {
     try {
       const res = await fetch(
@@ -187,35 +159,6 @@ function CaseManagement() {
   };
 
   // Handlers
-  const handleCreateCase = async () => {
-    if (!selectedBlotterId)
-      return showError("Please select a blotter entry to continue.");
-    try {
-      setModalLoading(true);
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ blotter_id: parseInt(selectedBlotterId) }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(`Case ${data.data.case_number} created successfully!`);
-        setShowCreateModal(false);
-        setSelectedBlotterId("");
-        fetchCases();
-        fetchStats();
-      } else {
-        showError(data.message);
-      }
-    } catch (err) {
-      showError("Failed to create case. Please try again.");
-    } finally {
-      setModalLoading(false);
-    }
-  };
 
   const handleAssign = async () => {
     try {
@@ -377,12 +320,6 @@ function CaseManagement() {
     setShowNoteModal(true);
   };
 
-  const openCreateModal = () => {
-    setSelectedBlotterId("");
-    setShowCreateModal(true);
-    fetchBlotters();
-  };
-
   // Helpers
   const formatDate = (d) => {
     if (!d) return "N/A";
@@ -419,11 +356,11 @@ function CaseManagement() {
           <h1>Case Management</h1>
           <p>Track and manage investigation cases</p>
         </div>
-        {isAdmin && (
+        {/* {isAdmin && (
           <button className="cm-btn cm-btn-primary" onClick={openCreateModal}>
             + Create New Case
           </button>
-        )}
+        )} */}
       </div>
 
       {/* STATS CARDS — Admin only */}
@@ -474,7 +411,6 @@ function CaseManagement() {
           <option>Under Investigation</option>
           <option>Solved</option>
           <option>Cleared</option>
-          <option>Referred</option>
         </select>
         <select
           className="cm-filter-input"
@@ -655,61 +591,6 @@ function CaseManagement() {
       </div>
 
       {/* ── CREATE CASE MODAL ── */}
-      {showCreateModal && (
-        <div className="cm-modal">
-          <div className="cm-modal-content">
-            <div className="cm-modal-header">
-              <h2>Create New Case</h2>
-              <span
-                className="cm-modal-close"
-                onClick={() => setShowCreateModal(false)}
-              >
-                &times;
-              </span>
-            </div>
-            <div className="cm-modal-body">
-              <p
-                style={{
-                  color: "#6b7280",
-                  marginBottom: "16px",
-                  fontSize: "14px",
-                }}
-              >
-                Select a blotter entry to convert into a case.
-              </p>
-              <label className="cm-modal-label">Select Blotter *</label>
-              <select
-                className="cm-modal-input"
-                value={selectedBlotterId}
-                onChange={(e) => setSelectedBlotterId(e.target.value)}
-              >
-                <option value="">-- Select a Blotter --</option>
-                {blotters.map((b) => (
-                  <option key={b.blotter_id} value={b.blotter_id}>
-                    {b.blotter_entry_number} — {b.incident_type} (
-                    {b.place_barangay})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="cm-modal-footer">
-              <button
-                className="cm-btn cm-btn-secondary"
-                onClick={() => setShowCreateModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="cm-btn cm-btn-primary"
-                onClick={handleCreateCase}
-                disabled={modalLoading}
-              >
-                {modalLoading ? "Creating..." : "Create Case"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── ASSIGN INVESTIGATOR MODAL ── */}
       {showAssignModal && (
@@ -818,7 +699,6 @@ function CaseManagement() {
                 <option>Under Investigation</option>
                 <option>Solved</option>
                 <option>Cleared</option>
-                <option>Referred</option>
               </select>
             </div>
             <div className="cm-modal-footer">

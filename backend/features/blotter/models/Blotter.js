@@ -19,11 +19,8 @@ class Blotter {
 
     const count = parseInt(result.rows[0].count) + 1;
     const sequencePart = count.toString().padStart(6, "0");
-    const randomPart = Math.floor(Math.random() * 99999 + 1)
-      .toString()
-      .padStart(5, "0");
 
-    return `${year}-${sequencePart}-${randomPart}`;
+    return `${year}-${sequencePart}`;
   }
   static async generateImportNumber(year) {
     const importYear = year || new Date().getFullYear();
