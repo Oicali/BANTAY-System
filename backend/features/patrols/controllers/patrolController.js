@@ -437,6 +437,20 @@ const deletePatrol = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+const updateRouteNotes = async (req, res) => {
+  const { routeId } = req.params;
+  const { notes } = req.body;
+  try {
+    await pool.query(
+      `UPDATE patrol_assignment_route SET notes = $1 WHERE route_id = $2`,
+      [notes || null, routeId]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Update notes error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 module.exports = {
   getPatrolStats,
@@ -450,4 +464,5 @@ module.exports = {
   createPatrol,
   updatePatrol,
   deletePatrol,
+  updateRouteNotes,
 };
