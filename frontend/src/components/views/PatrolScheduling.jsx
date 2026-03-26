@@ -1,3 +1,4 @@
+//1-12 only
 import { useState, useEffect, useRef, useCallback } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -5,11 +6,10 @@ import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
 const API_BASE = import.meta.env.VITE_API_URL;
 
-const SHIFTS = ["Morning", "Afternoon", "Night"];
+const SHIFTS = ["Morning","Night"];
 const SHIFT_LABELS = {
-  Morning:   "Morning (6AM - 2PM)",
-  Afternoon: "Afternoon (2PM - 10PM)",
-  Night:     "Night (10PM - 6AM)",
+  Morning:   "Morning",
+  Night:     "Night",
 };
 
 const emptyForm = {

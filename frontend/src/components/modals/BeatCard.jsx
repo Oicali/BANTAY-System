@@ -14,9 +14,8 @@ const labelLayer   = {
 };
 
 const SHIFT_LABELS = {
-  Morning:   "Morning (6AM - 2PM)",
-  Afternoon: "Afternoon (2PM - 10PM)",
-  Night:     "Night (10PM - 6AM)",
+  Morning:   "Morning",
+  Night:     "Night",
 };
 
 const parseLocalDate = (d) => {
