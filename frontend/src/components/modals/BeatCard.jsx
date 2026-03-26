@@ -10,40 +10,62 @@ const outlineLayer = { id: "bc-brgy-outline", type: "line",   paint: { "line-col
 const labelLayer   = {
   id: "bc-brgy-labels", type: "symbol",
   layout: { "text-field": ["get", "name_db"], "text-size": 10, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"], "text-max-width": 8, "text-anchor": "center", "text-allow-overlap": false },
-  paint:  { "text-color": "#0a1628", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.5 },
+  paint: { "text-color": "#0a1628", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.5 },
 };
 
 const SHIFT_LABELS = {
-  Day:   "Morning (6AM - 2PM)",
+  Morning:   "Morning (6AM - 2PM)",
   Afternoon: "Afternoon (2PM - 10PM)",
   Night:     "Night (10PM - 6AM)",
 };
 
-// Generate date range array
+const parseLocalDate = (d) => {
+  if (!d) return null;
+
+  const date = new Date(d);
+
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+};
+
+const toLocalDateStr = (d) => {
+  const date = parseLocalDate(d);
+  if (!date) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 const generateDateRange = (start, end) => {
   if (!start || !end) return [];
+
   const dates = [];
-  const cur  = new Date(start + "T00:00:00");
-  const last = new Date(end   + "T00:00:00");
+  let cur  = new Date(parseLocalDate(start));
+  const last = parseLocalDate(end);
+
   while (cur <= last) {
-    dates.push(cur.toISOString().split("T")[0]);
+    dates.push(toLocalDateStr(cur));
     cur.setDate(cur.getDate() + 1);
   }
+
   return dates;
 };
 
-const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh }) => {
+const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
   const token  = () => localStorage.getItem("token");
   const mapRef = useRef(null);
 
-  // ── Date tabs ──────────────────────────────────────────
-  const dateRange    = generateDateRange(
-    patrol?.start_date ? new Date(patrol.start_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }) : null,
-    patrol?.end_date   ? new Date(patrol.end_date  ).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" }) : null
-  );
+  const dateRange  = generateDateRange(patrol?.start_date, patrol?.end_date);
   const [activeDate, setActiveDate] = useState(dateRange[0] || null);
 
-  // ── Local routes state (for inline editing) ────────────
+  // ✅ FIX: ensure activeDate updates when patrol changes
+  useEffect(() => {
+    if (dateRange.length > 0) {
+      setActiveDate(dateRange[0]);
+    }
+  }, [patrol]);
+
   const [localRoutes, setLocalRoutes] = useState([]);
   const saveTimers = useRef({});
 
@@ -51,22 +73,14 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
     if (patrol?.routes) setLocalRoutes(patrol.routes);
   }, [patrol]);
 
-  // ── Routes for active date ─────────────────────────────
-  const routesForDate = localRoutes.filter((r) => {
-    const d = r.route_date
-      ? new Date(r.route_date).toLocaleDateString("en-CA", { timeZone: "Asia/Manila" })
-      : null;
-    return d === activeDate;
-  }).sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
+  const routesForDate = localRoutes
+    .filter((r) => toLocalDateStr(r.route_date) === activeDate)
+    .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
 
-  // ── Auto-save notes ────────────────────────────────────
   const handleNotesChange = (routeId, value) => {
-    // Update local state immediately
     setLocalRoutes((prev) =>
       prev.map((r) => r.route_id === routeId ? { ...r, notes: value } : r)
     );
-
-    // Debounce save — wait 800ms after typing stops
     clearTimeout(saveTimers.current[routeId]);
     saveTimers.current[routeId] = setTimeout(async () => {
       try {
@@ -79,38 +93,40 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
     }, 800);
   };
 
-  // ── Build GeoJSON ──────────────────────────────────────
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData || !patrol) return null;
-    const assignedBrgys = [...new Set(
-      (patrol.routes || []).map((r) => r.barangay).filter(Boolean)
-    )];
+    const assigned = [...new Set((patrol.routes || []).map((r) => r.barangay).filter(Boolean))];
     return {
       ...geoJSONData,
       features: geoJSONData.features.map((f) => ({
         ...f,
         properties: {
           ...f.properties,
-          fillColor: assignedBrgys.includes(f.properties.name_db) ? "#1e3a5f" : "#e9ecef",
+          fillColor: assigned.includes(f.properties.name_db) ? "#1e3a5f" : "#e9ecef",
         },
       })),
     };
   }, [geoJSONData, patrol]);
 
-  // ── Helpers ────────────────────────────────────────────
-  const getInitials  = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
-  const formatDate   = (d)    => d ? new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }) : "—";
-  const formatTabDate = (d)   => d ? new Date(d + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }) : "—";
-  const formatTime   = (t)    => t ? t.substring(0, 5) : "—";
+  const getInitials   = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
+  const formatDate    = (d)    => {
+    const date = parseLocalDate(d);
+    if (!date) return "—";
+    return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  };
+  const formatTabDate = (d)    => {
+    const date = parseLocalDate(d);
+    if (!date) return "—";
+    return date.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
+  };
+  const formatTime    = (t)    => t ? t.substring(0, 5) : "—";
 
   if (!patrol) return null;
-  const mapGeoJSON = buildGeoJSON();
 
   return (
     <div className="bc-overlay" onClick={onClose}>
       <div className="bc-modal" onClick={(e) => e.stopPropagation()}>
 
-        {/* ── HEADER ── */}
         <div className="bc-header">
           <div className="bc-header-left">
             <h2 className="bc-patrol-name">{patrol.patrol_name}</h2>
@@ -129,10 +145,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
           </div>
         </div>
 
-        {/* ── BODY ── */}
         <div className="bc-body">
 
-          {/* LEFT — Map */}
           <div className="bc-map-panel">
             <Map
               ref={mapRef}
@@ -141,8 +155,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
               style={{ width: "100%", height: "100%" }}
               mapStyle="mapbox://styles/mapbox/light-v11"
             >
-              {mapGeoJSON && (
-                <Source id="bc-barangays" type="geojson" data={mapGeoJSON}>
+              {buildGeoJSON() && (
+                <Source id="bc-barangays" type="geojson" data={buildGeoJSON()}>
                   <Layer {...fillLayer} />
                   <Layer {...outlineLayer} />
                   <Layer {...labelLayer} />
@@ -151,10 +165,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
             </Map>
           </div>
 
-          {/* RIGHT — Info */}
           <div className="bc-info-panel">
 
-            {/* Patrollers */}
             <div className="bc-section">
               <div className="bc-section-title">Assigned Patrollers</div>
               {patrol.patrollers?.length > 0 ? (
@@ -169,12 +181,10 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
               ) : <p className="bc-empty">No patrollers assigned.</p>}
             </div>
 
-            {/* Time Table with date tabs */}
             <div className="bc-section bc-section-grow">
               <div className="bc-section-title">Time Table</div>
 
-              {/* Date tabs */}
-              {dateRange.length > 1 && (
+              {dateRange.length > 0 && (
                 <div className="bc-date-tabs">
                   {dateRange.map((date) => (
                     <button
@@ -188,26 +198,40 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, onRefresh })
                 </div>
               )}
 
-              {/* Routes for active date */}
               {routesForDate.length > 0 ? (
-                <div className="bc-timetable">
-                  {routesForDate.map((r) => (
-                    <div key={r.route_id} className="bc-timetable-row">
-                      <div className="bc-timetable-time">
-                        {formatTime(r.time_start)} — {formatTime(r.time_end)}
-                      </div>
-                      <div className="bc-timetable-info">
-                        <span className="bc-timetable-brgy">{r.barangay}</span>
-                        <input
-                          className="bc-notes-input"
-                          type="text"
-                          placeholder="Add notes..."
-                          value={r.notes || ""}
-                          onChange={(e) => handleNotesChange(r.route_id, e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                <div className="bc-timetable-wrap">
+                  <table className="bc-timetable">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Notes</th>
+                        <th>Barangay Area</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {routesForDate.map((r) => (
+                        <tr key={r.route_id}>
+                          <td className="bc-tt-time">{formatTime(r.time_start)} — {formatTime(r.time_end)}</td>
+                          <td className="bc-tt-notes">
+                            <textarea
+  className="bc-notes-input"
+  value={r.notes || ""}
+  placeholder="Add notes..."
+  onChange={(e) => {
+    handleNotesChange(r.route_id, e.target.value);
+
+    // 🔥 auto expand
+    e.target.style.height = "auto";
+    e.target.style.height = e.target.scrollHeight + "px";
+  }}
+  rows={1}
+/>
+                          </td>
+                          <td className="bc-tt-brgy">{r.barangay}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
                 <p className="bc-empty">No stops for this date.</p>
