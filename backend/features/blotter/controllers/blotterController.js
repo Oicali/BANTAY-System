@@ -1,5 +1,30 @@
 const Blotter = require("../models/Blotter");
 const pool = require("../../../config/database");
+const autoCreateCase = async (client, blotterId, createdBy) => {
+  const existing = await client.query(
+    "SELECT id FROM cases WHERE blotter_id = $1", [blotterId]
+  );
+  if (existing.rows.length > 0) return;
+
+  const year = new Date().getFullYear();
+
+  // Use a DB-level sequence to avoid collision during bulk inserts
+  const seqResult = await client.query(
+    `INSERT INTO case_number_seq (year) VALUES ($1)
+     ON CONFLICT (year) DO UPDATE SET seq = case_number_seq.seq + 1
+     RETURNING seq`,
+    [year]
+  );
+  const seq = seqResult.rows[0].seq;
+  const case_number = `CASE-${year}-${String(seq).padStart(4, "0")}`;
+
+  await client.query(
+    `INSERT INTO cases (blotter_id, case_number, created_by)
+     VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING`,
+    [blotterId, case_number, createdBy]
+  );
+};
 // import
 const xlsx = require("xlsx");
 const { normalizeOffense, normalizeBarangay, deriveFromDate } = require("../utils/importUtils");
@@ -268,22 +293,22 @@ const createBlotter = async (req, res) => {
     const result = await Blotter.create(blotterData, complainants, suspects, offenses);
 
 // Auto-create case
-try {
-  const year = new Date(blotterData.date_time_commission).getFullYear();
-  const countResult = await pool.query(
-    "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
-  );
-  const count = parseInt(countResult.rows[0].count) + 1;
-  const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
-  await pool.query(
-    `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
-    [result.blotter_id, case_number, req.user.user_id]
-  );
-} catch (caseErr) {
-  console.error("Auto-case creation failed:", caseErr.message);
-  // Non-fatal — blotter still saved
-}
-
+// try {
+//   const year = new Date(blotterData.date_time_commission).getFullYear();
+//   const countResult = await pool.query(
+//     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
+//   );
+//   const count = parseInt(countResult.rows[0].count) + 1;
+//   const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
+//   await pool.query(
+//     `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
+//     [result.blotter_id, case_number, req.user.user_id]
+//   );
+// } catch (caseErr) {
+//   console.error("Auto-case creation failed:", caseErr.message);
+//   // Non-fatal — blotter still saved
+// }
+await autoCreateCase(pool, result.blotter_id || result.id, req.user.user_id);
 res.status(201).json({
   success: true,
   message: "Blotter entry created successfully",
@@ -605,8 +630,15 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
       const blotterNo = str(row["BLOTTER_ENTRY_NUMBER"]);
       if (!blotterNo) {
-        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Missing blotter number" });
-        continue;
+        const impYear = new Date().getFullYear();
+        const impCount = await pool.query(
+          `SELECT COUNT(*) FROM blotter_entries WHERE blotter_entry_number LIKE $1`,
+          [`IMP-${impYear}-%`]
+        );
+        const impSeq = (parseInt(impCount.rows[0].count) + 1).toString().padStart(6, "0");
+        row["BLOTTER_ENTRY_NUMBER"] = `IMP-${impYear}-${impSeq}`;
+        // re-assign blotterNo
+        continue; // still skip — require blotter number in Excel
       }
 
       const incidentType = str(row["INCIDENT_TYPE"]);
@@ -819,6 +851,7 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
         );
 
         const blotterId = blotterResult.rows[0].blotter_id;
+        await autoCreateCase(client, blotterId, req.user.user_id);
 
         // 2. Insert complainant (only if first name exists)
         if (r.complainant.first_name) {
@@ -976,22 +1009,22 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
         }
 
         // Auto-create case for imported blotter
-try {
-  const year = new Date(r.dateCommitted).getFullYear();
-  const countResult = await client.query(
-    "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
-  );
-  const caseCount = parseInt(countResult.rows[0].count) + 1;
-  const case_number = `CASE-${year}-${String(caseCount).padStart(4, "0")}`;
-  await client.query(
-    `INSERT INTO cases (blotter_id, case_number, created_by)
-     VALUES ($1, $2, $3)
-     ON CONFLICT DO NOTHING`,
-    [blotterId, case_number, req.user.user_id]
-  );
-} catch (caseErr) {
-  console.error("Auto-case (import) failed:", caseErr.message);
-}
+// try {
+//   const year = new Date(r.dateCommitted).getFullYear();
+//   const countResult = await client.query(
+//     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
+//   );
+//   const caseCount = parseInt(countResult.rows[0].count) + 1;
+//   const case_number = `CASE-${year}-${String(caseCount).padStart(4, "0")}`;
+//   await client.query(
+//     `INSERT INTO cases (blotter_id, case_number, created_by)
+//      VALUES ($1, $2, $3)
+//      ON CONFLICT DO NOTHING`,
+//     [blotterId, case_number, req.user.user_id]
+//   );
+// } catch (caseErr) {
+//   console.error("Auto-case (import) failed:", caseErr.message);
+// }
 
 actualInserted++;
       }
@@ -1054,19 +1087,7 @@ const acceptReferral = async (req, res) => {
     );
 
     // Auto-create case
-    const existing = await pool.query(`SELECT id FROM cases WHERE blotter_id = $1`, [id]);
-    if (existing.rows.length === 0) {
-      const year = new Date(blotter.rows[0].date_time_commission).getFullYear();
-      const countResult = await pool.query(
-        "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
-      );
-      const count = parseInt(countResult.rows[0].count) + 1;
-      const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
-      await pool.query(
-        `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
-        [id, case_number, req.user.user_id]
-      );
-    }
+    await autoCreateCase(pool, parseInt(id), req.user.user_id);
 
     return res.status(200).json({ success: true, message: "Referral accepted successfully" });
   } catch (error) {
@@ -1087,7 +1108,8 @@ const createBrgyReport = async (req, res) => {
     if (!date_time_reported) errors.push("Date & time reported is required");
     if (!place_barangay) errors.push("Barangay is required");
     if (!place_street) errors.push("Street is required");
-    if (!narrative || narrative.trim().length < 10) errors.push("Narrative must be at least 10 characters");
+    if (!narrative || narrative.trim().length < 20) errors.push("Narrative must be at least 20 characters");
+if (!place_street || place_street.trim().length < 2) errors.push("Street must be at least 2 characters");
     if (!victim_first_name) errors.push("Victim first name is required");
     if (!victim_last_name) errors.push("Victim last name is required");
 
@@ -1108,8 +1130,7 @@ const createBrgyReport = async (req, res) => {
       );
       const count = parseInt(countResult.rows[0].count) + 1;
       const seq = count.toString().padStart(6, "0");
-      const rand = Math.floor(Math.random() * 99999 + 1).toString().padStart(5, "0");
-      const blotterNumber = `BRGY-${year}-${seq}-${rand}`;
+      const blotterNumber = `BRGY-${year}-${seq}`;
 
       // Insert blotter
       const blotterResult = await client.query(
@@ -1132,7 +1153,6 @@ const createBrgyReport = async (req, res) => {
 
       const blotterId = blotterResult.rows[0].blotter_id;
 
-      // Insert victim as complainant
       await client.query(
         `INSERT INTO complainants (
           blotter_id, first_name, last_name, gender, nationality,
@@ -1146,8 +1166,25 @@ const createBrgyReport = async (req, res) => {
         ]
       );
 
+      // Insert offense so it shows correctly in EBlotter
+      await client.query(
+        `INSERT INTO offenses (
+          blotter_id, offense_name, stage_of_felony, index_type,
+          is_principal_offense, investigator_on_case, most_investigator
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          blotterId,
+          incident_type,
+          "COMPLETED",
+          "Index",
+          true,
+          "N/A",
+          "N/A"
+        ]
+      );
+
       await client.query("COMMIT");
-      return res.status(201).json({
+return res.status(201).json({
         success: true,
         message: "Report submitted successfully! Awaiting police review.",
         data: { blotter_entry_number: blotterNumber }
