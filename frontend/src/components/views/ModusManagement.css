@@ -22,7 +22,7 @@
 .mm-header p { color: var(--gray-600); font-size: 15px; margin: 0; }
 
 /* FILTER BAR */
-.mm-filter-bar { background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mm-filter-bar { background: var(--white); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--navy-primary); }
 .mm-filter-select { padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 14px; font-family: "DM Sans", sans-serif; background: var(--white); color: var(--gray-900); min-width: 180px; }
 .mm-filter-select:focus { outline: none; border-color: var(--navy-primary); }
 .mm-count { color: var(--gray-600); font-size: 13px; margin-left: auto; }
@@ -40,15 +40,19 @@
   table-layout: fixed;
   min-width: 700px;
 }
-
-.mm-table thead { background: var(--gray-50); }
+.mm-pagination-btn.mm-pagination-active {
+  background: var(--navy-primary);
+  color: white;
+  border-color: var(--navy-primary);
+}
+.mm-table thead { background: var(--gray-50); border-top: 3px solid var(--navy-primary); }
 
 /* COLUMN WIDTHS */
-.mm-table th:nth-child(1) { width: 15%; }  /* Crime Type */
+.mm-table th:nth-child(1) { width: 20%; }  /* Crime Type */
 .mm-table th:nth-child(2) { width: 16%; }  /* Modus Name */
-.mm-table th:nth-child(3) { width: 27%; }  /* Description */
+.mm-table th:nth-child(3) { width: 24%; }  /* Description */
 .mm-table th:nth-child(4) { width: 11%; }  /* Status */
-.mm-table th:nth-child(5) { width: 9%;  }  /* Created */
+.mm-table th:nth-child(5) { width: 13%;  }  /* Created */
 .mm-table th:nth-child(6) { width: 22%; }  /* Actions */
 
 /* BASE TH */
@@ -92,7 +96,7 @@
 .mm-table td:nth-child(2) {
   white-space: normal;
   word-break: break-word;
-  line-height: 1.5;
+  line-height: 1.2;
 }
 
 /* DESCRIPTION — allow wrapping, muted */
@@ -120,7 +124,7 @@
 .mm-table td:nth-child(6) {
   white-space: nowrap;
 }
-
+.mm-table tbody tr:nth-child(even) { background: #f8f9fb; }
 .mm-table tbody tr:hover { background: var(--gray-50); }
 .mm-table tbody tr:last-child td { border-bottom: none; }
 .mm-center { text-align: center; color: var(--gray-600); padding: 40px !important; }
@@ -129,16 +133,15 @@
 .mm-crime-badge {
   background: rgba(30, 58, 95, 0.1);
   color: var(--navy-primary);
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.3px;
   display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .mm-status { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
@@ -210,9 +213,9 @@
 /* MODAL */
 .mm-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .mm-modal { background: var(--white); border-radius: 8px; width: 100%; max-width: 520px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
-.mm-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px; border-bottom: 1px solid var(--gray-200); }
-.mm-modal-header h2 { font-family: "Inter", sans-serif; font-size: 20px; font-weight: 700; color: var(--navy-dark); margin: 0; }
-.mm-modal-close { font-size: 28px; font-weight: 300; color: var(--gray-600); cursor: pointer; line-height: 1; }
+.mm-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%); border-bottom: 3px solid var(--red-primary); border-radius: 8px 8px 0 0; }
+.mm-modal-header h2 { font-family: "Inter", sans-serif; font-size: 18px; font-weight: 700; color: white; margin: 0; }
+.mm-modal-close { font-size: 28px; font-weight: 300; color: rgba(255,255,255,0.7); cursor: pointer; line-height: 1; }
 .mm-modal-close:hover { color: var(--gray-900); }
 .mm-modal-body { padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
 .mm-modal-footer { padding: 20px 32px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 12px; background: var(--gray-50); border-radius: 0 0 8px 8px; }

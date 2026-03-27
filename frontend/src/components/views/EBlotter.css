@@ -94,8 +94,9 @@ body {
   margin-bottom: 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid var(--navy-primary);
 }
 
 .eb-filter-row {
@@ -212,11 +213,11 @@ body {
 /* Main blotter table column widths */
 /* Main blotter table column widths */
 .eb-table-card .eb-data-table th:nth-child(1) { width: 22%; } /* Blotter ID */
-.eb-table-card .eb-data-table th:nth-child(2) { width: 14%; } /* Incident Type */
+.eb-table-card .eb-data-table th:nth-child(2) { width: 18%; } /* Incident Type */
 .eb-table-card .eb-data-table th:nth-child(3) { width: 20%; } /* Location */
-.eb-table-card .eb-data-table th:nth-child(4) { width: 20%; } /* Date Reported */
-.eb-table-card .eb-data-table th:nth-child(5) { width: 16%;  } /* Status */
-.eb-table-card .eb-data-table th:nth-child(6) { width: 30%; } /* Actions */
+.eb-table-card .eb-data-table th:nth-child(4) { width: 21%; } /* Date Reported */
+.eb-table-card .eb-data-table th:nth-child(5) { width: 17%;  } /* Status */
+.eb-table-card .eb-data-table th:nth-child(6) { width: 31%; } /* Actions */
 
 /* All cells wrap by default */
 .eb-table-card .eb-data-table td {
@@ -251,7 +252,9 @@ body {
   color: var(--gray-700);
   border-bottom: 1px solid var(--gray-200);
 }
-
+.eb-data-table tbody tr:nth-child(even) {
+  background: #f8f9fb;
+}
 .eb-data-table tbody tr:hover {
   background: var(--gray-50);
 }
@@ -1153,4 +1156,40 @@ select.eb-modal-input {
 .eb-report-tab.active {
   color: var(--navy-primary);
   border-bottom-color: var(--navy-primary);
+}
+
+/* === SINGLE ROW FILTER === */
+.eb-filter-single-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+}
+
+.eb-filter-single-row .eb-filter-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.eb-filter-single-row .eb-filter-input {
+  height: 40px;
+  font-size: 13px;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.eb-filter-apply-btn {
+  height: 40px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.eb-btn-clear {
+  height: 40px;
+  width: 40px;
+  margin-left: 0;
 }

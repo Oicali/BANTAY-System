@@ -163,6 +163,12 @@ if (role === "Investigator") {
    LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
    ${where}
    ORDER BY 
+     CASE c.priority 
+       WHEN 'High' THEN 1 
+       WHEN 'Medium' THEN 2 
+       WHEN 'Low' THEN 3 
+       ELSE 4 
+     END,
      CASE c.status 
        WHEN 'Under Investigation' THEN 1 
        WHEN 'Cleared' THEN 2 

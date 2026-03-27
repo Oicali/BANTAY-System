@@ -393,6 +393,38 @@ function CaseManagement() {
 
       {/* FILTERS */}
       <div className="cm-filter-bar">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginRight: "4px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="13"
+            height="13"
+            fill="none"
+            stroke="var(--navy-primary)"
+            strokeWidth="2.5"
+            viewBox="0 0 24 24"
+          >
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: "700",
+              color: "var(--navy-primary)",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+            }}
+          >
+            Filter
+          </span>
+        </div>
         <input
           type="text"
           className="cm-filter-input"
@@ -454,11 +486,26 @@ function CaseManagement() {
           <div className="cm-empty-state">No cases found.</div>
         ) : (
           paginatedCases.map((c) => (
-            <div className="cm-case-card" key={c.id}>
+            <div
+              className={`cm-case-card priority-${(c.priority || "low").toLowerCase()}`}
+              key={c.id}
+            >
               <div className="cm-case-header">
                 <div>
                   <div className="cm-case-id">
-                    {c.blotter_entry_number || c.case_number}
+                    <span
+                      style={{
+                        fontFamily: "monospace",
+                        fontWeight: "700",
+                        color: "var(--navy-primary)",
+                        fontSize: "13px",
+                        background: "rgba(30,58,95,0.07)",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {c.blotter_entry_number || c.case_number}
+                    </span>
                   </div>
                   <div className="cm-case-title">
                     {c.incident_type} — {c.barangay}

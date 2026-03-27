@@ -855,17 +855,53 @@ function EBlotter() {
       alert("Failed to load blotter data");
     }
   };
-  const handleAcceptReferral = async (blotterId) => {
-    if (
-      !window.confirm(
-        "Accept this barangay referral? This will create a case automatically.",
-      )
-    )
+  const [acceptModal, setAcceptModal] = useState({
+    show: false,
+    blotterId: null,
+    cop: "",
+    type_of_place: "",
+    stage_of_felony: "COMPLETED",
+  });
+
+  const handleAcceptReferral = (blotterId) => {
+    setAcceptModal({
+      show: true,
+      blotterId,
+      cop: "",
+      type_of_place: "",
+      stage_of_felony: "COMPLETED",
+    });
+  };
+
+  const submitAcceptReferral = async () => {
+    const { blotterId, cop, type_of_place, stage_of_felony } = acceptModal;
+
+    // Validate required fields
+    if (!cop || cop.trim().length < 2) {
+      alert(
+        "COP (Officer on Case) is required and must be at least 2 characters",
+      );
       return;
+    }
+    if (!type_of_place) {
+      alert("Type of Place is required");
+      return;
+    }
+    if (!stage_of_felony) {
+      alert("Stage of Felony is required");
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/${blotterId}/accept`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          missingFields: { cop, type_of_place, stage_of_felony },
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -878,6 +914,13 @@ function EBlotter() {
           toast.classList.remove("show");
           setTimeout(() => toast.remove(), 300);
         }, 3000);
+        setAcceptModal({
+          show: false,
+          blotterId: null,
+          cop: "",
+          type_of_place: "",
+          stage_of_felony: "COMPLETED",
+        });
         fetchBlotters();
       } else {
         alert(data.message);
@@ -5247,7 +5290,38 @@ function EBlotter() {
       )}
 
       <div className="eb-filter-bar">
-        <div className="eb-filter-row">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginBottom: "8px",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="var(--navy-primary)"
+            strokeWidth="2.5"
+            viewBox="0 0 24 24"
+          >
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: "700",
+              color: "var(--navy-primary)",
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+            }}
+          >
+            Filter Records
+          </span>
+        </div>
+        <div className="eb-filter-single-row">
           <div className="eb-filter-group">
             <label className="eb-filter-label">Search</label>
             <input
@@ -5331,10 +5405,7 @@ function EBlotter() {
               <option value="bantay_import">Imported</option>
             </select>
           </div>
-        </div>
-
-        <div className="eb-filter-row eb-filter-row-2">
-          <div className="eb-filter-group eb-filter-group-sm">
+          <div className="eb-filter-group">
             <label className="eb-filter-label">Date From</label>
             <input
               type="date"
@@ -5346,7 +5417,7 @@ function EBlotter() {
               onKeyDown={(e) => e.preventDefault()}
             />
           </div>
-          <div className="eb-filter-group eb-filter-group-sm">
+          <div className="eb-filter-group">
             <label className="eb-filter-label">Date To</label>
             <input
               type="date"
@@ -5358,21 +5429,37 @@ function EBlotter() {
               onKeyDown={(e) => e.preventDefault()}
             />
           </div>
-          <div className="eb-filter-group eb-filter-group-btn">
+          <div
+            className="eb-filter-group"
+            style={{ justifyContent: "flex-end" }}
+          >
             <label className="eb-filter-label">&nbsp;</label>
-            <button className="eb-btn eb-btn-primary" onClick={fetchBlotters}>
-              Apply Filters
-            </button>
-          </div>
-          <div className="eb-filter-group eb-filter-group-btn">
-            <label className="eb-filter-label">&nbsp;</label>
-            <button
-              className="eb-btn eb-btn-clear"
-              onClick={clearFilters}
-              title="Clear all filters"
-            >
-              <span className="eb-restart-icon">↻</span>
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                className="eb-btn eb-btn-primary eb-filter-apply-btn"
+                onClick={fetchBlotters}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                Apply
+              </button>
+              <button
+                className="eb-btn eb-btn-clear"
+                onClick={clearFilters}
+                title="Clear filters"
+              >
+                <span className="eb-restart-icon">↻</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -5428,7 +5515,20 @@ function EBlotter() {
                 paginatedBlotters.map((b) => (
                   <tr key={b.blotter_id}>
                     <td>
-                      <strong>{b.blotter_entry_number}</strong>
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: "700",
+                          color: "var(--navy-primary)",
+                          fontSize: "13px",
+                          background: "rgba(30,58,95,0.07)",
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          display: "inline-block",
+                        }}
+                      >
+                        {b.blotter_entry_number}
+                      </span>
                       {b.data_source === "ciras_import" && (
                         <span
                           style={{
@@ -5446,7 +5546,43 @@ function EBlotter() {
                         </span>
                       )}
                     </td>
-                    <td>{b.incident_type}</td>
+                    <td>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "3px 10px",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          background:
+                            {
+                              Murder: "rgba(127,29,29,0.1)",
+                              Homicide: "rgba(153,27,27,0.1)",
+                              Rape: "rgba(147,51,234,0.1)",
+                              Robbery: "rgba(234,88,12,0.1)",
+                              Theft: "rgba(217,119,6,0.1)",
+                              "Physical Injury": "rgba(3,105,161,0.1)",
+                              "Carnapping - MC": "rgba(15,118,110,0.1)",
+                              "Carnapping - MV": "rgba(15,118,110,0.1)",
+                              "Special Complex Crime": "rgba(67,56,202,0.1)",
+                            }[b.incident_type] || "rgba(107,114,128,0.1)",
+                          color:
+                            {
+                              Murder: "#7f1d1d",
+                              Homicide: "#991b1b",
+                              Rape: "#9333ea",
+                              Robbery: "#ea580c",
+                              Theft: "#d97706",
+                              "Physical Injury": "#0369a1",
+                              "Carnapping - MC": "#0f766e",
+                              "Carnapping - MV": "#0f766e",
+                              "Special Complex Crime": "#4338ca",
+                            }[b.incident_type] || "#6b7280",
+                        }}
+                      >
+                        {b.incident_type}
+                      </span>
+                    </td>
                     <td>{`${b.place_barangay}, ${b.place_city_municipality}`}</td>
                     <td>{formatDate(b.date_time_reported)}</td>
                     <td>
@@ -5568,6 +5704,156 @@ function EBlotter() {
             setShowImport(false);
           }}
         />
+      )}
+
+      {acceptModal.show && (
+        <div className="eb-modal" style={{ zIndex: 10003 }}>
+          <div className="eb-modal-content" style={{ maxWidth: "500px" }}>
+            <div
+              className="eb-modal-header"
+              style={{
+                background: "linear-gradient(135deg, #16a34a, #22c55e)",
+              }}
+            >
+              <h2 style={{ color: "white", fontSize: "16px" }}>
+                Accept Barangay Referral
+              </h2>
+              <span
+                className="eb-modal-close"
+                style={{ color: "white" }}
+                onClick={() =>
+                  setAcceptModal({
+                    show: false,
+                    blotterId: null,
+                    cop: "",
+                    type_of_place: "",
+                    stage_of_felony: "COMPLETED",
+                  })
+                }
+              >
+                &times;
+              </span>
+            </div>
+            <div className="eb-modal-body" style={{ padding: "24px" }}>
+              <p
+                style={{
+                  color: "#6b7280",
+                  marginBottom: "20px",
+                  fontSize: "14px",
+                }}
+              >
+                Fill in the required fields to complete the report and create a
+                case.
+              </p>
+
+              <div
+                className="eb-modal-form-group"
+                style={{ marginBottom: "16px" }}
+              >
+                <label className="eb-modal-label">
+                  COP (Officer on Case) *
+                </label>
+                <input
+                  type="text"
+                  className="eb-modal-input"
+                  placeholder="Officer Name"
+                  value={acceptModal.cop}
+                  maxLength="100"
+                  onChange={(e) =>
+                    setAcceptModal({
+                      ...acceptModal,
+                      cop: e.target.value.replace(/[^A-Za-zÑñ.\s-]/g, ""),
+                    })
+                  }
+                />
+              </div>
+
+              <div
+                className="eb-modal-form-group"
+                style={{ marginBottom: "16px" }}
+              >
+                <label className="eb-modal-label">Type of Place *</label>
+                <select
+                  className="eb-modal-input"
+                  value={acceptModal.type_of_place}
+                  onChange={(e) =>
+                    setAcceptModal({
+                      ...acceptModal,
+                      type_of_place: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Select Type of Place</option>
+                  <option>
+                    Abandoned Structure (house, bldg, apartment/condo)
+                  </option>
+                  <option>Along the street</option>
+                  <option>Commercial/Business Establishment</option>
+                  <option>Construction/Industrial Barracks</option>
+                  <option>Farm/Ricefield</option>
+                  <option>Government Office/Establishment</option>
+                  <option>Onboard a vehicle (riding in/on)</option>
+                  <option>
+                    Parking Area (vacant lot, in bldg/structure, open parking)
+                  </option>
+                  <option>Recreational Place (resorts/parks)</option>
+                  <option>Residential (house/condo)</option>
+                  <option>River/Lake</option>
+                  <option>School (Grade/High School/College/University)</option>
+                  <option>
+                    Transportation Terminals (Tricycle, Jeep, FX, Bus, Train
+                    Station)
+                  </option>
+                  <option>Vacant Lot (unused/unoccupied open area)</option>
+                </select>
+              </div>
+
+              <div className="eb-modal-form-group">
+                <label className="eb-modal-label">Stage of Felony *</label>
+                <select
+                  className="eb-modal-input"
+                  value={acceptModal.stage_of_felony}
+                  onChange={(e) =>
+                    setAcceptModal({
+                      ...acceptModal,
+                      stage_of_felony: e.target.value,
+                    })
+                  }
+                >
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="ATTEMPTED">ATTEMPTED</option>
+                  <option value="FRUSTRATED">FRUSTRATED</option>
+                </select>
+              </div>
+            </div>
+            <div
+              className="eb-modal-footer"
+              style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb" }}
+            >
+              <button
+                className="eb-btn eb-btn-secondary"
+                onClick={() =>
+                  setAcceptModal({
+                    show: false,
+                    blotterId: null,
+                    cop: "",
+                    type_of_place: "",
+                    stage_of_felony: "COMPLETED",
+                  })
+                }
+              >
+                Cancel
+              </button>
+              <button
+                className="eb-btn eb-btn-primary"
+                style={{ background: "#16a34a" }}
+                onClick={submitAcceptReferral}
+              >
+                Accept & Create Case
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

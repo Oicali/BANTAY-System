@@ -692,8 +692,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   // =====================================================
   const renderInfoBox = () => (
     <div className="aum-info-box">
-      <strong>ℹ️ Auto-Generated Credentials:</strong> Username and password will
-      be automatically generated and sent to the user's email address.
+      <strong>Auto-Generated Credentials:</strong> Username and password will be
+      automatically generated and sent to the user's email address.
     </div>
   );
 
@@ -709,7 +709,18 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             <img src={profilePicturePreview} alt="Profile preview" />
           ) : (
             <div className="aum-profile-picture-placeholder">
-              <span>📷</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="36"
+                height="36"
+                fill="none"
+                stroke="#adb5bd"
+                strokeWidth="1.5"
+                viewBox="0 0 24 24"
+              >
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
               <p>No image selected</p>
             </div>
           )}
@@ -1145,7 +1156,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
         className="aum-info-box aum-info-box-note"
         style={{ marginTop: "12px" }}
       >
-        <strong>📌 Note:</strong> The barangay assignment is automatically taken
+        <strong>Note:</strong> The barangay assignment is automatically taken
         from the Barangay selected above. Each barangay can only have one
         designated account.
       </div>
@@ -1175,7 +1186,21 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                   className="aum-user-type-card"
                   onClick={() => handleUserTypeSelect("pnp")}
                 >
-                  <div className="aum-user-type-icon">🚔</div>
+                  <div className="aum-user-type-icon">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="48"
+                      height="48"
+                      fill="none"
+                      stroke="var(--navy-primary)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
                   <h4>PNP User</h4>
                   <p>Add a police officer to the system</p>
                 </div>
@@ -1183,7 +1208,20 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                   className="aum-user-type-card"
                   onClick={() => handleUserTypeSelect("barangay")}
                 >
-                  <div className="aum-user-type-icon">🏘️</div>
+                  <div className="aum-user-type-icon">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="48"
+                      height="48"
+                      fill="none"
+                      stroke="var(--navy-primary)"
+                      strokeWidth="1.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                  </div>
                   <h4>Barangay User</h4>
                   <p>Add a barangay official to the system</p>
                 </div>
