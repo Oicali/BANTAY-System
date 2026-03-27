@@ -248,7 +248,7 @@ const PatrollerDashboard = () => {
                 className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`}
                 onClick={() => setActiveTable("patrollers")}
               >
-                Active Patrollers
+              Patrollers
               </button>
               <button
                 className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`}
@@ -285,8 +285,7 @@ const PatrollerDashboard = () => {
                 <thead>
                   <tr>
                     <th>Officer</th>
-                    <th>Mobile Unit Assigned</th>
-                    <th>Status</th>
+                    <th>Mobile Unit Assigned</th> 
                     <th>Last Login</th>
                   </tr>
                 </thead>
@@ -307,11 +306,6 @@ const PatrollerDashboard = () => {
                             ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
                             : <span className="unassigned-badge">Unassigned</span>
                           }
-                        </td>
-                        <td>
-                          <span className={`status-badge ${getStatusClass(officer.status)}`}>
-                            {officer.status || "—"}
-                          </span>
                         </td>
                         <td>
                           <span className="time-badge">{formatTime(officer.last_login)}</span>
@@ -341,7 +335,15 @@ const PatrollerDashboard = () => {
                   {mobileUnits.length === 0 ? (
                     <tr><td colSpan={5} className="empty-row">No mobile units found.</td></tr>
                   ) : (
-                    mobileUnits.map((unit, index) => (
+                    
+[...mobileUnits]
+  .sort((a, b) =>
+    a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    })
+  )
+  .map((unit, index) => (
                       <tr key={unit.mobile_unit_id || index}>
                         <td>
                           <span className="unit-badge">{unit.mobile_unit_name}</span>
