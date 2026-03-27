@@ -861,7 +861,18 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                     <img src={profilePicturePreview} alt="Profile preview" />
                   ) : (
                     <div className="eum-profile-picture-placeholder">
-                      <span>📷</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="36"
+                        height="36"
+                        fill="none"
+                        stroke="#adb5bd"
+                        strokeWidth="1.5"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
                       <p>No image</p>
                     </div>
                   )}
@@ -1673,9 +1684,63 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                     background: isLocked ? "#16a34a" : "#c76b2e",
                     color: "white",
                     border: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
                   }}
                 >
-                  {isLocked ? "🔓 Unlock Account" : "🔒 Lock Account"}
+                  {isLocked ? (
+                    <>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        viewBox="0 0 24 24"
+                        style={{ marginRight: "6px" }}
+                      >
+                        <rect
+                          x="3"
+                          y="11"
+                          width="18"
+                          height="11"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                      </svg>
+                      Unlock Account
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        viewBox="0 0 24 24"
+                        style={{ marginRight: "6px" }}
+                      >
+                        <rect
+                          x="3"
+                          y="11"
+                          width="18"
+                          height="11"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      Lock Account
+                    </>
+                  )}
                 </button>
               )}
               <button

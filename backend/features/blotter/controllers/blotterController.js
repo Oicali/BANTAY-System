@@ -1064,6 +1064,7 @@ actualInserted++;
 const acceptReferral = async (req, res) => {
   try {
     const { id } = req.params;
+    const { missingFields } = req.body; // NEW: receive missing fields from frontend
 
     // Check blotter exists and is a brgy referral
     const blotter = await pool.query(
@@ -1080,10 +1081,30 @@ const acceptReferral = async (req, res) => {
       return res.status(400).json({ success: false, message: "Already accepted" });
     }
 
-    // Update status
+    // NEW: Validate that all required fields are provided
+    if (!missingFields || !missingFields.cop || !missingFields.type_of_place || !missingFields.stage_of_felony) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing required fields: COP, Type of Place, and Stage of Felony are required" 
+      });
+    }
+
+    // NEW: Update blotter with missing fields + status
     await pool.query(
-      `UPDATE blotter_entries SET status = 'Under Investigation', updated_at = NOW() WHERE blotter_id = $1`,
-      [id]
+      `UPDATE blotter_entries 
+       SET status = 'Under Investigation', 
+           cop = $2,
+           type_of_place = $3,
+           stage_of_felony = $4,
+           updated_at = NOW() 
+       WHERE blotter_id = $1`,
+      [id, missingFields.cop, missingFields.type_of_place, missingFields.stage_of_felony]
+    );
+
+    // NEW: Update offense table with stage_of_felony
+    await pool.query(
+      `UPDATE offenses SET stage_of_felony = $1 WHERE blotter_id = $2`,
+      [missingFields.stage_of_felony, id]
     );
 
     // Auto-create case

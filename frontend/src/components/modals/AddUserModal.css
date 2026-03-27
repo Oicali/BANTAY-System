@@ -141,7 +141,8 @@
 }
 
 .aum-user-type-icon {
-  font-size: 64px;
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
 }
 
