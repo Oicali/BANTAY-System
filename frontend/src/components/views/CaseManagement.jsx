@@ -48,6 +48,12 @@ function CaseManagement() {
     setErrorModal({ show: true, message });
   };
   const [showPriorityModal, setShowPriorityModal] = useState(false);
+  const [showActionConfirm, setShowActionConfirm] = useState({
+    show: false,
+    type: "",
+    label: "",
+    onConfirm: null,
+  });
   const [selectedPriority, setSelectedPriority] = useState("");
   const user = getUser();
   const isAdmin = user.role === "Administrator";
@@ -102,10 +108,32 @@ function CaseManagement() {
               c.assigned_io_id === null ||
               c.assigned_io_id === "",
           );
-        if (f.search)
-          result = result.filter((c) =>
-            c.case_number?.toLowerCase().includes(f.search.toLowerCase()),
-          );
+        if (f.search && f.search.trim().length > 0) {
+          const searchTerm = f.search.trim().toUpperCase();
+          result = result.filter((c) => {
+            const caseNum = c.case_number?.toUpperCase() || "";
+            const blotterNum = c.blotter_entry_number?.toUpperCase() || "";
+
+            // Exact match first
+            if (caseNum === searchTerm || blotterNum === searchTerm)
+              return true;
+
+            // Then check if it starts with search term
+            if (
+              caseNum.startsWith(searchTerm) ||
+              blotterNum.startsWith(searchTerm)
+            )
+              return true;
+
+            // Finally check if the number portion contains search term
+            const caseNumDigits = caseNum.replace(/\D/g, ""); // Remove non-digits
+            const blotterNumDigits = blotterNum.replace(/\D/g, "");
+            return (
+              caseNumDigits.includes(searchTerm) ||
+              blotterNumDigits.includes(searchTerm)
+            );
+          });
+        }
 
         setCases(result);
         setCurrentPage(1);
@@ -544,12 +572,14 @@ function CaseManagement() {
                   </button>
                   {isAdmin && (
                     <>
-                      <button
-                        className="cm-action-btn cm-action-btn-edit"
-                        onClick={() => openPriorityModal(c)}
-                      >
-                        Set Priority
-                      </button>
+                      {c.status === "Under Investigation" && (
+                        <button
+                          className="cm-action-btn cm-action-btn-edit"
+                          onClick={() => openPriorityModal(c)}
+                        >
+                          Set Priority
+                        </button>
+                      )}
                       <button
                         className="cm-action-btn cm-action-btn-edit"
                         onClick={() => openAssignModal(c)}
@@ -642,7 +672,10 @@ function CaseManagement() {
       {/* ── ASSIGN INVESTIGATOR MODAL ── */}
       {showAssignModal && (
         <div className="cm-modal">
-          <div className="cm-modal-content">
+          <div
+            className="cm-modal-content"
+            style={{ maxWidth: "700px", width: "95vw" }}
+          >
             <div className="cm-modal-header">
               <h2>Assign Investigator</h2>
               <span
@@ -652,43 +685,193 @@ function CaseManagement() {
                 &times;
               </span>
             </div>
-            <div className="cm-modal-body">
-              <p
+            <div className="cm-modal-body" style={{ padding: "20px 24px" }}>
+              <div
                 style={{
-                  color: "#6b7280",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
                   marginBottom: "16px",
-                  fontSize: "14px",
+                  padding: "10px 14px",
+                  background: "rgba(30,58,95,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(30,58,95,0.1)",
                 }}
               >
-                Case: <strong>{selectedCase?.case_number}</strong>
-              </p>
-              <label className="cm-modal-label">Select Investigator *</label>
-              {selectedCase?.assigned_io_name && (
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "#6b7280",
-                    marginBottom: "8px",
-                  }}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--navy-primary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  Currently assigned:{" "}
-                  <strong style={{ color: "#1e3a5f" }}>
-                    {selectedCase.assigned_io_name}
+                  <rect x="2" y="7" width="20" height="14" rx="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                <span style={{ fontSize: "13px", color: "#374151" }}>
+                  Case:{" "}
+                  <strong
+                    style={{
+                      color: "var(--navy-primary)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {selectedCase?.case_number}
                   </strong>
-                </p>
-              )}
-              <select
-                className="cm-modal-input"
-                value={selectedInvestigatorId}
-                onChange={(e) => setSelectedInvestigatorId(e.target.value)}
+                </span>
+              </div>
+
+              {/* Unassign Card */}
+              <div
+                className={`cm-io-card cm-io-unassign ${selectedInvestigatorId === "" ? "cm-io-selected" : ""}`}
+                onClick={() => setSelectedInvestigatorId("")}
               >
-                <option value="">-- Remove / Unassign IO --</option>
-                {investigators.map((i) => (
-                  <option key={i.user_id} value={i.user_id}>
-                    {i.first_name} {i.last_name}
-                  </option>
-                ))}
-              </select>
+                <div className="cm-io-avatar cm-io-avatar-danger">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                </div>
+                <div className="cm-io-info">
+                  <div className="cm-io-name">Remove / Unassign IO</div>
+                  <div className="cm-io-sub">
+                    Clear current assignment from this case
+                  </div>
+                </div>
+                {selectedInvestigatorId === "" && (
+                  <div className="cm-io-check">✓</div>
+                )}
+              </div>
+
+              <div className="cm-io-section-label">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                Available Investigators ({investigators.length})
+              </div>
+
+              <div className="cm-io-list">
+                {investigators.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "24px",
+                      color: "#9ca3af",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Loading investigators...
+                  </div>
+                ) : (
+                  investigators.map((inv) => {
+                    const initials =
+                      `${inv.first_name?.[0] || ""}${inv.last_name?.[0] || ""}`.toUpperCase();
+                    const isSelected =
+                      selectedInvestigatorId === String(inv.user_id);
+                    const isCurrent =
+                      String(selectedCase?.assigned_io_id) ===
+                      String(inv.user_id);
+                    const colors = [
+                      "#1e3a5f",
+                      "#c1272d",
+                      "#0369a1",
+                      "#059669",
+                      "#7c3aed",
+                      "#d97706",
+                    ];
+                    const color =
+                      colors[
+                        (inv.first_name?.charCodeAt(0) || 0) % colors.length
+                      ];
+                    return (
+                      <div
+                        key={inv.user_id}
+                        className={`cm-io-card ${isSelected ? "cm-io-selected" : ""}`}
+                        onClick={() =>
+                          setSelectedInvestigatorId(String(inv.user_id))
+                        }
+                      >
+                        <div
+                          className="cm-io-avatar"
+                          style={{ background: color }}
+                        >
+                          {initials}
+                        </div>
+                        <div className="cm-io-info">
+                          <div className="cm-io-name">
+                            {inv.first_name} {inv.last_name}
+                            {isCurrent && (
+                              <span
+                                style={{
+                                  marginLeft: "8px",
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  padding: "2px 8px",
+                                  borderRadius: "20px",
+                                  background: "rgba(217,119,6,0.1)",
+                                  color: "#d97706",
+                                }}
+                              >
+                                CURRENT
+                              </span>
+                            )}
+                          </div>
+                          <div className="cm-io-sub">
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                              }}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                              </svg>
+                              Investigator · Active
+                            </span>
+                          </div>
+                        </div>
+                        {isSelected && <div className="cm-io-check">✓</div>}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
             <div className="cm-modal-footer">
               <button
@@ -727,26 +910,164 @@ function CaseManagement() {
               </span>
             </div>
             <div className="cm-modal-body">
-              <p
+              <div
                 style={{
-                  color: "#6b7280",
-                  marginBottom: "16px",
-                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "20px",
+                  padding: "10px 14px",
+                  background: "rgba(30,58,95,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(30,58,95,0.1)",
                 }}
               >
-                Case: <strong>{selectedCase?.case_number}</strong>
-              </p>
-              <label className="cm-modal-label">Status *</label>
-              <select
-                className="cm-modal-input"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--navy-primary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="7" width="20" height="14" rx="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                <span style={{ fontSize: "13px", color: "#374151" }}>
+                  Case:{" "}
+                  <strong
+                    style={{
+                      color: "var(--navy-primary)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {selectedCase?.case_number}
+                  </strong>
+                </span>
+              </div>
+              <label
+                className="cm-modal-label"
+                style={{ marginBottom: "10px", display: "block" }}
               >
-                <option value="">-- Select Status --</option>
-                <option>Under Investigation</option>
-                <option>Solved</option>
-                <option>Cleared</option>
-              </select>
+                Select New Status *
+              </label>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                {[
+                  {
+                    value: "Under Investigation",
+                    color: "#3b82f6",
+                    bg: "rgba(59,130,246,0.08)",
+                    icon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+                    desc: "Case is actively being worked on",
+                  },
+                  {
+                    value: "Solved",
+                    color: "#16a34a",
+                    bg: "rgba(34,197,94,0.08)",
+                    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+                    desc: "Case has been resolved with suspect identified",
+                  },
+                  {
+                    value: "Cleared",
+                    color: "#4f46e5",
+                    bg: "rgba(99,102,241,0.08)",
+                    icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+                    desc: "Case cleared — no further action needed",
+                  },
+                ].map((s) => (
+                  <div
+                    key={s.value}
+                    onClick={() => setSelectedStatus(s.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      border: `2px solid ${selectedStatus === s.value ? s.color : "#e5e7eb"}`,
+                      background: selectedStatus === s.value ? s.bg : "white",
+                      cursor: "pointer",
+                      transition: "all 0.18s ease",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        background: s.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={s.color}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d={s.icon} />
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          color:
+                            selectedStatus === s.value ? s.color : "#111827",
+                        }}
+                      >
+                        {s.value}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {s.desc}
+                      </div>
+                    </div>
+                    {selectedStatus === s.value && (
+                      <div
+                        style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: s.color,
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="cm-modal-footer">
               <button
@@ -757,7 +1078,14 @@ function CaseManagement() {
               </button>
               <button
                 className="cm-btn cm-btn-primary"
-                onClick={handleUpdateStatus}
+                onClick={() =>
+                  setShowActionConfirm({
+                    show: true,
+                    type: "status",
+                    label: `Set status to "${selectedStatus}"?`,
+                    onConfirm: handleUpdateStatus,
+                  })
+                }
                 disabled={modalLoading}
               >
                 {modalLoading ? "Updating..." : "Update Status"}
@@ -770,7 +1098,10 @@ function CaseManagement() {
       {/* ── ADD NOTE MODAL ── */}
       {showNoteModal && (
         <div className="cm-modal">
-          <div className="cm-modal-content">
+          <div
+            className="cm-modal-content"
+            style={{ maxWidth: "700px", width: "95vw" }}
+          >
             <div className="cm-modal-header">
               <h2>Add Investigation Note</h2>
               <span
@@ -781,27 +1112,145 @@ function CaseManagement() {
               </span>
             </div>
             <div className="cm-modal-body">
-              <p
+              <div
                 style={{
-                  color: "#6b7280",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
                   marginBottom: "16px",
-                  fontSize: "14px",
+                  padding: "10px 14px",
+                  background: "rgba(30,58,95,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(30,58,95,0.1)",
                 }}
               >
-                Case: <strong>{selectedCase?.case_number}</strong>
-              </p>
-              <label className="cm-modal-label">Note *</label>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--navy-primary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="7" width="20" height="14" rx="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                <span style={{ fontSize: "13px", color: "#374151" }}>
+                  Case:{" "}
+                  <strong
+                    style={{
+                      color: "var(--navy-primary)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {selectedCase?.case_number}
+                  </strong>
+                </span>
+              </div>
+
+              <div
+                style={{
+                  background: "rgba(30,58,95,0.03)",
+                  border: "1px solid rgba(30,58,95,0.08)",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  marginBottom: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#6b7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                  Will be logged as:{" "}
+                  <strong style={{ color: "#374151" }}>
+                    {new Date().toLocaleDateString("en-PH", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}{" "}
+                    · {user.username || "Officer"}
+                  </strong>
+                </span>
+              </div>
+
+              <label className="cm-modal-label">Investigation Note *</label>
               <textarea
                 className="cm-modal-input"
-                rows="5"
-                placeholder="Write your investigation note here (minimum 3 characters)"
+                rows="6"
+                placeholder="Write your investigation note here (minimum 3 characters)..."
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 maxLength={2000}
+                style={{ resize: "vertical", marginBottom: "8px" }}
               />
-              <small style={{ color: "#9ca3af", fontSize: "12px" }}>
-                {noteText.length}/2000
-              </small>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "4px",
+                }}
+              >
+                <small
+                  style={{
+                    color: noteText.length > 1800 ? "#dc2626" : "#9ca3af",
+                    fontSize: "12px",
+                  }}
+                >
+                  {noteText.length}/2000 characters
+                </small>
+                {noteText.length >= 3 && (
+                  <small
+                    style={{
+                      color: "#16a34a",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ Ready to save
+                  </small>
+                )}
+              </div>
+              <div
+                style={{
+                  height: "4px",
+                  background: "#e5e7eb",
+                  borderRadius: "4px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${(noteText.length / 2000) * 100}%`,
+                    background:
+                      noteText.length > 1800
+                        ? "#dc2626"
+                        : noteText.length >= 3
+                          ? "#16a34a"
+                          : "var(--navy-primary)",
+                    borderRadius: "4px",
+                    transition: "all 0.2s",
+                  }}
+                />
+              </div>
             </div>
             <div className="cm-modal-footer">
               <button
@@ -825,7 +1274,16 @@ function CaseManagement() {
       {/* ── VIEW DETAIL MODAL ── */}
       {showDetailModal && selectedCase && (
         <div className="cm-modal">
-          <div className="cm-modal-content cm-modal-large">
+          <div
+            className="cm-modal-content cm-modal-large"
+            style={{
+              maxWidth: "1100px",
+              width: "96vw",
+              maxHeight: "92vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <div className="cm-modal-header">
               <h2>
                 {selectedCase.blotter_entry_number || selectedCase.case_number}
@@ -840,45 +1298,128 @@ function CaseManagement() {
                 &times;
               </span>
             </div>
-            <div className="cm-modal-body">
-              <div className="cm-detail-grid">
-                <div className="cm-detail-item">
+            <div
+              className="cm-modal-body"
+              style={{ overflowY: "auto", flex: 1 }}
+            >
+              <div
+                className="cm-detail-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "0",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                  marginBottom: "20px",
+                }}
+              >
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Incident Type</span>
                   <span>{selectedCase.incident_type}</span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Status</span>
                   <span
                     className={`cm-status-badge ${getStatusClass(selectedCase.status)}`}
+                    style={{ width: "fit-content" }}
                   >
                     {selectedCase.status}
                   </span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Priority</span>
                   <span
                     className={`cm-priority-badge ${getPriorityClass(selectedCase.priority)}`}
+                    style={{ width: "fit-content" }}
                   >
                     {selectedCase.priority}
                   </span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Assigned IO</span>
-                  <span>{selectedCase.assigned_io_name || "Unassigned"}</span>
+                  <span
+                    style={{
+                      color: selectedCase.assigned_io_name?.trim()
+                        ? "#111827"
+                        : "#9ca3af",
+                      fontStyle: selectedCase.assigned_io_name?.trim()
+                        ? "normal"
+                        : "italic",
+                    }}
+                  >
+                    {selectedCase.assigned_io_name?.trim() || "N/A"}
+                  </span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Barangay</span>
                   <span>{selectedCase.barangay}</span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Location</span>
                   <span>{selectedCase.location}</span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Date Opened</span>
                   <span>{formatDate(selectedCase.created_at)}</span>
                 </div>
-                <div className="cm-detail-item">
+                <div
+                  className="cm-detail-item"
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: "1px solid #f3f4f6",
+                    borderRight: "1px solid #f3f4f6",
+                  }}
+                >
                   <span className="cm-detail-label">Last Updated</span>
                   <span>{formatDate(selectedCase.updated_at)}</span>
                 </div>
@@ -886,17 +1427,32 @@ function CaseManagement() {
 
               {selectedCase.narrative && (
                 <div style={{ marginTop: "20px" }}>
-                  <div className="cm-detail-label">Narrative</div>
-                  <p
+                  <div
                     style={{
-                      marginTop: "8px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#9ca3af",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Narrative
+                  </div>
+                  <div
+                    style={{
+                      background: "rgba(30,58,95,0.04)",
+                      borderLeft: "4px solid var(--navy-primary)",
+                      borderRadius: "0 8px 8px 0",
+                      padding: "14px 18px",
                       color: "#374151",
-                      lineHeight: "1.6",
+                      lineHeight: "1.7",
                       fontSize: "14px",
+                      fontStyle: "italic",
                     }}
                   >
                     {selectedCase.narrative}
-                  </p>
+                  </div>
                 </div>
               )}
 
@@ -960,26 +1516,156 @@ function CaseManagement() {
               </span>
             </div>
             <div className="cm-modal-body">
-              <p
+              <div
                 style={{
-                  color: "#6b7280",
-                  marginBottom: "16px",
-                  fontSize: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "20px",
+                  padding: "10px 14px",
+                  background: "rgba(30,58,95,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(30,58,95,0.1)",
                 }}
               >
-                Case: <strong>{selectedCase?.case_number}</strong>
-              </p>
-              <label className="cm-modal-label">Priority *</label>
-              <select
-                className="cm-modal-input"
-                value={selectedPriority}
-                onChange={(e) => setSelectedPriority(e.target.value)}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--navy-primary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="7" width="20" height="14" rx="2" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+                <span style={{ fontSize: "13px", color: "#374151" }}>
+                  Case:{" "}
+                  <strong
+                    style={{
+                      color: "var(--navy-primary)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {selectedCase?.case_number}
+                  </strong>
+                </span>
+              </div>
+              <label
+                className="cm-modal-label"
+                style={{ marginBottom: "10px", display: "block" }}
               >
-                <option value="">-- Select Priority --</option>
-                <option>Low</option>
-                <option>Medium</option>
-                <option>High</option>
-              </select>
+                Set Priority Level *
+              </label>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                {[
+                  {
+                    value: "High",
+                    color: "#dc2626",
+                    bg: "rgba(239,68,68,0.08)",
+                    desc: "Requires immediate attention and resources",
+                  },
+                  {
+                    value: "Medium",
+                    color: "#d97706",
+                    bg: "rgba(251,191,36,0.08)",
+                    desc: "Important but not immediately critical",
+                  },
+                  {
+                    value: "Low",
+                    color: "#16a34a",
+                    bg: "rgba(34,197,94,0.08)",
+                    desc: "Routine — can be handled in normal course",
+                  },
+                ].map((p) => (
+                  <div
+                    key={p.value}
+                    onClick={() => setSelectedPriority(p.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "14px",
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      border: `2px solid ${selectedPriority === p.value ? p.color : "#e5e7eb"}`,
+                      background: selectedPriority === p.value ? p.bg : "white",
+                      cursor: "pointer",
+                      transition: "all 0.18s ease",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        borderRadius: "50%",
+                        background: p.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "14px",
+                          height: "14px",
+                          borderRadius: "50%",
+                          background: p.color,
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          color:
+                            selectedPriority === p.value ? p.color : "#111827",
+                        }}
+                      >
+                        {p.value} Priority
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#6b7280",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {p.desc}
+                      </div>
+                    </div>
+                    {selectedPriority === p.value && (
+                      <div
+                        style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: p.color,
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="cm-modal-footer">
               <button
@@ -990,7 +1676,14 @@ function CaseManagement() {
               </button>
               <button
                 className="cm-btn cm-btn-primary"
-                onClick={handleUpdatePriority}
+                onClick={() =>
+                  setShowActionConfirm({
+                    show: true,
+                    type: "priority",
+                    label: `Set priority to "${selectedPriority}"?`,
+                    onConfirm: handleUpdatePriority,
+                  })
+                }
                 disabled={modalLoading}
               >
                 {modalLoading ? "Updating..." : "Update Priority"}
@@ -1000,6 +1693,148 @@ function CaseManagement() {
         </div>
       )}
 
+      {showActionConfirm.show && (
+        <div className="cm-modal" style={{ zIndex: 1100 }}>
+          <div
+            className="cm-modal-content"
+            style={{ maxWidth: "420px", padding: 0 }}
+          >
+            <div
+              style={{
+                padding: "20px 24px",
+                background:
+                  "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+                borderBottom: "3px solid var(--red-primary)",
+                borderRadius: "8px 8px 0 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  background: "rgba(255,255,255,0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "white",
+                  }}
+                >
+                  Confirm Update
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.6)",
+                    marginTop: "2px",
+                  }}
+                >
+                  Please review before saving
+                </p>
+              </div>
+              <span
+                onClick={() =>
+                  setShowActionConfirm({
+                    show: false,
+                    type: "",
+                    label: "",
+                    onConfirm: null,
+                  })
+                }
+                style={{
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </span>
+            </div>
+            <div style={{ padding: "24px" }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  color: "#374151",
+                  lineHeight: "1.6",
+                }}
+              >
+                {showActionConfirm.label} This will update the record
+                immediately.
+              </p>
+            </div>
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #e5e7eb",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+                background: "var(--gray-50)",
+                borderRadius: "0 0 8px 8px",
+              }}
+            >
+              <button
+                className="cm-btn cm-btn-secondary"
+                onClick={() =>
+                  setShowActionConfirm({
+                    show: false,
+                    type: "",
+                    label: "",
+                    onConfirm: null,
+                  })
+                }
+              >
+                Cancel
+              </button>
+              <button
+                className="cm-btn cm-btn-primary"
+                onClick={() => {
+                  showActionConfirm.onConfirm();
+                  setShowActionConfirm({
+                    show: false,
+                    type: "",
+                    label: "",
+                    onConfirm: null,
+                  });
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ERROR MODAL */}
       {errorModal.show && (
         <div className="cm-modal">
@@ -1070,7 +1905,7 @@ function CaseManagement() {
                 width="18"
                 height="18"
                 viewBox="0 0 20 20"
-                fill="currentColor"
+                fill={toast.type === "success" ? "#10b981" : "#dc2626"}
               >
                 <path
                   fillRule="evenodd"
@@ -1079,12 +1914,7 @@ function CaseManagement() {
                 />
               </svg>
             ) : (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="#dc2626">
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"

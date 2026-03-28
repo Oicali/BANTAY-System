@@ -191,12 +191,26 @@ function EBlotter() {
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [deletedBlotters, setDeletedBlotters] = useState([]);
+  const [acceptMode, setAcceptMode] = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [hasSuspect, setHasSuspect] = useState(false);
   const [offenseModus, setOffenseModus] = useState({});
   const [offenseSelectedModus, setOffenseSelectedModus] = useState({});
   const [typeOfPlace, setTypeOfPlace] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [reactToast, setReactToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
+
+  const showReactToast = (message, type = "success") => {
+    setReactToast({ show: true, message, type });
+    setTimeout(
+      () => setReactToast({ show: false, message: "", type: "success" }),
+      3000,
+    );
+  };
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -440,15 +454,7 @@ function EBlotter() {
         });
         const data = await response.json();
         if (data.success) {
-          const toast = document.createElement("div");
-          toast.className = "eb-toast-success";
-          toast.textContent = "Report deleted successfully.";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.classList.add("show"), 10);
-          setTimeout(() => {
-            toast.classList.remove("show");
-            setTimeout(() => toast.remove(), 300);
-          }, 3000);
+          showReactToast("Report deleted successfully.");
           fetchBlotters();
         }
       } catch (error) {
@@ -464,15 +470,7 @@ function EBlotter() {
         });
         const data = await response.json();
         if (data.success) {
-          const toast = document.createElement("div");
-          toast.className = "eb-toast-success";
-          toast.textContent = "Report restored successfully.";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.classList.add("show"), 10);
-          setTimeout(() => {
-            toast.classList.remove("show");
-            setTimeout(() => toast.remove(), 300);
-          }, 3000);
+          showReactToast("Report restored successfully.");
           fetchDeletedBlotters();
           fetchBlotters();
         }
@@ -682,17 +680,10 @@ function EBlotter() {
             }),
           );
         } catch (e) {
-          const toast = document.createElement("div");
-          toast.className = "eb-toast-success";
-          toast.textContent =
-            "Some address dropdowns failed to load. Please re-select.";
-          toast.style.background = "#b45309";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.classList.add("show"), 10);
-          setTimeout(() => {
-            toast.classList.remove("show");
-            setTimeout(() => toast.remove(), 300);
-          }, 4000);
+          showReactToast(
+            "Some address dropdowns failed to load. Please re-select.",
+            "warning",
+          );
         }
         setComplainants(updatedComplainants);
         setCProvinces(newCProvinces);
@@ -730,17 +721,10 @@ function EBlotter() {
             }),
           );
         } catch (e) {
-          const toast = document.createElement("div");
-          toast.className = "eb-toast-success";
-          toast.textContent =
-            "Some address dropdowns failed to load. Please re-select.";
-          toast.style.background = "#b45309";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.classList.add("show"), 10);
-          setTimeout(() => {
-            toast.classList.remove("show");
-            setTimeout(() => toast.remove(), 300);
-          }, 4000);
+          showReactToast(
+            "Some address dropdowns failed to load. Please re-select.",
+            "warning",
+          );
         }
         setSuspects(updatedSuspects);
         setSProvinces(newSProvinces);
@@ -855,78 +839,107 @@ function EBlotter() {
       alert("Failed to load blotter data");
     }
   };
-  const [acceptModal, setAcceptModal] = useState({
-    show: false,
-    blotterId: null,
-    cop: "",
-    type_of_place: "",
-    stage_of_felony: "COMPLETED",
-  });
-
-  const handleAcceptReferral = (blotterId) => {
-    setAcceptModal({
-      show: true,
-      blotterId,
-      cop: "",
-      type_of_place: "",
-      stage_of_felony: "COMPLETED",
-    });
-  };
-
-  const submitAcceptReferral = async () => {
-    const { blotterId, cop, type_of_place, stage_of_felony } = acceptModal;
-
-    // Validate required fields
-    if (!cop || cop.trim().length < 2) {
-      alert(
-        "COP (Officer on Case) is required and must be at least 2 characters",
-      );
-      return;
-    }
-    if (!type_of_place) {
-      alert("Type of Place is required");
-      return;
-    }
-    if (!stage_of_felony) {
-      alert("Stage of Felony is required");
-      return;
-    }
-
+  const handleAcceptReferral = async (blotterId) => {
     try {
-      const res = await fetch(`${API_URL}/${blotterId}/accept`, {
-        method: "PATCH",
+      const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({
-          missingFields: { cop, type_of_place, stage_of_felony },
-        }),
       });
-      const data = await res.json();
+      const data = await response.json();
+
       if (data.success) {
-        const toast = document.createElement("div");
-        toast.className = "eb-toast-success";
-        toast.textContent = "Referral accepted! Case created automatically.";
-        document.body.appendChild(toast);
-        setTimeout(() => toast.classList.add("show"), 10);
-        setTimeout(() => {
-          toast.classList.remove("show");
-          setTimeout(() => toast.remove(), 300);
-        }, 3000);
-        setAcceptModal({
-          show: false,
-          blotterId: null,
-          cop: "",
-          type_of_place: "",
-          stage_of_felony: "COMPLETED",
+        setComplainants(data.data.complainants);
+        setSuspects(data.data.suspects);
+        setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
+
+        const OFFENSE_NORMALIZE = {
+          "carnapping - mc": "Carnapping - MC",
+          "carnapping - mv": "Carnapping - MV",
+          "special complex crime": "Special Complex Crime",
+        };
+        const normalizedOffenses = data.data.offenses.map((o) => ({
+          ...o,
+          offense_name:
+            OFFENSE_NORMALIZE[o.offense_name?.toLowerCase()] || o.offense_name,
+        }));
+        setOffenses(normalizedOffenses);
+        setTypeOfPlace(data.data.type_of_place || "");
+
+        const newOffenseModus = {};
+        const newOffenseSelectedModus = {};
+        const crimeType = OFFENSE_TO_CRIME_TYPE[data.data.incident_type];
+        if (crimeType) {
+          try {
+            const modusRes = await fetch(
+              `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              },
+            );
+            const modusData = await modusRes.json();
+            if (modusData.success) {
+              newOffenseModus[0] = modusData.data;
+              newOffenseSelectedModus[0] = data.data.modus_refs
+                ? data.data.modus_refs.map((m) => m.modus_reference_id)
+                : [];
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          newOffenseModus[0] = [];
+          newOffenseSelectedModus[0] = [];
+        }
+        setOffenseModus(newOffenseModus);
+        setOffenseSelectedModus(newOffenseSelectedModus);
+
+        const rawBrgy = data.data.place_barangay || "";
+        const resolvedBrgy =
+          BARANGAY_MIGRATION_MAP[rawBrgy.toUpperCase()] || rawBrgy;
+
+        setCaseDetail({
+          incident_type: data.data.incident_type,
+          cop: data.data.cop || "",
+          date_time_commission: data.data.date_time_commission || "",
+          date_time_reported: data.data.date_time_reported || "",
+          is_crime: data.data.is_crime,
+          place_region: "Region IV-A (CALABARZON)",
+          place_district_province: "Cavite",
+          place_city_municipality: "Bacoor City",
+          place_barangay: resolvedBrgy,
+          place_barangay_other: "",
+          place_street: data.data.place_street,
+          is_private_place: data.data.is_private_place,
+          narrative: data.data.narrative,
+          amount_involved: data.data.amount_involved,
+          referred_by_barangay: data.data.referred_by_barangay,
+          referred_to_barangay: data.data.referred_to_barangay,
+          referred_by_dilg: data.data.referred_by_dilg,
+          lat: data.data.lat != null ? String(data.data.lat) : "",
+          lng: data.data.lng != null ? String(data.data.lng) : "",
+          modus: data.data.modus_text || "",
         });
-        fetchBlotters();
-      } else {
-        alert(data.message);
+
+        if (resolvedBrgy && barangayGeoJSON) {
+          const feature = barangayGeoJSON.features.find(
+            (f) => f.properties.name_db === resolvedBrgy,
+          );
+          setSelectedBrgyFeature(feature || null);
+        }
+
+        setAcceptMode(true);
+        setEditMode(false);
+        setViewMode(false);
+        setEditingBlotterId(blotterId);
+        setCurrentStep(1);
+        setShowModal(true);
       }
-    } catch (err) {
-      alert("Failed to accept referral.");
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Failed to load blotter data");
     }
   };
   const handleApiResponse = (response) => {
@@ -1518,7 +1531,7 @@ function EBlotter() {
         alias: "",
         gender: "Male",
         birthday: "",
-        age: "",
+        age: null, // CHANGED
         birth_place: "",
         nationality: "FILIPINO",
         region_code: "",
@@ -1532,7 +1545,7 @@ function EBlotter() {
         category_drug_case: "",
         relation_to_victim: "",
         educational_attainment: "",
-        height_cm: "",
+        height_cm: null, // CHANGED
         drug_used: false,
         motive: "",
         occupation: "",
@@ -1686,6 +1699,7 @@ function EBlotter() {
     setFieldErrors({});
     setEditMode(false);
     setViewMode(false);
+    setAcceptMode(false);
     setEditingBlotterId(null);
     setOriginalData(null);
     resetForm();
@@ -1717,6 +1731,128 @@ function EBlotter() {
     try {
       setLoading(true);
 
+      // ACCEPT MODE: Use different endpoint
+      if (acceptMode) {
+        // First update the blotter with current form data
+        const finalCaseDetail = { ...caseDetail };
+        if (finalCaseDetail.amount_involved) {
+          finalCaseDetail.amount_involved =
+            finalCaseDetail.amount_involved.replace(/,/g, "");
+        }
+        if (
+          finalCaseDetail.place_barangay === "Other" &&
+          finalCaseDetail.place_barangay_other
+        ) {
+          finalCaseDetail.place_barangay = finalCaseDetail.place_barangay_other;
+        }
+        delete finalCaseDetail.place_barangay_other;
+        finalCaseDetail.lat = caseDetail.lat
+          ? parseFloat(caseDetail.lat)
+          : null;
+        finalCaseDetail.lng = caseDetail.lng
+          ? parseFloat(caseDetail.lng)
+          : null;
+        finalCaseDetail.type_of_place = typeOfPlace;
+        finalCaseDetail.modus_reference_ids =
+          Object.values(offenseSelectedModus).flat();
+
+        const offensesWithModus = offenses.map((o, i) => ({
+          ...o,
+          modus_reference_ids: offenseSelectedModus[i] || [],
+        }));
+
+        const resolvedComplainants = complainants.map((c, i) => {
+          const regionName =
+            (regions.find((r) => r.code === c.region_code) || {}).name ||
+            c.region_code;
+          const provinceName =
+            (
+              (cProvinces[i] || []).find((p) => p.code === c.province_code) ||
+              {}
+            ).name || c.province_code;
+          const cityName =
+            (
+              (cCities[i] || []).find((x) => x.code === c.municipality_code) ||
+              {}
+            ).name || c.municipality_code;
+          const barangayName =
+            (
+              (cBarangays[i] || []).find((b) => b.code === c.barangay_code) ||
+              {}
+            ).name || c.barangay_code;
+          return {
+            ...c,
+            region: regionName,
+            district_province: provinceName,
+            city_municipality: cityName,
+            barangay: barangayName,
+          };
+        });
+
+        const resolvedSuspects = suspects.map((s, i) => {
+          const regionName =
+            (regions.find((r) => r.code === s.region_code) || {}).name ||
+            s.region_code;
+          const provinceName =
+            (
+              (sProvinces[i] || []).find((p) => p.code === s.province_code) ||
+              {}
+            ).name || s.province_code;
+          const cityName =
+            (
+              (sCities[i] || []).find((x) => x.code === s.municipality_code) ||
+              {}
+            ).name || s.municipality_code;
+          const barangayName =
+            (
+              (sBarangays[i] || []).find((b) => b.code === s.barangay_code) ||
+              {}
+            ).name || s.barangay_code;
+          return {
+            ...s,
+            region: regionName,
+            district_province: provinceName,
+            city_municipality: cityName,
+            barangay: barangayName,
+          };
+        });
+
+        // Update blotter first
+        await fetch(`${API_URL}/${editingBlotterId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            blotterData: finalCaseDetail,
+            complainants: resolvedComplainants,
+            suspects: resolvedSuspects,
+            offenses: offensesWithModus,
+          }),
+        });
+
+        // Then accept (which creates case)
+        const res = await fetch(`${API_URL}/${editingBlotterId}/accept`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const data = await res.json();
+        if (data.success) {
+          showReactToast("Referral accepted! Case created automatically.");
+          closeModal();
+          fetchBlotters();
+        } else {
+          alert(data.message || "Failed to accept referral");
+        }
+        setLoading(false);
+        return;
+      }
+
+      // NORMAL EDIT/CREATE MODE
       const finalCaseDetail = { ...caseDetail };
       if (finalCaseDetail.amount_involved) {
         finalCaseDetail.amount_involved =
@@ -1814,19 +1950,7 @@ function EBlotter() {
           : `Report created successfully!\nReport ID: ${data.data.blotter_entry_number}`;
 
         // Show toast notification
-        const toast = document.createElement("div");
-        toast.className = "eb-toast-success";
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-          toast.classList.add("show");
-        }, 10);
-
-        setTimeout(() => {
-          toast.classList.remove("show");
-          setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        showReactToast(message);
         setOriginalData(null);
         closeModal();
         fetchBlotters();
@@ -1945,13 +2069,90 @@ function EBlotter() {
         <div className="eb-modal">
           <div className="eb-modal-content">
             <div className="eb-modal-header">
-              <h2>
-                {viewMode
-                  ? "View Blotter Entry"
-                  : editMode
-                    ? "Edit Blotter Entry"
-                    : "New Blotter Entry"}
-              </h2>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "14px" }}
+              >
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {viewMode ? (
+                      <>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    ) : acceptMode ? (
+                      <>
+                        <polyline points="20 6 9 17 4 12" />
+                      </>
+                    ) : editMode ? (
+                      <>
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </>
+                    ) : (
+                      <>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </>
+                    )}
+                  </svg>
+                </div>
+                <div>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: "18px",
+                      fontWeight: 700,
+                      color: "white",
+                    }}
+                  >
+                    {viewMode
+                      ? "View Blotter Entry"
+                      : acceptMode
+                        ? "Accept Barangay Report"
+                        : editMode
+                          ? "Edit Blotter Entry"
+                          : "New Blotter Entry"}
+                  </h2>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.6)",
+                      marginTop: "3px",
+                    }}
+                  >
+                    {viewMode
+                      ? "Read-only view of incident record"
+                      : acceptMode
+                        ? "Review and accept referred barangay report"
+                        : editMode
+                          ? "Modify existing blotter entry details"
+                          : "Record a new incident report entry"}
+                  </p>
+                </div>
+              </div>
               <span className="eb-modal-close" onClick={handleModalClose}>
                 &times;
               </span>
@@ -4765,12 +4966,15 @@ function EBlotter() {
                       className="eb-btn eb-btn-primary"
                       onClick={handleSubmit}
                       disabled={loading}
+                      style={acceptMode ? { background: "#16a34a" } : {}}
                     >
                       {loading
                         ? "Submitting..."
-                        : editMode
-                          ? "Update Report Entry"
-                          : "Submit Report Entry"}
+                        : acceptMode
+                          ? "Accept & Create Case"
+                          : editMode
+                            ? "Update Report Entry"
+                            : "Submit Report Entry"}
                     </button>
                   )}
                   {viewMode && (
@@ -4790,18 +4994,33 @@ function EBlotter() {
       )}
 
       {showTrash && (
-        <div className="eb-modal" style={{ zIndex: 10001 }}>
-          <div className="eb-modal-content" style={{ maxWidth: "960px" }}>
+        <div
+          className="eb-modal"
+          style={{ zIndex: 10001, alignItems: "flex-start" }}
+        >
+          <div
+            className="eb-modal-content"
+            style={{
+              maxWidth: "95vw",
+              width: "95vw",
+              margin: "20px auto",
+              maxHeight: "95vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             {/* Modal Header */}
             <div
               style={{
-                padding: "24px 32px",
-                borderBottom: "1px solid var(--gray-200)",
+                padding: "20px 32px",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                background: "var(--navy-primary)",
+                background:
+                  "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+                borderBottom: "3px solid var(--red-primary)",
                 borderRadius: "8px 8px 0 0",
+                flexShrink: 0,
               }}
             >
               <div
@@ -4879,6 +5098,8 @@ function EBlotter() {
                 padding: "28px 32px",
                 background: "var(--gray-50)",
                 minHeight: "200px",
+                flex: 1,
+                overflowY: "auto",
               }}
             >
               {trashLoading ? (
@@ -4976,13 +5197,9 @@ function EBlotter() {
                           <td>
                             <span
                               style={{
-                                display: "inline-block",
-                                padding: "3px 10px",
-                                borderRadius: "20px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                background: "rgba(30,58,95,0.08)",
-                                color: "var(--navy-primary)",
+                                fontSize: "14px",
+                                color: "#374151",
+                                fontWeight: 500,
                               }}
                             >
                               {b.incident_type}
@@ -5013,8 +5230,7 @@ function EBlotter() {
                             {formatDate(b.deleted_at)}
                           </td>
                           <td>
-                            <a
-                              href="#"
+                            <button
                               onClick={(e) => {
                                 e.preventDefault();
                                 handleRestore(b.blotter_id);
@@ -5022,11 +5238,16 @@ function EBlotter() {
                               style={{
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "5px",
-                                color: "#16a34a",
+                                gap: "6px",
+                                color: "white",
+                                background: "#16a34a",
+                                border: "none",
+                                borderRadius: "6px",
+                                padding: "7px 14px",
                                 fontWeight: 600,
                                 fontSize: "13px",
-                                textDecoration: "none",
+                                cursor: "pointer",
+                                fontFamily: "DM Sans, sans-serif",
                               }}
                             >
                               <svg
@@ -5044,7 +5265,7 @@ function EBlotter() {
                                 <path d="M3 3v5h5" />
                               </svg>
                               Restore
-                            </a>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -5082,7 +5303,10 @@ function EBlotter() {
       )}
 
       {confirmModal.show && (
-        <div className="eb-modal" style={{ zIndex: 10002 }}>
+        <div
+          className="eb-modal"
+          style={{ zIndex: 10002, alignItems: "center" }}
+        >
           <div
             className="eb-modal-content"
             style={{ maxWidth: "420px", padding: 0 }}
@@ -5094,6 +5318,7 @@ function EBlotter() {
                   confirmModal.type === "delete"
                     ? "linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)"
                     : "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+                borderBottom: "3px solid rgba(255,255,255,0.2)",
                 borderRadius: "8px 8px 0 0",
                 display: "flex",
                 alignItems: "center",
@@ -5172,6 +5397,26 @@ function EBlotter() {
                     : "Record will be moved to active"}
                 </p>
               </div>
+              <span
+                onClick={() =>
+                  setConfirmModal({
+                    show: false,
+                    type: "",
+                    id: null,
+                    message: "",
+                  })
+                }
+                style={{
+                  marginLeft: "auto",
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                &times;
+              </span>
             </div>
 
             <div style={{ padding: "24px" }}>
@@ -5232,33 +5477,99 @@ function EBlotter() {
       )}
 
       {showConfirmClose && (
-        <div className="eb-modal" style={{ zIndex: 10001 }}>
+        <div
+          className="eb-modal"
+          style={{ zIndex: 10001, alignItems: "center" }}
+        >
           <div
             className="eb-modal-content"
-            style={{ maxWidth: "400px", padding: "0" }}
+            style={{ maxWidth: "420px", padding: 0 }}
           >
-            <div style={{ padding: "24px", borderBottom: "1px solid #e5e7eb" }}>
-              <h3
+            <div
+              style={{
+                padding: "20px 24px",
+                background:
+                  "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+                borderBottom: "3px solid var(--red-primary)",
+                borderRadius: "8px 8px 0 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+              <div
                 style={{
-                  margin: 0,
-                  fontSize: "18px",
-                  fontWeight: 600,
-                  color: "#111827",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  background: "rgba(255,255,255,0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                Confirm Close
-              </h3>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "white",
+                  }}
+                >
+                  Confirm Close
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.6)",
+                    marginTop: "2px",
+                  }}
+                >
+                  Unsaved changes will be lost
+                </p>
+              </div>
+              <span
+                onClick={cancelClose}
+                style={{
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </span>
             </div>
             <div style={{ padding: "24px" }}>
               <p
                 style={{
                   margin: 0,
                   fontSize: "14px",
-                  color: "#6b7280",
-                  lineHeight: "1.5",
+                  color: "#374151",
+                  lineHeight: "1.6",
                 }}
               >
-                Are you sure you want to close? All unsaved data will be lost.
+                Are you sure you want to close? All unsaved data will be lost
+                and cannot be recovered.
               </p>
             </div>
             <div
@@ -5268,21 +5579,19 @@ function EBlotter() {
                 display: "flex",
                 gap: "12px",
                 justifyContent: "flex-end",
+                background: "var(--gray-50)",
+                borderRadius: "0 0 8px 8px",
               }}
             >
-              <button
-                className="eb-btn eb-btn-secondary"
-                onClick={cancelClose}
-                style={{ minWidth: "80px" }}
-              >
+              <button className="eb-btn eb-btn-secondary" onClick={cancelClose}>
                 Cancel
               </button>
               <button
                 className="eb-btn eb-btn-primary"
                 onClick={closeModal}
-                style={{ minWidth: "80px", background: "#dc2626" }}
+                style={{ background: "#dc2626" }}
               >
-                Close
+                Yes, Close
               </button>
             </div>
           </div>
@@ -5549,35 +5858,9 @@ function EBlotter() {
                     <td>
                       <span
                         style={{
-                          display: "inline-block",
-                          padding: "3px 10px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          background:
-                            {
-                              Murder: "rgba(127,29,29,0.1)",
-                              Homicide: "rgba(153,27,27,0.1)",
-                              Rape: "rgba(147,51,234,0.1)",
-                              Robbery: "rgba(234,88,12,0.1)",
-                              Theft: "rgba(217,119,6,0.1)",
-                              "Physical Injury": "rgba(3,105,161,0.1)",
-                              "Carnapping - MC": "rgba(15,118,110,0.1)",
-                              "Carnapping - MV": "rgba(15,118,110,0.1)",
-                              "Special Complex Crime": "rgba(67,56,202,0.1)",
-                            }[b.incident_type] || "rgba(107,114,128,0.1)",
-                          color:
-                            {
-                              Murder: "#7f1d1d",
-                              Homicide: "#991b1b",
-                              Rape: "#9333ea",
-                              Robbery: "#ea580c",
-                              Theft: "#d97706",
-                              "Physical Injury": "#0369a1",
-                              "Carnapping - MC": "#0f766e",
-                              "Carnapping - MV": "#0f766e",
-                              "Special Complex Crime": "#4338ca",
-                            }[b.incident_type] || "#6b7280",
+                          fontSize: "14px",
+                          color: "#374151",
+                          fontWeight: 500,
                         }}
                       >
                         {b.incident_type}
@@ -5594,42 +5877,56 @@ function EBlotter() {
                     </td>
                     <td>
                       <div className="eb-table-actions">
-                        {activeReportTab === "referred" && (
-                          <button
-                            className="eb-action-btn"
-                            style={{ background: "#16a34a", color: "white" }}
-                            onClick={() => handleAcceptReferral(b.blotter_id)}
-                          >
-                            ✓ Accept
-                          </button>
+                        {activeReportTab === "referred" ? (
+                          <>
+                            <button
+                              className="eb-action-btn"
+                              style={{ background: "#16a34a", color: "white" }}
+                              onClick={() => handleAcceptReferral(b.blotter_id)}
+                            >
+                              ✓ Accept
+                            </button>
+                            <button
+                              className="eb-action-btn eb-action-btn-danger"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDelete(b.blotter_id);
+                              }}
+                            >
+                              <DeleteIcon /> Delete
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              className="eb-action-btn eb-action-btn-view"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleView(b.blotter_id);
+                              }}
+                            >
+                              <ViewIcon /> View
+                            </button>
+                            <button
+                              className="eb-action-btn eb-action-btn-edit"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleEdit(b.blotter_id);
+                              }}
+                            >
+                              <EditIcon /> Edit
+                            </button>
+                            <button
+                              className="eb-action-btn eb-action-btn-danger"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDelete(b.blotter_id);
+                              }}
+                            >
+                              <DeleteIcon /> Delete
+                            </button>
+                          </>
                         )}
-                        <button
-                          className="eb-action-btn eb-action-btn-view"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleView(b.blotter_id);
-                          }}
-                        >
-                          <ViewIcon /> View
-                        </button>
-                        <button
-                          className="eb-action-btn eb-action-btn-edit"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleEdit(b.blotter_id);
-                          }}
-                        >
-                          <EditIcon /> Edit
-                        </button>
-                        <button
-                          className="eb-action-btn eb-action-btn-danger"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDelete(b.blotter_id);
-                          }}
-                        >
-                          <DeleteIcon /> Delete
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -5702,157 +5999,55 @@ function EBlotter() {
           onSuccess={() => {
             fetchBlotters();
             setShowImport(false);
+            showReactToast("Records imported successfully!");
           }}
         />
       )}
 
-      {acceptModal.show && (
-        <div className="eb-modal" style={{ zIndex: 10003 }}>
-          <div className="eb-modal-content" style={{ maxWidth: "500px" }}>
-            <div
-              className="eb-modal-header"
-              style={{
-                background: "linear-gradient(135deg, #16a34a, #22c55e)",
-              }}
-            >
-              <h2 style={{ color: "white", fontSize: "16px" }}>
-                Accept Barangay Referral
-              </h2>
-              <span
-                className="eb-modal-close"
-                style={{ color: "white" }}
-                onClick={() =>
-                  setAcceptModal({
-                    show: false,
-                    blotterId: null,
-                    cop: "",
-                    type_of_place: "",
-                    stage_of_felony: "COMPLETED",
-                  })
-                }
-              >
-                &times;
-              </span>
-            </div>
-            <div className="eb-modal-body" style={{ padding: "24px" }}>
-              <p
-                style={{
-                  color: "#6b7280",
-                  marginBottom: "20px",
-                  fontSize: "14px",
-                }}
-              >
-                Fill in the required fields to complete the report and create a
-                case.
-              </p>
-
-              <div
-                className="eb-modal-form-group"
-                style={{ marginBottom: "16px" }}
-              >
-                <label className="eb-modal-label">
-                  COP (Officer on Case) *
-                </label>
-                <input
-                  type="text"
-                  className="eb-modal-input"
-                  placeholder="Officer Name"
-                  value={acceptModal.cop}
-                  maxLength="100"
-                  onChange={(e) =>
-                    setAcceptModal({
-                      ...acceptModal,
-                      cop: e.target.value.replace(/[^A-Za-zÑñ.\s-]/g, ""),
-                    })
-                  }
-                />
-              </div>
-
-              <div
-                className="eb-modal-form-group"
-                style={{ marginBottom: "16px" }}
-              >
-                <label className="eb-modal-label">Type of Place *</label>
-                <select
-                  className="eb-modal-input"
-                  value={acceptModal.type_of_place}
-                  onChange={(e) =>
-                    setAcceptModal({
-                      ...acceptModal,
-                      type_of_place: e.target.value,
-                    })
-                  }
-                >
-                  <option value="">Select Type of Place</option>
-                  <option>
-                    Abandoned Structure (house, bldg, apartment/condo)
-                  </option>
-                  <option>Along the street</option>
-                  <option>Commercial/Business Establishment</option>
-                  <option>Construction/Industrial Barracks</option>
-                  <option>Farm/Ricefield</option>
-                  <option>Government Office/Establishment</option>
-                  <option>Onboard a vehicle (riding in/on)</option>
-                  <option>
-                    Parking Area (vacant lot, in bldg/structure, open parking)
-                  </option>
-                  <option>Recreational Place (resorts/parks)</option>
-                  <option>Residential (house/condo)</option>
-                  <option>River/Lake</option>
-                  <option>School (Grade/High School/College/University)</option>
-                  <option>
-                    Transportation Terminals (Tricycle, Jeep, FX, Bus, Train
-                    Station)
-                  </option>
-                  <option>Vacant Lot (unused/unoccupied open area)</option>
-                </select>
-              </div>
-
-              <div className="eb-modal-form-group">
-                <label className="eb-modal-label">Stage of Felony *</label>
-                <select
-                  className="eb-modal-input"
-                  value={acceptModal.stage_of_felony}
-                  onChange={(e) =>
-                    setAcceptModal({
-                      ...acceptModal,
-                      stage_of_felony: e.target.value,
-                    })
-                  }
-                >
-                  <option value="COMPLETED">COMPLETED</option>
-                  <option value="ATTEMPTED">ATTEMPTED</option>
-                  <option value="FRUSTRATED">FRUSTRATED</option>
-                </select>
-              </div>
-            </div>
-            <div
-              className="eb-modal-footer"
-              style={{ padding: "16px 24px", borderTop: "1px solid #e5e7eb" }}
-            >
-              <button
-                className="eb-btn eb-btn-secondary"
-                onClick={() =>
-                  setAcceptModal({
-                    show: false,
-                    blotterId: null,
-                    cop: "",
-                    type_of_place: "",
-                    stage_of_felony: "COMPLETED",
-                  })
-                }
-              >
-                Cancel
-              </button>
-              <button
-                className="eb-btn eb-btn-primary"
-                style={{ background: "#16a34a" }}
-                onClick={submitAcceptReferral}
-              >
-                Accept & Create Case
-              </button>
-            </div>
-          </div>
+      {reactToast.show && (
+        <div
+          style={{
+            position: "fixed",
+            top: "24px",
+            right: "24px",
+            zIndex: 99999,
+            minWidth: "320px",
+            padding: "16px 20px",
+            borderRadius: "8px",
+            background: "white",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            border: "1px solid #e5e7eb",
+            borderLeft: `4px solid ${reactToast.type === "success" ? "#10b981" : reactToast.type === "warning" ? "#f59e0b" : "#dc2626"}`,
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "14px",
+            fontWeight: 500,
+            color: "#111827",
+            animation: "slideInToast 0.3s ease",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 20 20"
+            fill={reactToast.type === "success" ? "#10b981" : "#dc2626"}
+          >
+            {reactToast.type === "success" ? (
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            ) : (
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
+            )}
+          </svg>
+          <span>{reactToast.message}</span>
         </div>
       )}
     </div>

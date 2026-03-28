@@ -366,7 +366,9 @@ body {
 
 /* === MODAL STYLES === */
 .eb-modal {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
   position: fixed;
   z-index: 1000;
   left: 0;
@@ -375,11 +377,12 @@ body {
   height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
+  padding: 20px 0;
 }
 
 .eb-modal-content {
   background-color: var(--white);
-  margin: 20px auto;
+  margin: 20px;
   width: 90%;
   max-width: 1400px;
   border-radius: 8px;
@@ -1192,4 +1195,66 @@ select.eb-modal-input {
   height: 40px;
   width: 40px;
   margin-left: 0;
+}
+@keyframes slideInToast {
+  from { transform: translateX(100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+/* Custom scrollbar — thin gray, all modules */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.eb-report-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  outline: none !important; /* REMOVE BLACK OUTLINE */
+}
+
+.eb-report-tab:focus {
+  outline: none !important; /* REMOVE BLACK OUTLINE ON FOCUS */
+}
+
+.eb-report-tab.active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+}
+
+.eb-report-tab:hover {
+  color: #1e3a5f;
+  background: rgba(30, 58, 95, 0.05);
+}
+
+/* Remove outline from all buttons */
+.eb-btn:focus,
+.eb-action-btn:focus,
+.eb-filter-btn:focus,
+.eb-pagination-btn:focus {
+  outline: none !important;
 }

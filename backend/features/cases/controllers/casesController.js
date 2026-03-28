@@ -163,19 +163,19 @@ if (role === "Investigator") {
    LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
    ${where}
    ORDER BY 
-     CASE c.priority 
-       WHEN 'High' THEN 1 
-       WHEN 'Medium' THEN 2 
-       WHEN 'Low' THEN 3 
-       ELSE 4 
-     END,
-     CASE c.status 
-       WHEN 'Under Investigation' THEN 1 
-       WHEN 'Cleared' THEN 2 
-       WHEN 'Solved' THEN 3 
-       ELSE 4 
-     END,
-     c.created_at DESC`,
+  CASE 
+    WHEN c.priority = 'High' AND c.status = 'Under Investigation' THEN 1
+    WHEN c.priority = 'Medium' AND c.status = 'Under Investigation' THEN 2
+    WHEN c.priority = 'Low' AND c.status = 'Under Investigation' THEN 3
+    WHEN c.priority = 'High' AND c.status = 'Cleared' THEN 4
+    WHEN c.priority = 'Medium' AND c.status = 'Cleared' THEN 5
+    WHEN c.priority = 'Low' AND c.status = 'Cleared' THEN 6
+    WHEN c.priority = 'High' AND c.status = 'Solved' THEN 7
+    WHEN c.priority = 'Medium' AND c.status = 'Solved' THEN 8
+    WHEN c.priority = 'Low' AND c.status = 'Solved' THEN 9
+    ELSE 10
+  END,
+  c.created_at DESC`,
   params
 );
 

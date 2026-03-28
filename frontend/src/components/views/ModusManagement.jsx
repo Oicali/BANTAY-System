@@ -258,10 +258,10 @@ function ModusManagement() {
       {toast && (
         <div className={`mm-toast ${toast.type}`}>
           <svg
-            width="20"
-            height="20"
+            width="18"
+            height="18"
             viewBox="0 0 20 20"
-            fill="currentColor"
+            fill={toast.type === "success" ? "#10b981" : "#dc2626"}
             style={{ flexShrink: 0 }}
           >
             {toast.type === "success" ? (
@@ -497,9 +497,78 @@ function ModusManagement() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="mm-modal-overlay">
-          <div className="mm-modal">
+          <div
+            className="mm-modal"
+            style={{ maxWidth: "620px", width: "92vw" }}
+          >
             <div className="mm-modal-header">
-              <h2>{editingId ? "Edit Modus" : "Add New Modus"}</h2>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "14px" }}
+              >
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    border: "1px solid rgba(255,255,255,0.2)",
+                  }}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {editingId ? (
+                      <>
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </>
+                    ) : (
+                      <>
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </>
+                    )}
+                  </svg>
+                </div>
+                <div>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: "18px",
+                      fontWeight: 700,
+                      color: "white",
+                    }}
+                  >
+                    {editingId
+                      ? "Edit Modus Operandi"
+                      : "Add New Modus Operandi"}
+                  </h2>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      color: "rgba(255,255,255,0.6)",
+                      marginTop: "3px",
+                    }}
+                  >
+                    {editingId
+                      ? "Modify existing modus operandi record"
+                      : "Register a new modus operandi classification"}
+                  </p>
+                </div>
+              </div>
               <span
                 className="mm-modal-close"
                 onClick={() => setShowModal(false)}
@@ -507,59 +576,172 @@ function ModusManagement() {
                 &times;
               </span>
             </div>
-            <div className="mm-modal-body">
+            <div
+              className="mm-modal-body"
+              style={{ padding: "28px 32px", gap: "24px" }}
+            >
+              {/* Crime Type */}
               <div className="mm-form-group">
-                <label>Crime Type *</label>
+                <label
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#374151",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                  }}
+                >
+                  Crime Type{" "}
+                  <span style={{ color: "var(--red-primary)" }}>*</span>
+                </label>
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: "12px",
+                    color: "#9ca3af",
+                  }}
+                >
+                  Select the index crime this modus falls under
+                </p>
                 <select
                   className={`mm-input ${errors.crime_type ? "error" : ""}`}
                   value={form.crime_type}
+                  style={{ height: "44px", fontSize: "14px" }}
                   onChange={(e) => {
                     setForm((p) => ({ ...p, crime_type: e.target.value }));
                     setErrors((p) => ({ ...p, crime_type: "" }));
                   }}
                 >
-                  <option value="">Select Crime Type</option>
+                  <option value="">— Select Crime Type —</option>
                   {INDEX_CRIMES.map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
                   ))}
                 </select>
+
                 {errors.crime_type && (
                   <span className="mm-error">{errors.crime_type}</span>
                 )}
               </div>
 
+              {/* Modus Name */}
               <div className="mm-form-group">
-                <label>Modus Name *</label>
+                <label
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#374151",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                  }}
+                >
+                  Modus Name{" "}
+                  <span style={{ color: "var(--red-primary)" }}>*</span>
+                </label>
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: "12px",
+                    color: "#9ca3af",
+                  }}
+                >
+                  Common name or terminology used (e.g., Akyat Bahay,
+                  Budol-Budol)
+                </p>
                 <input
                   type="text"
                   className={`mm-input ${errors.modus_name ? "error" : ""}`}
                   placeholder="e.g., Akyat Bahay"
                   value={form.modus_name}
                   maxLength="100"
+                  style={{ height: "44px", fontSize: "14px" }}
                   onChange={(e) => {
                     setForm((p) => ({ ...p, modus_name: e.target.value }));
                     setErrors((p) => ({ ...p, modus_name: "" }));
                   }}
                 />
-                {errors.modus_name && (
-                  <span className="mm-error">{errors.modus_name}</span>
-                )}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: "5px",
+                  }}
+                >
+                  {errors.modus_name ? (
+                    <span className="mm-error">{errors.modus_name}</span>
+                  ) : (
+                    <span />
+                  )}
+                  <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+                    {form.modus_name.length}/100
+                  </span>
+                </div>
               </div>
 
+              {/* Description */}
               <div className="mm-form-group">
-                <label>Description</label>
+                <label
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#374151",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                  }}
+                >
+                  Description{" "}
+                  <span
+                    style={{
+                      color: "#9ca3af",
+                      fontWeight: 400,
+                      textTransform: "none",
+                    }}
+                  >
+                    (optional)
+                  </span>
+                </label>
+                <p
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: "12px",
+                    color: "#9ca3af",
+                  }}
+                >
+                  Brief explanation of how this modus is typically carried out
+                </p>
                 <textarea
                   className="mm-input"
-                  rows="3"
-                  placeholder="Brief description of this modus..."
+                  rows="4"
+                  placeholder="Describe how this modus operandi is typically carried out..."
                   value={form.description}
                   maxLength="500"
+                  style={{
+                    fontSize: "14px",
+                    resize: "vertical",
+                    minHeight: "100px",
+                  }}
                   onChange={(e) =>
                     setForm((p) => ({ ...p, description: e.target.value }))
                   }
                 />
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginTop: "5px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      color:
+                        form.description.length > 450 ? "#dc2626" : "#9ca3af",
+                    }}
+                  >
+                    {form.description.length}/500
+                  </span>
+                </div>
               </div>
             </div>
             <div className="mm-modal-footer">
