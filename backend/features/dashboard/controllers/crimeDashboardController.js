@@ -62,9 +62,11 @@ const expandBarangays = (names) => {
 };
 
 // ─── SHARED WHERE BUILDER ─────────────────────────────────────────────────────
+// NOTE: is_deleted = false is intentionally omitted here — blotter_analytics_view
+// already filters it out at the view level. Including it is harmless but redundant.
 const buildWhere = (query) => {
   const { date_from, date_to, crime_types, barangays } = query;
-  const conditions = ["be.is_deleted = false"];
+  const conditions = [];
   const params = [];
   let p = 1;
 
@@ -93,12 +95,14 @@ const buildWhere = (query) => {
     }
   }
 
-  return { where: "WHERE " + conditions.join(" AND "), params, nextP: p };
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  return { where, params, nextP: p };
 };
 
 // ─── INDIVIDUAL QUERY HELPERS ─────────────────────────────────────────────────
-// Each returns a plain shaped array — no res.json(), no try/catch.
-// Errors bubble up to getOverview's single catch block.
+// All queries now target blotter_analytics_view (aliased as `be`) instead of
+// blotter_entries. The view pre-filters is_deleted = false and enriches rows
+// with victim_name, suspect_name, offense_name, and stage_of_felony.
 
 const querySummary = async (where, params, nextP) => {
   const result = await pool.query(
@@ -110,9 +114,9 @@ const querySummary = async (where, params, nextP) => {
       COUNT(*) FILTER (
         WHERE LOWER(be.status) NOT IN ('cleared','cce','solved','cse','closed')
       ) AS under_investigation
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
      GROUP BY UPPER(be.incident_type)`,
     [...params, INDEX_CRIMES],
   );
@@ -137,9 +141,9 @@ const querySummary = async (where, params, nextP) => {
 const queryTrends = async (where, params, nextP, granularity = "monthly", dateFrom, dateTo) => {
   // bidaily uses daily DATE_TRUNC then we thin the skeleton to every 2nd day
   const dateTrunc =
-    granularity === "daily"   ? "day"
-    : granularity === "bidaily" ? "day"
-    : granularity === "weekly"  ? "week"
+    granularity === "daily"    ? "day"
+    : granularity === "bidaily"  ? "day"
+    : granularity === "weekly"   ? "week"
     : "month";
 
   const result = await pool.query(
@@ -147,9 +151,9 @@ const queryTrends = async (where, params, nextP, granularity = "monthly", dateFr
       TO_CHAR(DATE_TRUNC('${dateTrunc}', be.date_time_commission), 'YYYY-MM-DD') AS label,
       UPPER(be.incident_type) AS crime,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
      GROUP BY label, UPPER(be.incident_type)
      ORDER BY label ASC`,
     [...params, INDEX_CRIMES],
@@ -173,7 +177,6 @@ const queryTrends = async (where, params, nextP, granularity = "monthly", dateFr
   }
 
   // Helper: format a Date as YYYY-MM-DD using LOCAL time (not UTC)
-  // This prevents the UTC-offset shift that causes mismatched labels
   const toLocalIso = (d) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -182,20 +185,15 @@ const queryTrends = async (where, params, nextP, granularity = "monthly", dateFr
   };
 
   // Build skeleton: snap cursor to period boundary then walk to end
-  // The snap must produce the SAME label that DATE_TRUNC produces in Postgres:
-  //   monthly → 1st of month  e.g. 2025-03-01
-  //   weekly  → Monday of week e.g. 2025-03-17
-  //   daily   → exact day      e.g. 2025-03-19
   const cursor = new Date(dateFrom + "T00:00:00");
 
   if (dateTrunc === "month") {
-    cursor.setDate(1);                         // snap to 1st of month
+    cursor.setDate(1);
   } else if (dateTrunc === "week") {
-    const dow = cursor.getDay();               // 0=Sun, 1=Mon ... 6=Sat
-    const diff = dow === 0 ? -6 : 1 - dow;    // roll back to Monday (Postgres default)
+    const dow = cursor.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
     cursor.setDate(cursor.getDate() + diff);
   }
-  // daily: no snap needed — cursor is already the exact day
 
   const end = new Date(dateTo + "T00:00:00");
 
@@ -211,24 +209,18 @@ const queryTrends = async (where, params, nextP, granularity = "monthly", dateFr
     else                           cursor.setMonth(cursor.getMonth() + 1);
   }
 
-  // For bidaily: also aggregate DB data into the 2-day buckets
-  // Each skeleton key represents a 2-day window starting on that date
+  // For bidaily: aggregate DB data into 2-day buckets
   if (granularity === "bidaily") {
     const skeletonKeys = Object.keys(skeleton).sort();
     skeletonKeys.forEach((key, i) => {
       const nextKey = skeletonKeys[i + 1];
-      // Find all dbMap keys that fall in [key, nextKey)
       Object.keys(dbMap).forEach((dbLabel) => {
         if (dbLabel >= key && (!nextKey || dbLabel < nextKey)) {
-          // Merge this day's data into the bucket
           INDEX_CRIMES.forEach((c) => {
             skeleton[key][c] += dbMap[dbLabel][c] || 0;
-            skeleton[key].Total += dbMap[dbLabel][c] || 0;
           });
-          // Recalculate Total correctly
         }
       });
-      // Recalculate Total from individual crimes
       skeleton[key].Total = INDEX_CRIMES.reduce((s, c) => s + (skeleton[key][c] || 0), 0);
     });
     return Object.values(skeleton).sort((a, b) => a.label.localeCompare(b.label));
@@ -247,15 +239,14 @@ const queryHourly = async (where, params, nextP) => {
     `SELECT
       EXTRACT(HOUR FROM be.date_time_commission)::int AS hour,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
      GROUP BY hour
      ORDER BY hour ASC`,
     [...params, INDEX_CRIMES],
   );
 
-  // Fill all 24 hours so the chart always has a complete x-axis
   const map = {};
   result.rows.forEach((r) => { map[r.hour] = parseInt(r.count); });
 
@@ -270,16 +261,15 @@ const queryByDay = async (where, params, nextP) => {
     `SELECT
       be.day_of_incident AS day,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.day_of_incident IS NOT NULL
      GROUP BY be.day_of_incident
      ORDER BY count DESC`,
     [...params, INDEX_CRIMES],
   );
 
-  // Map results into the fixed 7-day order so the chart always shows all days
   const map = {};
   result.rows.forEach((r) => { map[r.day] = parseInt(r.count); });
 
@@ -291,9 +281,9 @@ const queryPlace = async (where, params, nextP) => {
     `SELECT
       TRIM(be.type_of_place) AS place,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.type_of_place IS NOT NULL
        AND TRIM(be.type_of_place) <> ''
      GROUP BY TRIM(be.type_of_place)
@@ -313,9 +303,9 @@ const queryBarangay = async (where, params, nextP) => {
     `SELECT
       TRIM(be.place_barangay) AS barangay,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.place_barangay IS NOT NULL
        AND TRIM(be.place_barangay) <> ''
      GROUP BY TRIM(be.place_barangay)
@@ -335,9 +325,9 @@ const queryModus = async (where, params, nextP) => {
       UPPER(be.incident_type) AS crime,
       TRIM(be.modus) AS modus,
       COUNT(*) AS count
-     FROM blotter_entries be
+     FROM blotter_analytics_view be
      ${where}
-       AND UPPER(be.incident_type) = ANY($${nextP}::text[])
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.modus IS NOT NULL
        AND TRIM(be.modus) <> ''
      GROUP BY UPPER(be.incident_type), TRIM(be.modus)
@@ -354,13 +344,10 @@ const queryModus = async (where, params, nextP) => {
 };
 
 // ─── /overview — ALL 7 queries in one round trip ──────────────────────────────
-// All 7 queries fire simultaneously via Promise.all — total wait = slowest query.
-// One JSON body → one setState → one render → all panels always in sync.
 const getOverview = async (req, res) => {
   try {
     const { where, params, nextP } = buildWhere(req.query);
     const { granularity = "monthly", date_from, date_to, preset } = req.query;
-    // Use bidaily granularity for 30d preset so we get 15 points instead of 30
     const effectiveGranularity = preset === "30d" ? "bidaily" : granularity;
 
     const [summary, trends, hourly, byDay, place, barangay, modus] =
@@ -398,7 +385,6 @@ const getTrends = async (req, res) => {
   try {
     const { where, params, nextP } = buildWhere(req.query);
     const { granularity = "monthly", date_from, date_to, preset } = req.query;
-    // Use bidaily if preset is 30d regardless of granularity param
     const effectiveGranularity = preset === "30d" ? "bidaily" : granularity;
     const data = await queryTrends(where, params, nextP, effectiveGranularity, date_from, date_to);
     res.json({ success: true, data });
