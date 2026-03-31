@@ -758,3 +758,146 @@
   .crmap-sidebar { width: 260px; }
   .crmap-map-wrap { height: calc(100vh - 280px); }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   APPEND THIS BLOCK TO THE BOTTOM OF CrimeMapping.css
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── HEATMAP / CHOROPLETH TOGGLE PILL ──────────────────────────────────────── */
+.crmap-heatmap-toggle {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  color: var(--navy-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.crmap-heatmap-toggle:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+/* Active = heatmap mode on — pill goes dark to contrast the dark basemap */
+.crmap-heatmap-toggle.active {
+  background: rgba(15, 24, 44, 0.82);
+  border-color: rgba(255, 120, 30, 0.6);
+  color: #ff8c30;
+  box-shadow: 0 0 0 2px rgba(255, 120, 30, 0.18), 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+.crmap-heatmap-toggle.active svg {
+  stroke: #ff8c30;
+}
+.crmap-heatmap-toggle svg {
+  stroke: var(--navy-primary);
+  flex-shrink: 0;
+}
+
+/* ── HEATMAP LEGEND STRIP (bottom of map) ──────────────────────────────────── */
+.crmap-heat-legend {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 18, 36, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 6px 14px;
+  pointer-events: none;
+}
+.crmap-heat-legend-bar {
+  width: 140px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0) 0%,
+    #003300 8%,
+    #22ff44 25%,
+    #ffff00 45%,
+    #ff6600 65%,
+    #ff2200 82%,
+    #0a0000 100%
+  );
+  border: 0.5px solid rgba(255,255,255,0.12);
+}
+.crmap-heat-legend-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+}
+
+/* ── HEATMAP SIDEBAR LEGEND ─────────────────────────────────────────────────── */
+.crmap-heat-sidebar-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.crmap-heat-sidebar-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--gray-500);
+  margin-bottom: 4px;
+}
+.crmap-heat-scale-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0) 0%,
+    #003300 8%,
+    #22ff44 25%,
+    #ffff00 45%,
+    #ff6600 65%,
+    #ff2200 82%,
+    #0a0000 100%
+  );
+  border: 0.5px solid rgba(0,0,0,0.1);
+}
+.crmap-heat-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--gray-500);
+  font-weight: 600;
+}
+.crmap-severity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.crmap-severity-row:last-child { border-bottom: none; }
+.crmap-severity-crime {
+  color: var(--gray-700);
+  font-weight: 500;
+}
+.crmap-severity-weight {
+  font-family: "Inter", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy-primary);
+}

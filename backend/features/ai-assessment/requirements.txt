@@ -1,1 +1,10 @@
-pytest
+fastapi==0.115.0
+uvicorn==0.30.0
+pandas==2.2.0
+numpy==1.26.0
+scipy==1.13.0
+pmdarima==2.0.4
+scikit-learn==1.5.0
+psycopg2-binary==2.9.9
+python-dateutil==2.9.0
+python-dotenv==1.0.0
