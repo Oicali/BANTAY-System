@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from scipy import stats
 from sklearn.cluster import DBSCAN
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+load_dotenv()
 
 app = FastAPI(title="BANTAY AI Assessment Service", version="0.2.4")
 
