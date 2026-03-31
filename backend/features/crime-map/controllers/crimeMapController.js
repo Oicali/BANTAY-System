@@ -1,7 +1,11 @@
 const pool = require("../../../config/database");
 
+const fetch = (...args) =>
+  import('node-fetch').then(({ default: f }) => f(...args));
+
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+
 // GET /crime-map/boundaries
-// Returns all 46 barangays with crime count + color code
 const getBoundaries = async (req, res) => {
   try {
     const { date_from, date_to, incident_type } = req.query;
@@ -49,7 +53,7 @@ const getBoundaries = async (req, res) => {
 
     const boundaries = barangayResult.rows.map(b => {
       const count = crimeMap[b.name_db.toUpperCase()] || 0;
-      let color = '#9ca3af'; // GREY
+      let color = '#9ca3af';
       let risk = 'None';
 
       if (count >= 4) { color = '#ef4444'; risk = 'High'; }
@@ -75,7 +79,6 @@ const getBoundaries = async (req, res) => {
 };
 
 // GET /crime-map/pins
-// Returns all crime pins with coordinates
 const getPins = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
@@ -114,29 +117,28 @@ const getPins = async (req, res) => {
       params.push(incident_type);
     }
     if (barangay) {
-  query += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
-  params.push(barangay);
-}
-if (req.query.modus) {
-  query += ` AND EXISTS (
-    SELECT 1 FROM crime_modus cm
-    JOIN crime_modus_reference cmr ON cm.modus_reference_id = cmr.id
-    WHERE cm.blotter_id = blotter_entries.blotter_id
-    AND UPPER(cmr.modus_name) = UPPER($${p++})
-  )`;
-  params.push(req.query.modus);
-}
-if (req.query.hour !== undefined && req.query.hour !== '') {
-  query += ` AND EXTRACT(HOUR FROM date_time_commission) = $${p++}`;
-  params.push(parseInt(req.query.hour));
-}
-if (req.query.day) {
-  query += ` AND TRIM(TO_CHAR(date_time_commission, 'Day')) = $${p++}`;
-  params.push(req.query.day);
-}
+      query += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
+      params.push(barangay);
+    }
+    if (req.query.modus) {
+      query += ` AND EXISTS (
+        SELECT 1 FROM crime_modus cm
+        JOIN crime_modus_reference cmr ON cm.modus_reference_id = cmr.id
+        WHERE cm.blotter_id = blotter_entries.blotter_id
+        AND UPPER(cmr.modus_name) = UPPER($${p++})
+      )`;
+      params.push(req.query.modus);
+    }
+    if (req.query.hour !== undefined && req.query.hour !== '') {
+      query += ` AND EXTRACT(HOUR FROM date_time_commission) = $${p++}`;
+      params.push(parseInt(req.query.hour));
+    }
+    if (req.query.day) {
+      query += ` AND TRIM(TO_CHAR(date_time_commission, 'Day')) = $${p++}`;
+      params.push(req.query.day);
+    }
 
-    // Role-based filtering
-const { role_name, user_id } = req.user || {};
+    const { role_name, user_id } = req.user || {};
     const client = await pool.connect();
     let result;
     try {
@@ -172,31 +174,30 @@ const { role_name, user_id } = req.user || {};
       client.release();
     }
 
-    // Assign color per incident type
     const colorMap = {
-      'ROBBERY': '#ef4444',
-      'THEFT': '#f97316',
-      'PHYSICAL INJURIES': '#eab308',
-      'HOMICIDE': '#8b5cf6',
-      'MURDER': '#7c3aed',
-      'RAPE': '#ec4899',
-      'CARNAPPING - MC': '#3b82f6',
-      'CARNAPPING - MV': '#0ea5e9',
+      'ROBBERY':               '#ef4444',
+      'THEFT':                 '#f97316',
+      'PHYSICAL INJURIES':     '#eab308',
+      'HOMICIDE':              '#8b5cf6',
+      'MURDER':                '#7c3aed',
+      'RAPE':                  '#ec4899',
+      'CARNAPPING - MC':       '#3b82f6',
+      'CARNAPPING - MV':       '#0ea5e9',
       'SPECIAL COMPLEX CRIME': '#14b8a6',
     };
 
     const pins = result.rows.map(r => {
-  const dt = r.date_time_commission ? new Date(r.date_time_commission) : null;
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  return {
-    ...r,
-    lat: parseFloat(r.lat),
-    lng: parseFloat(r.lng),
-    color: colorMap[r.incident_type?.toUpperCase()] || '#6b7280',
-    time: dt ? dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : null,
-    day_of_week: dt ? days[dt.getDay()] : null,
-  };
-});
+      const dt = r.date_time_commission ? new Date(r.date_time_commission) : null;
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      return {
+        ...r,
+        lat: parseFloat(r.lat),
+        lng: parseFloat(r.lng),
+        color: colorMap[r.incident_type?.toUpperCase()] || '#6b7280',
+        time: dt ? dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : null,
+        day_of_week: dt ? days[dt.getDay()] : null,
+      };
+    });
 
     res.json({ success: true, count: pins.length, data: pins });
   } catch (error) {
@@ -206,48 +207,45 @@ const { role_name, user_id } = req.user || {};
 };
 
 // GET /crime-map/statistics
-// Returns summary stats for sidebar
 const getStatistics = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
-    
+
     let baseWhere = `WHERE lat IS NOT NULL AND is_deleted = false`;
     const params = [];
     let p = 1;
 
-    if (date_from) { baseWhere += ` AND date_time_commission >= $${p++}`; params.push(date_from); }
-    if (date_to) { baseWhere += ` AND date_time_commission <= $${p++}`; params.push(date_to); }
-    if (incident_type) { baseWhere += ` AND UPPER(incident_type) = UPPER($${p++})`; params.push(incident_type); }
-    if (barangay) { baseWhere += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`; params.push(barangay); }
+    if (date_from)     { baseWhere += ` AND date_time_commission >= $${p++}`;          params.push(date_from); }
+    if (date_to)       { baseWhere += ` AND date_time_commission <= $${p++}`;          params.push(date_to); }
+    if (incident_type) { baseWhere += ` AND UPPER(incident_type) = UPPER($${p++})`;   params.push(incident_type); }
+    if (barangay)      { baseWhere += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`; params.push(barangay); }
 
-   const client = await pool.connect();
-let totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters;
-try {
-  [totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters] = await Promise.all([
-    client.query(`SELECT COUNT(*) FROM blotter_entries ${baseWhere}`, params),
-    client.query(`SELECT incident_type, COUNT(*) as count FROM blotter_entries ${baseWhere} GROUP BY incident_type ORDER BY count DESC`, params),
-    client.query(`SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count FROM blotter_entries ${baseWhere} GROUP BY UPPER(TRIM(place_barangay)) HAVING COUNT(*) >= 4 ORDER BY count DESC`, params),
-    client.query(`SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_entries ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`, params),
-    client.query(`SELECT COUNT(*) FROM blotter_entries WHERE is_deleted = false`),
-  ]);
-} finally {
-  client.release();
-}
-
-    const topBarangay = hotspots.rows[0] || null;
+    const client = await pool.connect();
+    let totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters;
+    try {
+      [totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters] = await Promise.all([
+        client.query(`SELECT COUNT(*) FROM blotter_entries ${baseWhere}`, params),
+        client.query(`SELECT incident_type, COUNT(*) as count FROM blotter_entries ${baseWhere} GROUP BY incident_type ORDER BY count DESC`, params),
+        client.query(`SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count FROM blotter_entries ${baseWhere} GROUP BY UPPER(TRIM(place_barangay)) HAVING COUNT(*) >= 4 ORDER BY count DESC`, params),
+        client.query(`SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_entries ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`, params),
+        client.query(`SELECT COUNT(*) FROM blotter_entries WHERE is_deleted = false`),
+      ]);
+    } finally {
+      client.release();
+    }
 
     res.json({
       success: true,
       data: {
-        total_pins: parseInt(totalPins.rows[0].count),
-        total_blotters: parseInt(totalBlotters.rows[0].count),
+        total_pins:           parseInt(totalPins.rows[0].count),
+        total_blotters:       parseInt(totalBlotters.rows[0].count),
         barangays_with_crimes: [...new Set(byIncidentType.rows.map(r => r.incident_type))].length,
-        high_risk_count: hotspots.rows.length,
-        top_crime: byIncidentType.rows[0]?.incident_type || null,
-        top_barangay: topBarangay?.barangay || null,
-        by_incident_type: byIncidentType.rows,
-        hotspots: hotspots.rows,
-        recent_incidents: recentIncidents.rows,
+        high_risk_count:      hotspots.rows.length,
+        top_crime:            byIncidentType.rows[0]?.incident_type || null,
+        top_barangay:         hotspots.rows[0]?.barangay || null,
+        by_incident_type:     byIncidentType.rows,
+        hotspots:             hotspots.rows,
+        recent_incidents:     recentIncidents.rows,
       }
     });
   } catch (error) {
@@ -256,4 +254,188 @@ try {
   }
 };
 
-module.exports = { getBoundaries, getPins, getStatistics };
+// ─── CRIME SEVERITY WEIGHTS ────────────────────────────────────────────────────
+const SEVERITY_WEIGHT = {
+  'MURDER':                1.0,
+  'HOMICIDE':              0.95,
+  'RAPE':                  0.90,
+  'SPECIAL COMPLEX CRIME': 0.85,
+  'ROBBERY':               0.75,
+  'CARNAPPING - MV':       0.65,
+  'CARNAPPING - MC':       0.60,
+  'PHYSICAL INJURY':       0.50,
+  'THEFT':                 0.35,
+};
+
+// GET /crime-map/heatmap
+const getHeatmap = async (req, res) => {
+  try {
+    const { date_from, date_to, incident_type, barangay } = req.query;
+
+    // ── 1. Build base filter ───────────────────────────────────────────────────
+    let baseWhere = `
+      WHERE lat IS NOT NULL
+        AND lng IS NOT NULL
+        AND is_deleted = false
+    `;
+    const params = [];
+    let p = 1;
+
+    if (date_from) {
+      baseWhere += ` AND date_time_commission >= $${p++}`;
+      params.push(date_from);
+    }
+    if (date_to) {
+      baseWhere += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
+      params.push(date_to);
+    }
+    if (incident_type) {
+      baseWhere += ` AND UPPER(TRIM(incident_type)) = UPPER($${p++})`;
+      params.push(incident_type);
+    }
+    if (barangay) {
+      baseWhere += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
+      params.push(barangay);
+    }
+
+    // ── 2. Raw points query ────────────────────────────────────────────────────
+    const pointsSQL = `
+      SELECT
+        blotter_id,
+        UPPER(TRIM(incident_type))     AS incident_type,
+        UPPER(TRIM(place_barangay))    AS place_barangay,
+        date_time_commission,
+        lat::float,
+        lng::float
+      FROM blotter_entries
+      ${baseWhere}
+      ORDER BY date_time_commission DESC
+    `;
+
+    const client = await pool.connect();
+    let pointsResult;
+    try {
+      const { role_name, user_id } = req.user || {};
+
+      if (role_name === 'Barangay Official') {
+        const bdRes = await client.query(
+          `SELECT barangay_code FROM barangay_details WHERE user_id = $1`,
+          [user_id]
+        );
+        if (bdRes.rows.length > 0) {
+          const brgyWhere = ` AND UPPER(TRIM(place_barangay)) = UPPER($${p})`;
+          params.push(bdRes.rows[0].barangay_code);
+          pointsResult = await client.query(
+            pointsSQL.replace(baseWhere, baseWhere + brgyWhere), params
+          );
+        } else {
+          pointsResult = await client.query(pointsSQL, params);
+        }
+      } else if (role_name === 'Patrol') {
+        const patrolRes = await client.query(
+          `SELECT mu.barangay_area
+           FROM active_patroller ap
+           JOIN mobile_unit_patroller mup ON ap.active_patroller_id = mup.active_patroller_id
+           JOIN mobile_unit mu             ON mup.mobile_unit_id = mu.mobile_unit_id
+           WHERE ap.officer_id = $1 AND ap.status = 'Active'`,
+          [user_id]
+        );
+        if (patrolRes.rows.length > 0) {
+          const areas = patrolRes.rows.map(r => r.barangay_area.toUpperCase());
+          const patrolWhere = ` AND UPPER(TRIM(place_barangay)) = ANY($${p}::text[])`;
+          params.push(areas);
+          pointsResult = await client.query(
+            pointsSQL.replace(baseWhere, baseWhere + patrolWhere), params
+          );
+        } else {
+          pointsResult = await client.query(pointsSQL, params);
+        }
+      } else {
+        pointsResult = await client.query(pointsSQL, params);
+      }
+    } finally {
+      client.release();
+    }
+
+    // ── 3. Call Python DBSCAN service for clusters ─────────────────────────────
+    const aiPayload = {
+      date_from:   date_from   || '2000-01-01',
+      date_to:     date_to     || new Date().toISOString().slice(0, 10),
+      crime_types: incident_type ? [incident_type] : [],
+      barangays:   barangay    ? [barangay] : [],
+    };
+
+    let dbscanClusters = [];
+    try {
+      const aiRes = await fetch(`${AI_SERVICE_URL}/clusters`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(aiPayload),
+        signal:  AbortSignal.timeout(8000),
+      });
+      const aiData = await aiRes.json();
+      dbscanClusters = aiData.clusters || [];
+    } catch (aiErr) {
+      // AI service unavailable — heatmap points still render, rings won't show
+      console.warn('DBSCAN service unavailable, skipping clusters:', aiErr.message);
+    }
+
+    // ── 4. Build heatmap points GeoJSON ───────────────────────────────────────
+    const pointFeatures = pointsResult.rows.map(r => ({
+      type: 'Feature',
+      geometry: {
+        type:        'Point',
+        coordinates: [r.lng, r.lat],
+      },
+      properties: {
+        weight:        SEVERITY_WEIGHT[r.incident_type] ?? 0.3,
+        incident_type: r.incident_type,
+        barangay:      r.place_barangay,
+        date:          r.date_time_commission,
+      },
+    }));
+
+    // ── 5. Convert DBSCAN clusters → GeoJSON features ─────────────────────────
+    const maxCount = dbscanClusters.length
+      ? Math.max(...dbscanClusters.map(c => c.count))
+      : 1;
+
+    const clusterFeatures = dbscanClusters.map((c, i) => ({
+      type: 'Feature',
+      geometry: {
+        type:        'Point',
+        coordinates: [c.centroid_lng, c.centroid_lat],
+      },
+      properties: {
+        cluster:           true,
+        count:             c.count,
+        dominant_crime:    c.dominant_crime,
+        dominant_barangay: c.dominant_barangay ?? 'Unknown',
+        intensity:         Math.min(1, c.count / maxCount),
+        rank:              i + 1,
+        crime_types:       c.crime_types,
+        dominant_modus:    c.dominant_modus,
+      },
+    }));
+
+    return res.json({
+      success:        true,
+      total_points:   pointFeatures.length,
+      total_clusters: clusterFeatures.length,
+      points: {
+        type:     'FeatureCollection',
+        features: pointFeatures,
+      },
+      clusters: {
+        type:     'FeatureCollection',
+        features: clusterFeatures,
+      },
+    });
+
+  } catch (error) {
+    console.error('getHeatmap error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getBoundaries, getPins, getStatistics, getHeatmap };

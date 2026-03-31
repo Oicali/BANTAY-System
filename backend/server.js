@@ -29,8 +29,8 @@ app.use(
 );
 
 // ── 2. Body parsing ───────────────────────────────────────────────────────────
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+app.use(express.json({ limit: "50mb" }));        // ← was "10kb"
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));  // ← was "10kb"
 
 // ── 3. Database ───────────────────────────────────────────────────────────────
 require("./config/database");
@@ -46,6 +46,7 @@ app.use("/crime-map",        require("./features/crime-map/routes/crimeMapRoutes
 app.use("/crime-dashboard",        require("./features/dashboard/routes/crimeDashboardRoutes"));
 app.use("/patrol", require("./features/patrols/routes/patrolRoutes"));
 app.use('/gps', require('./features/gps/routes/gpsRoutes'));
+app.use("/ai-assessment", require("./features/ai-assessment/routes/assessment.routes"));
 
 // ── 5. Static uploads ─────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
