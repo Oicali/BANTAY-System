@@ -111,27 +111,12 @@ function CaseManagement() {
         if (f.search && f.search.trim().length > 0) {
           const searchTerm = f.search.trim().toUpperCase();
           result = result.filter((c) => {
-            const caseNum = c.case_number?.toUpperCase() || "";
-            const blotterNum = c.blotter_entry_number?.toUpperCase() || "";
-
-            // Exact match first
-            if (caseNum === searchTerm || blotterNum === searchTerm)
-              return true;
-
-            // Then check if it starts with search term
-            if (
-              caseNum.startsWith(searchTerm) ||
-              blotterNum.startsWith(searchTerm)
-            )
-              return true;
-
-            // Finally check if the number portion contains search term
-            const caseNumDigits = caseNum.replace(/\D/g, ""); // Remove non-digits
-            const blotterNumDigits = blotterNum.replace(/\D/g, "");
-            return (
-              caseNumDigits.includes(searchTerm) ||
-              blotterNumDigits.includes(searchTerm)
-            );
+            const displayNum = (
+              c.blotter_entry_number ||
+              c.case_number ||
+              ""
+            ).toUpperCase();
+            return displayNum.includes(searchTerm);
           });
         }
 

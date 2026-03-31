@@ -1816,9 +1816,16 @@ function EBlotter() {
             barangay: barangayName,
           };
         });
-
+        console.log(
+          "Accept PUT - lat:",
+          finalCaseDetail.lat,
+          "lng:",
+          finalCaseDetail.lng,
+          "type_of_place:",
+          finalCaseDetail.type_of_place,
+        );
         // Update blotter first
-        await fetch(`${API_URL}/${editingBlotterId}`, {
+        const updateRes = await fetch(`${API_URL}/${editingBlotterId}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -1831,6 +1838,15 @@ function EBlotter() {
             offenses: offensesWithModus,
           }),
         });
+        const updateData = await updateRes.json();
+        if (!updateData.success) {
+          alert(
+            "Update failed:\n" +
+              (updateData.errors?.join("\n") || updateData.message),
+          );
+          setLoading(false);
+          return;
+        }
 
         // Then accept (which creates case)
         const res = await fetch(`${API_URL}/${editingBlotterId}/accept`, {

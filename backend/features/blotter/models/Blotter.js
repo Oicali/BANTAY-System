@@ -361,7 +361,7 @@ class Blotter {
 
       // Update blotter entry (WITHOUT changing blotter_entry_number)
       await client.query(
-        `UPDATE blotter_entries SET
+  `UPDATE blotter_entries SET
     incident_type = $1, cop = $2, date_time_commission = $3,
     date_time_reported = $4, place_region = $5,
     place_district_province = $6, place_city_municipality = $7,
@@ -371,23 +371,23 @@ class Blotter {
     day_of_incident = $17, month_of_incident = $18,
     updated_at = CURRENT_TIMESTAMP
   WHERE blotter_id = $19`,
-        [
-          blotterData.incident_type,
-          blotterData.cop,
-          blotterData.date_time_commission,
-          blotterData.date_time_reported,
-          blotterData.place_region,
-          blotterData.place_district_province,
-          blotterData.place_city_municipality,
-          blotterData.place_barangay,
-          blotterData.place_street,
-          blotterData.is_private_place || null,
-          blotterData.narrative,
-          blotterData.amount_involved || null,
-          false,
-          false,
-          blotterData.lat || null,
-          blotterData.lng || null,
+  [
+    blotterData.incident_type,
+    blotterData.cop,
+    blotterData.date_time_commission,
+    blotterData.date_time_reported,
+    blotterData.place_region,
+    blotterData.place_district_province,
+    blotterData.place_city_municipality,
+    blotterData.place_barangay,
+    blotterData.place_street,
+    blotterData.is_private_place || null,
+    blotterData.narrative,
+    blotterData.amount_involved || null,
+    blotterData.referred_by_barangay ?? false,  
+    blotterData.referred_by_dilg ?? false,       
+    blotterData.lat || null,
+    blotterData.lng || null,
           new Date(blotterData.date_time_commission).toLocaleDateString(
             "en-US",
             { weekday: "long" },
