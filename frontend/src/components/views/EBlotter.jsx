@@ -8,6 +8,7 @@ import {
   LEGACY_BARANGAY_OPTIONS,
 } from "../../utils/barangayOptions";
 import ImportBlotterModal from "../modals/ImportBlotterModal";
+import LoadingModal from "../modals/LoadingModal";
 
 const OFFENSE_TO_CRIME_TYPE = {
   Murder: "MURDER",
@@ -5825,11 +5826,10 @@ function EBlotter() {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: "center" }}>
-                    Loading...
-                  </td>
-                </tr>
+                <LoadingModal
+                  isOpen={true}
+                  message={"Processing, please wait..."}
+                />
               ) : blotters.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: "center" }}>
@@ -5966,38 +5966,9 @@ function EBlotter() {
             >
               Previous
             </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(
-                (page) =>
-                  page === 1 ||
-                  page === totalPages ||
-                  Math.abs(page - currentPage) <= 1,
-              )
-              .reduce((acc, page, idx, arr) => {
-                if (idx > 0 && page - arr[idx - 1] > 1) acc.push("...");
-                acc.push(page);
-                return acc;
-              }, [])
-              .map((item, idx) =>
-                item === "..." ? (
-                  <span
-                    key={`ellipsis-${idx}`}
-                    style={{ padding: "0 6px", color: "#6b7280" }}
-                  >
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    className={`eb-pagination-btn ${currentPage === item ? "active" : ""}`}
-                    onClick={() => setCurrentPage(item)}
-                  >
-                    {item}
-                  </button>
-                ),
-              )}
-
+            <span className="eb-pagination-current">
+              Page {currentPage} of {totalPages || 1}
+            </span>
             <button
               className="eb-pagination-btn"
               disabled={currentPage === totalPages || totalPages === 0}
@@ -6022,48 +5993,31 @@ function EBlotter() {
 
       {reactToast.show && (
         <div
-          style={{
-            position: "fixed",
-            top: "24px",
-            right: "24px",
-            zIndex: 99999,
-            minWidth: "320px",
-            padding: "16px 20px",
-            borderRadius: "8px",
-            background: "white",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            border: "1px solid #e5e7eb",
-            borderLeft: `4px solid ${reactToast.type === "success" ? "#10b981" : reactToast.type === "warning" ? "#f59e0b" : "#dc2626"}`,
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            fontSize: "14px",
-            fontWeight: 500,
-            color: "#111827",
-            animation: "slideInToast 0.3s ease",
-          }}
+          className={`um-toast ${reactToast.type === "success" ? "um-toast-success" : "um-toast-error"}`}
+          style={{ zIndex: 99999 }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 20 20"
-            fill={reactToast.type === "success" ? "#10b981" : "#dc2626"}
-          >
-            {reactToast.type === "success" ? (
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            ) : (
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            )}
-          </svg>
-          <span>{reactToast.message}</span>
+          <div className="um-toast-content">
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              {reactToast.type === "success" ? (
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              ) : (
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              )}
+            </svg>
+            <span>{reactToast.message}</span>
+          </div>
         </div>
       )}
     </div>

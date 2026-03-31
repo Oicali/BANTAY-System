@@ -256,29 +256,32 @@ function ModusManagement() {
     <div className="mm-container">
       {/* TOAST */}
       {toast && (
-        <div className={`mm-toast ${toast.type}`}>
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 20 20"
-            fill={toast.type === "success" ? "#10b981" : "#dc2626"}
-            style={{ flexShrink: 0 }}
-          >
-            {toast.type === "success" ? (
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            ) : (
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            )}
-          </svg>
-          <span>{toast.msg}</span>
+        <div
+          className={`um-toast ${toast.type === "success" ? "um-toast-success" : "um-toast-error"}`}
+          style={{ zIndex: 99999 }}
+        >
+          <div className="um-toast-content">
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              {toast.type === "success" ? (
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              ) : (
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              )}
+            </svg>
+            <span>{toast.msg}</span>
+          </div>
         </div>
       )}
 
@@ -452,36 +455,9 @@ function ModusManagement() {
               >
                 Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(
-                  (page) =>
-                    page === 1 ||
-                    page === totalPages ||
-                    Math.abs(page - safePage) <= 1,
-                )
-                .reduce((acc, page, idx, arr) => {
-                  if (idx > 0 && page - arr[idx - 1] > 1) acc.push("...");
-                  acc.push(page);
-                  return acc;
-                }, [])
-                .map((item, idx) =>
-                  item === "..." ? (
-                    <span
-                      key={`e-${idx}`}
-                      style={{ padding: "0 6px", color: "#6b7280" }}
-                    >
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      className={`mm-pagination-btn ${safePage === item ? "mm-pagination-active" : ""}`}
-                      onClick={() => handlePageChange(item)}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
+              <span className="mm-pagination-current">
+                Page {safePage} of {totalPages || 1}
+              </span>
               <button
                 className="mm-pagination-btn"
                 onClick={() => handlePageChange(safePage + 1)}

@@ -236,8 +236,8 @@ body {
 }
 
 .eb-data-table th {
-  padding: 16px 24px;
-  text-align: center;
+  padding: 10px 24px;
+  text-align: left;
   font-size: 12px;
   font-weight: 600;
   color: var(--gray-600);
@@ -247,7 +247,7 @@ body {
 }
 
 .eb-data-table td {
-  padding: 16px 24px;
+  padding: 10px 24px;
   font-size: 14px;
   color: var(--gray-700);
   border-bottom: 1px solid var(--gray-200);
@@ -1263,4 +1263,13 @@ select.eb-modal-input {
 .eb-filter-btn:focus,
 .eb-pagination-btn:focus {
   outline: none !important;
+}
+
+.eb-pagination-current {
+  padding: 8px 16px;
+  color: var(--navy-primary);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
 }

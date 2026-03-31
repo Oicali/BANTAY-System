@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./CaseManagement.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/cases`;
 
@@ -494,7 +495,7 @@ function CaseManagement() {
       {/* CASES LIST */}
       <div className="cm-cases-grid">
         {loading ? (
-          <div className="cm-empty-state">Loading cases...</div>
+          <LoadingModal isOpen={true} message={"Loading cases..."} />
         ) : cases.length === 0 ? (
           <div className="cm-empty-state">No cases found.</div>
         ) : (
@@ -608,38 +609,9 @@ function CaseManagement() {
               >
                 Previous
               </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(
-                  (page) =>
-                    page === 1 ||
-                    page === totalPages ||
-                    Math.abs(page - currentPage) <= 1,
-                )
-                .reduce((acc, page, idx, arr) => {
-                  if (idx > 0 && page - arr[idx - 1] > 1) acc.push("...");
-                  acc.push(page);
-                  return acc;
-                }, [])
-                .map((item, idx) =>
-                  item === "..." ? (
-                    <span
-                      key={`ellipsis-${idx}`}
-                      style={{ padding: "0 6px", color: "#6b7280" }}
-                    >
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      className={`cm-pagination-btn ${currentPage === item ? "cm-active" : ""}`}
-                      onClick={() => setCurrentPage(item)}
-                    >
-                      {item}
-                    </button>
-                  ),
-                )}
-
+              <span className="cm-pagination-current">
+                Page {currentPage} of {totalPages || 1}
+              </span>
               <button
                 className="cm-pagination-btn"
                 disabled={currentPage === totalPages || totalPages === 0}
@@ -1883,34 +1855,40 @@ function CaseManagement() {
       )}
       {/* TOAST */}
       {toast.show && (
-        <div className={`cm-toast cm-toast-${toast.type}`}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            {toast.type === "success" ? (
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 20 20"
-                fill={toast.type === "success" ? "#10b981" : "#dc2626"}
-              >
+        <div
+          className={`um-toast ${toast.type === "success" ? "um-toast-success" : "um-toast-error"}`}
+          style={{ zIndex: 99999 }}
+        >
+          <div className="um-toast-content">
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              {toast.type === "success" ? (
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                   clipRule="evenodd"
                 />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="#dc2626">
+              ) : (
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
                   clipRule="evenodd"
                 />
-              </svg>
-            )}
+              )}
+            </svg>
             <span>{toast.message}</span>
           </div>
         </div>
       )}
+
+      {/* ACTION LOADING MODAL */}
+      <LoadingModal
+        isOpen={modalLoading}
+        message="Processing, please wait..."
+      />
     </div>
   );
 }

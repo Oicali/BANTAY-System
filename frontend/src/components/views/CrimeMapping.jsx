@@ -249,6 +249,8 @@ function CrimeMapping() {
   useEffect(() => {
     if (heatmapMode) {
       fetchHeatmap();
+      // Also fetch boundaries if not yet loaded so overlay works in heatmap mode
+      if (!boundaries.length) fetchAll();
     } else {
       fetchAll();
     }
@@ -269,7 +271,21 @@ function CrimeMapping() {
   // ── Mapbox helpers ────────────────────────────────────────────────────────────
 
   const buildGeoJSON = useCallback(() => {
-    if (!boundaries.length || !geoJSONData) return null;
+    if (!geoJSONData) return null;
+    // In heatmap mode we still want boundaries but with neutral/transparent fill
+    if (heatmapMode) {
+      return {
+        ...geoJSONData,
+        features: geoJSONData.features.map(f => ({
+          ...f,
+          properties: {
+            ...f.properties,
+            fillColor: "rgba(255,255,255,0.0)",
+          },
+        })),
+      };
+    }
+    if (!boundaries.length) return null;
     const colorLookup = {};
     boundaries.forEach(b => { colorLookup[b.name_kml] = b.color; });
     return {
@@ -282,7 +298,7 @@ function CrimeMapping() {
         },
       })),
     };
-  }, [boundaries, geoJSONData]);
+  }, [boundaries, geoJSONData, heatmapMode]);
 
   const handleMapDblClick = useCallback((e) => {
     if (!geoJSONData) return;
@@ -352,13 +368,25 @@ function CrimeMapping() {
   const fillLayer = {
     id:   "barangay-fill",
     type: "fill",
-    paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.4 },
+    paint: {
+      // In heatmap mode: transparent fill so only the outline shows
+      "fill-color":   ["get", "fillColor"],
+      "fill-opacity": heatmapMode ? 0 : 0.4,
+    },
   };
+
+  // In heatmap mode use a lighter/more visible outline color against the dark basemap
   const outlineLayer = {
     id:   "barangay-outline",
     type: "line",
-    paint: { "line-color": "#1e3a5f", "line-width": 1.2, "line-opacity": 0.5 },
+    paint: {
+      "line-color":   heatmapMode ? "rgba(180,210,255,0.55)" : "#1e3a5f",
+      "line-width":   heatmapMode ? 1.0 : 1.2,
+      "line-opacity": heatmapMode ? 0.7 : 0.5,
+    },
   };
+
+  // Labels adapt color for dark (heatmap) vs light (choropleth) basemap
   const labelLayer = {
     id:   "barangay-labels",
     type: "symbol",
@@ -371,8 +399,8 @@ function CrimeMapping() {
       "text-allow-overlap": false,
     },
     paint: {
-      "text-color":      "#0a1628",
-      "text-halo-color": "rgba(255,255,255,0.85)",
+      "text-color":      heatmapMode ? "rgba(220,235,255,0.9)" : "#0a1628",
+      "text-halo-color": heatmapMode ? "rgba(0,0,0,0.7)"       : "rgba(255,255,255,0.85)",
       "text-halo-width": 1.5,
     },
   };
@@ -616,8 +644,8 @@ function CrimeMapping() {
                   (mapRef.current.getCanvas().style.cursor = "");
               }}
             >
-              {/* ── CHOROPLETH layers ── */}
-              {!heatmapMode && geoJSON && (
+              {/* ── BARANGAY BOUNDARIES — always rendered in both modes ── */}
+              {geoJSON && (
                 <Source id="barangays" type="geojson" data={geoJSON}>
                   <Layer {...fillLayer} />
                   <Layer {...outlineLayer} />
@@ -625,10 +653,10 @@ function CrimeMapping() {
                 </Source>
               )}
 
-              {/* ── HEATMAP layer ── */}
+              {/* ── HEATMAP layer (rendered on top of boundaries) ── */}
               {heatmapMode && heatGeoJSON && (
                 <Source id="heat-points" type="geojson" data={heatGeoJSON}>
-                  <Layer {...HEATMAP_LAYER} />
+                  <Layer {...HEATMAP_LAYER} beforeId="barangay-labels" />
                 </Source>
               )}
 
@@ -639,7 +667,7 @@ function CrimeMapping() {
                 </Source>
               )}
 
-              {/* ── Crime pins (choropleth mode) ── */}
+              {/* ── Crime pins (choropleth mode only) ── */}
               {!heatmapMode && showPins && zoom >= 13 && pins.map(pin => (
                 <Marker
                   key={pin.blotter_id}
@@ -773,8 +801,8 @@ function CrimeMapping() {
               )}
             </Map>
 
-            {/* Barangay hover tooltip */}
-            {!heatmapMode && showBrgyTooltip && hoveredBarangay && (
+            {/* Barangay hover tooltip — available in both modes */}
+            {showBrgyTooltip && hoveredBarangay && (
               <div
                 className="crmap-brgy-tooltip"
                 style={{ left: hoveredBarangay.x + 12, top: hoveredBarangay.y - 10 }}
@@ -798,7 +826,7 @@ function CrimeMapping() {
             )}
           </div>
 
-          {/* ── MAP CONTROLS ── */}
+          {/* ── MAP CONTROLS — always visible in both modes ── */}
           <div className="crmap-controls">
             <button className="crmap-ctrl-btn" title="Zoom in"
               onClick={() => mapRef.current?.zoomIn({ duration: 300 })}>
@@ -844,23 +872,38 @@ function CrimeMapping() {
             </button>
             <div className="crmap-ctrl-divider"/>
 
-            {!heatmapMode && (
-              <div className="crmap-options-wrap">
-                <button
-                  className="crmap-ctrl-btn crmap-options-btn"
-                  title="Map Options"
-                  onClick={() => setShowMapOptions(v => !v)}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                  </svg>
-                </button>
-                {showMapOptions && (
-                  <div className="crmap-options-popover">
-                    <div className="crmap-options-title">Map Options</div>
-                    {[
+            {/* Gear / Options — always visible; options list adapts per mode */}
+            <div className="crmap-options-wrap">
+              <button
+                className="crmap-ctrl-btn crmap-options-btn"
+                title="Map Options"
+                onClick={() => setShowMapOptions(v => !v)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+
+              {showMapOptions && (
+                <div className="crmap-options-popover">
+                  <div className="crmap-options-title">Map Options</div>
+
+                  {/* Heatmap mode: only Barangay Labels toggle */}
+                  {heatmapMode ? (
+                    <div className="crmap-map-option">
+                      <span className="crmap-map-option-lbl">Barangay Labels</span>
+                      <button
+                        className={`crmap-toggle ${showLabels ? "on" : ""}`}
+                        onClick={() => setShowLabels(v => !v)}
+                      >
+                        <span className="crmap-toggle-knob" />
+                      </button>
+                    </div>
+                  ) : (
+                    /* Choropleth mode: all three toggles */
+                    [
                       { label: "Barangay Tooltip", state: showBrgyTooltip, toggle: () => setShowBrgyTooltip(v => !v) },
                       { label: "Crime Pins",        state: showPins,        toggle: () => setShowPins(v => !v)        },
                       { label: "Barangay Labels",   state: showLabels,      toggle: () => setShowLabels(v => !v)      },
@@ -874,11 +917,11 @@ function CrimeMapping() {
                           <span className="crmap-toggle-knob" />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── HEATMAP TOGGLE PILL ── */}
@@ -895,7 +938,7 @@ function CrimeMapping() {
             {heatmapMode ? "Choropleth" : "Heatmap"}
           </button>
 
-          {/* Zoom hint */}
+          {/* Zoom hint — choropleth mode only */}
           {!heatmapMode && zoom < 13 && (
             <div className="crmap-zoom-hint">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
