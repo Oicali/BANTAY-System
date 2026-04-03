@@ -32,6 +32,7 @@ export default function ProfileSettings() {
   const [originalFormData, setOriginalFormData] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadingEditSetup, setLoadingEditSetup] = useState(false);
   const [resolvedAddr, setResolvedAddr] = useState({
     region: "",
     province: "",
@@ -504,6 +505,7 @@ export default function ProfileSettings() {
   const isBarangayRole = () => profileData?.user_type === "barangay";
 
   const handleEditClick = async () => {
+    setLoadingEditSetup(true);
     setFormData((prev) => ({
       ...prev,
       phone: "",
@@ -533,6 +535,7 @@ export default function ProfileSettings() {
     } else if (isBarangayRole()) {
       await fetchAllBarangays();
     }
+    setLoadingEditSetup(false);
   };
 
   const handleCancelClick = () => {
@@ -1776,6 +1779,7 @@ export default function ProfileSettings() {
 
   return (
     <>
+      <LoadingModal isOpen={loadingEditSetup} message="Preparing form..." />
       <LoadingModal
         isOpen={isBusy}
         message={

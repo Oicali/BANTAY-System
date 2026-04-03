@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import "./ImportBlotterModal.css";
-
+import LoadingModal from "../modals/LoadingModal";
+import ReactDOM from "react-dom";
 function ImportBlotterModal({ onClose, onSuccess }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -66,9 +67,10 @@ function ImportBlotterModal({ onClose, onSuccess }) {
     URL.revokeObjectURL(url);
   };
 
-  return (
+  return ReactDOM.createPortal(
     <div className="im-overlay">
       <div className="im-modal">
+        <LoadingModal isOpen={loading} message="Importing blotter data..." />
         {/* Header */}
         <div className="im-header">
           <div>
@@ -239,7 +241,8 @@ function ImportBlotterModal({ onClose, onSuccess }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

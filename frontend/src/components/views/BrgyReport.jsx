@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import LoadingModal from "../modals/LoadingModal";
 const autofillFix = `
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
@@ -219,6 +220,7 @@ function BrgyReport() {
 
   return (
     <div style={{ padding: "28px 32px", maxWidth: "900px", margin: "0 auto" }}>
+      <LoadingModal isOpen={submitting} message="Submitting report..." />
       <style>{autofillFix}</style>
       {/* Header */}
       <div style={{ marginBottom: "28px" }}>

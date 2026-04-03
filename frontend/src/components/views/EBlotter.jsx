@@ -223,6 +223,9 @@ function EBlotter() {
   });
   const [editMode, setEditMode] = useState(false);
   const [editingBlotterId, setEditingBlotterId] = useState(null);
+  const [fetchingEdit, setFetchingEdit] = useState(false);
+  const [fetchingView, setFetchingView] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
     show: false,
@@ -528,6 +531,7 @@ function EBlotter() {
   }, [currentStep]);
 
   const handleEdit = async (blotterId) => {
+    setFetchingEdit(true);
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
@@ -739,9 +743,12 @@ function EBlotter() {
     } catch (error) {
       console.error("Error:", error);
       alert("Failed to load blotter data");
+    } finally {
+      setFetchingEdit(false);
     }
   };
   const handleView = async (blotterId) => {
+    setFetchingView(true);
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
@@ -838,6 +845,8 @@ function EBlotter() {
     } catch (error) {
       console.error("Error:", error);
       alert("Failed to load blotter data");
+    } finally {
+      setFetchingView(false);
     }
   };
   const handleAcceptReferral = async (blotterId) => {
@@ -1532,7 +1541,7 @@ function EBlotter() {
         alias: "",
         gender: "Male",
         birthday: "",
-        age: null, // CHANGED
+        age: "",
         birth_place: "",
         nationality: "FILIPINO",
         region_code: "",
@@ -1546,7 +1555,7 @@ function EBlotter() {
         category_drug_case: "",
         relation_to_victim: "",
         educational_attainment: "",
-        height_cm: null, // CHANGED
+        height_cm: "",
         drug_used: false,
         motive: "",
         occupation: "",
@@ -1700,6 +1709,8 @@ function EBlotter() {
     setFieldErrors({});
     setEditMode(false);
     setViewMode(false);
+    setFetchingEdit(false);
+    setFetchingView(false);
     setAcceptMode(false);
     setEditingBlotterId(null);
     setOriginalData(null);
@@ -1730,7 +1741,7 @@ function EBlotter() {
     }
 
     try {
-      setLoading(true);
+      setIsSubmitting(true);
 
       // ACCEPT MODE: Use different endpoint
       if (acceptMode) {
@@ -1981,7 +1992,7 @@ function EBlotter() {
       console.error("Error:", error);
       alert("Failed to submit. Please try again.");
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -2018,6 +2029,22 @@ function EBlotter() {
   );
   return (
     <div className="eb-content-area">
+      <LoadingModal
+        isOpen={loading && blotters.length === 0}
+        message="Loading records..."
+      />
+      <LoadingModal isOpen={fetchingEdit} message="Loading blotter data..." />
+      <LoadingModal isOpen={fetchingView} message="Loading blotter data..." />
+      <LoadingModal
+        isOpen={isSubmitting}
+        message={
+          acceptMode
+            ? "Accepting referral..."
+            : editMode
+              ? "Updating report..."
+              : "Submitting report..."
+        }
+      />
       <div className="eb-page-header">
         <div className="eb-page-header-left">
           <h1>Reporting Records</h1>
@@ -4982,10 +5009,10 @@ function EBlotter() {
                       type="button"
                       className="eb-btn eb-btn-primary"
                       onClick={handleSubmit}
-                      disabled={loading}
+                      disabled={isSubmitting}
                       style={acceptMode ? { background: "#16a34a" } : {}}
                     >
-                      {loading
+                      {isSubmitting
                         ? "Submitting..."
                         : acceptMode
                           ? "Accept & Create Case"
@@ -5826,10 +5853,18 @@ function EBlotter() {
             </thead>
             <tbody>
               {loading ? (
-                <LoadingModal
-                  isOpen={true}
-                  message={"Processing, please wait..."}
-                />
+                <tr>
+                  <td
+                    colSpan="6"
+                    style={{
+                      textAlign: "center",
+                      padding: "32px",
+                      color: "#9ca3af",
+                    }}
+                  >
+                    Loading...
+                  </td>
+                </tr>
               ) : blotters.length === 0 ? (
                 <tr>
                   <td colSpan="6" style={{ textAlign: "center" }}>

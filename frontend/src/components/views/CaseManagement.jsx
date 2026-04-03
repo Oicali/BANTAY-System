@@ -311,8 +311,10 @@ function CaseManagement() {
 
   const openViewDetail = async (c) => {
     setSelectedCase(c);
+    setModalLoading(true);
     setShowDetailModal(true);
     await fetchCaseDetail(c.id);
+    setModalLoading(false);
   };
 
   const openStatusModal = (c) => {
