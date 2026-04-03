@@ -137,6 +137,7 @@ function CaseManagement() {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
+      console.log("STATS RESPONSE:", data);
       if (data.success) setStats(data.data);
     } catch (err) {
       console.error(err);
@@ -1888,8 +1889,8 @@ function CaseManagement() {
 
       {/* ACTION LOADING MODAL */}
       <LoadingModal
-        isOpen={modalLoading}
-        message="Processing, please wait..."
+        isOpen={modalLoading || loading}
+        message={loading ? "Loading cases..." : "Processing, please wait..."}
       />
     </div>
   );

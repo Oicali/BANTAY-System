@@ -199,6 +199,8 @@ function EBlotter() {
   const [offenseSelectedModus, setOffenseSelectedModus] = useState({});
   const [typeOfPlace, setTypeOfPlace] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [deletedPage, setDeletedPage] = useState(1);
+  const DELETED_PER_PAGE = 15;
   const [reactToast, setReactToast] = useState({
     show: false,
     message: "",
@@ -324,7 +326,7 @@ function EBlotter() {
   ]);
 
   const [caseDetail, setCaseDetail] = useState({
-    incident_type: "Theft",
+    incident_type: "",
     cop: "",
     date_time_commission: "",
     date_time_reported: "",
@@ -386,11 +388,10 @@ function EBlotter() {
       if (filters.date_from) queryParams.append("date_from", filters.date_from);
       if (filters.date_to) queryParams.append("date_to", filters.date_to);
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
-      if (filters.data_source)
-        queryParams.append("data_source", filters.data_source);
+
       if (activeReportTab === "referred") {
         queryParams.append("referred", "true");
-      } else {
+      } else if (filters.data_source !== "brgy_referral") {
         queryParams.append("referred", "false");
       }
 
@@ -409,6 +410,19 @@ function EBlotter() {
             (b) =>
               b.incident_type.toLowerCase() ===
               filters.incident_type.toLowerCase(),
+          );
+        }
+        if (filters.data_source === "brgy_referral") {
+          results = results.filter((b) =>
+            (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
+          );
+        } else if (filters.data_source === "bantay_import") {
+          results = results.filter((b) =>
+            (b.blotter_entry_number || "").toUpperCase().startsWith("BLT"),
+          );
+        } else if (filters.data_source === "manual") {
+          results = results.filter((b) =>
+            /^\d{4}/.test(b.blotter_entry_number || ""),
           );
         }
         setBlotters(results);
@@ -1578,7 +1592,7 @@ function EBlotter() {
     setTypeOfPlace("");
 
     setCaseDetail({
-      incident_type: "Theft",
+      incident_type: "",
       cop: "",
       date_time_commission: "",
       date_time_reported: "",
@@ -1715,7 +1729,7 @@ function EBlotter() {
     setEditingBlotterId(null);
     setOriginalData(null);
     resetForm();
-    setHasSuspect(true);
+    setHasSuspect(false);
     setSelectedBrgyFeature(null);
   };
 
@@ -2021,7 +2035,13 @@ function EBlotter() {
     };
     return map[status] || "eb-status-pending";
   };
-
+  const totalDeletedPages = Math.ceil(
+    deletedBlotters.length / DELETED_PER_PAGE,
+  );
+  const paginatedDeleted = deletedBlotters.slice(
+    (deletedPage - 1) * DELETED_PER_PAGE,
+    deletedPage * DELETED_PER_PAGE,
+  );
   const totalPages = Math.ceil(blotters.length / ITEMS_PER_PAGE);
   const paginatedBlotters = blotters.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -2055,6 +2075,7 @@ function EBlotter() {
             className="eb-btn eb-btn-deleted"
             onClick={() => {
               setShowTrash(true);
+              setDeletedPage(1);
               fetchDeletedBlotters();
             }}
           >
@@ -2282,143 +2303,194 @@ function EBlotter() {
                 <div className="eb-view-section">
                   <h3 className="eb-view-section-title">Suspect Information</h3>
                   <div className="eb-view-section-body">
-                    {suspects.map((s, i) => (
-                      <div className="eb-view-card" key={i}>
-                        <h4 className="eb-view-card-title">Suspect #{i + 1}</h4>
-                        <div className="eb-view-grid">
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Name:</span>
-                            <span className="eb-view-value">
-                              {(() => {
-                                const isUnknown =
-                                  (!s.first_name ||
-                                    s.first_name.toUpperCase() === "UNKNOWN") &&
-                                  (!s.last_name ||
-                                    s.last_name.toUpperCase() === "UNKNOWN");
-                                if (isUnknown) return "Unknown";
-                                return `${s.first_name || ""} ${s.middle_name || ""} ${s.last_name || ""} ${s.qualifier || ""}`
-                                  .replace(/\s+/g, " ")
-                                  .trim();
-                              })()}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Gender:</span>
-                            <span className="eb-view-value">{s.gender}</span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Status:</span>
-                            <span className="eb-view-value">{s.status}</span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">
-                              Degree of Participation:
-                            </span>
-                            <span className="eb-view-value">
-                              {s.degree_participation}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Birthday:</span>
-                            <span className="eb-view-value">
-                              {s.birthday || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Age:</span>
-                            <span className="eb-view-value">
-                              {s.age || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Nationality:</span>
-                            <span className="eb-view-value">
-                              {s.nationality}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Alias:</span>
-                            <span className="eb-view-value">
-                              {s.alias || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Occupation:</span>
-                            <span className="eb-view-value">
-                              {s.occupation || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item eb-view-full">
-                            <span className="eb-view-label">Address:</span>
-                            <span className="eb-view-value">
-                              {(() => {
-                                const parts = [
-                                  s.house_street,
-                                  s.barangay,
-                                  s.city_municipality,
-                                  s.district_province,
-                                  s.region,
-                                ].filter((v) => v && v.trim() !== "");
-                                return parts.length > 0
-                                  ? parts.join(", ")
-                                  : "N/A";
-                              })()}
-                            </span>
-                          </div>
-                          {s.location_if_arrested && (
-                            <div className="eb-view-item">
-                              <span className="eb-view-label">
-                                Arrest Location:
-                              </span>
-                              <span className="eb-view-value">
-                                {s.location_if_arrested}
-                              </span>
-                            </div>
-                          )}
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Birth Place:</span>
-                            <span className="eb-view-value">
-                              {s.birth_place || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">
-                              Relation to Victim:
-                            </span>
-                            <span className="eb-view-value">
-                              {s.relation_to_victim || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">
-                              Educational Attainment:
-                            </span>
-                            <span className="eb-view-value">
-                              {s.educational_attainment || "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Height:</span>
-                            <span className="eb-view-value">
-                              {s.height_cm ? `${s.height_cm} cm` : "N/A"}
-                            </span>
-                          </div>
-                          <div className="eb-view-item">
-                            <span className="eb-view-label">Drug Used:</span>
-                            <span className="eb-view-value">
-                              {s.drug_used ? "Yes" : "No"}
-                            </span>
-                          </div>
-
-                          <div className="eb-view-item eb-view-full">
-                            <span className="eb-view-label">Motive:</span>
-                            <span className="eb-view-value">
-                              {s.motive || "N/A"}
-                            </span>
-                          </div>
+                    {suspects.length === 0 ||
+                    suspects.every((s) => !s.first_name && !s.last_name) ? (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          padding: "28px",
+                          color: "#9ca3af",
+                          background: "rgba(30,58,95,0.03)",
+                          borderRadius: "8px",
+                          border: "1px dashed #e5e7eb",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#d1d5db"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ marginBottom: "8px" }}
+                        >
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <line x1="23" y1="11" x2="17" y2="11" />
+                        </svg>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: "#6b7280",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          No Suspect Identified
+                        </div>
+                        <div style={{ fontSize: "12px" }}>
+                          Suspect information was not provided for this report
                         </div>
                       </div>
-                    ))}
+                    ) : (
+                      suspects.map((s, i) => (
+                        <div className="eb-view-card" key={i}>
+                          <h4 className="eb-view-card-title">
+                            Suspect #{i + 1}
+                          </h4>
+                          <div className="eb-view-grid">
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Name:</span>
+                              <span className="eb-view-value">
+                                {(() => {
+                                  const isUnknown =
+                                    (!s.first_name ||
+                                      s.first_name.toUpperCase() ===
+                                        "UNKNOWN") &&
+                                    (!s.last_name ||
+                                      s.last_name.toUpperCase() === "UNKNOWN");
+                                  if (isUnknown) return "Unknown";
+                                  return `${s.first_name || ""} ${s.middle_name || ""} ${s.last_name || ""} ${s.qualifier || ""}`
+                                    .replace(/\s+/g, " ")
+                                    .trim();
+                                })()}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Gender:</span>
+                              <span className="eb-view-value">{s.gender}</span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Status:</span>
+                              <span className="eb-view-value">{s.status}</span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">
+                                Degree of Participation:
+                              </span>
+                              <span className="eb-view-value">
+                                {s.degree_participation}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Birthday:</span>
+                              <span className="eb-view-value">
+                                {s.birthday || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Age:</span>
+                              <span className="eb-view-value">
+                                {s.age || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">
+                                Nationality:
+                              </span>
+                              <span className="eb-view-value">
+                                {s.nationality}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Alias:</span>
+                              <span className="eb-view-value">
+                                {s.alias || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Occupation:</span>
+                              <span className="eb-view-value">
+                                {s.occupation || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item eb-view-full">
+                              <span className="eb-view-label">Address:</span>
+                              <span className="eb-view-value">
+                                {(() => {
+                                  const parts = [
+                                    s.house_street,
+                                    s.barangay,
+                                    s.city_municipality,
+                                    s.district_province,
+                                    s.region,
+                                  ].filter((v) => v && v.trim() !== "");
+                                  return parts.length > 0
+                                    ? parts.join(", ")
+                                    : "N/A";
+                                })()}
+                              </span>
+                            </div>
+                            {s.location_if_arrested && (
+                              <div className="eb-view-item">
+                                <span className="eb-view-label">
+                                  Arrest Location:
+                                </span>
+                                <span className="eb-view-value">
+                                  {s.location_if_arrested}
+                                </span>
+                              </div>
+                            )}
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">
+                                Birth Place:
+                              </span>
+                              <span className="eb-view-value">
+                                {s.birth_place || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">
+                                Relation to Victim:
+                              </span>
+                              <span className="eb-view-value">
+                                {s.relation_to_victim || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">
+                                Educational Attainment:
+                              </span>
+                              <span className="eb-view-value">
+                                {s.educational_attainment || "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Height:</span>
+                              <span className="eb-view-value">
+                                {s.height_cm ? `${s.height_cm} cm` : "N/A"}
+                              </span>
+                            </div>
+                            <div className="eb-view-item">
+                              <span className="eb-view-label">Drug Used:</span>
+                              <span className="eb-view-value">
+                                {s.drug_used ? "Yes" : "No"}
+                              </span>
+                            </div>
+
+                            <div className="eb-view-item eb-view-full">
+                              <span className="eb-view-label">Motive:</span>
+                              <span className="eb-view-value">
+                                {s.motive || "N/A"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -4046,7 +4118,6 @@ function EBlotter() {
                         className="eb-btn-add-more"
                         onClick={() => {
                           setHasSuspect(true);
-                          addSuspect();
                         }}
                       >
                         Add Suspect
@@ -5224,7 +5295,7 @@ function EBlotter() {
                       </tr>
                     </thead>
                     <tbody>
-                      {deletedBlotters.map((b) => (
+                      {paginatedDeleted.map((b) => (
                         <tr key={b.blotter_id}>
                           <td>
                             <span
@@ -5335,12 +5406,38 @@ function EBlotter() {
                 {deletedBlotters.length} deleted{" "}
                 {deletedBlotters.length === 1 ? "record" : "records"}
               </span>
-              <button
-                className="eb-btn eb-btn-secondary"
-                onClick={() => setShowTrash(false)}
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
               >
-                Close
-              </button>
+                <button
+                  className="eb-pagination-btn"
+                  disabled={deletedPage === 1}
+                  onClick={() => setDeletedPage((p) => p - 1)}
+                >
+                  Previous
+                </button>
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--navy-primary)",
+                    padding: "0 8px",
+                  }}
+                >
+                  Page {deletedPage} of{" "}
+                  {Math.ceil(deletedBlotters.length / DELETED_PER_PAGE) || 1}
+                </span>
+                <button
+                  className="eb-pagination-btn"
+                  disabled={
+                    deletedPage >=
+                    Math.ceil(deletedBlotters.length / DELETED_PER_PAGE)
+                  }
+                  onClick={() => setDeletedPage((p) => p + 1)}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5696,8 +5793,6 @@ function EBlotter() {
             >
               <option value="">All Status</option>
               <option>Under Investigation</option>
-              <option>Pending</option>
-              <option>Urgent</option>
               <option>Cleared</option>
               <option>Solved</option>
             </select>
@@ -5756,6 +5851,7 @@ function EBlotter() {
               <option value="">All Records</option>
               <option value="manual">Manual Entry</option>
               <option value="bantay_import">Imported</option>
+              <option value="brgy_referral">Barangay Referred</option>
             </select>
           </div>
           <div className="eb-filter-group">
