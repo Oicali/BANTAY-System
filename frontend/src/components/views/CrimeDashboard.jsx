@@ -2314,8 +2314,8 @@ const CrimeDashboard = () => {
                 </button>
                 <p className="cd-ai-helper-text">
                   Generates an AI-powered EMPO QUAD assessment based on current
-                  filters. Requires at least 6 months of data for reliable
-                  forecasting.
+                  filters. <b>Requires at least 6 months of data for reliable
+                  forecasting.</b>
                 </p>
               </>
             ) : (

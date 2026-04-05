@@ -3,7 +3,9 @@
 const axios = require("axios");
 
 const PYTHON_SERVICE_URL =
-  process.env.PYTHON_SERVICE_URL || "http://localhost:8000";
+  process.env.PYTHON_SERVICE_URL ||
+  process.env.AI_SERVICE_URL ||
+  "http://localhost:8000";
 
 const analyzeWithPython = async ({
   barangays = [],
