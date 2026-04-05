@@ -16,8 +16,8 @@
   background: #ffffff;
   border-radius: 12px;
   width: 95vw;
-  height: 90vh;
-  max-width: 1200px;
+  height: 95vh;
+  max-width: 1400px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -140,8 +140,9 @@
 /* ── BODY ── */
 .apm-body {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 400px;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -314,7 +315,18 @@
 .apm-tt-brgy { font-size: 13px; font-weight: 600; color: #212529; }
 .apm-tt-time { white-space: nowrap; }
 
-.apm-time-inputs { display: flex; align-items: center; gap: 4px; }
+.apm-time-inputs input {
+  padding: 4px 6px;
+  border: 1px solid #ced4da;
+  border-radius: 5px;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  width: 100px;
+  transition: border-color 0.2s;
+  color: #6c757d;
+  background: #f8f9fa;
+}
 .apm-time-inputs input {
   padding: 4px 6px;
   border: 1px solid #ced4da;

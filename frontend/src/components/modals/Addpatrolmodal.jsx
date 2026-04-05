@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./AddPatrolModal.css";
+import LoadingModal from "./LoadingModal";
+import Notification from "./Notification";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -47,6 +49,8 @@ const AddPatrolModal = ({
   onSave,
 }) => {
   const mapRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+const [notif, setNotif] = useState(null);
 
   // ── Form state ─────────────────────────────────────────
   const [form, setForm] = useState({
@@ -61,7 +65,6 @@ const AddPatrolModal = ({
     (patrol?.patrollers || []).map((p) => p.active_patroller_id)
   );
   const [patrollerSearch, setPatrollerSearch] = useState("");
-
   // ── Stops (timetable rows) ─────────────────────────────
   const [stops, setStops] = useState(() => {
     if (!patrol?.routes?.length) return [{ ...emptyStop }];
@@ -132,24 +135,25 @@ const AddPatrolModal = ({
 
   // ── Submit ─────────────────────────────────────────────
   const handleSave = () => {
-    if (!form.patrol_name || !form.mobile_unit_id || !form.shift || !form.start_date || !form.end_date) {
-      alert("Please fill in all required fields."); return;
-    }
-    if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
-      alert("End date must be on or after start date."); return;
-    }
-    const validStops = stops.filter((s) => s.barangay && s.time_start && s.time_end);
-    if (validStops.length === 0) {
-      alert("Please add at least one stop with barangay and times."); return;
-    }
-    const dates  = generateDateRange(form.start_date, form.end_date);
-    const routes = [];
-    dates.forEach((date) => {
-      validStops.forEach((s, i) => routes.push({ ...s, route_date: date, stop_order: i+1 }));
-    });
-    onSave({ ...form, patroller_ids: selectedPatrollerIds, routes });
-  };
+  if (!form.patrol_name || !form.mobile_unit_id || !form.shift || !form.start_date || !form.end_date) {
+    setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
+  }
+  if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
+    setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
+  }
+  const validStops = stops.filter((s) => s.barangay && s.time_start && s.time_end);
+  if (validStops.length === 0) {
+    setNotif({ message: "Please add at least one stop with barangay and times.", type: "warning" }); return;
+  }
+  const dates  = generateDateRange(form.start_date, form.end_date);
+  const routes = [];
+  dates.forEach((date) => {
+    validStops.forEach((s, i) => routes.push({ ...s, route_date: date, stop_order: i + 1 }));
+  });
 
+  setLoading(true);
+  onSave({ ...form, patroller_ids: selectedPatrollerIds, routes });
+};
   // ── Helpers ────────────────────────────────────────────
   const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
 
@@ -366,6 +370,14 @@ const AddPatrolModal = ({
           </div>
         </div>
       </div>
+      <LoadingModal isOpen={loading} message="Saving patrol..." />
+{notif && (
+  <Notification
+    message={notif.message}
+    type={notif.type}
+    onClose={() => setNotif(null)}
+  />
+)}
     </div>
   );
 };

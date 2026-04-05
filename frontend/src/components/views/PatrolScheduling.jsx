@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
-import AddPatrolModal from "../modals/Addpatrolmodal";
+import Notification from "../modals/Notification";
+import AddPatrolModal from "../modals/AddPatrolModal";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -22,13 +24,14 @@ const toLocalDateStr = (d) => {
 
 const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
-
+const [notif, setNotif] = useState(null);
+// notif = { message: "...", type: "success" }
   // ── Data ───────────────────────────────────────────────
   const [patrols, setPatrols]                         = useState([]);
   const [mobileUnits, setMobileUnits]                 = useState([]);
   const [availablePatrollers, setAvailablePatrollers] = useState([]);
   const [geoJSONData, setGeoJSONData]                 = useState(null);
-
+const [loading, setLoading] = useState(false);
   // ── Table filters ──────────────────────────────────────
   const [search, setSearch]           = useState("");
   const [filterShift, setFilterShift] = useState("");
@@ -50,12 +53,14 @@ const PatrolScheduling = () => {
 
   // ── Fetchers ───────────────────────────────────────────
   const fetchPatrols = async () => {
-    try {
-      const res  = await fetch(`${API_BASE}/patrol/patrols`, { headers: { Authorization: `Bearer ${token()}` } });
-      const data = await res.json();
-      if (data.success) setPatrols(data.data);
-    } catch (err) { console.error("Patrols error:", err); }
-  };
+  setLoading(true);
+  try {
+    const res  = await fetch(`${API_BASE}/patrol/patrols`, { headers: { Authorization: `Bearer ${token()}` } });
+    const data = await res.json();
+    if (data.success) setPatrols(data.data);
+  } catch (err) { console.error("Patrols error:", err); }
+  finally { setLoading(false); }
+};
 
   const fetchMobileUnits = async () => {
     try {
@@ -92,26 +97,29 @@ const PatrolScheduling = () => {
 
   // ── Save patrol (create or update) ────────────────────
   const handleSave = async (formData) => {
-    try {
-      const url = addModalMode === "add"
-        ? `${API_BASE}/patrol/patrols`
-        : `${API_BASE}/patrol/patrols/${editingPatrol.patrol_id}`;
+  try {
+    const url = addModalMode === "add"
+      ? `${API_BASE}/patrol/patrols`
+      : `${API_BASE}/patrol/patrols/${editingPatrol.patrol_id}`;
 
-      const res  = await fetch(url, {
-        method: addModalMode === "add" ? "POST" : "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setShowAddModal(false);
-        setEditingPatrol(null);
-        fetchPatrols();
-      } else {
-        alert(data.message || "Something went wrong.");
-      }
-    } catch (err) { console.error("Save error:", err); }
-  };
+    const res  = await fetch(url, {
+      method: addModalMode === "add" ? "POST" : "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      body: JSON.stringify(formData),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setShowAddModal(false);
+      setEditingPatrol(null);
+      fetchPatrols();
+      setNotif({ message: addModalMode === "add" ? "Patrol created successfully!" : "Patrol updated successfully!", type: "success" });
+    } else {
+      setNotif({ message: data.message || "Something went wrong.", type: "error" });
+    }
+  } catch (err) {
+    setNotif({ message: "Server error. Please try again.", type: "error" });
+  }
+};
 
   // ── Delete patrol ──────────────────────────────────────
   const handleDelete = async (id) => {
@@ -122,11 +130,12 @@ const PatrolScheduling = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setShowBeatCard(false);
-        setBeatCardPatrol(null);
+        setNotif({ message: "Patrol deleted successfully!", type: "success" });
+        setShowAddModal(false);
+        setEditingPatrol(null);
         fetchPatrols();
       } else {
-        alert(data.message || "Something went wrong.");
+        setNotif({ message: "Something went wrong.", type: "error" });
       }
     } catch (err) { console.error("Delete error:", err); }
   };
@@ -264,6 +273,16 @@ const PatrolScheduling = () => {
           onDelete={() => handleDelete(beatCardPatrol.patrol_id)}
         />
       )}
+      <LoadingModal isOpen={loading} message="Loading patrols..." />
+          {/* ── NOTIFICATION ── */}
+    {notif && (
+      <Notification
+        message={notif.message}
+        type={notif.type}
+        onClose={() => setNotif(null)}
+        duration={3000}
+      />
+    )}
     </div>
   );
 };
