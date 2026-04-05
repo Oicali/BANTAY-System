@@ -1328,11 +1328,12 @@ body {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: 10px;
-  padding: 24px;
+  padding: 32px 24px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
+  text-align: center;
 }
 
 .cd-generate-btn {
@@ -1691,7 +1692,7 @@ body {
 
 /* ── ADD TO END OF CrimeDashboard.css ────────────────────────────────────── */
 
-.cd-ai-phase-wrap {
+/* .cd-ai-phase-wrap {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1700,9 +1701,9 @@ body {
   border: 1px solid rgba(30, 58, 95, 0.12);
   border-radius: 8px;
   margin-top: 4px;
-}
+} */
 
-.cd-ai-phase-spinner {
+/* .cd-ai-phase-spinner {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(30, 58, 95, 0.2);
@@ -1710,21 +1711,99 @@ body {
   border-radius: 50%;
   animation: cd-spin 0.8s linear infinite;
   flex-shrink: 0;
-}
+} */
 
-@keyframes cd-spin {
+/* @keyframes cd-spin {
   to { transform: rotate(360deg); }
-}
+} */
 
-.cd-ai-phase-text {
+/* .cd-ai-phase-text {
   font-size: 13px;
   font-weight: 500;
   color: var(--navy-primary);
-}
+} */
 
-.cd-ai-range-warning {
+/* .cd-ai-range-warning {
   font-size: 12px;
   color: #f59e0b;
   margin-top: 4px;
+} */
+
+/* ── AI LOADING ── */
+.cd-ai-loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
 }
 
+.cd-ai-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cd-ai-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--navy-primary);
+  display: inline-block;
+  animation: cd-wave 1.2s ease-in-out infinite;
+}
+
+.cd-ai-dots span:nth-child(1) { animation-delay: 0s; }
+.cd-ai-dots span:nth-child(2) { animation-delay: 0.2s; }
+.cd-ai-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes cd-wave {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-10px); opacity: 1; }
+}
+
+.cd-ai-phase-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy-primary);
+  text-align: center;
+}
+
+/* ── TOAST ── */
+.cd-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  min-width: 320px;
+  max-width: 420px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  z-index: 9999;
+  animation: cd-slide-in 0.3s ease-out;
+}
+
+@keyframes cd-slide-in {
+  from { transform: translateX(400px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.cd-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cd-toast-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.cd-toast-error {
+  background: rgba(239, 68, 68, 0.95);
+  border: 1px solid rgba(220, 38, 38, 0.8);
+}

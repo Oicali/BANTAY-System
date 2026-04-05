@@ -8,8 +8,8 @@ const {
 } = require("../prompts/prompt.assessment");
 
 const AI_PROVIDER    = (process.env.AI_PROVIDER || "mock").toLowerCase();
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-const OLLAMA_MODEL   = process.env.OLLAMA_MODEL    || "llama3.1:8b";
+// const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+// const OLLAMA_MODEL   = process.env.OLLAMA_MODEL    || "llama3.1:8b";
 const GEMINI_MODEL   = process.env.GEMINI_MODEL    || "gemini-1.5-flash";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY  || "";
 
@@ -226,9 +226,7 @@ const callGemini = async (prompt) => {
 };
 
 const callAI = async (prompt) => {
-  if (AI_PROVIDER === "ollama") return callOllama(prompt);
-  if (AI_PROVIDER === "gemini") return callGemini(prompt);
-  throw new Error(`Unknown AI provider: ${AI_PROVIDER}`);
+  return callGemini(prompt);
 };
 
 // ── Iterative per-crime AI generation ────────────────────────────────────────
@@ -236,7 +234,7 @@ const callAI = async (prompt) => {
 const maybeEnhanceWithAI = async (analysis, baseAssessment) => {
   const provider = AI_PROVIDER;
 
-  if (provider !== "ollama" && provider !== "gemini") {
+  if (!GEMINI_API_KEY) {
     return {
       providerUsed: "mock",
       modelUsed:    null,

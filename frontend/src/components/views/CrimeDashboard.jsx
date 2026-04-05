@@ -2020,6 +2020,7 @@ const CrimeDashboard = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const [isGeneratingAssessment, setIsGeneratingAssessment] = useState(false);
   const [assessmentPhase, setAssessmentPhase] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const fetchIdRef = useRef(0);
 
@@ -2101,6 +2102,13 @@ const CrimeDashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+  if (errorMessage) {
+    const t = setTimeout(() => setErrorMessage(""), 5000);
+    return () => clearTimeout(t);
+  }
+}, [errorMessage]);
+
   const getAssessmentMode = (dateTo) => {
     if (!dateTo) return "current";
 
@@ -2122,17 +2130,17 @@ const CrimeDashboard = () => {
     fetchOverview(newFilters, true);
   };
 
-  const ASSESSMENT_PHASES = [
-    "Querying blotter records...",
-    "Running DBSCAN spatial clustering...",
-    "Analyzing peak hours and days...",
-    "Computing Croston crime forecasts...",
-    "Calculating CCE and CSE...",
-    "Preparing assessment data...",
-    "AI is writing general assessment...",
-    "AI is writing EMPO QUAD recommendations...",
-    "Finalizing assessment...",
-  ];
+  // const ASSESSMENT_PHASES = [
+  //   "Querying blotter records...",
+  //   "Running DBSCAN spatial clustering...",
+  //   "Analyzing peak hours and days...",
+  //   "Computing Croston crime forecasts...",
+  //   "Calculating CCE and CSE...",
+  //   "Preparing assessment data...",
+  //   "AI is writing general assessment...",
+  //   "AI is writing EMPO QUAD recommendations...",
+  //   "Finalizing assessment...",
+  // ];
 
   const handleGenerateAssessment = async () => {
     if (isLoading || !dashData.summary.length) return;
@@ -2153,12 +2161,24 @@ const CrimeDashboard = () => {
     }
 
     // Start phase cycling
+    const crimes =
+      appliedFilters.crimeTypes.length > 0
+        ? appliedFilters.crimeTypes
+        : INDEX_CRIMES;
+
+    const phases = [
+      "Querying blotter records...",
+      "Running spatial clustering...",
+      "Computing forecasts...",
+      ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
+      "Finalizing assessment...",
+    ];
     let phaseIndex = 0;
-    setAssessmentPhase(ASSESSMENT_PHASES[0]);
+    setAssessmentPhase(phases[0]);
     const phaseInterval = setInterval(() => {
-      phaseIndex = Math.min(phaseIndex + 1, ASSESSMENT_PHASES.length - 1);
-      setAssessmentPhase(ASSESSMENT_PHASES[phaseIndex]);
-    }, 3500);
+      phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
+      setAssessmentPhase(phases[phaseIndex]);
+    }, 3200);
 
     try {
       setIsGeneratingAssessment(true);
@@ -2191,7 +2211,7 @@ const CrimeDashboard = () => {
       console.log("AI assessment response:", json);
     } catch (err) {
       console.error("Generate assessment error:", err);
-      alert(err.message || "Failed to generate assessment");
+      setErrorMessage(err.message || "Failed to generate assessment");
     } finally {
       clearInterval(phaseInterval);
       setAssessmentPhase("");
@@ -2283,29 +2303,30 @@ const CrimeDashboard = () => {
       >
         {!assessment && (
           <div className="cd-ai-generate-wrap">
-            <button
-              className="cd-generate-btn"
-              onClick={handleGenerateAssessment}
-              disabled={
-                isLoading || isGeneratingAssessment || !dashData.summary.length
-              }
-            >
-              {isGeneratingAssessment ? "Generating..." : "Generate Assessment"}
-            </button>
-
-            {isGeneratingAssessment && assessmentPhase && (
-              <div className="cd-ai-phase-wrap">
-                <div className="cd-ai-phase-spinner" />
-                <span className="cd-ai-phase-text">{assessmentPhase}</span>
+            {!isGeneratingAssessment ? (
+              <>
+                <button
+                  className="cd-generate-btn"
+                  onClick={handleGenerateAssessment}
+                  disabled={isLoading || !dashData.summary.length}
+                >
+                  Generate Assessment
+                </button>
+                <p className="cd-ai-helper-text">
+                  Generates an AI-powered EMPO QUAD assessment based on current
+                  filters. Requires at least 6 months of data for reliable
+                  forecasting.
+                </p>
+              </>
+            ) : (
+              <div className="cd-ai-loading-wrap">
+                <div className="cd-ai-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <p className="cd-ai-phase-text">{assessmentPhase}</p>
               </div>
-            )}
-
-            {!isGeneratingAssessment && (
-              <p className="cd-ai-helper-text">
-                Generates an AI assessment based on the currently applied
-                dashboard filters. Requires at least 6 months of data for
-                reliable forecasting.
-              </p>
             )}
           </div>
         )}
@@ -2388,7 +2409,7 @@ const CrimeDashboard = () => {
                 />
 
                 <div className="cd-ai-quad-item">
-                  <span className="cd-ai-quad-label">General Assessment</span>
+                  <span className="cd-ai-quad-label">Crime Assessment</span>
                   <p>{crime.general_assessment}</p>
                 </div>
 
@@ -2418,6 +2439,16 @@ const CrimeDashboard = () => {
           </div>
         )}
       </div>
+      {errorMessage && (
+        <div className="cd-toast cd-toast-error">
+          <div className="cd-toast-content">
+            <svg className="cd-toast-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+            </svg>
+            <span>{errorMessage}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
