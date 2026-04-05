@@ -17,7 +17,7 @@ from sklearn.cluster import DBSCAN
 
 load_dotenv()
 
-app = FastAPI(title="BANTAY AI Assessment Service", version="0.2.4")
+app = FastAPI(title="BANTAY AI Assessment Service", version="0.3.0")
 
 
 # ─── CRIME TYPE MAPPING ────────────────────────────────────────────────────────
@@ -211,10 +211,10 @@ def get_incidents(
     if df.empty:
         return df
 
-    df["hour"]             = df["date_time_commission"].dt.hour
-    df["day_of_incident"]  = df["date_time_commission"].dt.day_name()
-    df["month_of_incident"]= df["date_time_commission"].dt.month_name()
-    df["status_norm"]      = normalize_status_series(df["status"])
+    df["hour"]              = df["date_time_commission"].dt.hour
+    df["day_of_incident"]   = df["date_time_commission"].dt.day_name()
+    df["month_of_incident"] = df["date_time_commission"].dt.month_name()
+    df["status_norm"]       = normalize_status_series(df["status"])
 
     return df
 
@@ -275,10 +275,10 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
     per_crime: list[dict[str, Any]] = []
 
     for crime, group in df.groupby("incident_type"):
-        total              = int(len(group))
-        cleared            = int((group["status_norm"] == "cleared").sum())
-        solved             = int((group["status_norm"] == "solved").sum())
-        under_investigation= int((~group["status_norm"].isin(["cleared", "solved", "closed"])).sum())
+        total               = int(len(group))
+        cleared             = int((group["status_norm"] == "cleared").sum())
+        solved              = int((group["status_norm"] == "solved").sum())
+        under_investigation = int((~group["status_norm"].isin(["cleared", "solved", "closed"])).sum())
 
         cce = round(((cleared + solved) / total) * 100, 1) if total else 0.0
         cse = round((solved / total) * 100, 1) if total else 0.0
@@ -312,17 +312,17 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
         )
 
         per_crime.append({
-            "crime":              crime,
-            "total":              total,
-            "cleared":            cleared,
-            "solved":             solved,
-            "under_investigation":under_investigation,
-            "cce_percent":        cce,
-            "cse_percent":        cse,
-            "top_3_modus":        top_modus_list,
-            "top_place_type":     top_place_type,
-            "peak_hour":          peak_hour,
-            "peak_day":           peak_day,
+            "crime":               crime,
+            "total":               total,
+            "cleared":             cleared,
+            "solved":              solved,
+            "under_investigation": under_investigation,
+            "cce_percent":         cce,
+            "cse_percent":         cse,
+            "top_3_modus":         top_modus_list,
+            "top_place_type":      top_place_type,
+            "peak_hour":           peak_hour,
+            "peak_day":            peak_day,
         })
 
     total_all   = int(len(df))
@@ -332,15 +332,15 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
 
     return {
         "overall": {
-            "total":              total_all,
-            "cleared":            cleared_all,
-            "solved":             solved_all,
-            "under_investigation":ui_all,
-            "cce_percent":        round(((cleared_all + solved_all) / total_all) * 100, 1) if total_all else 0.0,
-            "cse_percent":        round((solved_all / total_all) * 100, 1) if total_all else 0.0,
-            "peak_hour":          int(df["hour"].mode().iloc[0]) if not df["hour"].mode().empty else None,
-            "peak_day":           df["day_of_incident"].mode().iloc[0] if not df["day_of_incident"].mode().empty else "Unknown",
-            "peak_month":         df["month_of_incident"].mode().iloc[0] if not df["month_of_incident"].mode().empty else "Unknown",
+            "total":               total_all,
+            "cleared":             cleared_all,
+            "solved":              solved_all,
+            "under_investigation": ui_all,
+            "cce_percent":         round(((cleared_all + solved_all) / total_all) * 100, 1) if total_all else 0.0,
+            "cse_percent":         round((solved_all / total_all) * 100, 1) if total_all else 0.0,
+            "peak_hour":           int(df["hour"].mode().iloc[0]) if not df["hour"].mode().empty else None,
+            "peak_day":            df["day_of_incident"].mode().iloc[0] if not df["day_of_incident"].mode().empty else "Unknown",
+            "peak_month":          df["month_of_incident"].mode().iloc[0] if not df["month_of_incident"].mode().empty else "Unknown",
         },
         "per_crime": per_crime,
     }
@@ -356,8 +356,8 @@ def compute_temporal(df: pd.DataFrame) -> dict[str, Any]:
     daily   = df["day_of_incident"].value_counts()
     monthly = df["month_of_incident"].value_counts()
 
-    hourly_dist  = {f"{h:02d}": int(hourly.get(h, 0)) for h in range(24)}
-    top_3_hours  = hourly.sort_values(ascending=False).head(3).index.tolist()
+    hourly_dist = {f"{h:02d}": int(hourly.get(h, 0)) for h in range(24)}
+    top_3_hours = hourly.sort_values(ascending=False).head(3).index.tolist()
 
     overall = {
         "peak_hour":            int(hourly.idxmax()) if not hourly.empty else None,
@@ -395,9 +395,9 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
 
     if total_with_coords < 3:
         return {
-            "clusters":           [],
-            "noise_count":        total_with_coords,
-            "total_with_coords":  total_with_coords,
+            "clusters":          [],
+            "noise_count":       total_with_coords,
+            "total_with_coords": total_with_coords,
         }
 
     coords = geo_df[["lat", "lng"]].values.astype(float)
@@ -413,8 +413,9 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
 
         cluster_rows = geo_df[geo_df["cluster_label"] == label]
 
-        centroid_lat   = float(cluster_rows["lat"].mean())
-        centroid_lng   = float(cluster_rows["lng"].mean())
+        centroid_lat = float(cluster_rows["lat"].mean())
+        centroid_lng = float(cluster_rows["lng"].mean())
+
         dominant_crime = (
             cluster_rows["incident_type"].mode().iloc[0]
             if not cluster_rows["incident_type"].mode().empty
@@ -432,15 +433,39 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         )
         crime_types = cluster_rows["incident_type"].unique().tolist()
 
+        # ── Spatiotemporal: peak hour and day within this cluster ─────────────
+        # Only report if cluster has enough incidents for a meaningful pattern.
+        # With fewer than 5 incidents, mode() is not reliable — one incident
+        # on a Friday doesn't mean "this cluster peaks on Fridays."
+        has_temporal_pattern = len(cluster_rows) >= 5
+
+        cluster_hours = cluster_rows["hour"].value_counts()
+        cluster_days  = cluster_rows["day_of_incident"].value_counts()
+
+        cluster_peak_hour = (
+            int(cluster_hours.idxmax())
+            if has_temporal_pattern and not cluster_hours.empty
+            else None
+        )
+        cluster_peak_day = (
+            cluster_days.idxmax()
+            if has_temporal_pattern and not cluster_days.empty
+            else None
+        )
+
         clusters.append({
-            "cluster_id":         int(label),
-            "count":              int(len(cluster_rows)),
-            "centroid_lat":       round(centroid_lat, 7),
-            "centroid_lng":       round(centroid_lng, 7),
-            "dominant_crime":     dominant_crime,
-            "dominant_modus":     dominant_modus,
-            "dominant_barangay":  dominant_barangay,
-            "crime_types":        crime_types,
+            "cluster_id":           int(label),
+            "count":                int(len(cluster_rows)),
+            "centroid_lat":         round(centroid_lat, 7),
+            "centroid_lng":         round(centroid_lng, 7),
+            "dominant_crime":       dominant_crime,
+            "dominant_modus":       dominant_modus,
+            "dominant_barangay":    dominant_barangay,
+            "crime_types":          crime_types,
+            # Spatiotemporal fields — None if insufficient incidents
+            "peak_hour":            cluster_peak_hour,
+            "peak_day":             cluster_peak_day,
+            "has_temporal_pattern": has_temporal_pattern,
         })
 
     noise_count = int((geo_df["cluster_label"] == -1).sum())
@@ -452,154 +477,116 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-# ─── MODULE 4 — LINEAR REGRESSION ─────────────────────────────────────────────
+# ─── MODULE 4 — CROSTON FORECASTING ───────────────────────────────────────────
 
-def compute_linreg(weekly_df: pd.DataFrame) -> dict[str, Any]:
+def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
+    """
+    Croston's method for intermittent demand forecasting.
+    Designed for sparse count data — exactly the crime data profile.
+    Only uses non-zero weeks. No zero-filling needed.
+    """
     if weekly_df.empty:
         return {"per_crime": []}
 
     per_crime: list[dict[str, Any]] = []
 
     for crime, group in weekly_df.groupby("incident_type"):
-        group = group.sort_values("week_start").reset_index(drop=True)
-        group["week_index"] = range(len(group))
+        # Only non-zero weeks — Croston handles intervals itself
+        nonzero = (
+            group[group["count"] > 0]
+            .sort_values("week_start")
+            .reset_index(drop=True)
+        )
+        nonzero_count = int(len(nonzero))
+        total_weeks   = int(len(group))
 
-        x = group["week_index"].values.astype(float)
-        y = group["count"].values.astype(float)
-
-        if len(x) < 2:
+        # Insufficient data — skip forecast entirely
+        if nonzero_count < 4:
             per_crime.append({
-                "crime":                crime,
-                "trend":                "stable",
-                "slope":                0.0,
-                "r_squared":            0.0,
-                "confidence_level":     "low",
-                "predicted_next_week":  int(y[-1]) if len(y) else 0,
-                "weeks_of_data":        int(len(x)),
+                "crime":               crime,
+                "trend":               "insufficient_data",
+                "predicted_next_week": None,
+                "confidence":          "none",
+                "nonzero_weeks":       nonzero_count,
+                "total_weeks":         total_weeks,
+                "method":              "none",
+                "message":             f"Only {nonzero_count} incident weeks — insufficient for forecasting",
             })
             continue
 
-        if np.all(y == y[0]):
-            per_crime.append({
-                "crime":                crime,
-                "trend":                "stable",
-                "slope":                0.0,
-                "r_squared":            0.0,
-                "confidence_level":     "low",
-                "predicted_next_week":  int(y[-1]),
-                "weeks_of_data":        int(len(x)),
-            })
-            continue
+        # Confidence level based on non-zero observations
+        if nonzero_count < 8:
+            confidence = "low"
+        elif nonzero_count < 20:
+            confidence = "moderate"
+        else:
+            confidence = "high"
 
-        result    = stats.linregress(x, y)
-        slope     = float(result.slope)     if np.isfinite(result.slope)     else 0.0
-        intercept = float(result.intercept) if np.isfinite(result.intercept) else 0.0
-        r_squared = float(result.rvalue**2) if np.isfinite(result.rvalue)    else 0.0
+        # ── Croston's method ──────────────────────────────────────────────────
+        demands     = nonzero["count"].values.astype(float)
+        week_starts = pd.to_datetime(nonzero["week_start"])
 
-        if slope > 0.1:   trend = "increasing"
-        elif slope < -0.1: trend = "decreasing"
-        else:              trend = "stable"
+        # Compute intervals between non-zero weeks (in weeks)
+        if len(week_starts) > 1:
+            intervals = [
+                max(1, (week_starts.iloc[i] - week_starts.iloc[i - 1]).days // 7)
+                for i in range(1, len(week_starts))
+            ]
+        else:
+            intervals = [1.0]
 
-        if r_squared > 0.6:   confidence_level = "high"
-        elif r_squared > 0.3: confidence_level = "moderate"
-        else:                 confidence_level = "low"
+        # Exponential smoothing on demand sizes and intervals
+        alpha            = 0.3
+        smoothed_demand  = float(demands[0])
+        smoothed_interval = float(intervals[0]) if intervals else 1.0
 
-        next_week_index = int(x[-1]) + 1
-        predicted = max(0, round(intercept + slope * next_week_index))
+        for i in range(1, len(demands)):
+            smoothed_demand = alpha * demands[i] + (1 - alpha) * smoothed_demand
+            if i - 1 < len(intervals):
+                smoothed_interval = alpha * intervals[i - 1] + (1 - alpha) * smoothed_interval
+
+        # Croston forecast = smoothed demand / smoothed interval
+        croston_rate = smoothed_demand / max(smoothed_interval, 1.0)
+        predicted    = max(0, round(croston_rate))
+
+        # ── Trend direction via moving average comparison ─────────────────────
+        if nonzero_count >= 8:
+            recent   = demands[-4:].mean()
+            previous = demands[-8:-4].mean() if nonzero_count >= 8 else demands.mean()
+            if previous > 0:
+                pct_change = ((recent - previous) / previous) * 100
+            else:
+                pct_change = 0.0
+
+            if pct_change > 20:
+                trend = "increasing"
+            elif pct_change < -20:
+                trend = "decreasing"
+            else:
+                trend = "stable"
+        else:
+            trend = "stable"
 
         per_crime.append({
-            "crime":                crime,
-            "trend":                trend,
-            "slope":                round(slope, 4),
-            "r_squared":            round(r_squared, 4),
-            "confidence_level":     confidence_level,
-            "predicted_next_week":  int(predicted),
-            "weeks_of_data":        int(len(x)),
+            "crime":               crime,
+            "trend":               trend,
+            "predicted_next_week": int(predicted),
+            "confidence":          confidence,
+            "nonzero_weeks":       nonzero_count,
+            "total_weeks":         total_weeks,
+            "method":              "croston",
+            "smoothed_demand":     round(smoothed_demand, 2),
+            "smoothed_interval":   round(smoothed_interval, 2),
         })
 
     return {"per_crime": per_crime}
-
-
-# ─── MODULE 5 — ARIMA ─────────────────────────────────────────────────────────
-
-def compute_arima(weekly_df: pd.DataFrame) -> dict[str, Any]:
-    ARIMA_MIN_WEEKS = 10
-
-    if weekly_df.empty:
-        return {
-            "predicted_total_next_week": None,
-            "vs_average":                "unknown",
-            "historical_weekly_mean":    None,
-            "method":                    "no_data",
-            "model_order":               None,
-            "weeks_of_data":             0,
-        }
-
-    weekly_total = (
-        weekly_df.groupby("week_start")["count"]
-        .sum()
-        .sort_index()
-        .reset_index()
-    )
-    weekly_total.columns = ["week_start", "total"]
-
-    series          = weekly_total["total"].values.astype(float)
-    n_weeks         = int(len(series))
-    historical_mean = float(series.mean())
-
-    def _label_vs_average(predicted: float, mean: float) -> str:
-        if mean == 0:
-            return "normal"
-        ratio = predicted / mean
-        if ratio > 1.10: return "above"
-        if ratio < 0.90: return "below"
-        return "normal"
-
-    if n_weeks >= ARIMA_MIN_WEEKS:
-        try:
-            import pmdarima as pm
-            model    = pm.auto_arima(
-                series, seasonal=False, stepwise=True,
-                suppress_warnings=True, error_action="ignore",
-                max_p=3, max_q=3, max_d=2,
-            )
-            forecast  = model.predict(n_periods=1)
-            predicted = max(0, round(float(forecast[0])))
-            return {
-                "predicted_total_next_week": int(predicted),
-                "vs_average":                _label_vs_average(predicted, historical_mean),
-                "historical_weekly_mean":    round(historical_mean, 2),
-                "method":                    "arima",
-                "model_order":               list(model.order),
-                "weeks_of_data":             n_weeks,
-            }
-        except Exception:
-            pass
-
-    x = np.arange(n_weeks, dtype=float)
-    y = series
-
-    if n_weeks >= 2:
-        result    = stats.linregress(x, y)
-        predicted = max(0, round(result.intercept + result.slope * n_weeks))
-    else:
-        predicted = int(series[-1]) if n_weeks else 0
-
-    return {
-        "predicted_total_next_week": int(predicted),
-        "vs_average":                _label_vs_average(predicted, historical_mean),
-        "historical_weekly_mean":    round(historical_mean, 2),
-        "method":                    "linreg_fallback",
-        "model_order":               None,
-        "weeks_of_data":             n_weeks,
-    }
 
 
 # ─── HEALTH CHECK ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health_check():
-    return {"ok": True, "service": "bantay-ai-assessment", "version": "0.2.4"}
+    return {"ok": True, "service": "bantay-ai-assessment", "version": "0.3.0"}
 
 
 # ─── /clusters — HEATMAP DBSCAN ENDPOINT ──────────────────────────────────────
@@ -609,10 +596,10 @@ def get_clusters(payload: ClustersRequest):
     """
     Lightweight endpoint called by crimeMapController.js to get
     DBSCAN cluster centroids for the heatmap ring layer.
-    Returns only cluster data — no trends, no ARIMA, no stats.
+    Returns only cluster data — no trends, no stats.
     """
     try:
-        incidents_df = get_incidents(
+        incidents_df    = get_incidents(
             barangays=payload.barangays,
             date_from=payload.date_from,
             date_to=payload.date_to,
@@ -636,56 +623,37 @@ def analyze(payload: AnalyzeRequest):
             crime_types=payload.crime_types,
         )
 
+        # All historical data up to date_to — no date_from cap
+        # This gives Croston the full history regardless of display range
         historical_weekly_df = get_historical_weekly(
             barangays=payload.barangays,
             up_to_date=payload.date_to,
             crime_types=payload.crime_types,
         )
 
-        # Fill in zero-count weeks for sparse crimes
-        if not historical_weekly_df.empty:
-            all_weeks = pd.date_range(
-                start=historical_weekly_df["week_start"].min(),
-                end=historical_weekly_df["week_start"].max(),
-                freq="W-MON",
-            ).normalize()
-
-            all_crimes = historical_weekly_df["incident_type"].unique()
-
-            full_index = pd.MultiIndex.from_product(
-                [all_weeks, all_crimes],
-                names=["week_start", "incident_type"],
-            )
-
-            historical_weekly_df = (
-                historical_weekly_df
-                .set_index(["week_start", "incident_type"])
-                .reindex(full_index, fill_value=0)
-                .reset_index()
-            )
-            historical_weekly_df["week_start"] = pd.to_datetime(historical_weekly_df["week_start"])
-
         stats_result    = compute_basic_stats(incidents_df)
         temporal_result = compute_temporal(incidents_df)
         clusters_result = compute_clusters(incidents_df)
-        linreg_result   = compute_linreg(historical_weekly_df)
-        arima_result    = compute_arima(historical_weekly_df)
+        croston_result  = compute_croston(historical_weekly_df)
 
-        linreg_map = {item["crime"]: item for item in linreg_result.get("per_crime", [])}
+        # Merge Croston results into per_crime stats
+        croston_map = {item["crime"]: item for item in croston_result.get("per_crime", [])}
 
         for crime_stat in stats_result.get("per_crime", []):
             crime = crime_stat["crime"]
-            lr    = linreg_map.get(crime, {})
-            crime_stat["trend"]                = lr.get("trend", "stable")
-            crime_stat["slope"]                = lr.get("slope", 0.0)
-            crime_stat["predicted_next_week"]  = lr.get("predicted_next_week", 0)
-            crime_stat["is_ecp"]               = (
+            cr    = croston_map.get(crime, {})
+            crime_stat["trend"]               = cr.get("trend", "stable")
+            crime_stat["predicted_next_week"] = cr.get("predicted_next_week", None)
+            crime_stat["confidence"]          = cr.get("confidence", "none")
+            crime_stat["nonzero_weeks"]       = cr.get("nonzero_weeks", 0)
+            crime_stat["forecast_method"]     = cr.get("method", "none")
+            crime_stat["is_ecp"]              = (
                 crime_stat["trend"] == "increasing"
                 and crime_stat["cse_percent"] < 30.0
+                and cr.get("confidence") not in ["none"]
             )
-            crime_stat["confidence_level"]     = lr.get("confidence_level", "low")
-            crime_stat["weeks_of_data"]        = lr.get("weeks_of_data", 0)
 
+        # Merge temporal per_crime into stats per_crime
         temporal_map = {item["crime"]: item for item in temporal_result.get("per_crime", [])}
 
         for crime_stat in stats_result.get("per_crime", []):
@@ -695,6 +663,8 @@ def analyze(payload: AnalyzeRequest):
                 crime_stat["peak_hour"] = t.get("peak_hour")
             crime_stat["top_3_hours"] = t.get("top_3_hours", [])
 
+        # Prepare historical rows for sparkline chart
+        # Keep only non-zero rows — frontend fills zeros for display
         historical_rows = historical_weekly_df.copy()
         if not historical_rows.empty:
             historical_rows["week_start"] = historical_rows["week_start"].dt.strftime("%Y-%m-%d")
@@ -712,8 +682,7 @@ def analyze(payload: AnalyzeRequest):
             "stats":                  stats_result,
             "temporal":               temporal_result,
             "clusters":               clusters_result,
-            "linreg":                 linreg_result,
-            "arima":                  arima_result,
+            "linreg":                 croston_result,   # key kept as "linreg" so frontend doesn't need changes
             "historical_weekly_rows": historical_rows.to_dict(orient="records"),
         }
 

@@ -462,7 +462,12 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
 };
 
 // ─── FILTER BAR ───────────────────────────────────────────────────────────────
-const FilterBar = ({ appliedFilters, onApply }) => {
+const FilterBar = ({
+  appliedFilters,
+  onApply,
+  isBarangayUser = false,
+  userBarangay = null,
+}) => {
   const [expanded, setExpanded] = useState(true);
   const [draft, setDraft] = useState(() => ({ ...appliedFilters }));
   const [dateError, setDateError] = useState("");
@@ -528,7 +533,11 @@ const FilterBar = ({ appliedFilters, onApply }) => {
 
   const handleReset = () => {
     setDateError("");
-    onApply(BLANK_FILTERS());
+    const base = BLANK_FILTERS();
+    if (isBarangayUser && userBarangay) {
+      base.barangays = [userBarangay];
+    }
+    onApply(base);
   };
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
@@ -642,10 +651,20 @@ const FilterBar = ({ appliedFilters, onApply }) => {
 
             <div className="cd-filter-group">
               <label>Barangay</label>
-              <BarangayMultiSelect
-                selected={draft.barangays}
-                onChange={(val) => setDraft((f) => ({ ...f, barangays: val }))}
-              />
+              {isBarangayUser && userBarangay ? (
+                <div className="cd-brgy-locked">
+                  <span className="cd-brgy-pill">
+                    {formatBarangayLabel(userBarangay)}
+                  </span>
+                </div>
+              ) : (
+                <BarangayMultiSelect
+                  selected={draft.barangays}
+                  onChange={(val) =>
+                    setDraft((f) => ({ ...f, barangays: val }))
+                  }
+                />
+              )}
             </div>
 
             <div className="cd-filter-group-actions">
@@ -1736,6 +1755,11 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
     return linregData.per_crime.find((l) => l.crime === crimeType) || null;
   }, [linregData, crimeType]);
 
+  // Croston has no slope — use trend from moving average comparison
+  // lr.trend is already set correctly from compute_croston
+  // lr.predicted_next_week comes from Croston rate
+  // lr.confidence replaces the old confidence_level
+
   if (!crimeRows.length) return null;
 
   const regressionData = useMemo(() => {
@@ -1793,7 +1817,10 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
         : "→ Stable";
 
   const isRetrospective = mode === "retrospective";
-  const hasEnoughData = crimeRows.length >= 8;
+  const hasEnoughData =
+    lr?.confidence === "moderate" || lr?.confidence === "high";
+  const insufficientForecast =
+    lr?.confidence === "none" || !lr || lr?.predicted_next_week === null;
 
   const tickInterval =
     crimeRows.length <= 8
@@ -1823,18 +1850,26 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
             data — use a wider date range for reliable trend
           </span>
         )}
-        {lr?.predicted_next_week !== undefined && (
-          <span className="cd-ai-sparkline-forecast">
-            {isRetrospective ? (
-              <>
-                Historical projection: <strong>{lr.predicted_next_week}</strong>{" "}
-                (period ended)
-              </>
-            ) : (
-              <>
-                Forecast: <strong>{lr.predicted_next_week}</strong> next week
-              </>
-            )}
+        {!insufficientForecast &&
+          lr?.predicted_next_week !== null &&
+          lr?.predicted_next_week !== undefined && (
+            <span className="cd-ai-sparkline-forecast">
+              {isRetrospective ? (
+                <>
+                  Historical projection:{" "}
+                  <strong>{lr.predicted_next_week}</strong> (period ended)
+                </>
+              ) : (
+                <>
+                  Forecast: <strong>{lr.predicted_next_week}</strong> next week
+                  · {lr.confidence} confidence
+                </>
+              )}
+            </span>
+          )}
+        {insufficientForecast && (
+          <span className="cd-ai-sparkline-warning">
+            ⚠ Insufficient data for forecast
           </span>
         )}
       </div>
@@ -1925,7 +1960,7 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
             className="cd-sparkline-dash"
             style={{ borderColor: trendColor }}
           />
-          Trend
+          Smoothed Rate
         </span>
         <span>
           <span
@@ -1957,7 +1992,23 @@ const isCacheValid = (filters) =>
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const CrimeDashboard = () => {
-  const [appliedFilters, setAppliedFilters] = useState(() => BLANK_FILTERS());
+  const rawUser = localStorage.getItem("user");
+  const currentUser = rawUser ? JSON.parse(rawUser) : null;
+  const isBarangayUser = currentUser?.user_type === "barangay";
+  const userBarangay = currentUser?.assigned_barangay_code ?? null;
+
+  const BLANK_FILTERS_FOR_USER = () => {
+    const base = BLANK_FILTERS();
+    if (isBarangayUser && userBarangay) {
+      base.barangays = [userBarangay];
+    }
+    return base;
+  };
+
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    BLANK_FILTERS_FOR_USER(),
+  );
+
   const [dashData, setDashData] = useState(() =>
     _cache ? _cache.data : EMPTY_DASHBOARD(),
   );
@@ -1968,6 +2019,7 @@ const CrimeDashboard = () => {
   const [assessment, setAssessment] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [isGeneratingAssessment, setIsGeneratingAssessment] = useState(false);
+  const [assessmentPhase, setAssessmentPhase] = useState("");
 
   const fetchIdRef = useRef(0);
 
@@ -2039,7 +2091,7 @@ const CrimeDashboard = () => {
   };
 
   useEffect(() => {
-    const defaults = BLANK_FILTERS();
+    const defaults = BLANK_FILTERS_FOR_USER();
 
     if (isCacheValid(defaults)) {
       setDashData(_cache.data);
@@ -2062,13 +2114,51 @@ const CrimeDashboard = () => {
   };
 
   const handleApply = (newFilters) => {
+    if (isBarangayUser && userBarangay) {
+      newFilters.barangays = [userBarangay];
+    }
     setAssessment(null);
     setAppliedFilters(newFilters);
     fetchOverview(newFilters, true);
   };
 
+  const ASSESSMENT_PHASES = [
+    "Querying blotter records...",
+    "Running DBSCAN spatial clustering...",
+    "Analyzing peak hours and days...",
+    "Computing Croston crime forecasts...",
+    "Calculating CCE and CSE...",
+    "Preparing assessment data...",
+    "AI is writing general assessment...",
+    "AI is writing EMPO QUAD recommendations...",
+    "Finalizing assessment...",
+  ];
+
   const handleGenerateAssessment = async () => {
     if (isLoading || !dashData.summary.length) return;
+
+    // Warn if date range is short — but don't block
+    const dayCount = Math.round(
+      (new Date(appliedFilters.dateTo) - new Date(appliedFilters.dateFrom)) /
+        86400000,
+    );
+    if (dayCount < 180) {
+      const proceed = window.confirm(
+        `Your selected range is only ${dayCount} days.\n\n` +
+          `For reliable Croston forecasting, at least 6 months (180 days) is recommended.\n\n` +
+          `The EMPO QUAD recommendations will still work, but trend forecasts may show "insufficient data".\n\n` +
+          `Continue anyway?`,
+      );
+      if (!proceed) return;
+    }
+
+    // Start phase cycling
+    let phaseIndex = 0;
+    setAssessmentPhase(ASSESSMENT_PHASES[0]);
+    const phaseInterval = setInterval(() => {
+      phaseIndex = Math.min(phaseIndex + 1, ASSESSMENT_PHASES.length - 1);
+      setAssessmentPhase(ASSESSMENT_PHASES[phaseIndex]);
+    }, 3500);
 
     try {
       setIsGeneratingAssessment(true);
@@ -2098,10 +2188,13 @@ const CrimeDashboard = () => {
 
       setAssessment(json.assessment);
       setAnalysisData(json.analysis);
+      console.log("AI assessment response:", json);
     } catch (err) {
       console.error("Generate assessment error:", err);
       alert(err.message || "Failed to generate assessment");
     } finally {
+      clearInterval(phaseInterval);
+      setAssessmentPhase("");
       setIsGeneratingAssessment(false);
     }
   };
@@ -2121,16 +2214,23 @@ const CrimeDashboard = () => {
             </span>
           </p>
         </div>
-        <button
-          className="cd-export-btn"
-          onClick={exportDoc}
-          disabled={isExporting || isLoading}
-        >
-          {isExporting ? "Exporting..." : "Export"}
-        </button>
+        {!isBarangayUser && (
+          <button
+            className="cd-export-btn"
+            onClick={exportDoc}
+            disabled={isExporting || isLoading}
+          >
+            {isExporting ? "Exporting..." : "Export"}
+          </button>
+        )}
       </div>
 
-      <FilterBar appliedFilters={appliedFilters} onApply={handleApply} />
+      <FilterBar
+        appliedFilters={appliedFilters}
+        onApply={handleApply}
+        isBarangayUser={isBarangayUser}
+        userBarangay={userBarangay}
+      />
 
       <SummaryCards data={dashData.summary} />
 
@@ -2170,12 +2270,17 @@ const CrimeDashboard = () => {
         <div ref={chartRefs.place}>
           <PlaceOfCommission data={dashData.place} />
         </div>
-        <div ref={chartRefs.barangay}>
-          <BarangayTable data={dashData.barangay} />
-        </div>
+        {!isBarangayUser && (
+          <div ref={chartRefs.barangay}>
+            <BarangayTable data={dashData.barangay} />
+          </div>
+        )}
       </div>
 
-      <div className="cd-ai-section">
+      <div
+        className="cd-ai-section"
+        style={{ display: isBarangayUser ? "none" : undefined }}
+      >
         {!assessment && (
           <div className="cd-ai-generate-wrap">
             <button
@@ -2185,15 +2290,23 @@ const CrimeDashboard = () => {
                 isLoading || isGeneratingAssessment || !dashData.summary.length
               }
             >
-              {isGeneratingAssessment
-                ? "Generating Assessment..."
-                : "Generate Assessment"}
+              {isGeneratingAssessment ? "Generating..." : "Generate Assessment"}
             </button>
 
-            <p className="cd-ai-helper-text">
-              Generates an AI assessment based on the currently applied
-              dashboard filters.
-            </p>
+            {isGeneratingAssessment && assessmentPhase && (
+              <div className="cd-ai-phase-wrap">
+                <div className="cd-ai-phase-spinner" />
+                <span className="cd-ai-phase-text">{assessmentPhase}</span>
+              </div>
+            )}
+
+            {!isGeneratingAssessment && (
+              <p className="cd-ai-helper-text">
+                Generates an AI assessment based on the currently applied
+                dashboard filters. Requires at least 6 months of data for
+                reliable forecasting.
+              </p>
+            )}
           </div>
         )}
 

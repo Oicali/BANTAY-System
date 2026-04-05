@@ -48,26 +48,33 @@ class UserValidator {
   // VALIDATE REQUIRED FIELDS FOR REGISTRATION
   // =====================================================
   static validateRequiredFields(data) {
-    const required = [
-      "userType",
-      "email",
-      "firstName",
-      "lastName",
-      "phone",
-      "role",
-      "gender",
-      "dateOfBirth",
-      "regionCode",
-      "provinceCode",
-      "municipalityCode",
-      "barangayCode",
-    ];
-    const missing = required.filter((field) => !data[field]);
-    if (missing.length > 0) {
-      return `Missing required fields: ${missing.join(", ")}`;
-    }
-    return null;
+  const baseRequired = [
+    "userType",
+    "email",
+    "firstName",
+    "lastName",
+    "phone",
+    "role",
+    "gender",
+    "dateOfBirth",
+    "regionCode",
+    "provinceCode",
+    "municipalityCode",
+  ];
+
+  const missing = baseRequired.filter((field) => !data[field]);
+
+  // Accept either 'barangayCode' or 'barangay' for the barangay field
+  const hasBarangay = data.barangayCode || data.barangay;
+  if (!hasBarangay) {
+    missing.push("barangayCode");
   }
+
+  if (missing.length > 0) {
+    return `Missing required fields: ${missing.join(", ")}`;
+  }
+  return null;
+}
 
   // =====================================================
   // VALIDATE PHONE AND ALTERNATE PHONE DIFFERENCE

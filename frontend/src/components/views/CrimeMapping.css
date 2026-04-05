@@ -901,3 +901,26 @@
   font-weight: 700;
   color: var(--navy-primary);
 }
+
+/* ── LOCKED BARANGAY FILTER ── */
+.crmap-fsel-locked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--gray-700);
+  background: var(--gray-50);
+  font-family: "DM Sans", sans-serif;
+  cursor: not-allowed;
+  min-width: 160px;
+  user-select: none;
+}
+
+.crmap-locked-icon {
+  font-size: 12px;
+  opacity: 0.6;
+}

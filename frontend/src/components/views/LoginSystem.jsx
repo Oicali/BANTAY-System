@@ -37,7 +37,6 @@ const LoginSystem = () => {
 
   const codeInputs = useRef([]);
 
-  
   const navigate = useNavigate();
 
   // Timer for verification code
@@ -181,6 +180,7 @@ const LoginSystem = () => {
       localStorage.setItem("role", decoded.role);
       localStorage.setItem("userId", decoded.user_id);
       localStorage.setItem("username", decoded.username);
+      localStorage.setItem("user", JSON.stringify(data.user)); // ← ADD THIS
 
       setSuccess("Login successful!");
       setFormData((prev) => ({

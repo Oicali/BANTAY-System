@@ -28,16 +28,18 @@ const login = async (req, res) => {
 
     const result = await pool.query(
       `SELECT
-        u.user_id, u.username, u.password, u.email,
-        u.first_name, u.last_name, u.user_type,
-        u.profile_picture,
-        u.status, u.lockout_until,
-        u.failed_login_attempts, u.last_login,
-        r.role_name
-       FROM users u
-       JOIN roles r ON u.role_id = r.role_id
-       WHERE u.username = $1`,
-      [username.trim()]
+    u.user_id, u.username, u.password, u.email,
+    u.first_name, u.last_name, u.user_type,
+    u.profile_picture,
+    u.status, u.lockout_until,
+    u.failed_login_attempts, u.last_login,
+    r.role_name,
+    bd.barangay_code AS assigned_barangay_code
+   FROM users u
+   JOIN roles r ON u.role_id = r.role_id
+   LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
+   WHERE u.username = $1`,
+      [username.trim()],
     );
 
     if (result.rows.length === 0) {
@@ -87,18 +89,17 @@ const login = async (req, res) => {
         `UPDATE users
          SET status = 'active', lockout_until = NULL, failed_login_attempts = 0
          WHERE user_id = $1`,
-        [user.user_id]
+        [user.user_id],
       );
       user.status = "active";
     }
 
-
-    
     // Permanent lock (lockout_until IS NULL but status = 'locked')
     if (user.status === "locked" && !user.lockout_until) {
       return res.status(403).json({
         success: false,
-        message: "Account is permanently locked. Please contact an administrator.",
+        message:
+          "Account is permanently locked. Please contact an administrator.",
       });
     }
 
@@ -114,21 +115,22 @@ const login = async (req, res) => {
       // 3  attempts → 15 min lock
       // 5  attempts → 1 hr lock
       // 8 attempts → permanent lock (requires admin to unlock)
-      if (attempts >= 8)       lockMinutes = null;
-      else if (attempts === 5)  lockMinutes = 60;
-      else if (attempts === 3)  lockMinutes = 15;
+      if (attempts >= 8) lockMinutes = null;
+      else if (attempts === 5) lockMinutes = 60;
+      else if (attempts === 3) lockMinutes = 15;
 
       if (attempts >= 8) {
         await pool.query(
           `UPDATE users
            SET failed_login_attempts = $1, status = 'locked', lockout_until = NULL
            WHERE user_id = $2`,
-          [attempts, user.user_id]
+          [attempts, user.user_id],
         );
 
         return res.status(403).json({
           success: false,
-          message: "Account permanently locked due to too many failed attempts. Contact an administrator.",
+          message:
+            "Account permanently locked due to too many failed attempts. Contact an administrator.",
           attempts,
         });
       }
@@ -140,7 +142,7 @@ const login = async (req, res) => {
           `UPDATE users
            SET failed_login_attempts = $1, status = 'locked', lockout_until = $2
            WHERE user_id = $3`,
-          [attempts, lockUntil, user.user_id]
+          [attempts, lockUntil, user.user_id],
         );
 
         return res.status(403).json({
@@ -154,7 +156,7 @@ const login = async (req, res) => {
       // No lock yet — just increment counter
       await pool.query(
         `UPDATE users SET failed_login_attempts = $1 WHERE user_id = $2`,
-        [attempts, user.user_id]
+        [attempts, user.user_id],
       );
 
       const attemptsLeft = attempts < 5 ? 5 - attempts : null;
@@ -175,14 +177,14 @@ const login = async (req, res) => {
            lockout_until = NULL,
            last_login = NOW()
        WHERE user_id = $1`,
-      [user.user_id]
+      [user.user_id],
     );
 
     const token = await tokenManager.createToken({
-      user_id:   user.user_id,
-      username:  user.username,
-      email:     user.email,
-      role:      user.role_name,
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      role: user.role_name,
       user_type: user.user_type,
     });
 
@@ -190,13 +192,14 @@ const login = async (req, res) => {
       success: true,
       token,
       user: {
-        user_id:         user.user_id,
-        username:        user.username,
-        role:            user.role_name,
-        user_type:       user.user_type,
-        first_name:      user.first_name,
-        last_name:       user.last_name,
+        user_id: user.user_id,
+        username: user.username,
+        role: user.role_name,
+        user_type: user.user_type,
+        first_name: user.first_name,
+        last_name: user.last_name,
         profile_picture: user.profile_picture || null,
+        assigned_barangay_code: user.assigned_barangay_code || null,
       },
     });
   } catch (error) {
@@ -213,7 +216,9 @@ const logout = async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(400).json({ success: false, message: "No token provided" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No token provided" });
     }
 
     await tokenManager.revokeToken(token);
@@ -230,7 +235,9 @@ const logout = async (req, res) => {
 const logoutAll = async (req, res) => {
   try {
     await tokenManager.revokeAllUserTokens(req.user.user_id);
-    res.status(200).json({ success: true, message: "Logged out from all devices" });
+    res
+      .status(200)
+      .json({ success: true, message: "Logged out from all devices" });
   } catch (error) {
     console.error("Logout all error:", error);
     res.status(500).json({ success: false, message: "Logout all failed" });
@@ -251,21 +258,27 @@ const sendOTP = async (req, res) => {
 
     const userCheck = await pool.query(
       "SELECT user_id, email, status FROM users WHERE LOWER(email) = LOWER($1)",
-      [email]
+      [email],
     );
 
     if (userCheck.rows.length === 0) {
-      return res.status(200).json({ success: false, message: "Email not found" });
+      return res
+        .status(200)
+        .json({ success: false, message: "Email not found" });
     }
 
     const user = userCheck.rows[0];
 
     if (user.status === "deactivated") {
-      return res.status(403).json({ success: false, message: "Account is deactivated" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Account is deactivated" });
     }
 
     if (user.status === "unverified") {
-      return res.status(403).json({ success: false, message: "Account is not yet verified" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Account is not yet verified" });
     }
 
     const result = await authService.sendOTP(email);
@@ -297,7 +310,9 @@ const verifyOTP = async (req, res) => {
     res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error("Verify OTP error:", error);
-    res.status(500).json({ success: false, message: "OTP verification failed" });
+    res
+      .status(500)
+      .json({ success: false, message: "OTP verification failed" });
   }
 };
 
@@ -340,19 +355,23 @@ const resetPassword = async (req, res) => {
 
     const userResult = await client.query(
       "SELECT user_id, password, status FROM users WHERE LOWER(email) = LOWER($1)",
-      [email]
+      [email],
     );
 
     if (userResult.rows.length === 0) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const user = userResult.rows[0];
 
     if (user.status === "deactivated") {
       await client.query("ROLLBACK");
-      return res.status(403).json({ success: false, message: "Account is deactivated" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Account is deactivated" });
     }
 
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
@@ -374,17 +393,19 @@ const resetPassword = async (req, res) => {
            lockout_until = NULL,
            updated_at = NOW()
        WHERE user_id = $2`,
-      [hashedPassword, user.user_id]
+      [hashedPassword, user.user_id],
     );
 
     await client.query(
       "DELETE FROM otp_requests WHERE LOWER(email) = LOWER($1)",
-      [email]
+      [email],
     );
 
     await client.query("COMMIT");
 
-    res.status(200).json({ success: true, message: "Password reset successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Password reset successfully" });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Reset password error:", error);
@@ -414,21 +435,31 @@ const changePassword = async (req, res) => {
 
     const result = await client.query(
       "SELECT password FROM users WHERE user_id = $1",
-      [req.user.user_id]
+      [req.user.user_id],
     );
 
     if (result.rows.length === 0) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    const valid = await bcrypt.compare(currentPassword, result.rows[0].password);
+    const valid = await bcrypt.compare(
+      currentPassword,
+      result.rows[0].password,
+    );
     if (!valid) {
       await client.query("ROLLBACK");
-      return res.status(401).json({ success: false, message: "Current password is incorrect" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Current password is incorrect" });
     }
 
-    const isSamePassword = await bcrypt.compare(newPassword, result.rows[0].password);
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      result.rows[0].password,
+    );
     if (isSamePassword) {
       await client.query("ROLLBACK");
       return res.status(400).json({
@@ -441,7 +472,7 @@ const changePassword = async (req, res) => {
 
     await client.query(
       "UPDATE users SET password = $1, updated_at = NOW() WHERE user_id = $2",
-      [hashed, req.user.user_id]
+      [hashed, req.user.user_id],
     );
 
     await tokenManager.revokeAllUserTokens(req.user.user_id);
