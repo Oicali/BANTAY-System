@@ -3,18 +3,20 @@ import "./ModusManagement.css";
 import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/modus-management`;
-const INDEX_CRIMES = [
-  "MURDER",
-  "HOMICIDE",
-  "PHYSICAL INJURIES",
-  "RAPE",
-  "ROBBERY",
-  "THEFT",
-  "CARNAPPING - MC",
-  "CARNAPPING - MV",
-  "SPECIAL COMPLEX CRIME",
+const CRIME_TYPES = [
+  { label: "Carnapping - MC", value: "CARNAPPING - MC" },
+  { label: "Carnapping - MV", value: "CARNAPPING - MV" },
+  { label: "Homicide", value: "HOMICIDE" },
+  { label: "Murder", value: "MURDER" },
+  { label: "Physical Injury", value: "PHYSICAL INJURIES" },
+  { label: "Rape", value: "RAPE" },
+  { label: "Robbery", value: "ROBBERY" },
+  { label: "Special Complex Crime", value: "SPECIAL COMPLEX CRIME" },
+  { label: "Theft", value: "THEFT" },
 ];
-
+const DB_TO_LABEL = Object.fromEntries(
+  CRIME_TYPES.map((c) => [c.value, c.label]),
+);
 const ITEMS_PER_PAGE = 15;
 
 const emptyForm = { crime_type: "", modus_name: "", description: "" };
@@ -334,9 +336,9 @@ function ModusManagement() {
           onChange={handleFilterChange(setFilterCrime)}
         >
           <option value="">All Crime Types</option>
-          {INDEX_CRIMES.map((c) => (
-            <option key={c} value={c}>
-              {c}
+          {CRIME_TYPES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
             </option>
           ))}
         </select>
@@ -388,7 +390,9 @@ function ModusManagement() {
                 paginated.map((m) => (
                   <tr key={m.id}>
                     <td>
-                      <span className="mm-crime-badge">{m.crime_type}</span>
+                      <span className="mm-crime-badge">
+                        {DB_TO_LABEL[m.crime_type] || m.crime_type}
+                      </span>
                     </td>
                     <td>
                       <strong>{m.modus_name}</strong>
@@ -589,9 +593,9 @@ function ModusManagement() {
                   }}
                 >
                   <option value="">— Select Crime Type —</option>
-                  {INDEX_CRIMES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {CRIME_TYPES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
                     </option>
                   ))}
                 </select>

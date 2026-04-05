@@ -294,7 +294,7 @@ function BrgyReport() {
           >
             {/* Incident Type */}
             <div>
-              <label style={labelStyle}>Incident Type *</label>
+              <label style={labelStyle}>Crime Type *</label>
               <select
                 style={inputStyle("incident_type")}
                 value={form.incident_type}
@@ -594,7 +594,7 @@ function BrgyReport() {
                 <tr style={{ borderBottom: "2px solid #f3f4f6" }}>
                   {[
                     "Reference No.",
-                    "Incident Type",
+                    "Crime Type",
                     "Street",
                     "Date Reported",
                     "Status",

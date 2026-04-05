@@ -195,6 +195,7 @@ function EBlotter() {
   const [acceptMode, setAcceptMode] = useState(false);
   const [trashLoading, setTrashLoading] = useState(false);
   const [hasSuspect, setHasSuspect] = useState(false);
+  const [isImportedRecord, setIsImportedRecord] = useState(false);
   const [offenseModus, setOffenseModus] = useState({});
   const [offenseSelectedModus, setOffenseSelectedModus] = useState({});
   const [typeOfPlace, setTypeOfPlace] = useState("");
@@ -558,6 +559,10 @@ function EBlotter() {
         setComplainants(data.data.complainants);
         setSuspects(data.data.suspects);
         setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
+        const hasNoPsgcCodes = data.data.complainants.every(
+          (c) => !c.region_code && !c.province_code && !c.municipality_code,
+        );
+        setIsImportedRecord(hasNoPsgcCodes);
 
         const OFFENSE_NORMALIZE = {
           "carnapping - mc": "Carnapping - MC",
@@ -1070,7 +1075,11 @@ function EBlotter() {
         }
 
         // Contact Number validation (optional)
-        if (c.contact_number && c.contact_number.length > 0) {
+        if (
+          c.contact_number &&
+          c.contact_number.length > 0 &&
+          !isImportedRecord
+        ) {
           if (c.contact_number.length !== 11) {
             errors[`${p}_contact_number`] = "Must be exactly 11 digits";
           } else if (!c.contact_number.startsWith("09")) {
@@ -1730,6 +1739,7 @@ function EBlotter() {
     setOriginalData(null);
     resetForm();
     setHasSuspect(false);
+    setIsImportedRecord(false);
     setSelectedBrgyFeature(null);
   };
 
@@ -1745,7 +1755,7 @@ function EBlotter() {
       setFieldErrors(errors);
       setTimeout(() => {
         const firstError = document.querySelector(
-          ".eb-modal-input.error, .eb-gender-buttons + .eb-field-error",
+          ".eb-modal-input.error, .eb-gender-buttons + .eb-field-error, .eb-pin-location-error",
         );
         if (firstError) {
           firstError.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1808,10 +1818,10 @@ function EBlotter() {
             ).name || c.barangay_code;
           return {
             ...c,
-            region: regionName,
-            district_province: provinceName,
-            city_municipality: cityName,
-            barangay: barangayName,
+            region: regionName || c.region,
+            district_province: provinceName || c.district_province,
+            city_municipality: cityName || c.city_municipality,
+            barangay: barangayName || c.barangay,
           };
         });
 
@@ -1836,10 +1846,10 @@ function EBlotter() {
             ).name || s.barangay_code;
           return {
             ...s,
-            region: regionName,
-            district_province: provinceName,
-            city_municipality: cityName,
-            barangay: barangayName,
+            region: regionName || s.region,
+            district_province: provinceName || s.district_province,
+            city_municipality: cityName || s.city_municipality,
+            barangay: barangayName || s.barangay,
           };
         });
         console.log(
@@ -1936,10 +1946,10 @@ function EBlotter() {
             .name || c.barangay_code;
         return {
           ...c,
-          region: regionName,
-          district_province: provinceName,
-          city_municipality: cityName,
-          barangay: barangayName,
+          region: regionName || c.region,
+          district_province: provinceName || c.district_province,
+          city_municipality: cityName || c.city_municipality,
+          barangay: barangayName || c.barangay,
         };
       });
 
@@ -1958,10 +1968,10 @@ function EBlotter() {
             .name || s.barangay_code;
         return {
           ...s,
-          region: regionName,
-          district_province: provinceName,
-          city_municipality: cityName,
-          barangay: barangayName,
+          region: regionName || s.region,
+          district_province: provinceName || s.district_province,
+          city_municipality: cityName || s.city_municipality,
+          barangay: barangayName || s.barangay,
         };
       });
 
@@ -2034,6 +2044,33 @@ function EBlotter() {
       Urgent: "eb-status-urgent",
     };
     return map[status] || "eb-status-pending";
+  };
+  const isPinOutsideBoundary = () => {
+    if (!caseDetail.lat || !caseDetail.lng || !selectedBrgyFeature)
+      return false;
+    const lat = parseFloat(caseDetail.lat);
+    const lng = parseFloat(caseDetail.lng);
+    const rings =
+      selectedBrgyFeature.geometry.type === "Polygon"
+        ? selectedBrgyFeature.geometry.coordinates
+        : selectedBrgyFeature.geometry.coordinates.flat(1);
+    let inside = false;
+    for (const ring of rings) {
+      const n = ring.length;
+      let j = n - 1;
+      for (let i = 0; i < n; i++) {
+        const xi = ring[i][0],
+          yi = ring[i][1];
+        const xj = ring[j][0],
+          yj = ring[j][1];
+        const intersect =
+          yi > lat !== yj > lat &&
+          lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+        j = i;
+      }
+    }
+    return !inside;
   };
   const totalDeletedPages = Math.ceil(
     deletedBlotters.length / DELETED_PER_PAGE,
@@ -2501,7 +2538,7 @@ function EBlotter() {
                     <div className="eb-view-card">
                       <div className="eb-view-grid">
                         <div className="eb-view-item">
-                          <span className="eb-view-label">Incident Type:</span>
+                          <span className="eb-view-label">Crime Type:</span>
                           <span className="eb-view-value">
                             {caseDetail.incident_type}
                           </span>
@@ -2911,220 +2948,298 @@ function EBlotter() {
                             />
                           </div>
 
-                          {/* Row 3 - Address */}
-                          <div className="eb-modal-form-group">
-                            <label className="eb-modal-label">Region</label>
-                            <select
-                              className={`eb-modal-input ${fieldErrors[`complainant_${i}_region_code`] ? "error" : ""}`}
-                              value={c.region_code}
-                              disabled={loadingRegions}
-                              onChange={async (e) => {
-                                const val = e.target.value;
-                                updateComplainant(i, "region_code", val);
-                                updateComplainant(i, "province_code", "");
-                                updateComplainant(i, "municipality_code", "");
-                                updateComplainant(i, "barangay_code", "");
-                                setCProvinces((p) => ({ ...p, [i]: [] }));
-                                setCCities((p) => ({ ...p, [i]: [] }));
-                                setCBarangays((p) => ({ ...p, [i]: [] }));
-                                if (val) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors[
-                                    `complainant_${i}_region_code`
-                                  ];
-                                  setFieldErrors(newErrors);
-                                  if (val === "130000000") {
-                                    setCLoadingCity((p) => ({
-                                      ...p,
-                                      [i]: true,
-                                    }));
-                                    const cities =
-                                      await fetchCitiesByRegion(val);
-                                    setCCities((p) => ({ ...p, [i]: cities }));
-                                    setCLoadingCity((p) => ({
-                                      ...p,
-                                      [i]: false,
-                                    }));
-                                  } else {
-                                    setCLoadingProv((p) => ({
-                                      ...p,
-                                      [i]: true,
-                                    }));
-                                    const data = await fetchProvinces(val);
-                                    setCProvinces((p) => ({ ...p, [i]: data }));
-                                    setCLoadingProv((p) => ({
-                                      ...p,
-                                      [i]: false,
-                                    }));
-                                  }
-                                }
-                              }}
+                          {isImportedRecord &&
+                          (c.region ||
+                            c.district_province ||
+                            c.city_municipality ||
+                            c.barangay) ? (
+                            <div
+                              className="eb-modal-form-group"
+                              style={{ gridColumn: "span 4" }}
                             >
-                              <option value="">
-                                {loadingRegions
-                                  ? "Loading..."
-                                  : "Select Region"}
-                              </option>
-                              {regions.map((r) => (
-                                <option key={r.code} value={r.code}>
-                                  {r.name}
-                                </option>
-                              ))}
-                            </select>
-                            <FieldError
-                              error={
-                                fieldErrors[`complainant_${i}_region_code`]
-                              }
-                            />
-                          </div>
-
-                          {/* PROVINCE */}
-                          <div className="eb-modal-form-group">
-                            <label className="eb-modal-label">Province</label>
-                            <select
-                              className={`eb-modal-input ${fieldErrors[`complainant_${i}_province_code`] ? "error" : ""}`}
-                              value={c.province_code}
-                              disabled={
-                                !c.region_code ||
-                                cLoadingProv[i] ||
-                                c.region_code === "130000000"
-                              }
-                              onChange={async (e) => {
-                                const val = e.target.value;
-                                updateComplainant(i, "province_code", val);
-                                updateComplainant(i, "municipality_code", "");
-                                updateComplainant(i, "barangay_code", "");
-                                setCCities((p) => ({ ...p, [i]: [] }));
-                                setCBarangays((p) => ({ ...p, [i]: [] }));
-                                if (val) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors[
-                                    `complainant_${i}_province_code`
-                                  ];
-                                  setFieldErrors(newErrors);
-                                  setCLoadingCity((p) => ({ ...p, [i]: true }));
-                                  const data = await fetchCities(val);
-                                  setCCities((p) => ({ ...p, [i]: data }));
-                                  setCLoadingCity((p) => ({
-                                    ...p,
-                                    [i]: false,
-                                  }));
-                                }
-                              }}
-                            >
-                              <option value="">
-                                {cLoadingProv[i]
-                                  ? "Loading..."
-                                  : c.region_code === "130000000"
-                                    ? "N/A (NCR has no province)"
-                                    : "Select Province"}
-                              </option>
-                              {(cProvinces[i] || []).map((p) => (
-                                <option key={p.code} value={p.code}>
-                                  {p.name}
-                                </option>
-                              ))}
-                            </select>
-                            <FieldError
-                              error={
-                                fieldErrors[`complainant_${i}_province_code`]
-                              }
-                            />
-                          </div>
-
-                          {/* CITY/MUNICIPALITY */}
-                          <div className="eb-modal-form-group">
-                            <label className="eb-modal-label">
-                              City/Municipality
-                            </label>
-                            <select
-                              className={`eb-modal-input ${fieldErrors[`complainant_${i}_municipality_code`] ? "error" : ""}`}
-                              value={c.municipality_code}
-                              disabled={
-                                (!c.province_code &&
-                                  c.region_code !== "130000000") ||
-                                cLoadingCity[i]
-                              }
-                              onChange={async (e) => {
-                                const val = e.target.value;
-                                updateComplainant(i, "municipality_code", val);
-                                updateComplainant(i, "barangay_code", "");
-                                setCBarangays((p) => ({ ...p, [i]: [] }));
-                                if (val) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors[
-                                    `complainant_${i}_municipality_code`
-                                  ];
-                                  setFieldErrors(newErrors);
-                                  setCLoadingBrgy((p) => ({ ...p, [i]: true }));
-                                  const data = await fetchBarangays(val);
-                                  setCBarangays((p) => ({ ...p, [i]: data }));
-                                  setCLoadingBrgy((p) => ({
-                                    ...p,
-                                    [i]: false,
-                                  }));
-                                }
-                              }}
-                            >
-                              <option value="">
-                                {cLoadingCity[i]
-                                  ? "Loading..."
-                                  : "Select City/Municipality"}
-                              </option>
-                              {(cCities[i] || []).map((c) => (
-                                <option key={c.code} value={c.code}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                            <FieldError
-                              error={
-                                fieldErrors[
-                                  `complainant_${i}_municipality_code`
+                              <label className="eb-modal-label">
+                                Address (Imported)
+                              </label>
+                              <input
+                                type="text"
+                                className="eb-modal-input"
+                                value={[
+                                  c.house_street,
+                                  c.barangay,
+                                  c.city_municipality,
+                                  c.district_province,
+                                  c.region,
                                 ]
-                              }
-                            />
-                          </div>
+                                  .filter(Boolean)
+                                  .join(", ")}
+                                disabled
+                                style={{
+                                  background: "#f3f4f6",
+                                  cursor: "not-allowed",
+                                  color: "#6b7280",
+                                }}
+                              />
+                              <small
+                                style={{ color: "#9ca3af", fontSize: "11px" }}
+                              >
+                                Address from imported record — read only
+                              </small>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Row 3 - Address */}
+                              <div className="eb-modal-form-group">
+                                <label className="eb-modal-label">Region</label>
+                                <select
+                                  className={`eb-modal-input ${fieldErrors[`complainant_${i}_region_code`] ? "error" : ""}`}
+                                  value={c.region_code}
+                                  disabled={loadingRegions}
+                                  onChange={async (e) => {
+                                    const val = e.target.value;
+                                    updateComplainant(i, "region_code", val);
+                                    updateComplainant(i, "province_code", "");
+                                    updateComplainant(
+                                      i,
+                                      "municipality_code",
+                                      "",
+                                    );
+                                    updateComplainant(i, "barangay_code", "");
+                                    setCProvinces((p) => ({ ...p, [i]: [] }));
+                                    setCCities((p) => ({ ...p, [i]: [] }));
+                                    setCBarangays((p) => ({ ...p, [i]: [] }));
+                                    if (val) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `complainant_${i}_region_code`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                      if (val === "130000000") {
+                                        setCLoadingCity((p) => ({
+                                          ...p,
+                                          [i]: true,
+                                        }));
+                                        const cities =
+                                          await fetchCitiesByRegion(val);
+                                        setCCities((p) => ({
+                                          ...p,
+                                          [i]: cities,
+                                        }));
+                                        setCLoadingCity((p) => ({
+                                          ...p,
+                                          [i]: false,
+                                        }));
+                                      } else {
+                                        setCLoadingProv((p) => ({
+                                          ...p,
+                                          [i]: true,
+                                        }));
+                                        const data = await fetchProvinces(val);
+                                        setCProvinces((p) => ({
+                                          ...p,
+                                          [i]: data,
+                                        }));
+                                        setCLoadingProv((p) => ({
+                                          ...p,
+                                          [i]: false,
+                                        }));
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <option value="">
+                                    {loadingRegions
+                                      ? "Loading..."
+                                      : "Select Region"}
+                                  </option>
+                                  {regions.map((r) => (
+                                    <option key={r.code} value={r.code}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FieldError
+                                  error={
+                                    fieldErrors[`complainant_${i}_region_code`]
+                                  }
+                                />
+                              </div>
 
-                          {/* BARANGAY */}
-                          <div className="eb-modal-form-group">
-                            <label className="eb-modal-label">Barangay</label>
-                            <select
-                              className={`eb-modal-input ${fieldErrors[`complainant_${i}_barangay_code`] ? "error" : ""}`}
-                              value={c.barangay_code}
-                              disabled={!c.municipality_code || cLoadingBrgy[i]}
-                              onChange={(e) => {
-                                updateComplainant(
-                                  i,
-                                  "barangay_code",
-                                  e.target.value,
-                                );
-                                if (e.target.value) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors[
-                                    `complainant_${i}_barangay_code`
-                                  ];
-                                  setFieldErrors(newErrors);
-                                }
-                              }}
-                            >
-                              <option value="">
-                                {cLoadingBrgy[i]
-                                  ? "Loading..."
-                                  : "Select Barangay"}
-                              </option>
-                              {(cBarangays[i] || []).map((b) => (
-                                <option key={b.code} value={b.code}>
-                                  {b.name}
-                                </option>
-                              ))}
-                            </select>
-                            <FieldError
-                              error={
-                                fieldErrors[`complainant_${i}_barangay_code`]
-                              }
-                            />
-                          </div>
+                              {/* PROVINCE */}
+                              <div className="eb-modal-form-group">
+                                <label className="eb-modal-label">
+                                  Province
+                                </label>
+                                <select
+                                  className={`eb-modal-input ${fieldErrors[`complainant_${i}_province_code`] ? "error" : ""}`}
+                                  value={c.province_code}
+                                  disabled={
+                                    !c.region_code ||
+                                    cLoadingProv[i] ||
+                                    c.region_code === "130000000"
+                                  }
+                                  onChange={async (e) => {
+                                    const val = e.target.value;
+                                    updateComplainant(i, "province_code", val);
+                                    updateComplainant(
+                                      i,
+                                      "municipality_code",
+                                      "",
+                                    );
+                                    updateComplainant(i, "barangay_code", "");
+                                    setCCities((p) => ({ ...p, [i]: [] }));
+                                    setCBarangays((p) => ({ ...p, [i]: [] }));
+                                    if (val) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `complainant_${i}_province_code`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                      setCLoadingCity((p) => ({
+                                        ...p,
+                                        [i]: true,
+                                      }));
+                                      const data = await fetchCities(val);
+                                      setCCities((p) => ({ ...p, [i]: data }));
+                                      setCLoadingCity((p) => ({
+                                        ...p,
+                                        [i]: false,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  <option value="">
+                                    {cLoadingProv[i]
+                                      ? "Loading..."
+                                      : c.region_code === "130000000"
+                                        ? "N/A (NCR has no province)"
+                                        : "Select Province"}
+                                  </option>
+                                  {(cProvinces[i] || []).map((p) => (
+                                    <option key={p.code} value={p.code}>
+                                      {p.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FieldError
+                                  error={
+                                    fieldErrors[
+                                      `complainant_${i}_province_code`
+                                    ]
+                                  }
+                                />
+                              </div>
+
+                              {/* CITY/MUNICIPALITY */}
+                              <div className="eb-modal-form-group">
+                                <label className="eb-modal-label">
+                                  City/Municipality
+                                </label>
+                                <select
+                                  className={`eb-modal-input ${fieldErrors[`complainant_${i}_municipality_code`] ? "error" : ""}`}
+                                  value={c.municipality_code}
+                                  disabled={
+                                    (!c.province_code &&
+                                      c.region_code !== "130000000") ||
+                                    cLoadingCity[i]
+                                  }
+                                  onChange={async (e) => {
+                                    const val = e.target.value;
+                                    updateComplainant(
+                                      i,
+                                      "municipality_code",
+                                      val,
+                                    );
+                                    updateComplainant(i, "barangay_code", "");
+                                    setCBarangays((p) => ({ ...p, [i]: [] }));
+                                    if (val) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `complainant_${i}_municipality_code`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                      setCLoadingBrgy((p) => ({
+                                        ...p,
+                                        [i]: true,
+                                      }));
+                                      const data = await fetchBarangays(val);
+                                      setCBarangays((p) => ({
+                                        ...p,
+                                        [i]: data,
+                                      }));
+                                      setCLoadingBrgy((p) => ({
+                                        ...p,
+                                        [i]: false,
+                                      }));
+                                    }
+                                  }}
+                                >
+                                  <option value="">
+                                    {cLoadingCity[i]
+                                      ? "Loading..."
+                                      : "Select City/Municipality"}
+                                  </option>
+                                  {(cCities[i] || []).map((c) => (
+                                    <option key={c.code} value={c.code}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FieldError
+                                  error={
+                                    fieldErrors[
+                                      `complainant_${i}_municipality_code`
+                                    ]
+                                  }
+                                />
+                              </div>
+
+                              {/* BARANGAY */}
+                              <div className="eb-modal-form-group">
+                                <label className="eb-modal-label">
+                                  Barangay
+                                </label>
+                                <select
+                                  className={`eb-modal-input ${fieldErrors[`complainant_${i}_barangay_code`] ? "error" : ""}`}
+                                  value={c.barangay_code}
+                                  disabled={
+                                    !c.municipality_code || cLoadingBrgy[i]
+                                  }
+                                  onChange={(e) => {
+                                    updateComplainant(
+                                      i,
+                                      "barangay_code",
+                                      e.target.value,
+                                    );
+                                    if (e.target.value) {
+                                      const newErrors = { ...fieldErrors };
+                                      delete newErrors[
+                                        `complainant_${i}_barangay_code`
+                                      ];
+                                      setFieldErrors(newErrors);
+                                    }
+                                  }}
+                                >
+                                  <option value="">
+                                    {cLoadingBrgy[i]
+                                      ? "Loading..."
+                                      : "Select Barangay"}
+                                  </option>
+                                  {(cBarangays[i] || []).map((b) => (
+                                    <option key={b.code} value={b.code}>
+                                      {b.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FieldError
+                                  error={
+                                    fieldErrors[
+                                      `complainant_${i}_barangay_code`
+                                    ]
+                                  }
+                                />
+                              </div>
+                            </>
+                          )}
 
                           {/* Row 4 */}
                           <div className="eb-modal-form-group">
@@ -3628,229 +3743,291 @@ function EBlotter() {
                               />
                             </div>
 
-                            {/* Row 4 - Address */}
-                            {/* REGION */}
-                            <div className="eb-modal-form-group">
-                              <label className="eb-modal-label">Region</label>
-                              <select
-                                className={`eb-modal-input ${fieldErrors[`suspect_${i}_region_code`] ? "error" : ""}`}
-                                value={s.region_code}
-                                disabled={loadingRegions}
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  updateSuspect(i, "region_code", val);
-                                  updateSuspect(i, "province_code", "");
-                                  updateSuspect(i, "municipality_code", "");
-                                  updateSuspect(i, "barangay_code", "");
-                                  setSProvinces((p) => ({ ...p, [i]: [] }));
-                                  setSCities((p) => ({ ...p, [i]: [] }));
-                                  setSBarangays((p) => ({ ...p, [i]: [] }));
-                                  if (val) {
-                                    const newErrors = { ...fieldErrors };
-                                    delete newErrors[
-                                      `suspect_${i}_region_code`
-                                    ];
-                                    setFieldErrors(newErrors);
-                                    if (val === "130000000") {
-                                      setSLoadingCity((p) => ({
-                                        ...p,
-                                        [i]: true,
-                                      }));
-                                      const cities =
-                                        await fetchCitiesByRegion(val);
-                                      setSCities((p) => ({
-                                        ...p,
-                                        [i]: cities,
-                                      }));
-                                      setSLoadingCity((p) => ({
-                                        ...p,
-                                        [i]: false,
-                                      }));
-                                    } else {
-                                      setSLoadingProv((p) => ({
-                                        ...p,
-                                        [i]: true,
-                                      }));
-                                      const data = await fetchProvinces(val);
-                                      setSProvinces((p) => ({
-                                        ...p,
-                                        [i]: data,
-                                      }));
-                                      setSLoadingProv((p) => ({
-                                        ...p,
-                                        [i]: false,
-                                      }));
+                            {isImportedRecord &&
+                            (s.region ||
+                              s.district_province ||
+                              s.city_municipality ||
+                              s.barangay) ? (
+                              <div
+                                className="eb-modal-form-group"
+                                style={{ gridColumn: "span 4" }}
+                              >
+                                <label className="eb-modal-label">
+                                  Address (Imported)
+                                </label>
+                                <input
+                                  type="text"
+                                  className="eb-modal-input"
+                                  value={[
+                                    s.house_street,
+                                    s.barangay,
+                                    s.city_municipality,
+                                    s.district_province,
+                                    s.region,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                  disabled
+                                  style={{
+                                    background: "#f3f4f6",
+                                    cursor: "not-allowed",
+                                    color: "#6b7280",
+                                  }}
+                                />
+                                <small
+                                  style={{ color: "#9ca3af", fontSize: "11px" }}
+                                >
+                                  Address from imported record — read only
+                                </small>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Row 4 - Address */}
+                                {/* REGION */}
+                                <div className="eb-modal-form-group">
+                                  <label className="eb-modal-label">
+                                    Region
+                                  </label>
+                                  <select
+                                    className={`eb-modal-input ${fieldErrors[`suspect_${i}_region_code`] ? "error" : ""}`}
+                                    value={s.region_code}
+                                    disabled={loadingRegions}
+                                    onChange={async (e) => {
+                                      const val = e.target.value;
+                                      updateSuspect(i, "region_code", val);
+                                      updateSuspect(i, "province_code", "");
+                                      updateSuspect(i, "municipality_code", "");
+                                      updateSuspect(i, "barangay_code", "");
+                                      setSProvinces((p) => ({ ...p, [i]: [] }));
+                                      setSCities((p) => ({ ...p, [i]: [] }));
+                                      setSBarangays((p) => ({ ...p, [i]: [] }));
+                                      if (val) {
+                                        const newErrors = { ...fieldErrors };
+                                        delete newErrors[
+                                          `suspect_${i}_region_code`
+                                        ];
+                                        setFieldErrors(newErrors);
+                                        if (val === "130000000") {
+                                          setSLoadingCity((p) => ({
+                                            ...p,
+                                            [i]: true,
+                                          }));
+                                          const cities =
+                                            await fetchCitiesByRegion(val);
+                                          setSCities((p) => ({
+                                            ...p,
+                                            [i]: cities,
+                                          }));
+                                          setSLoadingCity((p) => ({
+                                            ...p,
+                                            [i]: false,
+                                          }));
+                                        } else {
+                                          setSLoadingProv((p) => ({
+                                            ...p,
+                                            [i]: true,
+                                          }));
+                                          const data =
+                                            await fetchProvinces(val);
+                                          setSProvinces((p) => ({
+                                            ...p,
+                                            [i]: data,
+                                          }));
+                                          setSLoadingProv((p) => ({
+                                            ...p,
+                                            [i]: false,
+                                          }));
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <option value="">
+                                      {loadingRegions
+                                        ? "Loading..."
+                                        : "Select Region"}
+                                    </option>
+                                    {regions.map((r) => (
+                                      <option key={r.code} value={r.code}>
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <FieldError
+                                    error={
+                                      fieldErrors[`suspect_${i}_region_code`]
                                     }
-                                  }
-                                }}
-                              >
-                                <option value="">
-                                  {loadingRegions
-                                    ? "Loading..."
-                                    : "Select Region"}
-                                </option>
-                                {regions.map((r) => (
-                                  <option key={r.code} value={r.code}>
-                                    {r.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <FieldError
-                                error={fieldErrors[`suspect_${i}_region_code`]}
-                              />
-                            </div>
+                                  />
+                                </div>
 
-                            <div className="eb-modal-form-group">
-                              <label className="eb-modal-label">Province</label>
-                              <select
-                                className={`eb-modal-input ${fieldErrors[`suspect_${i}_province_code`] ? "error" : ""}`}
-                                value={s.province_code}
-                                disabled={
-                                  !s.region_code ||
-                                  sLoadingProv[i] ||
-                                  s.region_code === "130000000"
-                                }
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  updateSuspect(i, "province_code", val);
-                                  updateSuspect(i, "municipality_code", "");
-                                  updateSuspect(i, "barangay_code", "");
-                                  setSCities((p) => ({ ...p, [i]: [] }));
-                                  setSBarangays((p) => ({ ...p, [i]: [] }));
-                                  if (val) {
-                                    const newErrors = { ...fieldErrors };
-                                    delete newErrors[
-                                      `suspect_${i}_province_code`
-                                    ];
-                                    setFieldErrors(newErrors);
-                                    setSLoadingCity((p) => ({
-                                      ...p,
-                                      [i]: true,
-                                    }));
-                                    const data = await fetchCities(val);
-                                    setSCities((p) => ({ ...p, [i]: data }));
-                                    setSLoadingCity((p) => ({
-                                      ...p,
-                                      [i]: false,
-                                    }));
-                                  }
-                                }}
-                              >
-                                <option value="">
-                                  {sLoadingProv[i]
-                                    ? "Loading..."
-                                    : s.region_code === "130000000"
-                                      ? "N/A (NCR has no province)"
-                                      : "Select Province"}
-                                </option>
-                                {(sProvinces[i] || []).map((p) => (
-                                  <option key={p.code} value={p.code}>
-                                    {p.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <FieldError
-                                error={
-                                  fieldErrors[`suspect_${i}_province_code`]
-                                }
-                              />
-                            </div>
+                                <div className="eb-modal-form-group">
+                                  <label className="eb-modal-label">
+                                    Province
+                                  </label>
+                                  <select
+                                    className={`eb-modal-input ${fieldErrors[`suspect_${i}_province_code`] ? "error" : ""}`}
+                                    value={s.province_code}
+                                    disabled={
+                                      !s.region_code ||
+                                      sLoadingProv[i] ||
+                                      s.region_code === "130000000"
+                                    }
+                                    onChange={async (e) => {
+                                      const val = e.target.value;
+                                      updateSuspect(i, "province_code", val);
+                                      updateSuspect(i, "municipality_code", "");
+                                      updateSuspect(i, "barangay_code", "");
+                                      setSCities((p) => ({ ...p, [i]: [] }));
+                                      setSBarangays((p) => ({ ...p, [i]: [] }));
+                                      if (val) {
+                                        const newErrors = { ...fieldErrors };
+                                        delete newErrors[
+                                          `suspect_${i}_province_code`
+                                        ];
+                                        setFieldErrors(newErrors);
+                                        setSLoadingCity((p) => ({
+                                          ...p,
+                                          [i]: true,
+                                        }));
+                                        const data = await fetchCities(val);
+                                        setSCities((p) => ({
+                                          ...p,
+                                          [i]: data,
+                                        }));
+                                        setSLoadingCity((p) => ({
+                                          ...p,
+                                          [i]: false,
+                                        }));
+                                      }
+                                    }}
+                                  >
+                                    <option value="">
+                                      {sLoadingProv[i]
+                                        ? "Loading..."
+                                        : s.region_code === "130000000"
+                                          ? "N/A (NCR has no province)"
+                                          : "Select Province"}
+                                    </option>
+                                    {(sProvinces[i] || []).map((p) => (
+                                      <option key={p.code} value={p.code}>
+                                        {p.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <FieldError
+                                    error={
+                                      fieldErrors[`suspect_${i}_province_code`]
+                                    }
+                                  />
+                                </div>
 
-                            {/* CITY/MUNICIPALITY */}
-                            <div className="eb-modal-form-group">
-                              <label className="eb-modal-label">
-                                City/Municipality
-                              </label>
-                              <select
-                                className={`eb-modal-input ${fieldErrors[`suspect_${i}_municipality_code`] ? "error" : ""}`}
-                                value={s.municipality_code}
-                                disabled={
-                                  (!s.province_code &&
-                                    s.region_code !== "130000000") ||
-                                  sLoadingCity[i]
-                                }
-                                onChange={async (e) => {
-                                  const val = e.target.value;
-                                  updateSuspect(i, "municipality_code", val);
-                                  updateSuspect(i, "barangay_code", "");
-                                  setSBarangays((p) => ({ ...p, [i]: [] }));
-                                  if (val) {
-                                    const newErrors = { ...fieldErrors };
-                                    delete newErrors[
-                                      `suspect_${i}_municipality_code`
-                                    ];
-                                    setFieldErrors(newErrors);
-                                    setSLoadingBrgy((p) => ({
-                                      ...p,
-                                      [i]: true,
-                                    }));
-                                    const data = await fetchBarangays(val);
-                                    setSBarangays((p) => ({ ...p, [i]: data }));
-                                    setSLoadingBrgy((p) => ({
-                                      ...p,
-                                      [i]: false,
-                                    }));
-                                  }
-                                }}
-                              >
-                                <option value="">
-                                  {sLoadingCity[i]
-                                    ? "Loading..."
-                                    : "Select City/Municipality"}
-                                </option>
-                                {(sCities[i] || []).map((c) => (
-                                  <option key={c.code} value={c.code}>
-                                    {c.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <FieldError
-                                error={
-                                  fieldErrors[`suspect_${i}_municipality_code`]
-                                }
-                              />
-                            </div>
+                                {/* CITY/MUNICIPALITY */}
+                                <div className="eb-modal-form-group">
+                                  <label className="eb-modal-label">
+                                    City/Municipality
+                                  </label>
+                                  <select
+                                    className={`eb-modal-input ${fieldErrors[`suspect_${i}_municipality_code`] ? "error" : ""}`}
+                                    value={s.municipality_code}
+                                    disabled={
+                                      (!s.province_code &&
+                                        s.region_code !== "130000000") ||
+                                      sLoadingCity[i]
+                                    }
+                                    onChange={async (e) => {
+                                      const val = e.target.value;
+                                      updateSuspect(
+                                        i,
+                                        "municipality_code",
+                                        val,
+                                      );
+                                      updateSuspect(i, "barangay_code", "");
+                                      setSBarangays((p) => ({ ...p, [i]: [] }));
+                                      if (val) {
+                                        const newErrors = { ...fieldErrors };
+                                        delete newErrors[
+                                          `suspect_${i}_municipality_code`
+                                        ];
+                                        setFieldErrors(newErrors);
+                                        setSLoadingBrgy((p) => ({
+                                          ...p,
+                                          [i]: true,
+                                        }));
+                                        const data = await fetchBarangays(val);
+                                        setSBarangays((p) => ({
+                                          ...p,
+                                          [i]: data,
+                                        }));
+                                        setSLoadingBrgy((p) => ({
+                                          ...p,
+                                          [i]: false,
+                                        }));
+                                      }
+                                    }}
+                                  >
+                                    <option value="">
+                                      {sLoadingCity[i]
+                                        ? "Loading..."
+                                        : "Select City/Municipality"}
+                                    </option>
+                                    {(sCities[i] || []).map((c) => (
+                                      <option key={c.code} value={c.code}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <FieldError
+                                    error={
+                                      fieldErrors[
+                                        `suspect_${i}_municipality_code`
+                                      ]
+                                    }
+                                  />
+                                </div>
 
-                            <div className="eb-modal-form-group">
-                              <label className="eb-modal-label">Barangay</label>
-                              <select
-                                className={`eb-modal-input ${fieldErrors[`suspect_${i}_barangay_code`] ? "error" : ""}`}
-                                value={s.barangay_code}
-                                disabled={
-                                  !s.municipality_code || sLoadingBrgy[i]
-                                }
-                                onChange={(e) => {
-                                  updateSuspect(
-                                    i,
-                                    "barangay_code",
-                                    e.target.value,
-                                  );
-                                  if (e.target.value) {
-                                    const newErrors = { ...fieldErrors };
-                                    delete newErrors[
-                                      `suspect_${i}_barangay_code`
-                                    ];
-                                    setFieldErrors(newErrors);
-                                  }
-                                }}
-                              >
-                                <option value="">
-                                  {sLoadingBrgy[i]
-                                    ? "Loading..."
-                                    : "Select Barangay"}
-                                </option>
-                                {(sBarangays[i] || []).map((b) => (
-                                  <option key={b.code} value={b.code}>
-                                    {b.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <FieldError
-                                error={
-                                  fieldErrors[`suspect_${i}_barangay_code`]
-                                }
-                              />
-                            </div>
+                                <div className="eb-modal-form-group">
+                                  <label className="eb-modal-label">
+                                    Barangay
+                                  </label>
+                                  <select
+                                    className={`eb-modal-input ${fieldErrors[`suspect_${i}_barangay_code`] ? "error" : ""}`}
+                                    value={s.barangay_code}
+                                    disabled={
+                                      !s.municipality_code || sLoadingBrgy[i]
+                                    }
+                                    onChange={(e) => {
+                                      updateSuspect(
+                                        i,
+                                        "barangay_code",
+                                        e.target.value,
+                                      );
+                                      if (e.target.value) {
+                                        const newErrors = { ...fieldErrors };
+                                        delete newErrors[
+                                          `suspect_${i}_barangay_code`
+                                        ];
+                                        setFieldErrors(newErrors);
+                                      }
+                                    }}
+                                  >
+                                    <option value="">
+                                      {sLoadingBrgy[i]
+                                        ? "Loading..."
+                                        : "Select Barangay"}
+                                    </option>
+                                    {(sBarangays[i] || []).map((b) => (
+                                      <option key={b.code} value={b.code}>
+                                        {b.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <FieldError
+                                    error={
+                                      fieldErrors[`suspect_${i}_barangay_code`]
+                                    }
+                                  />
+                                </div>
+                              </>
+                            )}
 
                             {/* Row 5 - Remaining */}
                             <div className="eb-modal-form-group">
@@ -4135,9 +4312,7 @@ function EBlotter() {
                     <div className="eb-modal-form-grid">
                       {/* ── ROW 1: OFFENSE CLASSIFICATION ── */}
                       <div className="eb-modal-form-group">
-                        <label className="eb-modal-label">
-                          Incident Type *
-                        </label>
+                        <label className="eb-modal-label">Crime Type *</label>
                         <select
                           className={`eb-modal-input ${fieldErrors.incident_type ? "error" : ""}`}
                           value={caseDetail.incident_type}
@@ -4153,20 +4328,20 @@ function EBlotter() {
                             }
                           }}
                         >
-                          <option value="">Select Incident Type</option>
-                          <option>Murder</option>
-                          <option>Homicide</option>
-                          <option>Physical Injury</option>
-                          <option>Rape</option>
-                          <option>Robbery</option>
-                          <option>Theft</option>
+                          <option value="">Select Crime Type</option>
                           <option value="Carnapping - MC">
                             Carnapping - MC
                           </option>
                           <option value="Carnapping - MV">
                             Carnapping - MV
                           </option>
+                          <option>Homicide</option>
+                          <option>Murder</option>
+                          <option>Physical Injury</option>
+                          <option>Rape</option>
+                          <option>Robbery</option>
                           <option>Special Complex Crime</option>
+                          <option>Theft</option>
                         </select>
                         <FieldError error={fieldErrors.incident_type} />
                       </div>
@@ -4242,7 +4417,7 @@ function EBlotter() {
                           <input
                             type="text"
                             className="eb-modal-input"
-                            value="Select Incident Type first"
+                            value="Select Crime Type first"
                             disabled
                             style={{
                               background: "#f3f4f6",
@@ -4694,32 +4869,13 @@ function EBlotter() {
                             <input
                               type="text"
                               className="eb-modal-input"
-                              placeholder="e.g. 14.4341"
+                              placeholder="Set by clicking the map"
                               value={caseDetail.lat}
-                              disabled={!caseDetail.place_barangay}
-                              style={
-                                !caseDetail.place_barangay
-                                  ? {
-                                      background: "#f3f4f6",
-                                      cursor: "not-allowed",
-                                    }
-                                  : {}
-                              }
-                              onChange={(e) => {
-                                const v = e.target.value.replace(
-                                  /[^0-9.-]/g,
-                                  "",
-                                );
-                                updateCaseDetail("lat", v);
-                                if (
-                                  v &&
-                                  caseDetail.lng &&
-                                  fieldErrors.pin_location
-                                ) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors.pin_location;
-                                  setFieldErrors(newErrors);
-                                }
+                              disabled
+                              style={{
+                                background: "#f3f4f6",
+                                cursor: "not-allowed",
+                                color: "#6b7280",
                               }}
                             />
                           </div>
@@ -4737,32 +4893,13 @@ function EBlotter() {
                             <input
                               type="text"
                               className="eb-modal-input"
-                              placeholder="e.g. 120.9640"
+                              placeholder="Set by clicking the map"
                               value={caseDetail.lng}
-                              disabled={!caseDetail.place_barangay}
-                              style={
-                                !caseDetail.place_barangay
-                                  ? {
-                                      background: "#f3f4f6",
-                                      cursor: "not-allowed",
-                                    }
-                                  : {}
-                              }
-                              onChange={(e) => {
-                                const v = e.target.value.replace(
-                                  /[^0-9.-]/g,
-                                  "",
-                                );
-                                updateCaseDetail("lng", v);
-                                if (
-                                  v &&
-                                  caseDetail.lat &&
-                                  fieldErrors.pin_location
-                                ) {
-                                  const newErrors = { ...fieldErrors };
-                                  delete newErrors.pin_location;
-                                  setFieldErrors(newErrors);
-                                }
+                              disabled
+                              style={{
+                                background: "#f3f4f6",
+                                cursor: "not-allowed",
+                                color: "#6b7280",
                               }}
                             />
                           </div>
@@ -5010,12 +5147,70 @@ function EBlotter() {
                         </small>
                         {fieldErrors.pin_location && (
                           <span
-                            className="eb-field-error"
+                            className="eb-field-error eb-pin-location-error"
                             style={{ marginTop: "6px", display: "block" }}
                           >
                             {fieldErrors.pin_location}
                           </span>
                         )}
+                        {caseDetail.lat &&
+                          caseDetail.lng &&
+                          isPinOutsideBoundary() && (
+                            <div
+                              style={{
+                                marginTop: "8px",
+                                padding: "10px 14px",
+                                background: "#fef3c7",
+                                border: "1px solid #f59e0b",
+                                borderRadius: "6px",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "8px",
+                              }}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#d97706"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ flexShrink: 0, marginTop: "1px" }}
+                              >
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    fontWeight: 700,
+                                    color: "#92400e",
+                                  }}
+                                >
+                                  Pin Location Warning
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#b45309",
+                                    marginTop: "2px",
+                                  }}
+                                >
+                                  The pinned location appears to be outside the
+                                  selected barangay boundary (
+                                  {caseDetail.place_barangay}). This may be due
+                                  to an imported record with inaccurate
+                                  coordinates. Please verify and re-pin on the
+                                  map if needed.
+                                </div>
+                              </div>
+                            </div>
+                          )}
                       </div>
 
                       {caseDetail.place_barangay === "Other" && (
@@ -5287,7 +5482,7 @@ function EBlotter() {
                     <thead>
                       <tr style={{ background: "var(--gray-50)" }}>
                         <th>Report ID</th>
-                        <th>Incident Type</th>
+                        <th>Crime Type</th>
                         <th>Location</th>
                         <th>Date of Incident</th>
                         <th>Date Deleted</th>
@@ -5798,23 +5993,23 @@ function EBlotter() {
             </select>
           </div>
           <div className="eb-filter-group">
-            <label className="eb-filter-label">Incident Type</label>
+            <label className="eb-filter-label">Crime Type</label>
             <select
               className="eb-filter-input"
               name="incident_type"
               value={filters.incident_type}
               onChange={handleFilterChange}
             >
-              <option value="">All Types</option>
-              <option>Murder</option>
+              <option value="">All Crime Types</option>
+              <option value="Carnapping - MC">Carnapping - MC</option>
+              <option value="Carnapping - MV">Carnapping - MV</option>
               <option>Homicide</option>
+              <option>Murder</option>
               <option>Physical Injury</option>
               <option>Rape</option>
               <option>Robbery</option>
-              <option>Theft</option>
-              <option value="Carnapping - MC">Carnapping - MC</option>
-              <option value="Carnapping - MV">Carnapping - MV</option>
               <option>Special Complex Crime</option>
+              <option>Theft</option>
             </select>
           </div>
           <div className="eb-filter-group">
@@ -5940,7 +6135,7 @@ function EBlotter() {
             <thead>
               <tr>
                 <th>Report ID</th>
-                <th>Incident Type</th>
+                <th>Crime Type</th>
                 <th>Location</th>
                 <th>Date Reported</th>
                 <th>Status</th>

@@ -1282,7 +1282,7 @@ function CaseManagement() {
                     borderRight: "1px solid #f3f4f6",
                   }}
                 >
-                  <span className="cm-detail-label">Incident Type</span>
+                  <span className="cm-detail-label">Crime Type</span>
                   <span>{selectedCase.incident_type}</span>
                 </div>
                 <div

@@ -633,7 +633,7 @@ const FilterBar = ({ appliedFilters, onApply }) => {
 
           <div className="cd-filter-grid">
             <div className="cd-filter-group">
-              <label>Incident Type</label>
+              <label>Crime Type</label>
               <CrimeTypeMultiSelect
                 selected={draft.crimeTypes}
                 onChange={(val) => setDraft((f) => ({ ...f, crimeTypes: val }))}
@@ -1125,8 +1125,18 @@ const CrimeTrends = ({ appliedFilters, data }) => {
   })();
 
   const MONTHS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ];
 
   const years = new Set(data.map((d) => d.label?.slice(0, 4)).filter(Boolean));
@@ -1964,12 +1974,12 @@ const CrimeDashboard = () => {
   // ── Chart refs for html2canvas capture ──────────────────────────────────────
   const chartRefs = {
     caseStatus: useRef(null),
-    trends:     useRef(null),
-    clock:      useRef(null),
-    byDay:      useRef(null),
-    modus:      useRef(null),
-    place:      useRef(null),
-    barangay:   useRef(null),
+    trends: useRef(null),
+    clock: useRef(null),
+    byDay: useRef(null),
+    modus: useRef(null),
+    place: useRef(null),
+    barangay: useRef(null),
   };
 
   const { exportDoc, isExporting } = useExportDashboard(
@@ -1998,13 +2008,13 @@ const CrimeDashboard = () => {
 
         if (json.success) {
           const data = {
-            summary:  json.summary  ?? [],
-            trends:   json.trends   ?? [],
-            hourly:   json.hourly   ?? [],
-            byDay:    json.byDay    ?? [],
-            place:    json.place    ?? [],
+            summary: json.summary ?? [],
+            trends: json.trends ?? [],
+            hourly: json.hourly ?? [],
+            byDay: json.byDay ?? [],
+            place: json.place ?? [],
             barangay: json.barangay ?? [],
-            modus:    json.modus    ?? [],
+            modus: json.modus ?? [],
           };
 
           _cache = {
@@ -2064,18 +2074,18 @@ const CrimeDashboard = () => {
       setIsGeneratingAssessment(true);
 
       const payload = {
-        barangays:   appliedFilters.barangays  || [],
+        barangays: appliedFilters.barangays || [],
         crime_types: appliedFilters.crimeTypes || [],
-        date_from:   appliedFilters.dateFrom,
-        date_to:     appliedFilters.dateTo,
-        mode:        getAssessmentMode(appliedFilters.dateTo),
+        date_from: appliedFilters.dateFrom,
+        date_to: appliedFilters.dateTo,
+        mode: getAssessmentMode(appliedFilters.dateTo),
       };
 
       const response = await fetch(`${AI_API}/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization:  `Bearer ${getToken()}`,
+          Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify(payload),
       });

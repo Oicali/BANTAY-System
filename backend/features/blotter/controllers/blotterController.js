@@ -82,15 +82,19 @@ const validatePhoneNumber = (phone, required = false) => {
   }
   
   if (phone && phone.trim().length > 0) {
+    const cleaned = phone.replace(/[\s-]/g, '');
+    // Auto-fix 10-digit numbers starting with 9
+    const normalized = (cleaned.length === 10 && cleaned.startsWith("9"))
+      ? "0" + cleaned
+      : cleaned;
     const phonePattern = /^(09|\+639)\d{9}$/;
-    if (!phonePattern.test(phone.replace(/[\s-]/g, ''))) {
+    if (!phonePattern.test(normalized)) {
       errors.push("Please enter a valid Philippine mobile number (11 digits starting with 09)");
     }
   }
   
   return errors;
 };
-
 const validateComplainant = (complainant, index) => {
   const errors = [];
   const prefix = `Complainant #${index + 1}`;
@@ -752,7 +756,13 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
           alias: str(row["C_ALIAS"]),
           gender: str(row["C_GENDER"]) || "Male",
           nationality: str(row["C_NATIONALITY"]) || "FILIPINO",
-          contact_number: str(row["C_CONTACT_NUMBER"]),
+          contact_number: (() => {
+  const num = str(row["C_CONTACT_NUMBER"]);
+  if (!num) return null;
+  const cleaned = num.replace(/\D/g, "");
+  if (cleaned.length === 10 && cleaned.startsWith("9")) return "0" + cleaned;
+  return cleaned;
+})(),
           region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
           district_province: str(row["C_PROVINCE"]) || "Cavite",
           city_municipality: str(row["C_CITY_MUNICIPALITY"]) || "Bacoor City",
