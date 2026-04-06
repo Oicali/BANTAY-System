@@ -1,33 +1,24 @@
 import React, { useState, useEffect } from "react";
+import "./BrgyReport.css";
 import LoadingModal from "../modals/LoadingModal";
-const autofillFix = `
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px white inset !important;
-    -webkit-text-fill-color: #111827 !important;
-    caret-color: #111827;
-  }
-`;
+
 const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
 const ITEMS_PER_PAGE = 15;
 
 const formatDate = (d) => {
   if (!d) return "N/A";
-  const date = new Date(d);
-  return date.toLocaleDateString("en-PH", {
+  return new Date(d).toLocaleDateString("en-PH", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 };
 
-const statusColors = {
-  Pending: { bg: "#fef3c7", color: "#92400e" },
-  "Under Investigation": { bg: "#dbeafe", color: "#1e40af" },
-  Solved: { bg: "#d1fae5", color: "#065f46" },
-  Cleared: { bg: "#d1fae5", color: "#065f46" },
+const getStatusClass = (status) => {
+  if (status === "Pending") return "br-status-pending";
+  if (status === "Under Investigation") return "br-status-investigating";
+  if (status === "Solved" || status === "Cleared") return "br-status-solved";
+  return "br-status-pending";
 };
 
 function BrgyReport() {
@@ -49,7 +40,6 @@ function BrgyReport() {
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
   const [barangayName, setBarangayName] = useState("Loading...");
 
   useEffect(() => {
@@ -61,13 +51,11 @@ function BrgyReport() {
       .then((data) => {
         if (data?.user?.barangay_code) {
           const code = data.user.barangay_code;
-          // If it's already a name string (not a numeric PSGC code), use directly
           if (!/^\d+$/.test(code)) {
             setForm((prev) => ({ ...prev, place_barangay: code }));
             setBarangayName(code);
             return null;
           }
-          // Otherwise it's a PSGC number — resolve to name
           return fetch(`https://psgc.gitlab.io/api/barangays/${code}.json`);
         }
       })
@@ -75,13 +63,10 @@ function BrgyReport() {
       .then((brgyData) => {
         if (brgyData?.name) {
           setBarangayName(brgyData.name);
-          // Also store resolved name (not numeric code) in form
           setForm((prev) => ({ ...prev, place_barangay: brgyData.name }));
         }
       })
-      .catch(() => {
-        setBarangayName("Your assigned barangay");
-      });
+      .catch(() => setBarangayName("Your assigned barangay"));
   }, []);
 
   const fetchMyReports = async () => {
@@ -141,9 +126,15 @@ function BrgyReport() {
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
+      setTimeout(() => {
+        const firstError = document.querySelector(".br-input.error");
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+          firstError.focus();
+        }
+      }, 100);
       return;
     }
-
     try {
       setSubmitting(true);
       const res = await fetch(`${API_URL}/brgy-report`, {
@@ -157,7 +148,7 @@ function BrgyReport() {
       const data = await res.json();
       if (data.success) {
         setSuccessMsg(
-          `Report submitted! Reference: ${data.data.blotter_entry_number}`,
+          `Report submitted successfully! Reference No.: ${data.data.blotter_entry_number}`,
         );
         setForm({
           incident_type: "",
@@ -172,7 +163,7 @@ function BrgyReport() {
           victim_contact: "",
         });
         fetchMyReports();
-        setTimeout(() => setSuccessMsg(""), 6000);
+        setTimeout(() => setSuccessMsg(""), 7000);
       } else {
         const msg = data.errors ? data.errors.join("\n") : data.message;
         alert("Submission failed:\n" + msg);
@@ -190,511 +181,499 @@ function BrgyReport() {
     currentPage * ITEMS_PER_PAGE,
   );
 
-  const inputStyle = (field) => ({
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: "6px",
-    fontSize: "14px",
-    border: `1px solid ${errors[field] ? "#ef4444" : "#d1d5db"}`,
-    outline: "none",
-    boxSizing: "border-box",
-    background: "white",
-    color: "#111827",
-    colorScheme: "light",
-  });
-
-  const labelStyle = {
-    display: "block",
-    fontSize: "13px",
-    fontWeight: 600,
-    color: "#374151",
-    marginBottom: "5px",
-  };
-
-  const errStyle = {
-    fontSize: "12px",
-    color: "#ef4444",
-    marginTop: "3px",
-    display: "block",
-  };
-
   return (
-    <div style={{ padding: "28px 32px", maxWidth: "900px", margin: "0 auto" }}>
+    <div className="br-wrapper">
       <LoadingModal isOpen={submitting} message="Submitting report..." />
-      <style>{autofillFix}</style>
-      {/* Header */}
-      <div style={{ marginBottom: "28px" }}>
-        <h1
-          style={{
-            fontSize: "22px",
-            fontWeight: 700,
-            color: "#1e3a5f",
-            margin: 0,
-          }}
-        >
-          Submit Incident Report
-        </h1>
-        <p style={{ color: "#6b7280", fontSize: "14px", marginTop: "4px" }}>
-          Report an incident in your barangay for police review
-        </p>
+
+      {/* ── PAGE HEADER ── */}
+      <div className="br-page-header">
+        <div className="br-page-header-icon">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="br-page-title">Submit Incident Report</h1>
+          <p className="br-page-subtitle">
+            Report an incident for PNP Bacoor review
+          </p>
+        </div>
+        <div className="br-brgy-pill">
+          <div className="br-brgy-pill-dot" />
+          {barangayName}
+        </div>
       </div>
 
-      {/* Success Banner */}
+      {/* ── SUCCESS ── */}
       {successMsg && (
-        <div
-          style={{
-            background: "#d1fae5",
-            border: "1px solid #6ee7b7",
-            borderRadius: "8px",
-            padding: "14px 18px",
-            marginBottom: "24px",
-            color: "#065f46",
-            fontSize: "14px",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
-          ✓ {successMsg}
+        <div className="br-success">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          {successMsg}
         </div>
       )}
 
-      {/* Form */}
-      <div
-        style={{
-          background: "white",
-          borderRadius: "10px",
-          border: "1px solid #e5e7eb",
-          padding: "28px",
-          marginBottom: "32px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "15px",
-            fontWeight: 700,
-            color: "#1e3a5f",
-            marginBottom: "20px",
-            paddingBottom: "12px",
-            borderBottom: "1px solid #f3f4f6",
-          }}
+      {/* ── ALERT ── */}
+      <div className="br-alert">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#c1272d"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          Incident Details
-        </h2>
-
-        <form onSubmit={handleSubmit}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-          >
-            {/* Incident Type */}
-            <div>
-              <label style={labelStyle}>Crime Type *</label>
-              <select
-                style={inputStyle("incident_type")}
-                value={form.incident_type}
-                onChange={(e) => update("incident_type", e.target.value)}
-              >
-                <option value="">Select Type</option>
-                <option>Murder</option>
-                <option>Homicide</option>
-                <option>Physical Injury</option>
-                <option>Rape</option>
-                <option>Robbery</option>
-                <option>Theft</option>
-                <option value="Carnapping - MC">Carnapping - MC</option>
-                <option value="Carnapping - MV">Carnapping - MV</option>
-                <option>Special Complex Crime</option>
-              </select>
-              {errors.incident_type && (
-                <span style={errStyle}>{errors.incident_type}</span>
-              )}
-            </div>
-
-            {/* Barangay */}
-            <div>
-              <label style={labelStyle}>Barangay *</label>
-              <input
-                style={{
-                  ...inputStyle("place_barangay"),
-                  background: "#f9fafb",
-                }}
-                value={barangayName}
-                readOnly
-                placeholder="Auto-filled from your account"
-              />
-              {errors.place_barangay && (
-                <span style={errStyle}>{errors.place_barangay}</span>
-              )}
-            </div>
-
-            {/* Date Commission */}
-            <div>
-              <label style={labelStyle}>Date & Time of Incident *</label>
-              <input
-                type="datetime-local"
-                style={inputStyle("date_time_commission")}
-                value={form.date_time_commission}
-                max={new Date().toISOString().slice(0, 16)}
-                onKeyDown={(e) => e.preventDefault()}
-                onChange={(e) => update("date_time_commission", e.target.value)}
-              />
-              {errors.date_time_commission && (
-                <span style={errStyle}>{errors.date_time_commission}</span>
-              )}
-            </div>
-
-            {/* Date Reported */}
-            <div>
-              <label style={labelStyle}>Date & Time Reported *</label>
-              <input
-                type="datetime-local"
-                style={inputStyle("date_time_reported")}
-                value={form.date_time_reported}
-                max={new Date().toISOString().slice(0, 16)}
-                onKeyDown={(e) => e.preventDefault()}
-                onChange={(e) => update("date_time_reported", e.target.value)}
-              />
-              {errors.date_time_reported && (
-                <span style={errStyle}>{errors.date_time_reported}</span>
-              )}
-            </div>
-
-            {/* Street */}
-            <div style={{ gridColumn: "span 2" }}>
-              <label style={labelStyle}>Street / Location *</label>
-              <input
-                type="text"
-                style={inputStyle("place_street")}
-                value={form.place_street}
-                placeholder="e.g. Rizal St., near corner Mabini"
-                onChange={(e) =>
-                  update(
-                    "place_street",
-                    e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, ""),
-                  )
-                }
-              />
-              {errors.place_street && (
-                <span style={errStyle}>{errors.place_street}</span>
-              )}
-            </div>
-
-            {/* Narrative */}
-            <div style={{ gridColumn: "span 2" }}>
-              <label style={labelStyle}>Narrative *</label>
-              <textarea
-                style={{ ...inputStyle("narrative"), resize: "vertical" }}
-                rows={5}
-                value={form.narrative}
-                maxLength={3000}
-                placeholder="Describe what happened in detail (minimum 20 characters)"
-                onChange={(e) => update("narrative", e.target.value)}
-              />
-              {errors.narrative && (
-                <span style={errStyle}>{errors.narrative}</span>
-              )}
-              <span style={{ fontSize: "11px", color: "#9ca3af" }}>
-                {form.narrative.length}/3000
-              </span>
-            </div>
-          </div>
-
-          {/* Victim Section */}
-          <h2
-            style={{
-              fontSize: "15px",
-              fontWeight: 700,
-              color: "#1e3a5f",
-              margin: "24px 0 16px",
-              paddingTop: "16px",
-              borderTop: "1px solid #f3f4f6",
-            }}
-          >
-            Victim Information
-          </h2>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-          >
-            <div>
-              <label style={labelStyle}>First Name *</label>
-              <input
-                type="text"
-                style={inputStyle("victim_first_name")}
-                value={form.victim_first_name}
-                placeholder="First Name"
-                maxLength={50}
-                onChange={(e) =>
-                  update(
-                    "victim_first_name",
-                    e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
-                  )
-                }
-              />
-              {errors.victim_first_name && (
-                <span style={errStyle}>{errors.victim_first_name}</span>
-              )}
-            </div>
-            <div>
-              <label style={labelStyle}>Last Name *</label>
-              <input
-                type="text"
-                style={inputStyle("victim_last_name")}
-                value={form.victim_last_name}
-                placeholder="Last Name"
-                maxLength={50}
-                onChange={(e) =>
-                  update(
-                    "victim_last_name",
-                    e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
-                  )
-                }
-              />
-              {errors.victim_last_name && (
-                <span style={errStyle}>{errors.victim_last_name}</span>
-              )}
-            </div>
-            <div>
-              <label style={labelStyle}>Gender</label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {["Male", "Female"].map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    style={{
-                      flex: 1,
-                      padding: "10px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      border: `1px solid ${form.victim_gender === g ? "#1e3a5f" : "#d1d5db"}`,
-                      background:
-                        form.victim_gender === g ? "#1e3a5f" : "white",
-                      color: form.victim_gender === g ? "white" : "#374151",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                    }}
-                    onClick={() => update("victim_gender", g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={labelStyle}>Contact Number</label>
-              <input
-                type="text"
-                style={inputStyle("victim_contact")}
-                value={form.victim_contact}
-                placeholder="09XXXXXXXXX"
-                maxLength={11}
-                onChange={(e) =>
-                  update("victim_contact", e.target.value.replace(/\D/g, ""))
-                }
-              />
-            </div>
-          </div>
-
-          {/* Submit */}
-          <div
-            style={{
-              marginTop: "24px",
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                padding: "12px 32px",
-                background: submitting ? "#9ca3af" : "#1e3a5f",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontWeight: 700,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {submitting ? "Submitting..." : "Submit Report"}
-            </button>
-          </div>
-        </form>
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span>
+          This report will be forwarded directly to <strong>PNP Bacoor</strong>{" "}
+          for review and action. Please ensure all information is accurate and
+          truthful. Filing a false report is punishable by law.
+        </span>
       </div>
 
-      {/* My Submissions */}
-      <div
-        style={{
-          background: "white",
-          borderRadius: "10px",
-          border: "1px solid #e5e7eb",
-          padding: "28px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "15px",
-            fontWeight: 700,
-            color: "#1e3a5f",
-            marginBottom: "16px",
-            display: "flex",
-            justifyContent: "space-between",
-          }}
-        >
-          My Submitted Reports
-          <span style={{ fontSize: "13px", fontWeight: 400, color: "#6b7280" }}>
-            {reports.length} total
-          </span>
-        </h2>
+      <form onSubmit={handleSubmit} noValidate>
+        {/* ── INCIDENT DETAILS CARD ── */}
+        <div className="br-card">
+          <div className="br-card-header">
+            <div className="br-card-header-icon">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h2 className="br-card-title">Incident Details</h2>
+          </div>
+          <div className="br-card-body">
+            <div className="br-form-grid">
+              <div className="br-form-group">
+                <label className="br-label">
+                  Crime Type <span>*</span>
+                </label>
+                <select
+                  className={`br-input ${errors.incident_type ? "error" : ""}`}
+                  value={form.incident_type}
+                  onChange={(e) => update("incident_type", e.target.value)}
+                >
+                  <option value="">Select Crime Type</option>
+                  <option>Murder</option>
+                  <option>Homicide</option>
+                  <option>Physical Injury</option>
+                  <option>Rape</option>
+                  <option>Robbery</option>
+                  <option>Theft</option>
+                  <option value="Carnapping - MC">Carnapping - MC</option>
+                  <option value="Carnapping - MV">Carnapping - MV</option>
+                  <option>Special Complex Crime</option>
+                </select>
+                {errors.incident_type && (
+                  <span className="br-error">{errors.incident_type}</span>
+                )}
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">
+                  Barangay <span>*</span>
+                </label>
+                <div className="br-input-locked">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  {barangayName}
+                </div>
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">
+                  Date & Time of Incident <span>*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  className={`br-input ${errors.date_time_commission ? "error" : ""}`}
+                  value={form.date_time_commission}
+                  max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .slice(0, 16)}
+                  onKeyDown={(e) => e.preventDefault()}
+                  onChange={(e) =>
+                    update("date_time_commission", e.target.value)
+                  }
+                />
+                {errors.date_time_commission && (
+                  <span className="br-error">
+                    {errors.date_time_commission}
+                  </span>
+                )}
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">
+                  Date & Time Reported <span>*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  className={`br-input ${errors.date_time_reported ? "error" : ""}`}
+                  value={form.date_time_reported}
+                  max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .slice(0, 16)}
+                  onKeyDown={(e) => e.preventDefault()}
+                  onChange={(e) => update("date_time_reported", e.target.value)}
+                />
+                {errors.date_time_reported && (
+                  <span className="br-error">{errors.date_time_reported}</span>
+                )}
+              </div>
+
+              <div
+                className={`br-form-group ${""}`}
+                style={{ gridColumn: "span 2" }}
+              >
+                <label className="br-label">
+                  Street / Location <span>*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`br-input ${errors.place_street ? "error" : ""}`}
+                  value={form.place_street}
+                  placeholder="e.g. Rizal St., near corner Mabini"
+                  onChange={(e) =>
+                    update(
+                      "place_street",
+                      e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, ""),
+                    )
+                  }
+                />
+                {errors.place_street && (
+                  <span className="br-error">{errors.place_street}</span>
+                )}
+              </div>
+
+              <div className="br-form-group" style={{ gridColumn: "span 2" }}>
+                <label className="br-label">
+                  Narrative <span>*</span>
+                </label>
+                <textarea
+                  className={`br-input ${errors.narrative ? "error" : ""}`}
+                  style={{ resize: "vertical", minHeight: "120px" }}
+                  rows={5}
+                  value={form.narrative}
+                  maxLength={3000}
+                  placeholder="Describe what happened in detail — include time, location, persons involved, and sequence of events (minimum 20 characters)"
+                  onChange={(e) => update("narrative", e.target.value)}
+                />
+                {errors.narrative && (
+                  <span className="br-error">{errors.narrative}</span>
+                )}
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "#9ca3af",
+                    marginTop: "2px",
+                  }}
+                >
+                  {form.narrative.length}/3000 characters
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── VICTIM INFO CARD ── */}
+        <div className="br-card">
+          <div className="br-card-header">
+            <div className="br-card-header-icon">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <h2 className="br-card-title">Victim Information</h2>
+          </div>
+          <div className="br-card-body">
+            <div className="br-form-grid">
+              <div className="br-form-group">
+                <label className="br-label">
+                  First Name <span>*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`br-input ${errors.victim_first_name ? "error" : ""}`}
+                  value={form.victim_first_name}
+                  placeholder="First Name"
+                  maxLength={50}
+                  onChange={(e) =>
+                    update(
+                      "victim_first_name",
+                      e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
+                    )
+                  }
+                />
+                {errors.victim_first_name && (
+                  <span className="br-error">{errors.victim_first_name}</span>
+                )}
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">
+                  Last Name <span>*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`br-input ${errors.victim_last_name ? "error" : ""}`}
+                  value={form.victim_last_name}
+                  placeholder="Last Name"
+                  maxLength={50}
+                  onChange={(e) =>
+                    update(
+                      "victim_last_name",
+                      e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
+                    )
+                  }
+                />
+                {errors.victim_last_name && (
+                  <span className="br-error">{errors.victim_last_name}</span>
+                )}
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">Gender</label>
+                <div className="br-gender-row">
+                  {["Male", "Female"].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      className={`br-gender-btn ${form.victim_gender === g ? "active" : ""}`}
+                      onClick={() => update("victim_gender", g)}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        {g === "Male" ? (
+                          <>
+                            <circle cx="10" cy="7" r="4" />
+                            <path d="M21 2l-5.5 5.5" />
+                            <path d="M15 2h6v6" />
+                            <path d="M10 11v10" />
+                            <path d="M7 19h6" />
+                          </>
+                        ) : (
+                          <>
+                            <circle cx="12" cy="7" r="4" />
+                            <path d="M12 11v10" />
+                            <path d="M9 18h6" />
+                          </>
+                        )}
+                      </svg>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="br-form-group">
+                <label className="br-label">Contact Number</label>
+                <input
+                  type="text"
+                  className="br-input"
+                  value={form.victim_contact}
+                  placeholder="09XXXXXXXXX"
+                  maxLength={11}
+                  onChange={(e) =>
+                    update("victim_contact", e.target.value.replace(/\D/g, ""))
+                  }
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="br-submit-btn"
+              disabled={submitting}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+              {submitting ? "Submitting..." : "Submit Incident Report"}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      {/* ── MY SUBMITTED REPORTS ── */}
+      <div className="br-card">
+        <div className="br-reports-header">
+          <div className="br-reports-header-icon">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+          </div>
+          <h2 className="br-card-title">My Submitted Reports</h2>
+          <span className="br-reports-count">{reports.length} total</span>
+        </div>
 
         {loadingReports ? (
-          <p
-            style={{
-              color: "#9ca3af",
-              fontSize: "14px",
-              textAlign: "center",
-              padding: "32px",
-            }}
-          >
-            Loading...
-          </p>
+          <div className="br-loading">Loading submitted reports...</div>
         ) : reports.length === 0 ? (
-          <p
-            style={{
-              color: "#9ca3af",
-              fontSize: "14px",
-              textAlign: "center",
-              padding: "32px",
-            }}
-          >
-            No reports submitted yet.
-          </p>
+          <div className="br-empty">
+            <div className="br-empty-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9ca3af"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="16" y2="17" />
+              </svg>
+            </div>
+            <div className="br-empty-title">No reports submitted yet</div>
+            <div className="br-empty-sub">
+              Your submitted incident reports will appear here
+            </div>
+          </div>
         ) : (
           <>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "13px",
-              }}
-            >
+            <table className="br-table">
               <thead>
-                <tr style={{ borderBottom: "2px solid #f3f4f6" }}>
-                  {[
-                    "Reference No.",
-                    "Crime Type",
-                    "Street",
-                    "Date Reported",
-                    "Status",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "10px 12px",
-                        textAlign: "left",
-                        color: "#6b7280",
-                        fontWeight: 600,
-                        fontSize: "12px",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                <tr>
+                  <th>Reference No.</th>
+                  <th>Crime Type</th>
+                  <th>Street / Location</th>
+                  <th>Date Reported</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((r) => {
-                  const sc = statusColors[r.status] || {
-                    bg: "#f3f4f6",
-                    color: "#374151",
-                  };
-                  return (
-                    <tr
-                      key={r.blotter_id}
-                      style={{ borderBottom: "1px solid #f9fafb" }}
-                    >
-                      <td
-                        style={{
-                          padding: "12px",
-                          fontFamily: "monospace",
-                          fontWeight: 700,
-                          color: "#1e3a5f",
-                          fontSize: "12px",
-                        }}
-                      >
+                {paginated.map((r) => (
+                  <tr key={r.blotter_id}>
+                    <td>
+                      <span className="br-ref-num">
                         {r.blotter_entry_number}
-                      </td>
-                      <td style={{ padding: "12px", color: "#374151" }}>
-                        {r.incident_type}
-                      </td>
-                      <td style={{ padding: "12px", color: "#6b7280" }}>
-                        {r.place_street}
-                      </td>
-                      <td style={{ padding: "12px", color: "#6b7280" }}>
-                        {formatDate(r.date_time_reported)}
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <span
-                          style={{
-                            padding: "3px 10px",
-                            borderRadius: "20px",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            background: sc.bg,
-                            color: sc.color,
-                          }}
-                        >
-                          {r.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 500, color: "#374151" }}>
+                      {r.incident_type}
+                    </td>
+                    <td style={{ color: "#6b7280" }}>{r.place_street}</td>
+                    <td style={{ color: "#6b7280" }}>
+                      {formatDate(r.date_time_reported)}
+                    </td>
+                    <td>
+                      <span
+                        className={`br-status-badge ${getStatusClass(r.status)}`}
+                      >
+                        <span className="br-status-dot" />
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
-            {/* Pagination */}
             {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginTop: "16px",
-                  paddingTop: "16px",
-                  borderTop: "1px solid #f3f4f6",
-                }}
-              >
-                <span style={{ fontSize: "13px", color: "#6b7280" }}>
+              <div className="br-pagination">
+                <span className="br-pagination-info">
                   Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
                   {Math.min(currentPage * ITEMS_PER_PAGE, reports.length)} of{" "}
                   {reports.length}
                 </span>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div className="br-pagination-controls">
                   <button
+                    className="br-pagination-btn"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage((p) => p - 1)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: "6px",
-                      border: "1px solid #d1d5db",
-                      background: currentPage === 1 ? "#f9fafb" : "white",
-                      cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                      fontSize: "13px",
-                      color: "#374151",
-                    }}
                   >
                     Previous
                   </button>
@@ -702,35 +681,17 @@ function BrgyReport() {
                     (p) => (
                       <button
                         key={p}
+                        className={`br-pagination-page ${currentPage === p ? "active" : ""}`}
                         onClick={() => setCurrentPage(p)}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          fontSize: "13px",
-                          border: "1px solid #d1d5db",
-                          background: currentPage === p ? "#1e3a5f" : "white",
-                          color: currentPage === p ? "white" : "#374151",
-                          cursor: "pointer",
-                        }}
                       >
                         {p}
                       </button>
                     ),
                   )}
                   <button
+                    className="br-pagination-btn"
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage((p) => p + 1)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: "6px",
-                      border: "1px solid #d1d5db",
-                      background:
-                        currentPage === totalPages ? "#f9fafb" : "white",
-                      cursor:
-                        currentPage === totalPages ? "not-allowed" : "pointer",
-                      fontSize: "13px",
-                      color: "#374151",
-                    }}
                   >
                     Next
                   </button>
