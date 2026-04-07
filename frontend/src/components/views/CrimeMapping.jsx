@@ -170,6 +170,12 @@ function CrimeMapping() {
   const [heatLoading, setHeatLoading] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState(null);
 
+  // ── officer locations state
+  const [officers, setOfficers] = useState([]);
+  const [showOfficers, setShowOfficers] = useState(true);
+  const [hoveredOfficer, setHoveredOfficer] = useState(null);
+  const officerPollRef = useRef(null);
+
   // ── shared state
   const [loading, setLoading] = useState(true);
   const [selectedPin, setSelectedPin] = useState(null);
@@ -342,6 +348,28 @@ function CrimeMapping() {
       setHeatLoading(false);
     }
   }, [filters]);
+
+  // ── Officer locations fetch ───────────────────────────────────────────────────
+
+  const fetchOfficers = useCallback(async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/gps/officers`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      if (data.success) setOfficers(data.data);
+    } catch (err) {
+      console.warn("[Map] fetchOfficers error:", err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOfficers();
+    officerPollRef.current = setInterval(fetchOfficers, 5000);
+    return () => {
+      if (officerPollRef.current) clearInterval(officerPollRef.current);
+    };
+  }, [fetchOfficers]);
 
   // ── Trigger fetches on filter/mode change ─────────────────────────────────────
 
@@ -1079,6 +1107,76 @@ function CrimeMapping() {
                 </Popup>
               )}
 
+              {/* ── Officer location dots ── */}
+              {showOfficers &&
+                officers.map((officer) => (
+                  <Marker
+                    key={`officer-${officer.user_id}`}
+                    longitude={parseFloat(officer.longitude)}
+                    latitude={parseFloat(officer.latitude)}
+                    anchor="center"
+                  >
+                    <div
+                      className="crmap-officer-marker"
+                      onMouseEnter={(e) => {
+                        const el = e.currentTarget;
+                        const rect = el.getBoundingClientRect();
+                        const mapRect = mapRef.current
+                          ?.getContainer()
+                          ?.getBoundingClientRect();
+                        if (!mapRect) return;
+                        setHoveredOfficer({
+                          officer,
+                          x: rect.left - mapRect.left + rect.width / 2,
+                          y: rect.top - mapRect.top,
+                        });
+                      }}
+                      onMouseLeave={() => setHoveredOfficer(null)}
+                    >
+                      {/* Badge shield icon */}
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="#1d4ed8"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 2l7 4v5c0 4.5-3 8.5-7 10C5 19.5 2 15.5 2 11V6l10-4z" />
+                        <path
+                          d="M9 12l2 2 4-4"
+                          stroke="#ffffff"
+                          strokeWidth="1.8"
+                          fill="none"
+                        />
+                      </svg>
+                    </div>
+                  </Marker>
+                ))}
+
+              {/* ── Officer hover tooltip ── */}
+              {hoveredOfficer && (
+                <div
+                  className="crmap-officer-tooltip"
+                  style={{
+                    left: hoveredOfficer.x,
+                    top: hoveredOfficer.y,
+                  }}
+                >
+                  <div className="crmap-officer-tooltip-name">
+                    👮{" "}
+                    {hoveredOfficer.officer.full_name ||
+                      hoveredOfficer.officer.name ||
+                      "Officer"}
+                  </div>
+                  <div className="crmap-officer-tooltip-detail">
+                    {hoveredOfficer.officer.rank || "PNP"} · Online
+                  </div>
+                </div>
+              )}
+
               {/* ── DBSCAN cluster popup ── */}
               {heatmapMode && selectedCluster && (
                 <Popup
@@ -1288,6 +1386,20 @@ function CrimeMapping() {
               {showMapOptions && (
                 <div className="crmap-options-popover">
                   <div className="crmap-options-title">Map Options</div>
+
+                  {/* Officer Locations — shown in BOTH modes */}
+                  <div className="crmap-map-option">
+                    <span className="crmap-map-option-lbl">
+                      Officer Locations
+                    </span>
+                    <button
+                      className={`crmap-toggle ${showOfficers ? "on" : ""}`}
+                      onClick={() => setShowOfficers((v) => !v)}
+                    >
+                      <span className="crmap-toggle-knob" />
+                    </button>
+                  </div>
+
                   {heatmapMode ? (
                     <div className="crmap-map-option">
                       <span className="crmap-map-option-lbl">

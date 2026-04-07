@@ -1,6 +1,7 @@
 // backend/features/ai-assessment/services/assessment.service.js
 
 const axios = require("axios");
+const pool = require("../../../config/database");
 const { analyzeWithPython } = require("./python.service");
 const {
   buildGeneralAssessmentPrompt,
@@ -8,10 +9,8 @@ const {
 } = require("../prompts/prompt.assessment");
 
 const AI_PROVIDER    = (process.env.AI_PROVIDER || "mock").toLowerCase();
-// const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-// const OLLAMA_MODEL   = process.env.OLLAMA_MODEL    || "llama3.1:8b";
-const GEMINI_MODEL   = process.env.GEMINI_MODEL    || "gemini-1.5-flash";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY  || "";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_MODEL   = process.env.GROQ_MODEL   || "meta-llama/llama-4-scout-17b-16e-instruct";
 
 const inferMode = (dateTo) => {
   if (!dateTo) return "current";
@@ -81,6 +80,36 @@ const parseJsonFromText = (text) => {
     return JSON.parse(candidate);
   } catch (_) {
     return null;
+  }
+};
+
+const fetchModusDescriptions = async (crimeTypes = []) => {
+  try {
+    let query = `
+      SELECT crime_type, modus_name, description
+      FROM crime_modus_reference
+      WHERE is_active = true
+    `;
+    const params = [];
+    if (crimeTypes.length > 0) {
+      query += ` AND UPPER(crime_type) = ANY($1::text[])`;
+      params.push(crimeTypes.map(c => c.toUpperCase()));
+    }
+    query += ` ORDER BY crime_type, modus_name`;
+    const result = await pool.query(query, params);
+
+    const map = {};
+    result.rows.forEach(r => {
+      if (!map[r.crime_type]) map[r.crime_type] = [];
+      map[r.crime_type].push({
+        name: r.modus_name,
+        description: r.description || ""
+      });
+    });
+    return map;
+  } catch (err) {
+    console.warn("[AI] Could not fetch modus descriptions:", err.message);
+    return {};
   }
 };
 
@@ -182,59 +211,40 @@ const buildBaseAssessment = (analysis) => {
   };
 };
 
-const callOllama = async (prompt) => {
-  const response = await axios.post(
-    `${OLLAMA_BASE_URL}/api/generate`,
-    {
-      model:  OLLAMA_MODEL,
-      prompt,
-      stream: false,
-      options: { temperature: 0.2 },
-    },
-    {
-      timeout: 300000, // 5 minutes — per-crime calls are smaller but give headroom
-      headers: { "Content-Type": "application/json" },
-    },
-  );
-  return response.data?.response || "";
-};
 
-const callGemini = async (prompt) => {
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is missing");
+const callGroq = async (prompt) => {
+  if (!GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is missing");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
   const response = await axios.post(
-    url,
+    "https://api.groq.com/openai/v1/chat/completions",
     {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2 },
+      model: GROQ_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
     },
     {
       timeout: 120000,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+      },
     },
   );
 
-  return (
-    response.data?.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || "")
-      .join("") || ""
-  );
+  return response.data?.choices?.[0]?.message?.content || "";
 };
 
 const callAI = async (prompt) => {
-  return callGemini(prompt);
+  return callGroq(prompt);
 };
-
 // ── Iterative per-crime AI generation ────────────────────────────────────────
 // Each crime type gets its own focused prompt → no context overflow → all crimes appear
-const maybeEnhanceWithAI = async (analysis, baseAssessment) => {
+const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
   const provider = AI_PROVIDER;
 
-  if (!GEMINI_API_KEY) {
+  if (!GROQ_API_KEY) {
     return {
       providerUsed: "mock",
       modelUsed:    null,
@@ -261,7 +271,7 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment) => {
     for (const crimeBase of perCrimeBase) {
       console.time(`[AI] ${crimeBase.crime_type}`);
       try {
-        const crimePrompt   = buildPerCrimePrompt({ analysis, crimeType: crimeBase.crime_type, crimeBase });
+        const crimePrompt = buildPerCrimePrompt({ analysis, crimeType: crimeBase.crime_type, crimeBase, modusMap });
         const crimeRawText  = await callAI(crimePrompt);
         const crimeParsed   = parseJsonFromText(crimeRawText);
 
@@ -281,7 +291,7 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment) => {
 
     return {
       providerUsed: provider,
-      modelUsed:    provider === "ollama" ? OLLAMA_MODEL : GEMINI_MODEL,
+      modelUsed: GROQ_MODEL,
       assessment: {
         ...(baseAssessment || {}),
         title:              baseAssessment?.title || "AI Crime Assessment",
@@ -320,8 +330,9 @@ const generateAssessment = async ({
     crime_types,
   });
 
-  const baseAssessment = buildBaseAssessment(analysis);
-  const aiResult       = await maybeEnhanceWithAI(analysis, baseAssessment);
+const modusMap       = await fetchModusDescriptions(crime_types);
+const baseAssessment = buildBaseAssessment(analysis);
+const aiResult       = await maybeEnhanceWithAI(analysis, baseAssessment, modusMap);
 
   console.log("AI_PROVIDER:",  AI_PROVIDER);
   console.log("providerUsed:", aiResult.providerUsed);

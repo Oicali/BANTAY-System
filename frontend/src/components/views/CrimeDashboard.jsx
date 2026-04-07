@@ -2021,6 +2021,8 @@ const CrimeDashboard = () => {
   const [isGeneratingAssessment, setIsGeneratingAssessment] = useState(false);
   const [assessmentPhase, setAssessmentPhase] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showAiErrorModal, setShowAiErrorModal] = useState(false);
+  const [aiErrorMessage, setAiErrorMessage] = useState("");
 
   const fetchIdRef = useRef(0);
 
@@ -2103,11 +2105,11 @@ const CrimeDashboard = () => {
   }, []);
 
   useEffect(() => {
-  if (errorMessage) {
-    const t = setTimeout(() => setErrorMessage(""), 5000);
-    return () => clearTimeout(t);
-  }
-}, [errorMessage]);
+    if (errorMessage) {
+      const t = setTimeout(() => setErrorMessage(""), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMessage]);
 
   const getAssessmentMode = (dateTo) => {
     if (!dateTo) return "current";
@@ -2211,7 +2213,18 @@ const CrimeDashboard = () => {
       console.log("AI assessment response:", json);
     } catch (err) {
       console.error("Generate assessment error:", err);
-      setErrorMessage(err.message || "Failed to generate assessment");
+      const msg = err.message || "";
+      const isRateLimit =
+        msg.includes("429") ||
+        msg.includes("rate limit") ||
+        msg.includes("quota") ||
+        msg.includes("limit");
+      setAiErrorMessage(
+        isRateLimit
+          ? "The AI service has reached its daily request limit. Please try again tomorrow (resets at 8:00 AM Philippine Time)."
+          : "Something went wrong while generating the assessment. Please try again in a few moments.",
+      );
+      setShowAiErrorModal(true);
     } finally {
       clearInterval(phaseInterval);
       setAssessmentPhase("");
@@ -2314,8 +2327,10 @@ const CrimeDashboard = () => {
                 </button>
                 <p className="cd-ai-helper-text">
                   Generates an AI-powered EMPO QUAD assessment based on current
-                  filters. <b>Requires at least 6 months of data for reliable
-                  forecasting.</b>
+                  filters.{" "}
+                  <b>
+                    Requires at least 6 months of data for reliable forecasting.
+                  </b>
                 </p>
               </>
             ) : (
@@ -2439,11 +2454,43 @@ const CrimeDashboard = () => {
           </div>
         )}
       </div>
+      {showAiErrorModal && (
+        <div className="cd-ai-error-overlay">
+          <div className="cd-ai-error-modal">
+            <div className="cd-ai-error-icon">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h3>Assessment Unavailable</h3>
+            <p>{aiErrorMessage}</p>
+            <button onClick={() => setShowAiErrorModal(false)}>Got it</button>
+          </div>
+        </div>
+      )}
+
       {errorMessage && (
         <div className="cd-toast cd-toast-error">
           <div className="cd-toast-content">
-            <svg className="cd-toast-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+            <svg
+              className="cd-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
             <span>{errorMessage}</span>
           </div>

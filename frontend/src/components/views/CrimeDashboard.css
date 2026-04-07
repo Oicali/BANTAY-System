@@ -1807,3 +1807,73 @@ body {
   background: rgba(239, 68, 68, 0.95);
   border: 1px solid rgba(220, 38, 38, 0.8);
 }
+
+/* ── AI ERROR MODAL ── */
+.cd-ai-error-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 40, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cd-ai-error-modal {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 36px 32px;
+  max-width: 420px;
+  width: 90vw;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.cd-ai-error-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+}
+
+.cd-ai-error-modal h3 {
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  margin: 0;
+}
+
+.cd-ai-error-modal p {
+  font-size: 14px;
+  color: var(--gray-600);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.cd-ai-error-modal button {
+  margin-top: 8px;
+  padding: 10px 32px;
+  background: var(--navy-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cd-ai-error-modal button:hover {
+  background: var(--red-primary);
+}

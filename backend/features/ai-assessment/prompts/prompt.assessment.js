@@ -46,7 +46,8 @@ const CRIME_REASONING = {
   },
 
   ROBBERY: {
-    nature: "violent property crime, use or threat of force, higher victim impact than theft",
+    nature:
+      "violent property crime, use or threat of force, higher victim impact than theft",
     operations: `
       - Robbery demands mobile patrol with standby capacity — foot patrol alone is insufficient.
       - Deploy near commercial corridors, ATMs, pawnshops, and transport terminals based on place type data.
@@ -74,7 +75,8 @@ const CRIME_REASONING = {
   },
 
   RAPE: {
-    nature: "sexual violence crime — requires sensitive, victim-centered response; often involves known offender",
+    nature:
+      "sexual violence crime — requires sensitive, victim-centered response; often involves known offender",
     operations: `
       - Patrol recommendations must be careful: most rape cases involve known offenders in private settings — street patrol has limited deterrent value.
       - Focus on place type: if residential, recommend Women and Children Protection Desk coordination and community safety programs rather than foot patrol.
@@ -100,7 +102,8 @@ const CRIME_REASONING = {
   },
 
   MURDER: {
-    nature: "capital offense — intentional killing; often connected to rido, drug trade, or personal dispute",
+    nature:
+      "capital offense — intentional killing; often connected to rido, drug trade, or personal dispute",
     operations: `
       - Murder is low-frequency but high-consequence — patrol recommendations focus on deterrence in identified hotspot areas.
       - If a DBSCAN cluster exists, reference the barangay name in the Situation — not coordinates.
@@ -129,7 +132,8 @@ const CRIME_REASONING = {
   },
 
   HOMICIDE: {
-    nature: "unlawful killing without intent to kill — may arise from reckless acts, fights, or escalation",
+    nature:
+      "unlawful killing without intent to kill — may arise from reckless acts, fights, or escalation",
     operations: `
       - Similar to murder in operational response but typically lower organized-crime risk.
       - Focus Execution on visibility at venues where altercations occurred (bars, basketball courts, public gathering spots if identified in place type data).
@@ -152,7 +156,8 @@ const CRIME_REASONING = {
   },
 
   "PHYSICAL INJURY": {
-    nature: "assault resulting in injury — frequently domestic, alcohol-related, or neighbor disputes; rarely stranger crime",
+    nature:
+      "assault resulting in injury — frequently domestic, alcohol-related, or neighbor disputes; rarely stranger crime",
     operations: `
       - Physical injuries are poorly addressed by street patrol — most occur indoors or in semi-private spaces.
       - Peak day and hour data is critical: if weekend night hours dominate, recommend visibility near drinking establishments during those specific windows only.
@@ -175,7 +180,8 @@ const CRIME_REASONING = {
   },
 
   "SPECIAL COMPLEX CRIME": {
-    nature: "composite offense combining elements of multiple index crimes (e.g., rape with homicide, kidnapping with murder)",
+    nature:
+      "composite offense combining elements of multiple index crimes (e.g., rape with homicide, kidnapping with murder)",
     operations: `
       - Rare but high-impact — any occurrence warrants elevated response posture.
       - Recommend regional-level coordination in Execution (Scene of the Crime Operations, Women and Children Protection Desk, National Bureau of Investigation as appropriate).
@@ -196,7 +202,8 @@ const CRIME_REASONING = {
   },
 
   "CARNAPPING - MC": {
-    nature: "theft of motorcycles — often by organized groups, targets both parked and moving motorcycles",
+    nature:
+      "theft of motorcycles — often by organized groups, targets both parked and moving motorcycles",
     operations: `
       - Carnapping is route-specific — checkpoint operations and highway patrol are more effective than beat patrol.
       - If a cluster exists, reference the barangay name in Situation.
@@ -221,7 +228,8 @@ const CRIME_REASONING = {
   },
 
   "CARNAPPING - MV": {
-    nature: "theft of four-wheeled vehicles — often more sophisticated, may involve key cloning or relay attacks",
+    nature:
+      "theft of four-wheeled vehicles — often more sophisticated, may involve key cloning or relay attacks",
     operations: `
       - Four-wheel carnapping is typically more planned than motorcycle theft — modus identification is critical.
       - Mobile patrol with checkpoint authority on major roads; coordinate with Highway Patrol Group.
@@ -269,19 +277,23 @@ const DEFAULT_REASONING = {
 
 function formatHourWindow(hour) {
   if (hour === null || hour === undefined) return "unknown hours";
-  const start      = hour % 12 || 12;
-  const end        = (hour + 1) % 12 || 12;
+  const start = hour % 12 || 12;
+  const end = (hour + 1) % 12 || 12;
   const startSuffix = hour < 12 ? "AM" : "PM";
-  const endSuffix   = (hour + 1) < 12 ? "AM" : "PM";
+  const endSuffix = hour + 1 < 12 ? "AM" : "PM";
   return `${start}:00 ${startSuffix}–${end}:00 ${endSuffix}`;
 }
 
-function buildModusBlock(top3Modus) {
+function buildModusBlock(top3Modus, modusDescriptions = []) {
   if (!top3Modus || top3Modus.length === 0) return "No modus data available.";
   return top3Modus
     .map((m) => {
       const base = `${m.modus} (${m.percentage}%)`;
-      return m.description ? `${base}: ${m.description}` : base;
+      const dbEntry = modusDescriptions.find(
+        (d) => d.name.toUpperCase() === m.modus.toUpperCase(),
+      );
+      const desc = dbEntry?.description || "";
+      return desc ? `${base}: ${desc}` : base;
     })
     .join("\n      ");
 }
@@ -305,12 +317,13 @@ function buildClusterBlock(clusters) {
 
 const buildGeneralAssessmentPrompt = ({ analysis, baseAssessment }) => {
   const { filters, stats, clusters, mode } = analysis;
-  const overall      = stats?.overall || {};
+  const overall = stats?.overall || {};
   const clusterBlock = buildClusterBlock(clusters?.clusters || []);
 
-  const modeInstruction = mode === "retrospective"
-    ? "Frame as LESSONS LEARNED. Use past tense."
-    : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
+  const modeInstruction =
+    mode === "retrospective"
+      ? "Frame as LESSONS LEARNED. Use past tense."
+      : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
 
   return `
 You are a senior PNP crime analyst writing a formal strategic assessment for a station commander.
@@ -346,36 +359,64 @@ Return VALID JSON ONLY. No markdown. No extra keys.
 
 // ─── PROMPT 2 — PER CRIME TYPE (called once per crime) ────────────────────────
 
-const buildPerCrimePrompt = ({ analysis, crimeType, crimeBase }) => {
+const buildPerCrimePrompt = ({
+  analysis,
+  crimeType,
+  crimeBase,
+  modusMap = {},
+}) => {
   const { filters, stats, temporal, clusters, mode } = analysis;
 
-  const crimeStat    = (stats?.per_crime || []).find(c => c.crime === crimeType) || {};
-  const temporalMap  = Object.fromEntries((temporal?.per_crime || []).map(t => [t.crime, t]));
-  const crimeCluster = (clusters?.clusters || []).find(c => c.dominant_crime === crimeType);
+  const crimeStat =
+    (stats?.per_crime || []).find((c) => c.crime === crimeType) || {};
+  const temporalMap = Object.fromEntries(
+    (temporal?.per_crime || []).map((t) => [t.crime, t]),
+  );
+  const crimeCluster = (clusters?.clusters || []).find(
+    (c) => c.dominant_crime === crimeType,
+  );
 
   const temporal_data = temporalMap[crimeType] || {};
-  const peakHour      = crimeStat.peak_hour ?? temporal_data.peak_hour ?? null;
-  const top3Hours     = crimeStat.top_3_hours?.length
+  const peakHour = crimeStat.peak_hour ?? temporal_data.peak_hour ?? null;
+  const top3Hours = crimeStat.top_3_hours?.length
     ? crimeStat.top_3_hours
     : temporal_data.top_3_hours || [];
 
-  const hoursDisplay = top3Hours.length > 0
-    ? top3Hours.map(formatHourWindow).join(", ")
-    : peakHour !== null ? formatHourWindow(peakHour) : "unknown";
+  const hoursDisplay =
+    top3Hours.length > 0
+      ? top3Hours.map(formatHourWindow).join(", ")
+      : peakHour !== null
+        ? formatHourWindow(peakHour)
+        : "unknown";
 
-  const modeInstruction = mode === "retrospective"
-    ? "Frame as LESSONS LEARNED. Use past tense."
-    : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
+  const modeInstruction =
+    mode === "retrospective"
+      ? "Frame as LESSONS LEARNED. Use past tense."
+      : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
 
   const guide = CRIME_REASONING[crimeType] || DEFAULT_REASONING;
 
-  const forecastText = crimeStat.predicted_next_week !== null && crimeStat.predicted_next_week !== undefined
-    ? `${crimeStat.predicted_next_week} incidents (${crimeStat.confidence || "low"} confidence, Croston method)`
-    : "Insufficient data for forecast";
+  const forecastText =
+    crimeStat.predicted_next_week !== null &&
+    crimeStat.predicted_next_week !== undefined
+      ? `${crimeStat.predicted_next_week} incidents (${crimeStat.confidence || "low"} confidence, Croston method)`
+      : "Insufficient data for forecast";
 
   const clusterText = crimeCluster
     ? `Cluster detected in ${crimeCluster.dominant_barangay} — ${crimeCluster.count} incidents, dominant modus: ${crimeCluster.dominant_modus}`
     : "No geographic cluster detected for this crime type";
+
+  const patrolOpsContext = `
+PATROL OPERATIONS FRAMEWORK (PNP Managing Patrol Operations Manual):
+- Patrol deployment must follow the EMPO framework: Employment, Mission, Priority, and Operations.
+- Foot patrol is preferred in high-density areas; mobile patrol for wider coverage.
+- Checkpoint operations require designated sites approved by station commander.
+- Shift assignments: Shift 1 = 6AM-2PM, Shift 2 = 2PM-10PM, Shift 3 = 10PM-6AM.
+- All patrol tasks must include: specific location, time window, and assigned unit.
+- Force multipliers: Barangay Tanods, CAFGU, BPSO, HPG, CIDG as appropriate.
+- Hot pursuit and warrant service are patrol functions requiring pre-briefing.
+- Intelligence-driven patrol: deploy based on crime clock data, not generic schedules.
+`;
 
   return `
 You are a senior PNP crime analyst writing ONE section of a formal assessment for a station commander.
@@ -396,8 +437,11 @@ CRIME DATA FOR ${crimeType}:
   Peak day            : ${crimeStat.peak_day ?? temporal_data.peak_day ?? "Unknown"}
   Dominant place type : ${crimeStat.top_place_type ?? "Unknown"}
   Top modus           :
-      ${buildModusBlock(crimeStat.top_3_modus)}
+      ${buildModusBlock(crimeStat.top_3_modus, modusMap[crimeType] || [])}
   Geographic cluster  : ${clusterText}
+
+${patrolOpsContext}
+REASONING GUIDE FOR ${crimeType}:
 
 REASONING GUIDE FOR ${crimeType}:
   Nature              : ${guide.nature}
