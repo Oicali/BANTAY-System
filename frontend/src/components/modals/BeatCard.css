@@ -12,8 +12,8 @@
 .bc-modal {
   background: #fff;
   border-radius: 12px;
-  width: 95vw; height: 90vh;
-  max-width: 1200px;
+  width: 95vw; height: 95vh;
+   max-width: 1400px;
   display: flex; flex-direction: column;
   overflow: hidden;
   box-shadow: 0 24px 80px rgba(0,0,0,0.3);
@@ -42,7 +42,7 @@
 .bc-btn-close:hover { background: #f8f9fa; }
 
 /* ── BODY ── */
-.bc-body { display: grid; grid-template-columns: 1fr 380px; flex: 1; overflow: hidden; }
+.bc-body { display: grid; grid-template-columns: 1fr 400px; flex: 1; overflow: hidden; }
 .bc-map-panel { position: relative; overflow: hidden; border-right: 1px solid #dee2e6; }
 .bc-info-panel { display: flex; flex-direction: column; overflow: hidden; }
 
