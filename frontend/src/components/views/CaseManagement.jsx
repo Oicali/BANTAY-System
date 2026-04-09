@@ -405,6 +405,11 @@ function CaseManagement() {
               Unassigned
             </span>
           </div>
+          <div className="cm-status-card">
+            <div className="cm-status-card-label">Cleared</div>
+            <div className="cm-status-card-value">{stats.cleared_cases}</div>
+            <span className="cm-status-card-badge cm-badge-blue">Cleared</span>
+          </div>
         </div>
       )}
 
@@ -674,14 +679,8 @@ function CaseManagement() {
                 </svg>
                 <span style={{ fontSize: "13px", color: "#374151" }}>
                   Case:{" "}
-                  <strong
-                    style={{
-                      color: "var(--navy-primary)",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {selectedCase?.case_number}
-                  </strong>
+                  {selectedCase?.blotter_entry_number ||
+                    selectedCase?.case_number}
                 </span>
               </div>
 
@@ -778,9 +777,25 @@ function CaseManagement() {
                       >
                         <div
                           className="cm-io-avatar"
-                          style={{ background: color }}
+                          style={{
+                            background: color,
+                            overflow: "hidden",
+                            padding: 0,
+                          }}
                         >
-                          {initials}
+                          {inv.profile_picture ? (
+                            <img
+                              src={inv.profile_picture}
+                              alt={initials}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          ) : (
+                            initials
+                          )}
                         </div>
                         <div className="cm-io-info">
                           <div className="cm-io-name">
@@ -898,14 +913,8 @@ function CaseManagement() {
                 </svg>
                 <span style={{ fontSize: "13px", color: "#374151" }}>
                   Case:{" "}
-                  <strong
-                    style={{
-                      color: "var(--navy-primary)",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {selectedCase?.case_number}
-                  </strong>
+                  {selectedCase?.blotter_entry_number ||
+                    selectedCase?.case_number}
                 </span>
               </div>
               <label
@@ -1100,14 +1109,8 @@ function CaseManagement() {
                 </svg>
                 <span style={{ fontSize: "13px", color: "#374151" }}>
                   Case:{" "}
-                  <strong
-                    style={{
-                      color: "var(--navy-primary)",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {selectedCase?.case_number}
-                  </strong>
+                  {selectedCase?.blotter_entry_number ||
+                    selectedCase?.case_number}
                 </span>
               </div>
 
@@ -1510,7 +1513,8 @@ function CaseManagement() {
                       fontFamily: "monospace",
                     }}
                   >
-                    {selectedCase?.case_number}
+                    {selectedCase?.blotter_entry_number ||
+                      selectedCase?.case_number}
                   </strong>
                 </span>
               </div>

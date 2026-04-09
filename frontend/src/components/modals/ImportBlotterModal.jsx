@@ -28,7 +28,6 @@ function ImportBlotterModal({ onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     if (!file) return;
-    setProgress({ current: 0, total: 0 });
 
     let totalRows = 0;
     try {
@@ -44,15 +43,20 @@ function ImportBlotterModal({ onClose, onSuccess }) {
 
     setProgress({ current: 0, total: totalRows });
     setLoading(true);
+
+    // Simulate progress up to 90% max while server processes
     let simCount = 0;
+    const cap = Math.floor(totalRows * 0.9);
     const interval =
       totalRows > 0
         ? setInterval(
             () => {
-              simCount = Math.min(simCount + 1, totalRows - 1);
-              setProgress((p) => ({ ...p, current: simCount }));
+              if (simCount < cap) {
+                simCount++;
+                setProgress({ current: simCount, total: totalRows });
+              }
             },
-            Math.max(50, 8000 / totalRows),
+            Math.max(20, Math.floor(5000 / totalRows)),
           )
         : null;
 
@@ -69,7 +73,10 @@ function ImportBlotterModal({ onClose, onSuccess }) {
       );
       const data = await res.json();
       if (interval) clearInterval(interval);
+
+      // Jump to 100% then show result
       setProgress({ current: totalRows, total: totalRows });
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
       if (data.success) {
         setResult(data.summary);
@@ -80,9 +87,8 @@ function ImportBlotterModal({ onClose, onSuccess }) {
     } catch (err) {
       if (interval) clearInterval(interval);
       alert("Import failed: " + err.message);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const downloadErrors = () => {
@@ -110,7 +116,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
               <div className="im-progress-sub">
                 {progress.total > 0
                   ? `${progress.current} / ${progress.total} records processed`
-                  : "Reading file..."}
+                  : "Uploading and processing, please wait..."}
               </div>
               <div className="im-progress-bar-bg">
                 <div
