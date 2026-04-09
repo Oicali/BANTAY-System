@@ -1,3 +1,5 @@
+// frontend\src\components\views\CaseManagement.jsx
+
 import React, { useState, useEffect } from "react";
 import "./CaseManagement.css";
 import LoadingModal from "../modals/LoadingModal";
@@ -383,32 +385,49 @@ function CaseManagement() {
       {/* STATS CARDS — Admin only */}
       {isAdmin && (
         <div className="cm-status-cards-grid">
-          <div className="cm-status-card">
+          <div
+            className="cm-status-card"
+            style={{ borderLeft: "4px solid #3b82f6" }}
+          >
             <div className="cm-status-card-label">Total Cases</div>
             <div className="cm-status-card-value">{stats.total_cases}</div>
             <span className="cm-status-card-badge cm-badge-blue">Total</span>
           </div>
-          <div className="cm-status-card">
+          <div
+            className="cm-status-card"
+            style={{ borderLeft: "4px solid #f59e0b" }}
+          >
             <div className="cm-status-card-label">Under Investigation</div>
             <div className="cm-status-card-value">{stats.active_cases}</div>
             <span className="cm-status-card-badge cm-badge-yellow">Active</span>
           </div>
-          <div className="cm-status-card">
+          <div
+            className="cm-status-card"
+            style={{ borderLeft: "4px solid #16a34a" }}
+          >
             <div className="cm-status-card-label">Solved</div>
             <div className="cm-status-card-value">{stats.solved_cases}</div>
             <span className="cm-status-card-badge cm-badge-green">Solved</span>
           </div>
-          <div className="cm-status-card">
+          <div
+            className="cm-status-card"
+            style={{ borderLeft: "4px solid #4f46e5" }}
+          >
+            <div className="cm-status-card-label">Cleared</div>
+            <div className="cm-status-card-value">{stats.cleared_cases}</div>
+            <span className="cm-status-card-badge cm-badge-purple">
+              Cleared
+            </span>
+          </div>
+          <div
+            className="cm-status-card"
+            style={{ borderLeft: "4px solid #dc2626" }}
+          >
             <div className="cm-status-card-label">Unassigned</div>
             <div className="cm-status-card-value">{stats.unassigned_cases}</div>
             <span className="cm-status-card-badge cm-badge-red">
               Unassigned
             </span>
-          </div>
-          <div className="cm-status-card">
-            <div className="cm-status-card-label">Cleared</div>
-            <div className="cm-status-card-value">{stats.cleared_cases}</div>
-            <span className="cm-status-card-badge cm-badge-blue">Cleared</span>
           </div>
         </div>
       )}
@@ -933,8 +952,8 @@ function CaseManagement() {
                 {[
                   {
                     value: "Under Investigation",
-                    color: "#3b82f6",
-                    bg: "rgba(59,130,246,0.08)",
+                    color: "#f59e0b",
+                    bg: "rgba(245,158,11,0.08)",
                     icon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
                     desc: "Case is actively being worked on",
                   },

@@ -1,3 +1,5 @@
+// backend\features\cases\controllers\casesController.js
+
 const pool = require("../../../config/database");
 
 // POST /cases — Admin only
@@ -228,12 +230,13 @@ const getCaseById = async (req, res) => {
     const userId = req.user.user_id;
 
     const caseResult = await pool.query(
-      `SELECT c.*, 
-              CONCAT(u.first_name, ' ', u.last_name) AS assigned_io_name,
-              b.incident_type, b.place_barangay AS barangay,
-              b.narrative, b.status AS blotter_status,
-              CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
-       FROM cases c
+  `SELECT c.*, 
+          CONCAT(u.first_name, ' ', u.last_name) AS assigned_io_name,
+          b.incident_type, b.place_barangay AS barangay,
+          b.narrative, b.status AS blotter_status,
+          b.blotter_entry_number,
+          CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
+   FROM cases c
        LEFT JOIN users u ON c.assigned_io_id = u.user_id
        LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
        WHERE c.id = $1`,
