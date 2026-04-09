@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import psycopg2
+import math
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -181,11 +182,9 @@ def get_incidents(
             lng,
             COALESCE(NULLIF(TRIM(modus), ''), 'Unknown')          AS modus,
             COALESCE(NULLIF(TRIM(type_of_place), ''), 'Unknown')  AS type_of_place,
-            UPPER(TRIM(place_barangay))                           AS place_barangay,
-            COALESCE(NULLIF(TRIM(place_commission), ''), 'Unknown') AS place_commission
-        FROM blotter_entries
-        WHERE is_deleted = false
-          AND date_time_commission >= %s
+            UPPER(TRIM(place_barangay))                           AS place_barangay
+        FROM blotter_analytics_view
+        WHERE date_time_commission >= %s
           AND date_time_commission < (%s::date + interval '1 day')
     """
     params: list[Any] = [date_from, date_to]
@@ -213,7 +212,7 @@ def get_incidents(
 
     df["hour"]              = df["date_time_commission"].dt.hour
     df["day_of_incident"]   = df["date_time_commission"].dt.day_name()
-    df["month_of_incident"] = df["date_time_commission"].dt.month_name()
+    df["month_of_incident"] = df["date_time_commission"].dt.strftime("%B %Y")
     df["status_norm"]       = normalize_status_series(df["status"])
 
     return df
@@ -232,9 +231,8 @@ def get_historical_weekly(
             DATE_TRUNC('week', date_time_commission)::date AS week_start,
             UPPER(TRIM(incident_type))                     AS incident_type,
             COUNT(*)                                       AS count
-        FROM blotter_entries
-        WHERE is_deleted = false
-          AND date_time_commission < (%s::date + interval '1 day')
+        FROM blotter_analytics_view
+        WHERE date_time_commission < (%s::date + interval '1 day')
     """
     params: list[Any] = [up_to_date]
 
@@ -283,15 +281,30 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
         cce = round(((cleared + solved) / total) * 100, 1) if total else 0.0
         cse = round((solved / total) * 100, 1) if total else 0.0
 
-        top_modus = (
-            group["modus"]
-            .value_counts(normalize=True)
-            .head(3)
-            .rename_axis("modus")
-            .reset_index(name="ratio")
-        )
+        # AFTER (clean)
+        modus_vc = group["modus"].value_counts()
+        # Exclude 'Unknown' from both top list and percentage denominator
+        known_modus_vc = modus_vc[modus_vc.index != "Unknown"]
+        if len(known_modus_vc) > 0:
+            top_modus = (
+                known_modus_vc.head(min(3, len(known_modus_vc)))
+                .rename_axis("modus")
+                .reset_index(name="count")
+            )
+            total_modus = int(known_modus_vc.sum())
+        else:
+            # All modus are Unknown — fall back to including it
+            top_modus = (
+                modus_vc.head(min(3, len(modus_vc)))
+                .rename_axis("modus")
+                .reset_index(name="count")
+            )
+            total_modus = int(modus_vc.sum())
         top_modus_list = [
-            {"modus": row["modus"], "percentage": round(float(row["ratio"]) * 100, 1)}
+            {
+                "modus": row["modus"],
+                "percentage": round((int(row["count"]) / total_modus) * 100, 1)
+            }
             for _, row in top_modus.iterrows()
         ]
 
@@ -506,7 +519,7 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
                 "crime":               crime,
                 "trend":               "insufficient_data",
                 "predicted_next_week": None,
-                "confidence":          "none",
+                "confidence":          0,
                 "nonzero_weeks":       nonzero_count,
                 "total_weeks":         total_weeks,
                 "method":              "none",
@@ -515,12 +528,8 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             continue
 
         # Confidence level based on non-zero observations
-        if nonzero_count < 8:
-            confidence = "low"
-        elif nonzero_count < 20:
-            confidence = "moderate"
-        else:
-            confidence = "high"
+        raw = math.log(nonzero_count + 1) / math.log(53 + 1)  # 53 = ~1 full year of weekly data
+        confidence_pct = round(min(raw * 100, 95))  # cap at 95% — never claim certainty
 
         # ── Croston's method ──────────────────────────────────────────────────
         demands     = nonzero["count"].values.astype(float)
@@ -571,7 +580,7 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             "crime":               crime,
             "trend":               trend,
             "predicted_next_week": int(predicted),
-            "confidence":          confidence,
+            "confidence":          confidence_pct,
             "nonzero_weeks":       nonzero_count,
             "total_weeks":         total_weeks,
             "method":              "croston",
@@ -682,7 +691,7 @@ def analyze(payload: AnalyzeRequest):
             "stats":                  stats_result,
             "temporal":               temporal_result,
             "clusters":               clusters_result,
-            "linreg":                 croston_result,   # key kept as "linreg" so frontend doesn't need changes
+            "croston":                 croston_result,   # key kept as "linreg" so frontend doesn't need changes
             "historical_weekly_rows": historical_rows.to_dict(orient="records"),
         }
 
