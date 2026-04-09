@@ -214,7 +214,7 @@ const buildBaseAssessment = (analysis) => {
     const forecastText =
       crimeLinreg.predicted_next_week !== null &&
       crimeLinreg.predicted_next_week !== undefined
-        ? ` Forecast: ${crimeLinreg.predicted_next_week} incident${crimeLinreg.predicted_next_week === 1 ? "" : "s"} next week (${crimeLinreg.confidence || "low"} confidence, Croston method).`
+        ? ` Forecast: ${crimeLinreg.predicted_next_week} incident${crimeLinreg.predicted_next_week === 1 ? "" : "s"} next week (${crimeLinreg.confidence ?? 0}% confidence, Croston method).`
         : " Insufficient data for reliable forecast.";
 
     const clusterText = crimeCluster

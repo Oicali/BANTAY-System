@@ -1899,10 +1899,8 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
         : "→ Stable";
 
   const isRetrospective = mode === "retrospective";
-  const hasEnoughData =
-    lr?.confidence === "moderate" || lr?.confidence === "high";
-  const insufficientForecast =
-    lr?.confidence === "none" || !lr || lr?.predicted_next_week === null;
+  const hasEnoughData = typeof lr?.confidence === "number" && lr.confidence >= 50;
+  const insufficientForecast = !lr || lr?.predicted_next_week === null || lr?.confidence === 0;
 
   const tickInterval =
     crimeRows.length <= 8
@@ -1944,7 +1942,7 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
               ) : (
                 <>
                   Forecast: <strong>{lr.predicted_next_week}</strong> next week
-                  · {lr.confidence} confidence
+                · {lr.confidence}% confidence
                 </>
               )}
             </span>
@@ -2051,9 +2049,9 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
           />
           {isRetrospective ? "Historical Projection" : "Forecast"}
         </span>
-        {!hasEnoughData && (
+        {!hasEnoughData && lr?.confidence > 0 && (
           <span style={{ marginLeft: "auto", fontSize: 10, color: "#f59e0b" }}>
-            Low confidence
+            {lr.confidence}% confidence
           </span>
         )}
       </div>

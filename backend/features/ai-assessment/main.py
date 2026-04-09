@@ -519,7 +519,7 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
                 "crime":               crime,
                 "trend":               "insufficient_data",
                 "predicted_next_week": None,
-                "confidence":          "none",
+                "confidence":          0,
                 "nonzero_weeks":       nonzero_count,
                 "total_weeks":         total_weeks,
                 "method":              "none",
@@ -528,12 +528,8 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             continue
 
         # Confidence level based on non-zero observations
-        if nonzero_count < 8:
-            confidence = "low"
-        elif nonzero_count < 20:
-            confidence = "moderate"
-        else:
-            confidence = "high"
+        raw = math.log(nonzero_count + 1) / math.log(53 + 1)  # 53 = ~1 full year of weekly data
+        confidence_pct = round(min(raw * 100, 95))  # cap at 95% — never claim certainty
 
         # ── Croston's method ──────────────────────────────────────────────────
         demands     = nonzero["count"].values.astype(float)
@@ -584,7 +580,7 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             "crime":               crime,
             "trend":               trend,
             "predicted_next_week": int(predicted),
-            "confidence":          confidence,
+            "confidence":          confidence_pct,
             "nonzero_weeks":       nonzero_count,
             "total_weeks":         total_weeks,
             "method":              "croston",

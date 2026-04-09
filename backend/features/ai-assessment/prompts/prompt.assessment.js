@@ -439,7 +439,7 @@ const buildPerCrimePrompt = ({
   const forecastText =
     crimeStat.predicted_next_week !== null &&
     crimeStat.predicted_next_week !== undefined
-      ? `${crimeStat.predicted_next_week} incidents (${crimeStat.confidence || "low"} confidence, Croston method)`
+      ? `${crimeStat.predicted_next_week} incidents (${crimeStat.confidence ?? 0}% confidence, Croston method)`
       : "Insufficient data for forecast";
 
   const clusterText = crimeCluster
