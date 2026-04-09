@@ -14,6 +14,7 @@ const {
   updatePatrol,
   deletePatrol,
   updateRouteNotes,
+  updateRouteTime,
 } = require("../controllers/patrolController");
 
 router.get("/stats",                authenticate, getPatrolStats);
@@ -28,5 +29,6 @@ router.post("/patrols",       authenticate, createPatrol);
 router.put("/patrols/:id",    authenticate, updatePatrol);
 router.delete("/patrols/:id", authenticate, deletePatrol);
 router.patch("/routes/:routeId/notes", authenticate, updateRouteNotes);
+router.patch("/routes/:routeId/time", authenticate, updateRouteTime);
 
 module.exports = router;

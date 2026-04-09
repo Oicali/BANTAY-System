@@ -28,8 +28,37 @@ function ImportBlotterModal({ onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     if (!file) return;
-    setProgress({ current: 0, total: 0 });
+
+    let totalRows = 0;
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      totalRows = rows.length;
+    } catch (_) {
+      totalRows = 0;
+    }
+
+    setProgress({ current: 0, total: totalRows });
     setLoading(true);
+
+    // Simulate progress up to 90% max while server processes
+    let simCount = 0;
+    const cap = Math.floor(totalRows * 0.9);
+    const interval =
+      totalRows > 0
+        ? setInterval(
+            () => {
+              if (simCount < cap) {
+                simCount++;
+                setProgress({ current: simCount, total: totalRows });
+              }
+            },
+            Math.max(20, Math.floor(5000 / totalRows)),
+          )
+        : null;
 
     try {
       const formData = new FormData();
@@ -43,20 +72,20 @@ function ImportBlotterModal({ onClose, onSuccess }) {
         },
       );
       const data = await res.json();
+      if (interval) clearInterval(interval);
+
+      // Jump to 100% then show result
+      setProgress({ current: totalRows, total: totalRows });
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
       if (data.success) {
-        const total =
-          data.summary.inserted +
-          data.summary.skipped_duplicates +
-          data.summary.skipped_errors;
-        setProgress({ current: total, total });
-        await new Promise((resolve) => setTimeout(resolve, 500));
         setResult(data.summary);
         onSuccess && onSuccess();
       } else {
         alert(data.message || "Import failed");
       }
     } catch (err) {
+      if (interval) clearInterval(interval);
       alert("Import failed: " + err.message);
     }
     setLoading(false);
@@ -87,7 +116,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
               <div className="im-progress-sub">
                 {progress.total > 0
                   ? `${progress.current} / ${progress.total} records processed`
-                  : "Reading file..."}
+                  : "Uploading and processing, please wait..."}
               </div>
               <div className="im-progress-bar-bg">
                 <div
