@@ -52,7 +52,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
               simCount = Math.min(simCount + 1, totalRows - 1);
               setProgress((p) => ({ ...p, current: simCount }));
             },
-            Math.max(50, 8000 / totalRows),
+            Math.max(30, 3000 / totalRows),
           )
         : null;
 
@@ -69,7 +69,24 @@ function ImportBlotterModal({ onClose, onSuccess }) {
       );
       const data = await res.json();
       if (interval) clearInterval(interval);
-      setProgress({ current: totalRows, total: totalRows });
+
+      await new Promise((resolve) => {
+        let cur = simCount;
+        const remaining = totalRows - cur;
+        if (remaining <= 0) {
+          setTimeout(resolve, 300);
+          return;
+        }
+        const stepDelay = Math.max(10, Math.floor(500 / remaining));
+        const fill = setInterval(() => {
+          cur++;
+          setProgress({ current: cur, total: totalRows });
+          if (cur >= totalRows) {
+            clearInterval(fill);
+            setTimeout(resolve, 150);
+          }
+        }, stepDelay);
+      });
 
       if (data.success) {
         setResult(data.summary);
@@ -80,9 +97,8 @@ function ImportBlotterModal({ onClose, onSuccess }) {
     } catch (err) {
       if (interval) clearInterval(interval);
       alert("Import failed: " + err.message);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   const downloadErrors = () => {

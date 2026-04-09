@@ -18,11 +18,18 @@ const autoCreateCase = async (client, blotterId, createdBy) => {
   const seq = seqResult.rows[0].seq;
   const case_number = `CASE-${year}-${String(seq).padStart(4, "0")}`;
 
+  const blotterRow = await client.query(
+    "SELECT status FROM blotter_entries WHERE blotter_id = $1", [blotterId]
+  );
+  const blotterStatus = blotterRow.rows[0]?.status || "Under Investigation";
+  const validStatuses = ["Under Investigation", "Solved", "Cleared"];
+  const caseStatus = validStatuses.includes(blotterStatus) ? blotterStatus : "Under Investigation";
+
   await client.query(
-    `INSERT INTO cases (blotter_id, case_number, created_by)
-     VALUES ($1, $2, $3)
+    `INSERT INTO cases (blotter_id, case_number, status, created_by)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT DO NOTHING`,
-    [blotterId, case_number, createdBy]
+    [blotterId, case_number, caseStatus, createdBy]
   );
 };
 // import
