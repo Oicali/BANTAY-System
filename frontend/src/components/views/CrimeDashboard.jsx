@@ -132,19 +132,28 @@ const MODUS_PAGE_SIZE = 10;
 const CHART_ROW_HEIGHT = 480;
 
 // ─── DATE HELPERS ─────────────────────────────────────────────────────────────
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const getPhtDateParts = () => {
+  const now = new Date();
+  // PHT is UTC+8, so add 8 hours worth of ms
+  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+  const pht = new Date(phtMs);
+  return pht.toISOString().slice(0, 10); // always "YYYY-MM-DD" in PHT
+};
+
+const todayIso = () => getPhtDateParts();
 
 const offsetDate = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const now = new Date();
+  const phtMs = now.getTime() + 8 * 60 * 60 * 1000 + days * 86400000;
+  const pht = new Date(phtMs);
+  return pht.toISOString().slice(0, 10);
 };
 
 const PRESETS = [
   { label: "Last 7 days", key: "7d" },
   { label: "Last 30 days", key: "30d" },
   { label: "Last 3 months", key: "3m" },
-  { label: "Last 365 days", key: "365d" },
+  { label: "Last 1 Year", key: "365d" },
   { label: "Custom", key: "custom" },
 ];
 
@@ -152,14 +161,28 @@ const getPresetRange = (key) => {
   const t = todayIso();
   if (key === "7d") return { from: offsetDate(-6), to: t };
   if (key === "30d") return { from: offsetDate(-29), to: t };
-  if (key === "3m") return { from: offsetDate(-90), to: t };
-  if (key === "365d") return { from: offsetDate(-364), to: t };
+  if (key === "3m") {
+    const now = new Date();
+    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+    const phtToday = new Date(phtMs);
+    const threeMonthsAgo = new Date(phtToday);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    return { from: threeMonthsAgo.toISOString().slice(0, 10), to: t };
+  }
+  if (key === "365d") {
+    const now = new Date();
+    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+    const phtToday = new Date(phtMs);
+    const lastYear = new Date(phtToday);
+    lastYear.setFullYear(lastYear.getFullYear() - 1);
+    return { from: lastYear.toISOString().slice(0, 10), to: t };
+  }
   return null;
 };
 
 const getGranularity = (preset, dateFrom, dateTo) => {
   if (preset === "7d") return "daily";
-  if (preset === "30d") return "bidaily";
+  if (preset === "30d") return "weekly";
   if (preset === "3m") return "weekly";
   if (preset === "365d") return "monthly";
 
@@ -186,7 +209,7 @@ const pct = (n, d) => (d ? ((n / d) * 100).toFixed(1) : "0.0");
 const fmtDate = (iso) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
-  return `${m}/${d}/${y}`;
+  return `${d}/${m}/${y}`;
 };
 
 const buildParams = (filters) => {
@@ -228,6 +251,7 @@ const EMPTY_DASHBOARD = () => ({
   place: [],
   barangay: [],
   modus: [],
+  completeData: [], // ← add this
 });
 
 // ─── SMALL LABEL COMPONENTS ───────────────────────────────────────────────────
@@ -510,8 +534,15 @@ const FilterBar = ({
   };
 
   const handleDateFrom = (val) => {
-    setDraft((f) => ({ ...f, dateFrom: val }));
-    setDateError(validateDates(val, draft.dateTo));
+    const autoTo = (() => {
+      const d = new Date(val);
+      d.setFullYear(d.getFullYear() + 1);
+      const cap = todayIso();
+      const computed = d.toISOString().slice(0, 10);
+      return computed <= cap ? computed : cap;
+    })();
+    setDraft((f) => ({ ...f, dateFrom: val, dateTo: autoTo }));
+    setDateError(validateDates(val, autoTo));
   };
 
   const handleDateTo = (val) => {
@@ -811,7 +842,6 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
           {selectedCrimes.length > 0
             ? `${rows.length} crimes shown`
             : "All index crimes"}{" "}
-          · CCE = Cleared + Solved / Total · CSE = Solved / Total
         </span>
       </div>
 
@@ -824,8 +854,34 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
               <SortTh col="cleared">Cleared</SortTh>
               <SortTh col="solved">Solved</SortTh>
               <SortTh col="underInvestigation">Under Inv.</SortTh>
-              <th className="cd-num-cell">CCE %</th>
-              <th className="cd-num-cell">CSE %</th>
+              <th
+                className="cd-num-cell cd-th-tooltip-wrap"
+                style={{ textAlign: "right" }}
+              >
+                CCE %
+                <div className="cd-th-tooltip">
+                  <div className="cd-th-tooltip-title">
+                    Crime Clearance Efficiency
+                  </div>
+                  <div className="cd-th-tooltip-formula">
+                    (Cleared + Solved) ÷ Total × 100
+                  </div>
+                </div>
+              </th>
+              <th
+                className="cd-num-cell cd-th-tooltip-wrap"
+                style={{ textAlign: "right" }}
+              >
+                CSE %
+                <div className="cd-th-tooltip">
+                  <div className="cd-th-tooltip-title">
+                    Crime Solution Efficiency
+                  </div>
+                  <div className="cd-th-tooltip-formula">
+                    Solved ÷ Total × 100
+                  </div>
+                </div>
+              </th>
             </tr>
           </thead>
 
@@ -972,7 +1028,7 @@ const CaseStatusChart = ({ data, selectedCrimes }) => {
       <ResponsiveContainer width="100%" height={320}>
         <BarChart
           data={rows}
-          margin={{ top: 28, right: 16, left: 0, bottom: 52 }}
+          margin={{ top: 28, right: 16, left: 0, bottom: 16 }}
           barCategoryGap="22%"
         >
           <CartesianGrid
@@ -982,12 +1038,18 @@ const CaseStatusChart = ({ data, selectedCrimes }) => {
           />
           <XAxis
             dataKey="crime"
-            tick={{ fontSize: 11, fill: "#374151" }}
-            angle={-28}
-            textAnchor="end"
+            tick={{
+              fontSize: Math.max(
+                9,
+                Math.min(11, Math.floor(200 / rows.length)),
+              ),
+              fill: "#6b7280",
+            }}
+            angle={0}
+            textAnchor="middle"
             interval={0}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
           <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
           <Bar
             dataKey="Cleared"
@@ -1241,7 +1303,7 @@ const CrimeTrends = ({ appliedFilters, data }) => {
             tick={{ fontSize: 11, fill: "#6b7280" }}
             interval={tickInterval}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
           <Tooltip content={<TrendsTooltip />} />
 
           <Line
@@ -1318,15 +1380,39 @@ const CrimeClock = ({ data }) => (
           tick={{ fontSize: 10, fill: "#6b7280" }}
           interval={1}
         />
-        <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+        <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
         <Tooltip content={<ClockTooltip />} />
         <Line
           type="linear"
           dataKey="count"
           stroke="#1e3a5f"
           strokeWidth={2.5}
-          dot={{ r: 3 }}
+          dot={(props) => {
+            const { cx, cy, value } = props;
+            if (!value)
+              return (
+                <circle
+                  key={props.key}
+                  cx={cx}
+                  cy={cy}
+                  r={2}
+                  fill="#1e3a5f"
+                  stroke="none"
+                />
+              );
+            return (
+              <circle
+                key={props.key}
+                cx={cx}
+                cy={cy}
+                r={3.5}
+                fill="#1e3a5f"
+                stroke="none"
+              />
+            );
+          }}
           activeDot={{ r: 5 }}
+          connectNulls={true}
         />
       </LineChart>
     </ResponsiveContainer>
@@ -1358,7 +1444,7 @@ const CrimeByDay = ({ data }) => {
             tickFormatter={(d) => d.slice(0, 3)}
             tick={{ fontSize: 13, fill: "#6b7280" }}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 6 }}
             formatter={(v) => [v, "Reported"]}
@@ -2037,10 +2123,12 @@ const CrimeDashboard = () => {
     barangay: useRef(null),
   };
 
+  const [isExportLoading, setIsExportLoading] = useState(false);
   const { exportDoc, isExporting } = useExportDashboard(
     dashData,
     appliedFilters,
     chartRefs,
+    setIsExportLoading,
   );
 
   const fetchOverview = (filters, force = false) => {
@@ -2070,6 +2158,7 @@ const CrimeDashboard = () => {
             place: json.place ?? [],
             barangay: json.barangay ?? [],
             modus: json.modus ?? [],
+            completeData: json.completeData ?? [], // ← add this
           };
 
           _cache = {
@@ -2235,6 +2324,10 @@ const CrimeDashboard = () => {
   return (
     <div className="content-area">
       <LoadingModal isOpen={isLoading} message="Loading crime data..." />
+      <LoadingModal
+        isOpen={isExportLoading}
+        message="Preparing export... Please wait."
+      />
 
       <div className="cd-page-header">
         <div className="cd-page-header-left">

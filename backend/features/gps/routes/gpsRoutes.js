@@ -13,7 +13,13 @@ const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 router.post("/location", authenticate, updateLocation);
 
 // GET  /gps/officers     — web crime map polls every 5s
-router.get("/officers", authenticate, getActiveOfficers);
+// REPLACE WITH:
+router.get("/officers", authenticate, (req, res, next) => {
+  if (req.user?.role_name === "Barangay Official") {
+    return res.json({ success: true, data: [] });
+  }
+  next();
+}, getActiveOfficers);
 
 // POST /gps/off-duty     — called on logout
 router.post("/off-duty", authenticate, setOffDuty);

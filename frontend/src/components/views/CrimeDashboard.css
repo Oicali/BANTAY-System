@@ -319,10 +319,17 @@ body {
 .cd-page-header {
   margin-bottom: 24px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;        /* was flex-start */
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.cd-page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .cd-page-header-left h1 {
@@ -330,13 +337,14 @@ body {
   font-size: 28px;
   font-weight: 700;
   color: var(--navy-dark);
-  margin-bottom: 8px;
+  margin-bottom: 0px;
 }
 
 .cd-page-header-left p { color: var(--gray-600); font-size: 15px; }
 .cd-date-range-label   { font-weight: 600; color: var(--navy-primary); }
 
 /* === EXPORT BUTTON === */
+/* REPLACE */
 .cd-export-btn {
   height: 40px;
   padding: 0 20px;
@@ -347,9 +355,20 @@ body {
   font-family: "DM Sans", sans-serif;
   font-size: 14px;
   font-weight: 600;
-  cursor: not-allowed;
-  opacity: 0.5;
+  cursor: pointer;
   align-self: center;
+  transition: all 0.2s ease;
+}
+
+.cd-export-btn:hover:not(:disabled) {
+  background: var(--gray-100);
+  border-color: var(--navy-primary);
+  color: var(--navy-primary);
+}
+
+.cd-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* === FILTER BAR === */
@@ -359,6 +378,7 @@ body {
   border-radius: 10px;
   margin-bottom: 24px;
   overflow: visible;
+  border-left: 4px solid var(--navy-primary);
 }
 
 .cd-filter-bar.cd-collapsed .cd-filter-bar-header { border-bottom: none; }
@@ -478,6 +498,7 @@ body {
   border-radius: 16px;
   white-space: nowrap;
   flex-shrink: 0;
+  text-align: center;
 }
 
 /* === CUSTOM RANGE === */
@@ -1289,35 +1310,6 @@ body {
   transition: background 0.13s;
 }
 
-/* === RESPONSIVE === */
-@media (max-width: 1200px) {
-  .content-grid        { grid-template-columns: 1fr; }
-  .cd-summary-cards    { grid-template-columns: repeat(2, 1fr); }
-  .cd-charts-two-col   { grid-template-columns: 1fr; }
-  .cd-charts-three-col { grid-template-columns: 1fr 1fr; }
-  .cd-filter-grid      { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 900px) {
-  .cd-filter-grid      { grid-template-columns: 1fr 1fr; }
-  .cd-preset-btns      { gap: 4px; }
-  .cd-charts-three-col { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 768px) {
-  .sidebar             { transform: translateX(-100%); }
-  .main-content        { margin-left: 0; }
-  .stats-grid          { grid-template-columns: 1fr; }
-  .cd-summary-cards    { grid-template-columns: 1fr 1fr; }
-  .content-area        { padding: 16px 16px 40px; }
-  .cd-preset-row       { flex-direction: column; align-items: flex-start; height: auto; }
-}
-
-@media (max-width: 480px) {
-  .cd-summary-cards { grid-template-columns: 1fr; }
-  .cd-filter-grid   { grid-template-columns: 1fr; }
-}
-
 /* === AI ASSESSMENT SECTION === */
 .cd-ai-section {
   margin-top: 24px;
@@ -1518,37 +1510,7 @@ body {
   margin-bottom: 0;
 }
 
-/* === RESPONSIVE === */
-@media (max-width: 900px) {
-  .cd-ai-scope {
-    grid-template-columns: 1fr;
-  }
 
-  .cd-ai-stat-row {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .cd-ai-card,
-  .cd-ai-generate-wrap {
-    padding: 16px;
-  }
-
-  .cd-ai-card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .cd-ai-stat-row {
-    grid-template-columns: 1fr;
-  }
-
-  .cd-generate-btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
 
 .cd-ai-crime-block {
   border: 1px solid #e5e7eb;
@@ -1876,4 +1838,409 @@ body {
 
 .cd-ai-error-modal button:hover {
   background: var(--red-primary);
+}
+
+/* ADD to CrimeDashboard.css */
+.cd-brgy-ms-dropdown {
+  background: #ffffff !important;
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-item {
+  background: #ffffff;
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-item span {
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-item:hover {
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+
+.cd-brgy-ms-list {
+  background: #ffffff;
+}
+
+.cd-brgy-ms-actions {
+  background: #ffffff;
+}
+
+.cd-brgy-ms-search-row {
+  background: #ffffff;
+}
+
+/* ADD to CrimeDashboard.css — force white background on all dropdown parts */
+.cd-brgy-ms-dropdown,
+.cd-brgy-ms-dropdown * {
+  color-scheme: light;
+}
+
+.cd-brgy-ms-dropdown {
+  background: #ffffff !important;
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-list {
+  background: #ffffff !important;
+}
+
+.cd-brgy-ms-actions {
+  background: #ffffff !important;
+}
+
+.cd-brgy-ms-search-row {
+  background: #ffffff !important;
+}
+
+.cd-brgy-ms-item {
+  background: #ffffff !important;
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-item span {
+  color: #374151 !important;
+}
+
+.cd-brgy-ms-item:hover {
+  background: #f9fafb !important;
+  color: #111827 !important;
+}
+
+.cd-brgy-ms-item input[type="checkbox"] {
+  color-scheme: light;
+  accent-color: #1e3a5f;
+}
+
+.cd-brgy-ms-group-label {
+  background: #ffffff !important;
+  color: #9ca3af !important;
+}
+
+.cd-brgy-ms-empty {
+  background: #ffffff !important;
+  color: #9ca3af !important;
+}
+
+.cd-crime-table th.cd-num-cell {
+  text-align: right !important;
+}
+
+/* ADD to CrimeDashboard.css */
+.cd-th-tooltip-wrap {
+  position: relative;
+  cursor: default; /* was: cursor: help */
+}
+
+.cd-th-tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 200;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  min-width: 200px;
+  text-align: left;
+  pointer-events: none;
+}
+
+.cd-th-tooltip-wrap:hover .cd-th-tooltip {
+  display: block;
+}
+
+.cd-th-tooltip-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e3a5f;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.cd-th-tooltip-formula {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1200px) {
+  .content-grid        { grid-template-columns: 1fr; }
+  .cd-summary-cards    { grid-template-columns: repeat(2, 1fr); }
+  .cd-charts-two-col   { grid-template-columns: 1fr; }
+  .cd-charts-three-col { grid-template-columns: 1fr 1fr; }
+  .cd-filter-grid      { grid-template-columns: 1fr 1fr; }
+  .cd-ai-scope         { grid-template-columns: 1fr 1fr; }
+  .cd-ai-stat-row      { grid-template-columns: repeat(2, 1fr); }
+  .recharts-xAxis .recharts-cartesian-axis-tick text {
+    font-size: 10px !important;
+  }
+}
+
+@media (max-width: 1080px) {
+  .recharts-xAxis .recharts-cartesian-axis-tick text {
+    font-size: 9px !important;
+  }
+
+  .cd-chart-card .recharts-xAxis .recharts-cartesian-axis-tick:nth-child(even) {
+    display: none;
+  }
+}
+
+@media (max-width: 1150px) {
+  .cd-preset-row {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 12px;
+    gap: 8px;
+  }
+
+  .cd-preset-range-display {
+    width: 100%;
+    margin-top: 2px;
+  }
+}
+
+
+
+@media (max-width: 950px) {
+  .cd-preset-row {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 12px;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .cd-preset-btns {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cd-preset-label {
+    width: 100%;
+    line-height: 1;
+    margin-right: 0;
+  }
+
+  .cd-preset-range-display {
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  .cd-custom-range-wrap {
+    width: 100%;
+  }
+
+  .cd-custom-range {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cd-custom-range input[type="date"] {
+    flex: 1;
+    min-width: 130px;
+  }
+
+  /* Also fix the header at this width */
+  .cd-page-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .cd-page-header-left h1 {
+    font-size: 24px;
+  }
+
+  /* Filter grid to single column */
+  .cd-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cd-filter-group-actions {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .cd-filter-grid      { grid-template-columns: 1fr; }
+  .cd-charts-three-col { grid-template-columns: 1fr; }
+  .cd-charts-two-col   { grid-template-columns: 1fr; }
+  .cd-summary-cards    { grid-template-columns: repeat(2, 1fr); }
+  .cd-ai-scope         { grid-template-columns: 1fr; }
+  .cd-ai-stat-row      { grid-template-columns: repeat(2, 1fr); }
+
+  .cd-preset-row {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 12px;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .cd-preset-btns {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cd-preset-range-display {
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .cd-table-fixed-height {
+    height: 420px !important;
+    max-height: 420px !important;
+  }
+
+  .cd-chart-fixed-height {
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Hide dense x-axis ticks on medium screens */
+  .recharts-xAxis .recharts-cartesian-axis-tick:nth-child(even) {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .cd-preset-btns {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cd-preset-btn {
+    font-size: 11px;
+    padding: 0 10px;
+    height: 30px;
+  }
+}
+
+@media (max-width: 800px) {
+  .sidebar           { transform: translateX(-100%); }
+  .main-content      { margin-left: 0; }
+  .stats-grid        { grid-template-columns: 1fr; }
+  .cd-summary-cards  { grid-template-columns: repeat(2, 1fr); }
+  .content-area      { padding: 16px 16px 40px; }
+
+  /* Page header — keep h1 and export on same row */
+  .cd-page-header {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cd-page-header-left h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+
+  .cd-export-btn {
+    align-self: center;
+  }
+
+  .cd-preset-row {
+    flex-direction: column;
+    align-items: flex-start;
+    height: auto;
+    gap: 8px;
+  }
+
+  .cd-preset-label { line-height: 1; }
+
+  .cd-preset-btns { flex-wrap: wrap; gap: 6px; }
+
+  .cd-preset-btn { font-size: 11px; padding: 0 10px; height: 30px; }
+
+  .cd-filter-grid        { grid-template-columns: 1fr; }
+  .cd-filter-group-actions { padding-top: 0; }
+  .cd-charts-two-col     { grid-template-columns: 1fr; }
+  .cd-charts-three-col   { grid-template-columns: 1fr; }
+  .cd-summary-value      { font-size: 26px; }
+
+  .cd-table-wrapper      { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cd-crime-table        { min-width: 600px; }
+
+  .cd-ai-scope    { grid-template-columns: 1fr; }
+  .cd-ai-stat-row { grid-template-columns: repeat(2, 1fr); }
+
+  .cd-table-fixed-height {
+    height: 400px !important;
+    max-height: 400px !important;
+  }
+
+  .cd-th-tooltip {
+    right: auto;
+    left: 0;
+  }
+
+  /* Hide all x-axis labels on small screens */
+  .recharts-xAxis .recharts-cartesian-axis-tick {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .cd-summary-cards  { grid-template-columns: 1fr; }
+  .cd-filter-grid    { grid-template-columns: 1fr; }
+  .cd-ai-stat-row    { grid-template-columns: 1fr; }
+  .cd-ai-scope       { grid-template-columns: 1fr; }
+  .cd-summary-value  { font-size: 28px; }
+  .content-area      { padding: 12px 12px 40px; }
+
+  .cd-page-header-left h1 { font-size: 20px; }
+
+  .cd-custom-range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cd-custom-range input[type="date"] { width: 100%; }
+  .cd-range-sep  { display: none; }
+  .cd-crime-table { min-width: 520px; }
+
+  .cd-table-fixed-height {
+    height: 360px !important;
+    max-height: 360px !important;
+  }
+}
+
+/* === RESPONSIVE === */
+
+@media (max-width: 900px) {
+  .cd-ai-scope {
+    grid-template-columns: 1fr;
+  }
+
+  .cd-ai-stat-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .cd-ai-card,
+  .cd-ai-generate-wrap {
+    padding: 16px;
+  }
+
+  .cd-ai-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cd-ai-stat-row {
+    grid-template-columns: 1fr;
+  }
+
+  .cd-generate-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }

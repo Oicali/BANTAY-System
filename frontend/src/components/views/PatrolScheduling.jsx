@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
 import Notification from "../modals/Notification";
-import AddPatrolModal from "../modals/AddPatrolModal";
+import AddPatrolModal from "../modals/AddPatrolModal.jsx";
 import LoadingModal from "../modals/LoadingModal";
 
 const API_BASE = import.meta.env.VITE_API_URL;

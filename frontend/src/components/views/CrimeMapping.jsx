@@ -6,6 +6,7 @@ import {
   CURRENT_BARANGAYS,
   LEGACY_BARANGAY_OPTIONS,
 } from "../../utils/barangayOptions";
+import LoadingModal from "../modals/LoadingModal";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-map`;
 const getToken = () => localStorage.getItem("token");
@@ -37,10 +38,10 @@ const LEGEND_ITEMS = [
 ];
 
 const RISK_LEVELS = [
-  { color: "#ef4444", label: "High Risk (4+)" },
-  { color: "#f97316", label: "Medium Risk (2–3)" },
-  { color: "#22c55e", label: "Low Risk (1)" },
   { color: "#adb5bd", label: "No Crimes (0)" },
+  { color: "#eab308", label: "Low Risk (1)" },
+  { color: "#f97316", label: "Medium Risk (2–3)" },
+  { color: "#b91c1c", label: "High Risk (4+)" },
 ];
 
 // Mapbox heatmap layer — radar-style color ramp
@@ -85,18 +86,16 @@ const HEATMAP_LAYER = {
       ["heatmap-density"],
       0,
       "rgba(0,0,0,0)",
-      0.1,
-      "rgba(0,80,0,0.6)",
-      0.25,
-      "rgba(34,255,68,0.75)",
-      0.45,
-      "rgba(255,255,0,0.82)",
+      0.15,
+      "rgba(234,179,8,0.75)",
+      0.4,
+      "rgba(249,115,22,0.85)",
       0.65,
-      "rgba(255,102,0,0.88)",
-      0.82,
-      "rgba(220,20,20,0.92)",
+      "rgba(220,38,38,0.90)",
+      0.85,
+      "rgba(153,27,27,0.94)",
       1.0,
-      "rgba(10,0,0,0.96)",
+      "rgba(69,10,10,0.97)",
     ],
     "heatmap-opacity": [
       "interpolate",
@@ -183,11 +182,25 @@ function CrimeMapping() {
   const [error, setError] = useState(null);
 
   // Lock barangay filter for barangay users
-  const today = new Date();
-  const defaultDateTo = today.toISOString().slice(0, 10);
-  const defaultDateFrom = new Date(today.setDate(today.getDate() - 364))
-    .toISOString()
-    .slice(0, 10);
+  const getPHTDate = (offsetDays = 0) => {
+    const now = new Date();
+    const phtMs = now.getTime() + 8 * 60 * 60 * 1000 + offsetDays * 86400000;
+    return new Date(phtMs).toISOString().slice(0, 10);
+  };
+
+  const getPHTToday = () => getPHTDate(0);
+
+  const getPHTOneYearAgo = () => {
+    const now = new Date();
+    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+    const phtToday = new Date(phtMs);
+    const oneYearAgo = new Date(phtToday);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    return oneYearAgo.toISOString().slice(0, 10);
+  };
+
+  const defaultDateTo = getPHTToday();
+  const defaultDateFrom = getPHTOneYearAgo();
 
   const [filters, setFilters] = useState({
     incident_type: "",
@@ -352,6 +365,7 @@ function CrimeMapping() {
   // ── Officer locations fetch ───────────────────────────────────────────────────
 
   const fetchOfficers = useCallback(async () => {
+    if (isBarangayUser) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/gps/officers`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -361,7 +375,7 @@ function CrimeMapping() {
     } catch (err) {
       console.warn("[Map] fetchOfficers error:", err.message);
     }
-  }, []);
+  }, [isBarangayUser]);
 
   useEffect(() => {
     fetchOfficers();
@@ -606,9 +620,9 @@ function CrimeMapping() {
     id: "barangay-outline",
     type: "line",
     paint: {
-      "line-color": heatmapMode ? "rgba(180,210,255,0.55)" : "#1e3a5f",
-      "line-width": heatmapMode ? 1.0 : 1.2,
-      "line-opacity": heatmapMode ? 0.7 : 0.5,
+      "line-color": heatmapMode ? "#96c8ff" : "#1e3a5f",
+      "line-width": heatmapMode ? 1.2 : 1.2,
+      "line-opacity": heatmapMode ? 0.6 : 0.8,
     },
   };
 
@@ -641,19 +655,6 @@ function CrimeMapping() {
       {/* HEADER */}
       <div className="crmap-header">
         <div className="crmap-header-left">
-          <div className="crmap-header-icon">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-          </div>
           <div>
             <h1 className="crmap-title">Crime Mapping</h1>
             <p className="crmap-subtitle">
@@ -785,15 +786,36 @@ function CrimeMapping() {
               type="date"
               className="crmap-fsel crmap-fsel-date"
               value={filters.date_from}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, date_from: e.target.value }))
-              }
+              max={(() => {
+                if (!filters.date_to) return getPHTDate(0);
+                const d = new Date(filters.date_to);
+                d.setDate(d.getDate() - 1);
+                return d.toISOString().slice(0, 10);
+              })()}
+              onChange={(e) => {
+                const from = e.target.value;
+                const autoTo = (() => {
+                  const d = new Date(from);
+                  d.setFullYear(d.getFullYear() + 1);
+                  const cap = getPHTDate(0);
+                  const computed = d.toISOString().slice(0, 10);
+                  return computed <= cap ? computed : cap;
+                })();
+                setFilters((f) => ({ ...f, date_from: from, date_to: autoTo }));
+              }}
             />
             <span className="crmap-date-arrow">→</span>
             <input
               type="date"
               className="crmap-fsel crmap-fsel-date"
               value={filters.date_to}
+              min={(() => {
+                if (!filters.date_from) return undefined;
+                const d = new Date(filters.date_from);
+                d.setDate(d.getDate() + 1);
+                return d.toISOString().slice(0, 10);
+              })()}
+              max={getPHTDate(0)}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, date_to: e.target.value }))
               }
@@ -812,11 +834,8 @@ function CrimeMapping() {
           <button
             className="crmap-clear-btn"
             onClick={() => {
-              const t = new Date();
-              const clearTo = t.toISOString().slice(0, 10);
-              const clearFrom = new Date(new Date().setDate(t.getDate() - 364))
-                .toISOString()
-                .slice(0, 10);
+              const clearTo = getPHTToday();
+              const clearFrom = getPHTOneYearAgo();
               setFilters({
                 incident_type: "",
                 date_from: clearFrom,
@@ -832,7 +851,7 @@ function CrimeMapping() {
               }
             }}
           >
-            Reset
+            ↺
           </button>
         </div>
 
@@ -851,12 +870,7 @@ function CrimeMapping() {
         <div className="crmap-map-wrap">
           {/* Loading overlay */}
           {(loading || heatLoading) && (
-            <div className="crmap-loading-overlay">
-              <div className="crmap-spinner" />
-              <span className="crmap-loading-text">
-                {heatLoading ? "Generating heatmap…" : "Loading map data…"}
-              </span>
-            </div>
+            <LoadingModal isOpen={true} message={"Loading map data..."} />
           )}
 
           {/* Error banner */}
@@ -910,7 +924,7 @@ function CrimeMapping() {
                 <div className="crmap-empty-sub">
                   Try adjusting your filters or clearing them to see all data.
                 </div>
-                <button
+                {/* <button
                   onClick={() =>
                     setFilters({
                       incident_type: "",
@@ -922,7 +936,7 @@ function CrimeMapping() {
                   }
                 >
                   Clear Filters
-                </button>
+                </button> */}
               </div>
             )}
 
@@ -936,6 +950,8 @@ function CrimeMapping() {
                 latitude: 14.4341,
                 zoom: 12,
               }}
+              minZoom={11.5} //change to 12.0 if you want to force users to see barangay boundaries
+              maxZoom={18}
               style={{ width: "100%", height: "100%" }}
               mapStyle={
                 heatmapMode
@@ -1109,6 +1125,7 @@ function CrimeMapping() {
 
               {/* ── Officer location dots ── */}
               {showOfficers &&
+                zoom >= 13 &&
                 officers.map((officer) => (
                   <Marker
                     key={`officer-${officer.user_id}`}
@@ -1135,16 +1152,16 @@ function CrimeMapping() {
                     >
                       {/* Badge shield icon */}
                       <svg
-                        width="22"
-                        height="22"
+                        width="24"
+                        height="24"
                         viewBox="0 0 24 24"
                         fill="#1d4ed8"
                         stroke="#ffffff"
-                        strokeWidth="1.5"
+                        strokeWidth="1.4"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M12 2l7 4v5c0 4.5-3 8.5-7 10C5 19.5 2 15.5 2 11V6l10-4z" />
+                        <path d="M12 2L4 5v6c0 4.97 3.4 9.13 8 10 4.6-.87 8-5.03 8-10V5l-8-3z" />
                         <path
                           d="M9 12l2 2 4-4"
                           stroke="#ffffff"
@@ -1386,20 +1403,20 @@ function CrimeMapping() {
               {showMapOptions && (
                 <div className="crmap-options-popover">
                   <div className="crmap-options-title">Map Options</div>
-
-                  {/* Officer Locations — shown in BOTH modes */}
-                  <div className="crmap-map-option">
-                    <span className="crmap-map-option-lbl">
-                      Officer Locations
-                    </span>
-                    <button
-                      className={`crmap-toggle ${showOfficers ? "on" : ""}`}
-                      onClick={() => setShowOfficers((v) => !v)}
-                    >
-                      <span className="crmap-toggle-knob" />
-                    </button>
-                  </div>
-
+                  {/* Officer Locations — hidden from barangay users */}
+                  {!isBarangayUser && (
+                    <div className="crmap-map-option">
+                      <span className="crmap-map-option-lbl">
+                        Officer Locations
+                      </span>
+                      <button
+                        className={`crmap-toggle ${showOfficers ? "on" : ""}`}
+                        onClick={() => setShowOfficers((v) => !v)}
+                      >
+                        <span className="crmap-toggle-knob" />
+                      </button>
+                    </div>
+                  )}
                   {heatmapMode ? (
                     <div className="crmap-map-option">
                       <span className="crmap-map-option-lbl">
@@ -1504,7 +1521,10 @@ function CrimeMapping() {
           </button>
 
           {/* ── SIDEBAR ── */}
-          <div className={`crmap-sidebar ${!sidebarOpen ? "hidden" : ""}`}>
+
+          <div
+            className={`crmap-sidebar ${!sidebarOpen ? "hidden" : ""} ${heatmapMode ? "heatmap" : ""}`}
+          >
             <div className="crmap-tabs">
               {[
                 { key: "legend", label: "Legend" },
@@ -1539,61 +1559,104 @@ function CrimeMapping() {
                         className="crmap-heat-sidebar-title"
                         style={{ marginTop: 16 }}
                       >
-                        Severity weight
+                        Crime Types Mapped
                       </div>
-                      {[
-                        { crime: "Murder / Homicide", w: "1.0 – 0.95" },
-                        { crime: "Rape", w: "0.90" },
-                        { crime: "Special Complex", w: "0.85" },
-                        { crime: "Robbery", w: "0.75" },
-                        { crime: "Carnapping", w: "0.60 – 0.65" },
-                        { crime: "Physical Injury", w: "0.50" },
-                        { crime: "Theft", w: "0.35" },
-                      ].map((r) => (
-                        <div key={r.crime} className="crmap-severity-row">
-                          <span className="crmap-severity-crime">
-                            {r.crime}
-                          </span>
-                          <span className="crmap-severity-weight">{r.w}</span>
-                        </div>
-                      ))}
+                      {(stats?.by_incident_type?.length > 0
+                        ? stats.by_incident_type
+                        : LEGEND_ITEMS.map((i) => ({
+                            incident_type: i.label,
+                            count: 0,
+                          }))
+                      ).map((item) => {
+                        const name = item.incident_type || item.label;
+                        const color =
+                          INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
+                        const count = parseInt(item.count) || 0;
+                        return (
+                          <div className="crmap-severity-row" key={name}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  background: color,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span className="crmap-severity-crime">
+                                {name}
+                              </span>
+                            </div>
+                            <span className="crmap-severity-weight">
+                              {count}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    (stats?.by_incident_type?.length > 0
-                      ? stats.by_incident_type
-                      : LEGEND_ITEMS.map((i) => ({
-                          incident_type: i.label,
-                          count: 0,
-                        }))
-                    ).map((item) => {
-                      const name = item.incident_type || item.label;
-                      const color =
-                        INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
-                      const count = parseInt(item.count) || 0;
-                      const max =
-                        parseInt(stats?.by_incident_type?.[0]?.count) || 1;
-                      const pct = Math.round((count / max) * 100);
-                      return (
-                        <div className="crmap-legend-row" key={name}>
-                          <div className="crmap-legend-top">
-                            <div className="crmap-legend-left">
-                              <div
-                                className="crmap-legend-dot"
-                                style={{ background: color }}
-                              />
-                              <span className="crmap-legend-name">{name}</span>
+                    <div className="crmap-heat-sidebar-legend">
+                      <div className="crmap-heat-sidebar-title">
+                        Barangay Risk Scale
+                      </div>
+                      <div className="crmap-risk-scale-bar" />
+                      <div className="crmap-heat-scale-labels">
+                        <span>No Crimes</span>
+                        <span>High Risk</span>
+                      </div>
+                      <div
+                        className="crmap-heat-sidebar-title"
+                        style={{ marginTop: 16 }}
+                      >
+                        Crime Types
+                      </div>
+                      {(stats?.by_incident_type?.length > 0
+                        ? stats.by_incident_type
+                        : LEGEND_ITEMS.map((i) => ({
+                            incident_type: i.label,
+                            count: 0,
+                          }))
+                      ).map((item) => {
+                        const name = item.incident_type || item.label;
+                        const color =
+                          INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
+                        const count = parseInt(item.count) || 0;
+                        const max =
+                          parseInt(stats?.by_incident_type?.[0]?.count) || 1;
+                        const pct = Math.round((count / max) * 100);
+                        return (
+                          <div className="crmap-legend-row" key={name}>
+                            <div className="crmap-legend-top">
+                              <div className="crmap-legend-left">
+                                <div
+                                  className="crmap-legend-dot"
+                                  style={{ background: color }}
+                                />
+                                <span className="crmap-legend-name">
+                                  {name}
+                                </span>
+                              </div>
+                              <span className="crmap-legend-count">
+                                {count}
+                              </span>
                             </div>
-                            <span className="crmap-legend-count">{count}</span>
+                            <div className="crmap-bar-bg">
+                              <div
+                                className="crmap-bar-fill"
+                                style={{ width: `${pct}%`, background: color }}
+                              />
+                            </div>
                           </div>
-                          <div className="crmap-bar-bg">
-                            <div
-                              className="crmap-bar-fill"
-                              style={{ width: `${pct}%`, background: color }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               )}
@@ -1696,7 +1759,46 @@ function CrimeMapping() {
 
               {activeTab === "hotspots" && (
                 <div className="crmap-panel-section">
-                  {stats?.hotspots?.length > 0 ? (
+                  {heatmapMode && clusterGeoJSON?.features?.length > 0 ? (
+                    [...clusterGeoJSON.features]
+                      .sort((a, b) => b.properties.count - a.properties.count)
+                      .map((f, i) => {
+                        const p = f.properties;
+                        const max = Math.max(
+                          ...clusterGeoJSON.features.map(
+                            (c) => c.properties.count,
+                          ),
+                        );
+                        return (
+                          <div className="crmap-hotspot-row" key={i}>
+                            <div className="crmap-hotspot-rank">#{i + 1}</div>
+                            <div className="crmap-hotspot-info">
+                              <div className="crmap-hotspot-name">
+                                {p.dominant_barangay || "Unknown"}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  color: "var(--gray-500)",
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {p.dominant_crime || "Mixed"}
+                              </div>
+                              <div className="crmap-hotspot-bar-bg">
+                                <div
+                                  className="crmap-hotspot-bar-fill"
+                                  style={{
+                                    width: `${Math.min(100, (p.count / max) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="crmap-hotspot-count">{p.count}</div>
+                          </div>
+                        );
+                      })
+                  ) : !heatmapMode && stats?.hotspots?.length > 0 ? (
                     stats.hotspots.map((h, i) => (
                       <div className="crmap-hotspot-row" key={i}>
                         <div className="crmap-hotspot-rank">#{i + 1}</div>
@@ -1706,10 +1808,7 @@ function CrimeMapping() {
                             <div
                               className="crmap-hotspot-bar-fill"
                               style={{
-                                width: `${Math.min(
-                                  100,
-                                  (h.count / stats.hotspots[0].count) * 100,
-                                )}%`,
+                                width: `${Math.min(100, (h.count / stats.hotspots[0].count) * 100)}%`,
                               }}
                             />
                           </div>
@@ -1718,7 +1817,11 @@ function CrimeMapping() {
                       </div>
                     ))
                   ) : (
-                    <div className="crmap-empty">No hotspots detected.</div>
+                    <div className="crmap-empty">
+                      {heatmapMode
+                        ? "No clusters detected."
+                        : "No hotspots detected."}
+                    </div>
                   )}
                 </div>
               )}
