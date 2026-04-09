@@ -452,6 +452,20 @@ const updateRouteNotes = async (req, res) => {
   }
 };
 
+const updateRouteTime = async (req, res) => {
+  const { routeId } = req.params;
+  const { time_start, time_end } = req.body;
+  try {
+    await pool.query(
+      `UPDATE patrol_assignment_route SET time_start = $1, time_end = $2 WHERE route_id = $3`,
+      [time_start || null, time_end || null, routeId]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
+};
+
 module.exports = {
   getPatrolStats,
   getActivePatrollers,
@@ -465,4 +479,5 @@ module.exports = {
   updatePatrol,
   deletePatrol,
   updateRouteNotes,
+  updateRouteTime,
 };

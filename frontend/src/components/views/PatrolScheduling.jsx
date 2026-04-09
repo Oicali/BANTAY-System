@@ -4,7 +4,7 @@ import BeatCard from "../modals/BeatCard";
 import Notification from "../modals/Notification";
 import AddPatrolModal from "../modals/AddPatrolModal";
 import LoadingModal from "../modals/LoadingModal";
-
+import EditPatrolModal from "../modals/EditPatrolModal";
 const API_BASE = import.meta.env.VITE_API_URL;
 
 const SHIFTS = ["Morning", "Night"];
@@ -26,6 +26,7 @@ const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
 const [notif, setNotif] = useState(null);
 // notif = { message: "...", type: "success" }
+
   // ── Data ───────────────────────────────────────────────
   const [patrols, setPatrols]                         = useState([]);
   const [mobileUnits, setMobileUnits]                 = useState([]);
@@ -42,6 +43,7 @@ const [loading, setLoading] = useState(false);
   const [editingPatrol, setEditingPatrol]     = useState(null);
   const [showBeatCard, setShowBeatCard]       = useState(false);
   const [beatCardPatrol, setBeatCardPatrol]   = useState(null);
+  const [showEditModal, setShowEditModal]     = useState(false);
 
   // ── Load GeoJSON once ──────────────────────────────────
   useEffect(() => {
@@ -89,11 +91,10 @@ const [loading, setLoading] = useState(false);
   };
 
   const openEditModal = (patrol) => {
-    setAddModalMode("edit");
-    setEditingPatrol(patrol);
-    fetchAvailablePatrollers();
-    setShowAddModal(true);
-  };
+  setEditingPatrol(patrol);
+  fetchAvailablePatrollers();
+  setShowEditModal(true);
+};
 
   // ── Save patrol (create or update) ────────────────────
   const handleSave = async (formData) => {
@@ -269,7 +270,7 @@ const [loading, setLoading] = useState(false);
           patrol={beatCardPatrol}
           geoJSONData={geoJSONData}
           onClose={() => { setShowBeatCard(false); setBeatCardPatrol(null); }}
-          onEdit={() => { setShowBeatCard(false); openEditModal(beatCardPatrol); }}
+         onEdit={() => { setShowBeatCard(false); openEditModal(beatCardPatrol); }}
           onDelete={() => handleDelete(beatCardPatrol.patrol_id)}
         />
       )}
@@ -283,6 +284,35 @@ const [loading, setLoading] = useState(false);
         duration={3000}
       />
     )}
+    {showEditModal && editingPatrol && (
+  <EditPatrolModal
+    patrol={editingPatrol}
+    mobileUnits={mobileUnits}
+    availablePatrollers={availablePatrollers}
+    geoJSONData={geoJSONData}
+    onClose={() => { setShowEditModal(false); setEditingPatrol(null); }}
+    onSave={async (formData) => {
+      try {
+        const res  = await fetch(`${API_BASE}/patrol/patrols/${editingPatrol.patrol_id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+          body: JSON.stringify(formData),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setShowEditModal(false);
+          setEditingPatrol(null);
+          fetchPatrols();
+          setNotif({ message: "Patrol updated successfully!", type: "success" });
+        } else {
+          setNotif({ message: data.message || "Something went wrong.", type: "error" });
+        }
+      } catch (err) {
+        setNotif({ message: "Server error.", type: "error" });
+      }
+    }}
+  />
+)}
     </div>
   );
 };
