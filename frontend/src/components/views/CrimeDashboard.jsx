@@ -2326,7 +2326,7 @@ const CrimeDashboard = () => {
       <LoadingModal isOpen={isLoading} message="Loading crime data..." />
       <LoadingModal
         isOpen={isExportLoading}
-        message="Preparing export... Please wait."
+        message="Preparing export..."
       />
 
       <div className="cd-page-header">
