@@ -29,32 +29,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
   const handleSubmit = async () => {
     if (!file) return;
     setProgress({ current: 0, total: 0 });
-
-    let totalRows = 0;
-    try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-      totalRows = rows.length;
-    } catch (_) {
-      totalRows = 0;
-    }
-
-    setProgress({ current: 0, total: totalRows });
     setLoading(true);
-    let simCount = 0;
-    const interval =
-      totalRows > 0
-        ? setInterval(
-            () => {
-              simCount = Math.min(simCount + 1, totalRows - 1);
-              setProgress((p) => ({ ...p, current: simCount }));
-            },
-            Math.max(30, 3000 / totalRows),
-          )
-        : null;
 
     try {
       const formData = new FormData();
@@ -68,34 +43,20 @@ function ImportBlotterModal({ onClose, onSuccess }) {
         },
       );
       const data = await res.json();
-      if (interval) clearInterval(interval);
-
-      await new Promise((resolve) => {
-        let cur = simCount;
-        const remaining = totalRows - cur;
-        if (remaining <= 0) {
-          setTimeout(resolve, 300);
-          return;
-        }
-        const stepDelay = Math.max(10, Math.floor(500 / remaining));
-        const fill = setInterval(() => {
-          cur++;
-          setProgress({ current: cur, total: totalRows });
-          if (cur >= totalRows) {
-            clearInterval(fill);
-            setTimeout(resolve, 150);
-          }
-        }, stepDelay);
-      });
 
       if (data.success) {
+        const total =
+          data.summary.inserted +
+          data.summary.skipped_duplicates +
+          data.summary.skipped_errors;
+        setProgress({ current: total, total });
+        await new Promise((resolve) => setTimeout(resolve, 500));
         setResult(data.summary);
         onSuccess && onSuccess();
       } else {
         alert(data.message || "Import failed");
       }
     } catch (err) {
-      if (interval) clearInterval(interval);
       alert("Import failed: " + err.message);
     }
     setLoading(false);
