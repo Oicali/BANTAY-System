@@ -87,10 +87,6 @@ body {
   border-left: 4px solid var(--gray-300);
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
-.cm-status-card:nth-child(1) { border-left-color: var(--navy-primary); }
-.cm-status-card:nth-child(2) { border-left-color: #d97706; }
-.cm-status-card:nth-child(3) { border-left-color: #16a34a; }
-.cm-status-card:nth-child(4) { border-left-color: #dc2626; }
 
 .cm-status-card-label {
   font-size: 11px;
@@ -123,10 +119,10 @@ body {
 }
 
 .cm-badge-yellow {
-  background: rgba(251, 191, 36, 0.1);
-  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
-
 .cm-badge-purple {
   background: rgba(168, 85, 247, 0.1);
   color: #9333ea;
@@ -303,8 +299,8 @@ body {
 }
 
 .cm-status-active {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
 }
 
 .cm-status-pending {
@@ -783,4 +779,10 @@ body {
   font-weight: 600;
   display: flex;
   align-items: center;
+}
+
+.cm-badge-purple {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  border: 1px solid rgba(99, 102, 241, 0.2);
 }

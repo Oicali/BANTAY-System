@@ -5108,15 +5108,15 @@ function EBlotter() {
                                     borderRadius: "50% 50% 50% 0",
                                     background: (() => {
                                       const colors = {
-                                        Murder: "#7f1d1d",
-                                        Homicide: "#991b1b",
-                                        Rape: "#9333ea",
-                                        Robbery: "#ea580c",
-                                        Theft: "#d97706",
-                                        "Physical Injury": "#0369a1",
-                                        "Carnapping - MC": "#0f766e",
-                                        "Carnapping - MV": "#0f766e",
-                                        "Special Complex Crime": "#4338ca",
+                                        Murder: "#7c3aed",
+                                        Homicide: "#8b5cf6",
+                                        Rape: "#ec4899",
+                                        Robbery: "#ef4444",
+                                        Theft: "#f97316",
+                                        "Physical Injury": "#eab308",
+                                        "Carnapping - MC": "#3b82f6",
+                                        "Carnapping - MV": "#0ea5e9",
+                                        "Special Complex Crime": "#14b8a6",
                                       };
                                       return (
                                         colors[caseDetail.incident_type] ||
