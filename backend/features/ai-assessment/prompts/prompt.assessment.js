@@ -1,275 +1,311 @@
 // backend/features/ai-assessment/prompts/prompt.assessment.js
 
 /**
- * assessment.prompt.js
- * Builds the Gemini/Ollama prompts from Python /analyze output.
+ * prompt.assessment.js
+ * Builds the Groq/LLM prompts from Python /analyze output.
  *
- * v3 changes:
- *  - Split into two focused prompts: general + per-crime
- *  - Per-crime prompt is called once per crime type (no context overflow)
- *  - ARIMA removed — uses Croston forecast fields
- *  - buildClusterBlock uses barangay names not coordinates
- *  - CRIME_REASONING guides kept — they feed the per-crime prompt
+ * v5 changes (aligned to PNP Managing Patrol Operations Manual 2015):
+ *  - Replaced incorrect "EMPO framework" reference with the manual's actual
+ *    Five-Part Plan format: Situation → Mission → Execution → Tasks →
+ *    Coordinating Instructions (Section 3.5)
+ *  - Added Preparatory Conference (Section 2.8) as the framing context —
+ *    AI output is now positioned as inputs to the daily COP conference
+ *  - MUST DOs now require time window + specific location, per Annex A
+ *  - BIN (Barangay Information Network) now framed as an actionable
+ *    deliverable patrollers build, not just a mention
+ *  - CPA (Crime Pattern Analysis) added as the analytical basis distinct
+ *    from ECP (Emerging Crime Problem)
+ *  - All hardcoded modus names removed from CRIME_REASONING static text
+ *  - Dynamic modusContextBlock injected per crime — AI only sees modus
+ *    names drawn from real incident data
+ *  - Duplicate REASONING GUIDE block removed
+ *  - formatShift() helper added for shift-aware deployment language
  */
 
 "use strict";
 
 // ─── CRIME-SPECIFIC REASONING GUIDES ─────────────────────────────────────────
+// IMPORTANT: These guides must remain modus-agnostic.
+// Do NOT hardcode any modus names here.
+// Modus-specific content is injected dynamically via modusContextBlock,
+// which is built from actual incident data at prompt-build time.
+//
+// All structural references below follow the PNP Managing Patrol Operations
+// Manual 2015 (Five-Part Plan, QUAD functions, IPS, BIN, CPA/ECP, MUST DOs).
 
 const CRIME_REASONING = {
   THEFT: {
-    nature: "property crime, often opportunistic, highest volume index crime",
+    nature:
+      "property crime — often opportunistic; highest volume index crime; opportunity-driven, so police presence and target hardening are primary deterrents",
     operations: `
-      - Prioritize foot patrol near the dominant place type (residential = Akyat Bahay prevention, commercial = Salisi/Snatching).
-      - Deploy during peak hours identified in temporal data — not generic "evening patrol".
-      - If a DBSCAN cluster exists for this crime, reference the barangay name — never use coordinates.
-      - Tasks (MUST DOs): derive tasks from actual top modus in data only. If modus is commercial (Salisi, Snatching), task patrollers to monitor market areas. If modus is residential (Akyat Bahay), task residential block checks. Use ONLY what the data shows.
-      - Coordinating Instructions: engage Barangay Tanods for joint patrol, establish Block Information Network near cluster area.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize theft pattern using actual incident count, prevalent place type, peak hour/day, and cluster barangay if detected. Reference Crime Pattern Analysis (CPA) findings.
+      - Mission: State what the patrol unit aims to accomplish — reduce theft opportunity in the identified area during peak hours.
+      - Execution: Specify patrol method matched to place type from data (residential areas call for foot patrol at block level; commercial/market areas call for foot or motorcycle patrol along identified corridors).
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks exclusively from the modus names in ACTUAL MODUS IN DATA. Example format: "At 8:00 AM – 9:00 AM, conduct foot patrol and target hardening check at [place type from data] in [cluster barangay]." Do not assign tasks for modus not in the data.
+      - Coordinating Instructions: Engage Barangay Tanods and BPATs for joint patrol. Task patrollers to establish or activate Barangay Information Network (BIN) contacts near cluster barangay — BIN contacts are community members who provide early warning on suspicious persons and activity.
     `,
     intelligence: `
-      - Focus on modus-based pattern: Akyat Bahay = monitor repeat target residences; Salisi = identify known offenders near market/transport hubs; Snatching = track motorcycle descriptions.
-      - Flag as ECP if trend is increasing AND CSE < 30%.
-      - Task patrollers as information collectors from residents near hotspot area.
-      - CRITICAL: Only mention modus names that appear in the top modus data. Never invent modus names.
+      - Intelligence function at the Preparatory Conference: prepare information on modus operandi using only the names in ACTUAL MODUS IN DATA. Brief the COP on patterns tied to those specific modus.
+      - Task beat patrollers as 'bee workers' — collectors of significant information from residents and business owners near the hotspot area. Information collected feeds back to the next Preparatory Conference.
+      - Flag as Emerging Crime Problem (ECP) if trend is increasing AND Case Solution Efficiency (CSE) is below 30% — ECP declaration triggers adjustment of the Station Patrol Plan.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Prioritize open cases by modus severity — use actual modus names from data.
-      - Cross-reference modus across cases for series crime patterns.
-      - Pursue recovery of stolen property as a case-closing mechanism.
+      - Investigation function at the Preparatory Conference: present updated list of open cases with modus breakdown using names from ACTUAL MODUS IN DATA only.
+      - Prioritize open cases by modus as shown in data — cross-reference modus across cases to detect series crime patterns.
+      - Pursue recovery of stolen property as a primary case-closing mechanism. Brief patrollers on persons of interest and wanted persons related to open theft cases.
     `,
     pcr: `
-      - Community awareness aligned to dominant modus and place type from data.
-      - Market/transport hub awareness if Salisi/Snatching dominates.
-      - Recruit Block Information Network volunteers near cluster area.
-      - Engage barangay tanods for night patrol near peak-hour areas.
+      - PCR function at the Preparatory Conference: develop community engagement strategies aligned to the prevalent modus and place type from data — not generic theft prevention messaging.
+      - Task patrollers to build Barangay Information Network (BIN) in the cluster barangay — identify community volunteers who can serve as early-warning contacts.
+      - Engage Barangay Tanods for joint patrol during peak hours identified in data.
+      - Address quality-of-life issues (lighting, blind spots, unsecured areas) near the prevalent place type as crime breeding grounds.
     `,
   },
 
   ROBBERY: {
     nature:
-      "violent property crime, use or threat of force, higher victim impact than theft",
+      "violent property crime — use or threat of force; higher victim impact than theft; demands mobile response capacity and rapid TOC coordination",
     operations: `
-      - Robbery demands mobile patrol with standby capacity — foot patrol alone is insufficient.
-      - Deploy near commercial corridors, ATMs, pawnshops, and transport terminals based on place type data.
-      - Peak hours should drive shift assignment — specify shift (e.g., Shift 2 = 3PM–11PM) not just "evening".
-      - If a cluster exists, reference the barangay name in the Situation.
-      - Tasks (MUST DOs): bank/pawnshop exterior checks, ATM area visibility.
-      - Coordinating Instructions: coordinate TOC for real-time comms, HPG if highway robbery modus present.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize robbery pattern using actual count, prevalent place type, peak hour/day, and cluster barangay. Reference CPA findings and note if an ECP declaration is warranted.
+      - Mission: State the patrol unit's objective — deter robbery in identified place type areas during peak shift.
+      - Execution: Robbery demands mobile patrol with standby capacity — foot patrol alone is insufficient. Deploy near the place type identified in data.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks exclusively from modus names in ACTUAL MODUS IN DATA. Example format: "At 2:00 PM – 3:00 PM, conduct mobile patrol and exterior check of [place type from data] in [cluster barangay]." Do not assign tasks for modus not in the data.
+      - Coordinating Instructions: Coordinate with Tactical Operations Center (TOC) for real-time communications during patrol. Engage Highway Patrol Group (HPG) only if highway-related modus appears in ACTUAL MODUS IN DATA.
     `,
     intelligence: `
-      - Robbery with firearm modus warrants immediate ECP declaration if increasing.
-      - Develop informants near transport terminals and commercial areas where modus concentrates.
-      - Prepare persons-of-interest list for pre-deployment briefing if there are repeat modus patterns.
-      - CRITICAL: Only mention modus names from the top modus data.
+      - Intelligence function at the Preparatory Conference: brief on modus patterns using only names in ACTUAL MODUS IN DATA. Prepare persons-of-interest list for pre-deployment briefing if repeat modus patterns are present.
+      - Develop informants near the place type identified in data — feed information back to the Preparatory Conference.
+      - Flag as ECP if trend is increasing and CSE is below 30%.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Robbery cases with firearm modus are high-priority — higher re-offense and escalation risk.
-      - Victims and witnesses should be re-contacted promptly for leads.
-      - Cross-reference with theft cases for escalation patterns.
+      - Investigation function at the Preparatory Conference: present open case list with modus breakdown using names from ACTUAL MODUS IN DATA only. Update staff on case development and support needed.
+      - Victims and witnesses in open cases should be re-contacted promptly — brief patrollers to assist with witness identification during patrol.
+      - Cross-reference modus across cases for series crime or escalation patterns.
     `,
     pcr: `
-      - Brief business establishments in high-incident areas on robbery deterrence (CCTV, security guards, signage).
-      - Encourage pawnshops and money changers to coordinate with station on suspicious transactions.
-      - Engage barangay emergency response volunteers near commercial clusters.
+      - PCR function at the Preparatory Conference: develop strategies to reduce robbery opportunity at the prevalent place type from data.
+      - Brief establishments in high-incident areas on deterrence measures appropriate to the place type — engage relevant business associations.
+      - Task patrollers to develop Barangay Information Network (BIN) contacts near commercial or transport clusters if identified in data.
     `,
   },
 
   RAPE: {
     nature:
-      "sexual violence crime — requires sensitive, victim-centered response; often involves known offender",
+      "sexual violence crime — requires sensitive, victim-centered response; often involves known offenders in private settings; street patrol has limited deterrent value in most cases",
     operations: `
-      - Patrol recommendations must be careful: most rape cases involve known offenders in private settings — street patrol has limited deterrent value.
-      - Focus on place type: if residential, recommend Women and Children Protection Desk coordination and community safety programs rather than foot patrol.
-      - If public place is the dominant place type, visibility at the specific location type (park, school vicinity) is appropriate.
-      - Coordinate with Women and Children Protection Desk for all operational planning involving this offense.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize pattern using actual count, prevalent place type, and peak period. Note that most rape cases involve known offenders — patrol posture must reflect place type data, not assumed street-crime patterns.
+      - Mission: State objective in terms of victim support infrastructure and community early-warning, not just patrol visibility.
+      - Execution: If residential place type dominates, prioritize Women and Children Protection Desk (WCPD) coordination over foot patrol. If public place type dominates, assign visibility at the specific location type identified in data during peak hours.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks from place type and temporal data — not from modus assumptions. Coordinate all tasks with WCPD.
+      - Coordinating Instructions: WCPD must be involved in all operational planning for this offense. Coordinate with barangay Violence Against Women and Children (VAWC) desk.
     `,
     intelligence: `
-      - Intelligence focus is on identifying repeat offenders and locations, not street-level modus.
-      - Develop informants within the community network (barangay officials, community leaders) for early warning.
-      - Flag as ECP if increasing — but note the sensitivity of this classification to the commander.
+      - Intelligence function at the Preparatory Conference: focus on identifying repeat offenders and recurring locations — not street-level modus patterns.
+      - Develop informants within the community network (barangay officials, community leaders, barangay health workers) for early warning.
+      - Flag as ECP if trend is increasing — note the sensitivity of this classification to the commander.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - All rape cases are high-priority regardless of CCE/CSE figures.
-      - Women and Children Protection Desk should lead or co-lead all active investigations.
-      - Under Investigation cases must be reviewed for victim support status and evidence collection completeness.
+      - Investigation function at the Preparatory Conference: all rape cases are priority-one regardless of CCE/CSE figures. WCPD should lead or co-lead all active investigations.
+      - Under Investigation cases must be reviewed for victim support status and evidence collection completeness — brief the COP on any gaps.
     `,
     pcr: `
-      - Community awareness programs must be run through Women and Children Protection Desk, not general patrol.
-      - Engage schools, barangay health centers, and women's organizations.
-      - Focus messaging on reporting mechanisms and victim support.
-      - Establish safe reporting channels through barangay-level Violence Against Women and Children desks.
+      - PCR function at the Preparatory Conference: develop community engagement strategies through WCPD — not general patrol channels.
+      - Engage schools, barangay health centers, and women's organizations as community partners.
+      - Task patrollers to establish Barangay Information Network (BIN) contacts with trusted community figures who can serve as safe reporting conduits.
+      - Establish safe reporting channels through barangay-level VAWC desks.
     `,
   },
 
   MURDER: {
     nature:
-      "capital offense — intentional killing; often connected to rido, drug trade, or personal dispute",
+      "capital offense — intentional killing; low frequency but highest consequence; any occurrence triggers priority-one response regardless of trend",
     operations: `
-      - Murder is low-frequency but high-consequence — patrol recommendations focus on deterrence in identified hotspot areas.
-      - If a DBSCAN cluster exists, reference the barangay name in the Situation — not coordinates.
-      - Mobile patrol with investigation support posture, not just visibility.
-      - Tasks: warrant service for persons of interest, coordination with investigation team.
-      - Coordinating Instructions: National Bureau of Investigation or Criminal Investigation and Detection Group coordination if organized crime modus is suspected.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, prevalent place type, cluster barangay if detected, and modus from ACTUAL MODUS IN DATA. Note CPA findings and any series pattern across cases.
+      - Mission: State the objective — deter further incidents in identified hotspot area and support active investigations.
+      - Execution: Mobile patrol with investigation support posture — not just visibility. Focus on cluster barangay if detected.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Include warrant service for persons of interest as a MUST DO where applicable. Example format: "At 6:00 PM – 8:00 PM, conduct mobile patrol with heightened visibility in [cluster barangay]; coordinate warrant service for persons of interest with investigation team."
+      - Coordinating Instructions: National Bureau of Investigation (NBI) or Criminal Investigation and Detection Group (CIDG) coordination if modus data suggests organized crime involvement. Regional Homicide Unit if case complexity warrants.
     `,
     intelligence: `
-      - Murder warrants immediate intelligence effort regardless of trend direction.
-      - Identify if cases share a modus or geographic cluster — series pattern indicates organized threat.
-      - Task intelligence personnel to map relationships between victims if multiple cases.
-      - Consider rido mapping or drug trade presence as intelligence context.
+      - Intelligence function at the Preparatory Conference: murder warrants immediate intelligence effort regardless of trend. Identify if cases share a modus or geographic cluster — a series pattern indicates an organized threat.
+      - Task intelligence personnel to map relationships between victims if multiple cases are present. Consider contextual threat factors consistent with the modus data — do not assume context not shown in data.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - All murder cases are priority-one investigations — no case should remain Under Investigation without active follow-up.
-      - Warrant service for identified persons of interest should be briefed at every pre-deployment.
-      - CSE for murder below 30% is a significant performance concern — flag explicitly to commander.
+      - Investigation function at the Preparatory Conference: all murder cases are priority-one — no case should remain Under Investigation without active follow-up. Present updated warrant list and persons of interest to brief patrollers.
+      - CSE below 30% for murder is a significant performance concern — flag explicitly to COP.
       - Coordinate with Regional Homicide Unit if case complexity warrants.
     `,
     pcr: `
-      - Engage barangay officials and community leaders for information — murder cases often have community witnesses who are reluctant to come forward.
-      - Build trust through consistent, visible presence in affected barangay.
-      - Consider peace-building dialogues if rido or dispute origin is suspected.
-      - Avoid public announcements that could compromise witness safety.
+      - PCR function at the Preparatory Conference: engage barangay officials and community leaders for information — murder cases often have community witnesses reluctant to come forward.
+      - Build trust through consistent, visible presence in the affected barangay. Task patrollers to develop Barangay Information Network (BIN) contacts as witness conduits.
+      - Tailor engagement approach to contextual factors suggested by modus data — avoid public announcements that could compromise witness safety.
     `,
   },
 
   HOMICIDE: {
     nature:
-      "unlawful killing without intent to kill — may arise from reckless acts, fights, or escalation",
+      "unlawful killing without premeditation — may arise from reckless acts, altercations, or dispute escalation; often linked to alcohol, recreation venues, or personal conflicts",
     operations: `
-      - Similar to murder in operational response but typically lower organized-crime risk.
-      - Focus Execution on visibility at venues where altercations occurred (bars, basketball courts, public gathering spots if identified in place type data).
-      - Recommend alcohol-related enforcement operations if night hours and recreation venue are dominant.
-      - Coordinating Instructions: coordinate with Local Government Unit on ordinance enforcement (liquor bans, curfew) if nighttime altercation pattern is present.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, prevalent place type, peak hour/day, and modus from ACTUAL MODUS IN DATA. Note if nighttime altercation pattern is present in temporal data.
+      - Mission: State the objective — prevent escalation of disputes in identified venues during peak windows.
+      - Execution: Focus patrol on the place type identified in data (recreation venues, public gathering spots, drinking establishments). If nighttime hours dominate, assign to the correct shift. Recommend alcohol-related enforcement only if nighttime and recreation venue pattern is supported by data.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window derived from temporal data. Example format: "At 9:00 PM – 11:00 PM, conduct foot patrol and visibility check at [place type from data] in [cluster barangay or peak area]."
+      - Coordinating Instructions: Coordinate with Local Government Unit (LGU) on ordinance enforcement (liquor bans, curfew) only if nighttime altercation pattern is supported by temporal data.
     `,
     intelligence: `
-      - Map recurring dispute locations and known antagonist groups.
-      - Develop community informants near incident-dense barangays.
+      - Intelligence function at the Preparatory Conference: map recurring dispute locations and known antagonist groups using actual incident locations from data.
+      - Develop community informants near incident-dense barangays identified in cluster data.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Homicide cases with Under Investigation status require witness follow-up as a priority.
-      - Modus analysis (bladed weapon vs. firearm vs. blunt object) informs arrest and evidence strategy.
+      - Investigation function at the Preparatory Conference: homicide cases with Under Investigation status require witness follow-up as a priority — brief patrollers to assist with witness identification during patrol.
+      - Modus data should inform arrest and evidence strategy — use only modus names from ACTUAL MODUS IN DATA.
     `,
     pcr: `
-      - Dialogue-based intervention in barangays with multiple homicide incidents.
-      - Engage barangay peace and order councils on early conflict resolution.
-      - Partner with Bureau of Jail Management and Penology or Department of Social Welfare and Development for at-risk individual referrals if youth or substance involvement is noted.
+      - PCR function at the Preparatory Conference: develop dialogue-based intervention strategies for barangays with multiple homicide incidents.
+      - Engage barangay peace and order councils on early conflict resolution — address dispute breeding grounds.
+      - Task patrollers to build Barangay Information Network (BIN) contacts with purok leaders and barangay kagawads as early-warning network for escalating disputes.
+      - Partner with Department of Social Welfare and Development (DSWD) for at-risk individual referrals if temporal or place data suggests youth or substance involvement.
     `,
   },
 
   "PHYSICAL INJURY": {
     nature:
-      "assault resulting in injury — frequently domestic, alcohol-related, or neighbor disputes; rarely stranger crime",
+      "assault resulting in injury — frequently domestic, alcohol-related, or dispute-driven; rarely stranger crime; poorly addressed by blanket street patrol; best addressed through barangay-level intervention",
     operations: `
-      - Physical injuries are poorly addressed by street patrol — most occur indoors or in semi-private spaces.
-      - Peak day and hour data is critical: if weekend night hours dominate, recommend visibility near drinking establishments during those specific windows only.
-      - Do NOT recommend generic 24/7 increased patrol — be specific to the peak window.
-      - Tasks (MUST DOs): check-in with barangay tanods at start of shift, coordinate with barangay officials on known dispute households.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, prevalent place type, peak hour/day, and modus from ACTUAL MODUS IN DATA. Note if domestic or recreational venue pattern is evident.
+      - Mission: State the objective — reduce injury incidents at identified place type during peak window; support barangay-level dispute resolution.
+      - Execution: Physical injuries are poorly addressed by blanket street patrol — most occur in residential or semi-private spaces. Deploy visibility near the place type identified in data ONLY during the specific peak window. Do NOT recommend generic 24/7 increased patrol.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Example format: "At 10:00 PM – 12:00 AM, conduct foot patrol and check-in with Barangay Tanods near [place type from data] in [cluster barangay or peak area]." Tasks must be derived from place type and temporal data only — not invented from assumed modus.
+      - Coordinating Instructions: Check-in with Barangay Tanods at shift start. Coordinate with barangay officials on known dispute-prone households or establishments identified through community intelligence.
     `,
     intelligence: `
-      - Focus on repeat-location and repeat-offender patterns.
-      - Flag households or establishments with multiple incidents for barangay-level intervention.
+      - Intelligence function at the Preparatory Conference: focus on repeat-location and repeat-offender patterns using actual incident data. Flag establishments or households with multiple incidents for barangay-level intervention.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Physical injuries with open cases should be reviewed for Violence Against Women and Children angles.
-      - Mediation through barangay may resolve some cases — note this as a case disposition option.
+      - Investigation function at the Preparatory Conference: review open cases for Violence Against Women and Children (VAWC) angles where applicable. Mediation through barangay is a valid case disposition option — note this to the COP.
+      - Use modus names from ACTUAL MODUS IN DATA when identifying priority cases.
     `,
     pcr: `
-      - Barangay-level conflict resolution programs are more effective than patrol for this crime type.
-      - Coordinate with Department of Social Welfare and Development, Women and Children Protection Desk, and barangay Violence Against Women and Children desk for domestic-origin cases.
-      - Engage purok leaders and barangay kagawads as community conflict early-warning network.
+      - PCR function at the Preparatory Conference: barangay-level conflict resolution programs are more effective than patrol for this crime type — develop these as the primary PCR strategy.
+      - Coordinate with DSWD, Women and Children Protection Desk (WCPD), and barangay VAWC desk for domestic-origin cases.
+      - Task patrollers to engage purok leaders and barangay kagawads as community conflict early-warning network — these are the Barangay Information Network (BIN) contacts for this crime type.
     `,
   },
 
   "SPECIAL COMPLEX CRIME": {
     nature:
-      "composite offense combining elements of multiple index crimes (e.g., rape with homicide, kidnapping with murder)",
+      "composite offense combining elements of multiple index crimes (e.g. rape with homicide, kidnapping with murder) — rare but highest consequence; any occurrence demands immediate elevated response",
     operations: `
-      - Rare but high-impact — any occurrence warrants elevated response posture.
-      - Recommend regional-level coordination in Execution (Scene of the Crime Operations, Women and Children Protection Desk, National Bureau of Investigation as appropriate).
-      - Secure crime scene area, mobile patrol with investigation support.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, specific composite offense type, prevalent place type, and cluster if detected. Any occurrence warrants elevated CPA review at the Preparatory Conference.
+      - Mission: State the objective — secure incident area, support investigation, and prevent recurrence.
+      - Execution: Recommend regional-level coordination immediately — Scene of the Crime Operations (SOCO), WCPD, NBI as appropriate to the specific composite offense. Mobile patrol with investigation support posture.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Tasks must be derived from the specific composite offense type and place type in data.
+      - Coordinating Instructions: SOCO, WCPD, NBI, and Regional Intelligence and Investigation Division (RIID) as appropriate. Public Information Officer (PIO) must coordinate any community communication.
     `,
     intelligence: `
-      - Treat any occurrence as a potential organized crime indicator — initiate full intelligence assessment.
-      - Coordinate with Regional Intelligence and Investigation Division for regional threat context.
+      - Intelligence function at the Preparatory Conference: treat any occurrence as a potential organized crime indicator — initiate full intelligence assessment immediately. Coordinate with RIID for regional threat context.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Prioritize Scene of the Crime Operations involvement and full forensic documentation.
-      - No special complex crime should be in Under Investigation status without weekly command review.
+      - Investigation function at the Preparatory Conference: prioritize SOCO involvement and full forensic documentation. No special complex crime should remain Under Investigation without weekly COP review — flag this explicitly.
     `,
     pcr: `
-      - Public communication must be coordinated with Public Information Officer — community anxiety is high for this offense type.
-      - Reassure community through visible command presence, not just rank-and-file patrol.
+      - PCR function at the Preparatory Conference: all public communication must be coordinated with the Public Information Officer (PIO) — community anxiety is high for this offense type.
+      - Task patrol supervisors to provide reassurance through visible command presence in the affected barangay — not just rank-and-file patrol.
+      - Avoid releasing case details that could compromise investigation integrity.
     `,
   },
 
   "CARNAPPING - MC": {
     nature:
-      "theft of motorcycles — often by organized groups, targets both parked and moving motorcycles",
+      "theft of motorcycles — often by organized groups; targets both parked and moving units; route-dependent and inter-jurisdictional in nature",
     operations: `
-      - Carnapping is route-specific — checkpoint operations and highway patrol are more effective than beat patrol.
-      - If a cluster exists, reference the barangay name in Situation.
-      - Tasks (MUST DOs): verify motorcycle registrations at checkpoints; monitor chop-shop indicators in adjacent industrial/residential areas.
-      - Coordinating Instructions: Highway Patrol Group coordination required; coordinate with Land Transportation Office for hot unit flagging.
-      - Recommend Oplan Katok in residential areas if parked-motorcycle modus dominates.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, prevalent place type, peak hour/day, cluster barangay if detected, and modus from ACTUAL MODUS IN DATA. Note if inter-jurisdictional pattern is suggested by data.
+      - Mission: State the objective — reduce motorcycle theft opportunity along identified routes and in cluster barangay.
+      - Execution: Carnapping is route-specific — checkpoint operations and highway patrol are more effective than beat patrol. Reference the peak hour window and assign to the correct shift.
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks exclusively from modus names in ACTUAL MODUS IN DATA. Example format: "At 8:00 PM – 10:00 PM, conduct checkpoint operation at [specific road or area in cluster barangay]; verify motorcycle registrations and check for hot units." Do not assign tasks for modus not in the data.
+      - Coordinating Instructions: Highway Patrol Group (HPG) coordination is standard. Land Transportation Office (LTO) for hot unit flagging. Coordinate with adjacent stations if cross-boundary modus pattern is evident in data.
     `,
     intelligence: `
-      - Carnapping groups operate across multiple jurisdictions — develop intelligence on receiver/chop-shop networks.
-      - Coordinate with adjacent stations for stolen unit sightings.
-      - Monitor online selling platforms for suspiciously priced motorcycles.
-      - CRITICAL: Only mention modus names from the top modus data.
+      - Intelligence function at the Preparatory Conference: brief on modus patterns using only names in ACTUAL MODUS IN DATA. Carnapping groups often operate across jurisdictions — develop intelligence on receiver and chop-shop networks consistent with the modus data.
+      - Monitor online selling platforms for suspicious listings aligned to unit types in incident data.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Recovery of stolen units is a primary case-closing metric — coordinate with Land Transportation Office for plate tracing.
-      - Build a stolen motorcycle database entry for each case for cross-station matching.
+      - Investigation function at the Preparatory Conference: recovery of stolen units is the primary case-closing metric — coordinate with LTO for plate and chassis tracing on all open cases.
+      - Build a stolen motorcycle database entry per case for cross-station matching. Prioritize cases by modus names in ACTUAL MODUS IN DATA.
     `,
     pcr: `
-      - Community awareness on motorcycle security: wheel locks, hidden trackers, secure parking.
-      - Engage transport groups (habal-habal, delivery riders) as community information partners.
+      - PCR function at the Preparatory Conference: community awareness must be tailored to the modus in ACTUAL MODUS IN DATA — not generic anti-theft messaging.
+      - Engage transport groups relevant to the unit types in incident data as Barangay Information Network (BIN) partners — delivery riders and transport operators are valuable community intelligence sources for this crime type.
     `,
   },
 
   "CARNAPPING - MV": {
     nature:
-      "theft of four-wheeled vehicles — often more sophisticated, may involve key cloning or relay attacks",
+      "theft of four-wheeled vehicles — typically more planned than motorcycle theft; method varies by modus; may involve syndicate activity across jurisdictions",
     operations: `
-      - Four-wheel carnapping is typically more planned than motorcycle theft — modus identification is critical.
-      - Mobile patrol with checkpoint authority on major roads; coordinate with Highway Patrol Group.
-      - Tasks (MUST DOs): check parking areas of malls/markets; verify vehicle papers during checkpoints.
-      - Coordinating Instructions: Highway Patrol Group, Land Transportation Office coordination; Criminal Investigation and Detection Group if carnapping syndicate is suspected.
+      FIVE-PART PLAN GUIDANCE:
+      - Situation: Summarize using actual count, prevalent place type, peak hour/day, cluster barangay if detected, and modus from ACTUAL MODUS IN DATA. Note if syndicate-level pattern is suggested by data.
+      - Mission: State the objective — reduce vehicle theft opportunity at identified place type during peak window.
+      - Execution: Mobile patrol with checkpoint authority on major roads. 
+      - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks exclusively from modus names in ACTUAL MODUS IN DATA. Example format: "At 10:00 AM – 12:00 PM, conduct mobile patrol and parking area check at [place type from data] in [cluster barangay]; verify vehicle registrations at checkpoint." Do not assign tasks for modus not in the data.
+      - Coordinating Instructions: HPG and LTO coordination are standard. CIDG engagement only if syndicate-level modus is suggested by data.
     `,
     intelligence: `
-      - Coordinate with Criminal Investigation and Detection Group and Highway Patrol Group intelligence units for syndicate-level threat assessment.
-      - Monitor reports of suspicious vehicle activity (casing of parking areas) from community.
+      - Intelligence function at the Preparatory Conference: coordinate with CIDG and HPG intelligence units for syndicate-level threat assessment if data supports it. Monitor reports of suspicious activity (e.g., casing of parking areas) — tie to place type in data.
+      - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
     `,
     investigations: `
-      - Land Transportation Office coordination for vehicle tracing is mandatory in all open cases.
-      - Check insurance fraud angle if multiple high-value units are involved.
+      - Investigation function at the Preparatory Conference: LTO coordination for vehicle tracing is mandatory in all open cases. Review for insurance fraud angle only if volume data supports this.
+      - Prioritize cases by modus names in ACTUAL MODUS IN DATA.
     `,
     pcr: `
-      - Awareness campaign for vehicle owners on anti-theft measures.
-      - Coordinate with mall/establishment security on closed-circuit television coverage of parking facilities.
+      - PCR function at the Preparatory Conference: awareness campaign for vehicle owners must be tailored to the modus in ACTUAL MODUS IN DATA — not generic anti-theft advice.
+      - Coordinate with mall and establishment security on CCTV coverage of parking facilities if place type data supports this.
+      - Task patrollers to develop Barangay Information Network (BIN) contacts with parking attendants and establishment security as early-warning sources.
     `,
   },
 };
 
 const DEFAULT_REASONING = {
-  nature: "index crime requiring standard QUAD response",
+  nature: "index crime requiring standard QUAD policing response",
   operations: `
-    - Recommend patrol deployment aligned to peak hours and dominant place type from temporal data.
-    - If a DBSCAN cluster exists, reference the barangay name — never use coordinates.
-    - Tasks derived from actual dominant modus in data only.
+    FIVE-PART PLAN GUIDANCE:
+    - Situation: Summarize using actual count, prevalent place type, peak hour/day, and cluster barangay if detected. Reference CPA findings.
+    - Mission: State the patrol unit's objective based on the crime situation assessment.
+    - Execution: Match patrol method to place type from data. Reference cluster barangay by name — never use coordinates.
+    - Tasks (MUST DOs): Each task must have a specific location AND a time window. Derive tasks exclusively from modus names in ACTUAL MODUS IN DATA. Do not assign tasks for modus not listed.
+    - Coordinating Instructions: Engage Barangay Tanods and BPATs for joint patrol. Activate Barangay Information Network (BIN) near cluster area.
   `,
   intelligence: `
-    - Monitor modus patterns and flag Emerging Crime Problem if trend is increasing and CSE is below 30%.
-    - Task patrollers as information collectors from the community near incident hotspots.
-    - CRITICAL: Only mention modus names from the top modus data.
+    - Intelligence function at the Preparatory Conference: brief on modus patterns using only names in ACTUAL MODUS IN DATA.
+    - Task beat patrollers as 'bee workers' — collectors of significant information from the community near incident hotspots. Feed back to next Preparatory Conference.
+    - Flag as ECP if trend is increasing and CSE is below 30%.
+    - CRITICAL: Never reference a modus name not present in ACTUAL MODUS IN DATA.
   `,
   investigations: `
-    - Prioritize open cases by modus severity.
+    - Investigation function at the Preparatory Conference: present open case list with modus breakdown using names from ACTUAL MODUS IN DATA only.
     - Cross-reference modus across cases for series crime indicators.
   `,
   pcr: `
-    - Community awareness aligned to dominant modus and place type.
-    - Engage barangay tanods for joint patrol and information development.
+    - PCR function at the Preparatory Conference: develop community engagement strategies aligned to prevalent modus and place type from data — not generic messaging.
+    - Task patrollers to build Barangay Information Network (BIN) contacts in the cluster barangay.
+    - Engage Barangay Tanods for joint patrol and information development during peak hours.
   `,
 };
 
@@ -281,7 +317,7 @@ function formatHourWindow(hour) {
   const end = (hour + 1) % 12 || 12;
   const startSuffix = hour < 12 ? "AM" : "PM";
   const endSuffix = hour + 1 < 12 ? "AM" : "PM";
-  return `${start}:00 ${startSuffix}–${end}:00 ${endSuffix}`;
+  return `${start}:00 ${startSuffix} – ${end}:00 ${endSuffix}`;
 }
 
 function buildModusBlock(top3Modus, modusDescriptions = []) {
@@ -308,7 +344,7 @@ function buildClusterBlock(clusters) {
   return clusters
     .map((c, i) => {
       const label = String.fromCharCode(65 + i); // A, B, C...
-      return `Cluster ${label}: ${c.count} incidents in ${c.dominant_barangay || "Unknown barangay"} — dominant crime: ${c.dominant_crime}, dominant modus: ${c.dominant_modus}`;
+      return `Cluster ${label}: ${c.count} incidents in ${c.prevalent_barangay || "Unknown barangay"} — prevalent crime: ${c.prevalent_crime}, prevalent modus: ${c.prevalent_modus}`;
     })
     .join("\n");
 }
@@ -322,18 +358,22 @@ const buildGeneralAssessmentPrompt = ({ analysis, baseAssessment }) => {
 
   const modeInstruction =
     mode === "retrospective"
-      ? "Frame as LESSONS LEARNED. Use past tense."
-      : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
+      ? "Frame as LESSONS LEARNED for the Preparatory Conference review. Use past tense."
+      : "Frame as IMMEDIATE ACTION ITEMS for today's Preparatory Conference. Use present/future tense.";
 
   return `
 You are a senior PNP crime analyst writing a formal strategic assessment for a station commander.
+This assessment will be presented at the Preparatory Conference (Section 2.8 of the PNP Managing
+Patrol Operations Manual 2015) — the daily meeting where the Chief of Police, QUAD Staff, and
+Patrol Supervisors review Crime Pattern Analysis (CPA) and Emerging Crime Problems (ECP) to guide
+patrol deployment decisions.
 
 ASSESSMENT PERIOD: ${filters?.date_from || "unknown"} to ${filters?.date_to || "unknown"}
 AREA: ${filters?.barangays?.join(", ") || "All barangays"}
 MODE: ${mode || "current"}
 ${modeInstruction}
 
-OVERALL SITUATION:
+OVERALL SITUATION (Crime Pattern Analysis):
 Total incidents     : ${overall.total ?? 0}
 Cleared             : ${overall.cleared ?? 0}
 Solved              : ${overall.solved ?? 0}
@@ -344,7 +384,7 @@ Peak hour           : ${overall.peak_hour !== null && overall.peak_hour !== unde
 Peak day            : ${overall.peak_day ?? "Unknown"}
 Peak month          : ${overall.peak_month ?? "Unknown"}
 
-GEOGRAPHIC HOTSPOTS (DBSCAN):
+GEOGRAPHIC HOTSPOTS (DBSCAN Cluster Analysis):
 ${clusterBlock}
 
 PRIOR DRAFT (improve this, do not copy verbatim):
@@ -352,7 +392,7 @@ ${baseAssessment?.general_assessment || ""}
 
 Return VALID JSON ONLY. No markdown. No extra keys.
 {
-  "general_assessment": "3 to 5 sentences. Cover: total incidents, CCE/CSE performance, top crime by volume, peak period, and most significant hotspot barangay if detected. Use actual numbers. Be specific and formal."
+  "general_assessment": "3 to 5 sentences for the Preparatory Conference. Cover: total incidents from the Crime Pattern Analysis, CCE/CSE performance, top crime by volume, peak period, and most significant hotspot barangay if detected. Flag any Emerging Crime Problem. Use actual numbers. Be specific and formal."
 }
 `.trim();
 };
@@ -373,7 +413,7 @@ const buildPerCrimePrompt = ({
     (temporal?.per_crime || []).map((t) => [t.crime, t]),
   );
   const crimeCluster = (clusters?.clusters || []).find(
-    (c) => c.dominant_crime === crimeType,
+    (c) => c.prevalent_crime === crimeType,
   );
 
   const temporal_data = temporalMap[crimeType] || {};
@@ -391,8 +431,8 @@ const buildPerCrimePrompt = ({
 
   const modeInstruction =
     mode === "retrospective"
-      ? "Frame as LESSONS LEARNED. Use past tense."
-      : "Frame as IMMEDIATE ACTION ITEMS. Use present/future tense.";
+      ? "Frame as LESSONS LEARNED for the Preparatory Conference review. Use past tense."
+      : "Frame as IMMEDIATE ACTION ITEMS for today's Preparatory Conference. Use present/future tense.";
 
   const guide = CRIME_REASONING[crimeType] || DEFAULT_REASONING;
 
@@ -403,47 +443,101 @@ const buildPerCrimePrompt = ({
       : "Insufficient data for forecast";
 
   const clusterText = crimeCluster
-    ? `Cluster detected in ${crimeCluster.dominant_barangay} — ${crimeCluster.count} incidents, dominant modus: ${crimeCluster.dominant_modus}`
+    ? `Cluster detected in ${crimeCluster.prevalent_barangay} — ${crimeCluster.count} incidents, prevalent modus: ${crimeCluster.prevalent_modus}`
     : "No geographic cluster detected for this crime type";
 
+  // ── Dynamic modus context — built from actual incident data only ──────────
+  // This is the single source of truth for modus names the AI is allowed to use.
+  // CRIME_REASONING guides are intentionally modus-agnostic so that only
+  // these names — drawn from real data — appear in the AI output.
+  const top3ModusNames = (crimeStat.top_3_modus || [])
+    .map((m) => m.modus)
+    .filter(Boolean);
+
+  const modusContextBlock =
+    top3ModusNames.length > 0
+      ? `ACTUAL MODUS IN DATA (use ONLY these names in your response — never invent or assume others):
+${top3ModusNames.map((m, i) => `  ${i + 1}. ${m}`).join("\n")}`
+      : `ACTUAL MODUS IN DATA: None recorded for this period. Do not reference any modus name in your response.`;
+
   const patrolOpsContext = `
-PATROL OPERATIONS FRAMEWORK (PNP Managing Patrol Operations Manual):
-- Patrol deployment must follow the EMPO framework: Employment, Mission, Priority, and Operations.
-- Foot patrol is preferred in high-density areas; mobile patrol for wider coverage.
-- Checkpoint operations require designated sites approved by station commander.
-- Shift assignments: Shift 1 = 6AM-2PM, Shift 2 = 2PM-10PM, Shift 3 = 10PM-6AM.
-- All patrol tasks must include: specific location, time window, and assigned unit.
-- Force multipliers: Barangay Tanods, CAFGU, BPSO, HPG, CIDG as appropriate.
-- Hot pursuit and warrant service are patrol functions requiring pre-briefing.
-- Intelligence-driven patrol: deploy based on crime clock data, not generic schedules.
+PATROL OPERATIONS FRAMEWORK (PNP Managing Patrol Operations Manual 2015):
+
+This assessment output will be used at the Preparatory Conference (Section 2.8) — the daily
+meeting where the COP, QUAD Staff, and Patrol Supervisors review Crime Pattern Analysis (CPA)
+and Emerging Crime Problems (ECP) to guide patrol deployment.
+
+The Four QUAD Functions (each section of the output maps to one):
+  - Operations   : Adjust patrol deployment based on CPA. Uses the Five-Part Plan format.
+  - Intelligence : Prepare info on criminal elements and modus operandi for the briefing.
+  - Investigation: Present updated case status, warrant list, and persons of interest.
+  - PCR          : Develop community engagement strategies; organize force multipliers and BINs.
+
+Five-Part Plan Format (Section 3.5 of the Manual — for the Operations section):
+  a. Situation            — Nature and extent of crime; modus; time/location/rate of incidence
+  b. Mission              — What the patrol unit aims to accomplish
+  c. Execution            — Concept of operations; patrol method;  beat/sector
+  d. Tasks (MUST DOs)     — Specific duties with TIME WINDOW and LOCATION for each task
+  e. Coordinating         — Force multipliers, TOC, adjacent units, inter-agency coordination
+     Instructions
+
+Patrol Methods (choose based on place type from data):
+  - Foot patrol      : Heavily populated areas, markets, schools, terminals, residential blocks
+  - Motorcycle patrol: Against mobile criminals; traffic-congested areas
+  - Mobile/automobile: Wider coverage; rapid response; highway and checkpoint operations
+
+
+MUST DOs (per Annex A of the Manual):
+  - Must be time-stamped and location-specific
+  - Example: "At 9:00 AM – 10:00 AM, conduct foot patrol and target hardening check at [place] in [barangay]"
+  - Derived from CPA findings and crime clock data — never generic
+
+Force Multipliers (Section 2.3):
+  - Barangay Tanods, BPATs, HPG, CIDG, NBI, WCPD, DSWD, LTO, LGU
+
+Barangay Information Network (BIN):
+  - Community members recruited by patrollers to provide early warning on suspicious activity
+  - Patrollers act as 'bee workers' — collectors of community intelligence fed back to the Preparatory Conference
+  - BIN contacts are an actionable PCR deliverable with a specific recruit target (e.g., market vendors, transport drivers, purok leaders)
+
+ECP and CPA:
+  - CPA (Crime Pattern Analysis): the analytical basis — what the data shows
+  - ECP (Emerging Crime Problem): declared when trend is increasing and CSE < 30%; triggers Station Patrol Plan adjustment
 `;
 
   return `
 You are a senior PNP crime analyst writing ONE section of a formal assessment for a station commander.
-Write ONLY for the crime type: ${crimeType}
+This output will be presented at today's Preparatory Conference (Section 2.8, PNP Managing Patrol
+Operations Manual 2015) for the crime type: ${crimeType}
 ${modeInstruction}
 
-CRIME DATA FOR ${crimeType}:
-  Total incidents     : ${crimeStat.total ?? 0}
-  Cleared             : ${crimeStat.cleared ?? 0}
-  Solved              : ${crimeStat.solved ?? 0}
-  Under investigation : ${crimeStat.under_investigation ?? 0}
-  CCE                 : ${crimeStat.cce_percent ?? 0}%
-  CSE                 : ${crimeStat.cse_percent ?? 0}%
-  Trend               : ${crimeStat.trend ?? "stable"}
-  Forecast next week  : ${forecastText}
-  Emerging Crime Problem flag : ${crimeStat.is_ecp ? "YES — flag explicitly" : "No"}
-  Peak hours          : ${hoursDisplay}
-  Peak day            : ${crimeStat.peak_day ?? temporal_data.peak_day ?? "Unknown"}
-  Dominant place type : ${crimeStat.top_place_type ?? "Unknown"}
-  Top modus           :
+CRIME PATTERN ANALYSIS (CPA) FOR ${crimeType}:
+  Total incidents              : ${crimeStat.total ?? 0}
+  Cleared                      : ${crimeStat.cleared ?? 0}
+  Solved                       : ${crimeStat.solved ?? 0}
+  Under investigation          : ${crimeStat.under_investigation ?? 0}
+  CCE                          : ${crimeStat.cce_percent ?? 0}%
+  CSE                          : ${crimeStat.cse_percent ?? 0}%
+  Trend                        : ${(crimeStat.trend === "insufficient_data" ? "insufficient data" : crimeStat.trend) ?? "stable"}
+  Forecast next week           : ${forecastText}
+  Emerging Crime Problem (ECP) : ${crimeStat.is_ecp ? "YES — declare ECP; Station Patrol Plan must be adjusted" : "No"}
+  Peak hours                   : ${hoursDisplay}
+  Peak day                     : ${crimeStat.peak_day ?? temporal_data.peak_day ?? "Unknown"}
+  prevalent place type          : ${crimeStat.top_place_type ?? "Unknown"}
+  Top modus (with descriptions):
       ${buildModusBlock(crimeStat.top_3_modus, modusMap[crimeType] || [])}
-  Geographic cluster  : ${clusterText}
+  Geographic cluster           : ${clusterText}
+
+${modusContextBlock}
 
 ${patrolOpsContext}
-REASONING GUIDE FOR ${crimeType}:
 
-REASONING GUIDE FOR ${crimeType}:
+REASONING GUIDE FOR ${crimeType}
+(Ground all recommendations in the CPA data above.
+ Adapt to ACTUAL MODUS IN DATA — never reference modus not in that list.
+ Use the Five-Part Plan format for the operations section.
+ MUST DOs must each include a time window and a specific location.):
+
   Nature              : ${guide.nature}
   Operations guidance : ${guide.operations.trim()}
   Intelligence guide  : ${guide.intelligence.trim()}
@@ -460,17 +554,19 @@ PRIOR DRAFT (improve this, do not copy verbatim):
 Return VALID JSON ONLY. No markdown. No extra keys. One object only.
 {
   "crime_type": "${crimeType}",
-  "general_assessment": "2 to 3 sentences — incident count, trend with confidence level, peak time and day, dominant modus by name, Emerging Crime Problem status if applicable.",
-  "operations": "2 to 3 sentences. Situation: summarize the crime pattern. Mission: one sentence goal. Execution: specify patrol method, barangay from cluster if detected, peak hours from data. Tasks: 2 specific tasks tied to the actual dominant modus — not generic. Coordinating Instructions: name relevant force multipliers.",
-  "intelligence": "1 to 2 sentences. Reference at least one specific modus by name from the top modus data. Flag Emerging Crime Problem if applicable. Do not mention modus names not in the data.",
-  "investigations": "1 to 2 sentences. Reference actual open case count. Mention specific modus priority. No generic advice.",
-  "police_community_relations": "1 to 2 sentences. Name at least one specific community partner type relevant to this crime (Block Information Network volunteers, Women and Children Protection Desk, barangay tanods, transport groups, etc.). Tie to dominant place type and modus."
+  "general_assessment": "2 to 3 sentences for the Preparatory Conference. Cover: incident count from CPA, trend with forecast and confidence level, peak time, prevalent modus by name from ACTUAL MODUS IN DATA only, ECP status if applicable.",
+  "operations": "Use the Five-Part Plan format as flowing prose — do NOT use arrays, bullet points, or JSON inside this field. Structure: Situation: [crime pattern from CPA]. Mission: [one sentence goal]. Execution: [patrol method matched to place type, cluster barangay by name if detected, peak hours]. Tasks (MUST DOs): [write exactly 2 MUST DOs as plain sentences, each starting with a time in AM/PM format, e.g. 'At 8:00 AM – 9:00 AM, ...', tied to ACTUAL MODUS IN DATA]. Coordinating Instructions: [name relevant force multipliers].",
+  "intelligence": "1 to 2 sentences for the Preparatory Conference intelligence brief. Reference at least one specific modus by name from ACTUAL MODUS IN DATA only. State what patrollers should collect as 'bee workers' from the community. Flag ECP if applicable. Never mention modus not in ACTUAL MODUS IN DATA.",
+  "investigations": "1 to 2 sentences for the Preparatory Conference investigation brief. CRITICAL: If under_investigation count is 0, do NOT suggest follow-up on open cases — state that all cases have been cleared or solved. Only reference open cases if under_investigation > 0. Reference modus names from ACTUAL MODUS IN DATA only where applicable.",
+  "police_community_relations": "1 to 2 sentences for the Preparatory Conference PCR brief. Name at least one specific community partner. State one actionable BIN task — who patrollers should recruit as BIN contacts and why. Tie to prevalent place type and modus from ACTUAL MODUS IN DATA. Any time references must use AM/PM format (e.g. '11:00 PM'), never 24-hour military time.",
 }
 
 Critical rules:
-- ONLY use modus names that appear in the Top modus data above. Never invent modus names not in the data.
-- Reference the cluster barangay by name if one was detected — never use coordinates.
-- No markdown. No extra keys. No invented facts.
+- ONLY use modus names from ACTUAL MODUS IN DATA. Never invent or assume modus names not in that list.
+- ALL time references anywhere in your response must use AM/PM format (e.g. "8:00 AM – 9:00 AM", "11:00 PM") — never 24-hour military time. This applies to every field: general_assessment, operations, intelligence, investigations, and police_community_relations.
+- MUST DO tasks must be written as plain prose sentences — never as a JSON array or bullet list.
+- Reference cluster barangay by name if detected — never use coordinates.
+- No markdown. No extra keys. No invented facts. No arrays inside field values.
 - Spell out all abbreviations fully on first use.
 `.trim();
 };

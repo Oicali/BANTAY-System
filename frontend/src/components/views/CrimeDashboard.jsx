@@ -1049,7 +1049,10 @@ const CaseStatusChart = ({ data, selectedCrimes }) => {
             textAnchor="middle"
             interval={0}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
+          <YAxis
+            tick={{ fontSize: 11, fill: "#6b7280" }}
+            allowDecimals={false}
+          />
           <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
           <Bar
             dataKey="Cleared"
@@ -1303,7 +1306,10 @@ const CrimeTrends = ({ appliedFilters, data }) => {
             tick={{ fontSize: 11, fill: "#6b7280" }}
             interval={tickInterval}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
+          <YAxis
+            tick={{ fontSize: 11, fill: "#6b7280" }}
+            allowDecimals={false}
+          />
           <Tooltip content={<TrendsTooltip />} />
 
           <Line
@@ -1444,7 +1450,10 @@ const CrimeByDay = ({ data }) => {
             tickFormatter={(d) => d.slice(0, 3)}
             tick={{ fontSize: 13, fill: "#6b7280" }}
           />
-          <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} allowDecimals={false} />
+          <YAxis
+            tick={{ fontSize: 11, fill: "#6b7280" }}
+            allowDecimals={false}
+          />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 6 }}
             formatter={(v) => [v, "Reported"]}
@@ -1849,41 +1858,28 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
   if (!crimeRows.length) return null;
 
   const regressionData = useMemo(() => {
-    if (!lr || lr.slope === undefined) return [];
-    const n = crimeRows.length;
-    const meanX = (n - 1) / 2;
-    const meanY = crimeRows.reduce((s, r) => s + r.count, 0) / n;
-    const intercept = meanY - lr.slope * meanX;
-
-    return crimeRows.map((r, i) => ({
+    if (!lr || lr.smoothed_demand === undefined) return [];
+    // Croston rate = smoothed_demand / smoothed_interval
+    const rate = lr.smoothed_demand / Math.max(lr.smoothed_interval || 1, 1);
+    return crimeRows.map((r) => ({
       ...r,
-      regression: Math.max(
-        0,
-        parseFloat((intercept + lr.slope * i).toFixed(2)),
-      ),
+      regression: Math.max(0, parseFloat(rate.toFixed(2))),
     }));
   }, [crimeRows, lr]);
 
   const chartData = useMemo(() => {
     if (!regressionData.length) return crimeRows;
-    const n = regressionData.length;
-    const meanX = (n - 1) / 2;
-    const meanY = crimeRows.reduce((s, r) => s + r.count, 0) / n;
-    const intercept = meanY - lr.slope * meanX;
-    const nextIndex = n;
-    const nextRegression = Math.max(
-      0,
-      parseFloat((intercept + lr.slope * nextIndex).toFixed(2)),
-    );
+    const rate = lr.smoothed_demand / Math.max(lr.smoothed_interval || 1, 1);
+    const forecastVal = Math.max(0, parseFloat(rate.toFixed(2)));
 
     return [
       ...regressionData,
       {
-        index: nextIndex,
+        index: regressionData.length,
         week: "Forecast",
         count: null,
-        regression: nextRegression,
-        predicted: lr.predicted_next_week ?? nextRegression,
+        regression: forecastVal,
+        predicted: lr.predicted_next_week ?? forecastVal,
       },
     ];
   }, [regressionData, lr, crimeRows]);
@@ -2112,15 +2108,22 @@ const CrimeDashboard = () => {
 
   const fetchIdRef = useRef(0);
 
-  // ── Chart refs for html2canvas capture ──────────────────────────────────────
+  const refCaseStatus = useRef(null);
+  const refTrends = useRef(null);
+  const refClock = useRef(null);
+  const refByDay = useRef(null);
+  const refModus = useRef(null);
+  const refPlace = useRef(null);
+  const refBarangay = useRef(null);
+
   const chartRefs = {
-    caseStatus: useRef(null),
-    trends: useRef(null),
-    clock: useRef(null),
-    byDay: useRef(null),
-    modus: useRef(null),
-    place: useRef(null),
-    barangay: useRef(null),
+    caseStatus: refCaseStatus,
+    trends: refTrends,
+    clock: refClock,
+    byDay: refByDay,
+    modus: refModus,
+    place: refPlace,
+    barangay: refBarangay,
   };
 
   const [isExportLoading, setIsExportLoading] = useState(false);
@@ -2324,10 +2327,7 @@ const CrimeDashboard = () => {
   return (
     <div className="content-area">
       <LoadingModal isOpen={isLoading} message="Loading crime data..." />
-      <LoadingModal
-        isOpen={isExportLoading}
-        message="Preparing export..."
-      />
+      <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
 
       <div className="cd-page-header">
         <div className="cd-page-header-left">
@@ -2512,7 +2512,7 @@ const CrimeDashboard = () => {
                 <TrendSparkline
                   crimeType={crime.crime_type}
                   weeklyRows={analysisData?.historical_weekly_rows}
-                  linregData={analysisData?.linreg}
+                  linregData={analysisData?.croston}
                   mode={analysisData?.mode}
                 />
 

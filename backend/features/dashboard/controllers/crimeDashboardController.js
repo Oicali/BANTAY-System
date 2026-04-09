@@ -312,10 +312,14 @@ const queryHourly = async (where, params, nextP) => {
     map[r.hour] = parseInt(r.count);
   });
 
-  return Array.from({ length: 24 }, (_, h) => ({
-    hour: `${String(h).padStart(2, "0")}:00`,
-    count: map[h] || 0,
-  }));
+  return Array.from({ length: 24 }, (_, h) => {
+    const period = h < 12 ? "AM" : "PM";
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    return {
+      hour: `${displayH}${period}`,
+      count: map[h] || 0,
+    };
+  });
 };
 
 const queryByDay = async (where, params, nextP) => {
