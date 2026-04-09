@@ -117,7 +117,7 @@ const getMobileUnits = async (req, res) => {
         plate_number,
         created_at
       FROM mobile_unit
-      ORDER BY created_at DESC
+      ORDER BY mobile_unit_name ASC
     `);
 
     res.json({ success: true, data: result.rows });
