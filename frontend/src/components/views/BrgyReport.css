@@ -461,3 +461,12 @@
   .br-page-header { flex-wrap: wrap; }
   .br-brgy-pill { margin-left: 0; }
 }
+
+.br-wrapper input:-webkit-autofill,
+.br-wrapper input:-webkit-autofill:hover,
+.br-wrapper input:-webkit-autofill:focus,
+.br-wrapper input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}

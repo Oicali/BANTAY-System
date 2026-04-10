@@ -214,13 +214,14 @@ const validateBlotterData = (blotterData) => {
     const reported = new Date(blotterData.date_time_reported);
     const now = new Date();
     
-    if (commission > now) {
-      errors.push("Commission date cannot be in the future");
-    }
-    
-    if (reported > now) {
-      errors.push("Report date cannot be in the future");
-    }
+    const futureLimit = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+if (commission > futureLimit) {
+  errors.push("Commission date cannot be in the future");
+}
+
+if (reported > futureLimit) {
+  errors.push("Report date cannot be in the future");
+}
     
     if (commission > reported) {
       errors.push("Commission date cannot be after report date");
