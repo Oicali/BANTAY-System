@@ -36,14 +36,19 @@ function BrgyReport() {
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState("");
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [barangayName, setBarangayName] = useState("Loading...");
-
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [toast, setToast] = useState({ show: false, message: "" });
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: "" }), 3000);
+  };
   useEffect(() => {
     fetchMyReports();
+    setLoadingProfile(true);
     fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     })
@@ -54,6 +59,7 @@ function BrgyReport() {
           if (!/^\d+$/.test(code)) {
             setForm((prev) => ({ ...prev, place_barangay: code }));
             setBarangayName(code);
+            setLoadingProfile(false);
             return null;
           }
           return fetch(`https://psgc.gitlab.io/api/barangays/${code}.json`);
@@ -66,7 +72,8 @@ function BrgyReport() {
           setForm((prev) => ({ ...prev, place_barangay: brgyData.name }));
         }
       })
-      .catch(() => setBarangayName("Your assigned barangay"));
+      .catch(() => setBarangayName("Your assigned barangay"))
+      .finally(() => setLoadingProfile(false));
   }, []);
 
   const fetchMyReports = async () => {
@@ -99,21 +106,34 @@ function BrgyReport() {
     if (!form.incident_type) e.incident_type = "Required";
     if (!form.date_time_commission) {
       e.date_time_commission = "Required";
-    } else if (new Date(form.date_time_commission) > new Date()) {
-      e.date_time_commission = "Cannot be in the future";
+    } else {
+      const commission = new Date(form.date_time_commission);
+      const now = new Date();
+      if (commission > now) e.date_time_commission = "Cannot be future date";
+      else if (
+        form.date_time_reported &&
+        commission > new Date(form.date_time_reported)
+      )
+        e.date_time_commission = "Must be before report date";
     }
     if (!form.date_time_reported) {
       e.date_time_reported = "Required";
-    } else if (new Date(form.date_time_reported) > new Date()) {
-      e.date_time_reported = "Cannot be in the future";
-    } else if (
-      form.date_time_commission &&
-      new Date(form.date_time_commission) > new Date(form.date_time_reported)
-    ) {
-      e.date_time_reported = "Cannot be before incident date";
+    } else {
+      const reported = new Date(form.date_time_reported);
+      const now = new Date();
+      if (reported > now) e.date_time_reported = "Cannot be future date";
+      else if (
+        form.date_time_commission &&
+        reported < new Date(form.date_time_commission)
+      )
+        e.date_time_reported = "Cannot be before commission";
     }
     if (!form.place_barangay) e.place_barangay = "Required";
-    if (!form.place_street) e.place_street = "Required";
+    if (!form.place_street || form.place_street.trim().length === 0) {
+      e.place_street = "Required";
+    } else if (form.place_street.trim().length < 2) {
+      e.place_street = "At least 2 characters";
+    }
     if (!form.narrative || form.narrative.trim().length < 20)
       e.narrative = "At least 20 characters";
     if (!form.victim_first_name) e.victim_first_name = "Required";
@@ -147,8 +167,8 @@ function BrgyReport() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccessMsg(
-          `Report submitted successfully! Reference No.: ${data.data.blotter_entry_number}`,
+        showToast(
+          `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
         );
         setForm({
           incident_type: "",
@@ -163,7 +183,9 @@ function BrgyReport() {
           victim_contact: "",
         });
         fetchMyReports();
-        setTimeout(() => setSuccessMsg(""), 7000);
+        document
+          .querySelector(".content-wrapper")
+          ?.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         const msg = data.errors ? data.errors.join("\n") : data.message;
         alert("Submission failed:\n" + msg);
@@ -184,6 +206,10 @@ function BrgyReport() {
   return (
     <div className="br-wrapper">
       <LoadingModal isOpen={submitting} message="Submitting report..." />
+      <LoadingModal
+        isOpen={loadingReports || loadingProfile}
+        message="Loading..."
+      />
 
       {/* ── PAGE HEADER ── */}
       <div className="br-page-header">
@@ -216,26 +242,6 @@ function BrgyReport() {
           {barangayName}
         </div>
       </div>
-
-      {/* ── SUCCESS ── */}
-      {successMsg && (
-        <div className="br-success">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          {successMsg}
-        </div>
-      )}
 
       {/* ── ALERT ── */}
       <div className="br-alert">
@@ -339,9 +345,7 @@ function BrgyReport() {
                   type="datetime-local"
                   className={`br-input ${errors.date_time_commission ? "error" : ""}`}
                   value={form.date_time_commission}
-                  max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
-                    .toISOString()
-                    .slice(0, 16)}
+                  max={new Date().toISOString().slice(0, 16)}
                   onKeyDown={(e) => e.preventDefault()}
                   onChange={(e) =>
                     update("date_time_commission", e.target.value)
@@ -362,9 +366,7 @@ function BrgyReport() {
                   type="datetime-local"
                   className={`br-input ${errors.date_time_reported ? "error" : ""}`}
                   value={form.date_time_reported}
-                  max={new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
-                    .toISOString()
-                    .slice(0, 16)}
+                  max={new Date().toISOString().slice(0, 16)}
                   onKeyDown={(e) => e.preventDefault()}
                   onChange={(e) => update("date_time_reported", e.target.value)}
                 />
@@ -596,9 +598,7 @@ function BrgyReport() {
           <span className="br-reports-count">{reports.length} total</span>
         </div>
 
-        {loadingReports ? (
-          <div className="br-loading">Loading submitted reports...</div>
-        ) : reports.length === 0 ? (
+        {reports.length === 0 && !loadingReports ? (
           <div className="br-empty">
             <div className="br-empty-icon">
               <svg
@@ -701,6 +701,24 @@ function BrgyReport() {
           </>
         )}
       </div>
+      {toast.show && (
+        <div className="um-toast um-toast-success" style={{ zIndex: 99999 }}>
+          <div className="um-toast-content">
+            <svg
+              className="um-toast-icon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

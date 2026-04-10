@@ -871,6 +871,7 @@ function EBlotter() {
     }
   };
   const handleAcceptReferral = async (blotterId) => {
+    setFetchingEdit(true);
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
@@ -971,6 +972,8 @@ function EBlotter() {
     } catch (error) {
       console.error("Error:", error);
       alert("Failed to load blotter data");
+    } finally {
+      setFetchingEdit(false);
     }
   };
   const handleApiResponse = (response) => {
@@ -2579,6 +2582,52 @@ function EBlotter() {
                             {typeOfPlace || "N/A"}
                           </span>
                         </div>
+                        {caseDetail.lat && caseDetail.lng && (
+                          <div className="eb-view-item eb-view-full">
+                            <span className="eb-view-label">Pin Location:</span>
+                            <div
+                              style={{
+                                height: "250px",
+                                borderRadius: "8px",
+                                overflow: "hidden",
+                                marginTop: "6px",
+                                border: "1px solid #e5e7eb",
+                              }}
+                            >
+                              <Map
+                                mapboxAccessToken={
+                                  import.meta.env.VITE_MAPBOX_TOKEN
+                                }
+                                initialViewState={{
+                                  longitude: parseFloat(caseDetail.lng),
+                                  latitude: parseFloat(caseDetail.lat),
+                                  zoom: 15,
+                                }}
+                                style={{ width: "100%", height: "100%" }}
+                                mapStyle="mapbox://styles/mapbox/streets-v12"
+                                interactive={false}
+                              >
+                                <Marker
+                                  longitude={parseFloat(caseDetail.lng)}
+                                  latitude={parseFloat(caseDetail.lat)}
+                                  anchor="bottom"
+                                >
+                                  <div
+                                    style={{
+                                      width: "20px",
+                                      height: "20px",
+                                      borderRadius: "50% 50% 50% 0",
+                                      background: "#c1272d",
+                                      border: "2px solid white",
+                                      transform: "rotate(-45deg)",
+                                      boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                                    }}
+                                  />
+                                </Marker>
+                              </Map>
+                            </div>
+                          </div>
+                        )}
                         <div className="eb-view-item">
                           <span className="eb-view-label">Private Place?</span>
                           <span className="eb-view-value">
@@ -4465,11 +4514,7 @@ function EBlotter() {
                           type="datetime-local"
                           className={`eb-modal-input ${fieldErrors.date_time_commission ? "error" : ""}`}
                           value={caseDetail.date_time_commission}
-                          max={new Date(
-                            new Date().getTime() + 24 * 60 * 60 * 1000,
-                          )
-                            .toISOString()
-                            .slice(0, 16)}
+                          max={new Date().toISOString().slice(0, 16)}
                           onKeyDown={(e) => e.preventDefault()}
                           onChange={(e) => {
                             updateCaseDetail(
@@ -4497,11 +4542,7 @@ function EBlotter() {
                           type="datetime-local"
                           className={`eb-modal-input ${fieldErrors.date_time_reported ? "error" : ""}`}
                           value={caseDetail.date_time_reported}
-                          max={new Date(
-                            new Date().getTime() + 24 * 60 * 60 * 1000,
-                          )
-                            .toISOString()
-                            .slice(0, 16)}
+                          max={new Date().toISOString().slice(0, 16)}
                           onKeyDown={(e) => e.preventDefault()}
                           onChange={(e) => {
                             updateCaseDetail(
