@@ -153,7 +153,7 @@ const PRESETS = [
   { label: "Last 7 days", key: "7d" },
   { label: "Last 30 days", key: "30d" },
   { label: "Last 3 months", key: "3m" },
-  { label: "Last 1 Year", key: "365d" },
+  { label: "Last 1 year", key: "365d" },
   { label: "Custom", key: "custom" },
 ];
 
@@ -173,10 +173,12 @@ const getPresetRange = (key) => {
     const now = new Date();
     const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
     const phtToday = new Date(phtMs);
-    const lastYear = new Date(phtToday);
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
-    return { from: lastYear.toISOString().slice(0, 10), to: t };
+    const from = new Date(phtToday);
+    from.setFullYear(from.getFullYear() - 1);
+    from.setDate(from.getDate() + 1); // fix off-by-one
+    return { from: from.toISOString().slice(0, 10), to: t };
   }
+  // if (key === "365d") return { from: offsetDate(-364), to: t };
   return null;
 };
 
@@ -528,19 +530,14 @@ const FilterBar = ({
   const validateDates = (from, to) => {
     if (!from || !to) return "Please select both start and end dates.";
     if (from >= to) return "Start date must be before end date.";
-    const days = Math.round((new Date(to) - new Date(from)) / 86400000);
+    const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
     if (days < 7) return "Custom range must be at least 7 days.";
     return "";
   };
 
   const handleDateFrom = (val) => {
-    const autoTo = (() => {
-      const d = new Date(val);
-      d.setFullYear(d.getFullYear() + 1);
-      const cap = todayIso();
-      const computed = d.toISOString().slice(0, 10);
-      return computed <= cap ? computed : cap;
-    })();
+    const autoTo =
+      draft.dateTo && draft.dateTo > val ? draft.dateTo : todayIso();
     setDraft((f) => ({ ...f, dateFrom: val, dateTo: autoTo }));
     setDateError(validateDates(val, autoTo));
   };
@@ -631,7 +628,7 @@ const FilterBar = ({
                       draft.dateTo
                         ? (() => {
                             const d = new Date(draft.dateTo);
-                            d.setDate(d.getDate() - 7);
+                            d.setDate(d.getDate() - 6);
                             return d.toISOString().slice(0, 10);
                           })()
                         : todayIso()
@@ -646,7 +643,7 @@ const FilterBar = ({
                       draft.dateFrom
                         ? (() => {
                             const d = new Date(draft.dateFrom);
-                            d.setDate(d.getDate() + 7);
+                            d.setDate(d.getDate() + 6);
                             return d.toISOString().slice(0, 10);
                           })()
                         : undefined
@@ -1025,62 +1022,68 @@ const CaseStatusChart = ({ data, selectedCrimes }) => {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <BarChart
-          data={rows}
-          margin={{ top: 28, right: 16, left: 0, bottom: 16 }}
-          barCategoryGap="22%"
+      <div style={{ overflowX: "auto", overflowY: "hidden" }}>
+        <ResponsiveContainer
+          width="100%"
+          minWidth={rows.length * 80}
+          height={320}
         >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="#e5e7eb"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="crime"
-            tick={{
-              fontSize: Math.max(
-                9,
-                Math.min(11, Math.floor(200 / rows.length)),
-              ),
-              fill: "#6b7280",
-            }}
-            angle={0}
-            textAnchor="middle"
-            interval={0}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            allowDecimals={false}
-          />
-          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
-          <Bar
-            dataKey="Cleared"
-            stackId="a"
-            fill={STATUS_COLORS.cleared}
-            maxBarSize={48}
-          />
-          <Bar
-            dataKey="Solved"
-            stackId="a"
-            fill={STATUS_COLORS.solved}
-            maxBarSize={48}
-          />
-          <Bar
-            dataKey="Under Inv."
-            stackId="a"
-            fill={STATUS_COLORS.underInvestigation}
-            radius={[3, 3, 0, 0]}
-            maxBarSize={48}
-            shape={
-              <TopLabelBar
-                fill={STATUS_COLORS.underInvestigation}
-                radius={[3, 3, 0, 0]}
-              />
-            }
-          />
-        </BarChart>
-      </ResponsiveContainer>
+          <BarChart
+            data={rows}
+            margin={{ top: 28, right: 16, left: 0, bottom: 16 }}
+            barCategoryGap="22%"
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#e5e7eb"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="crime"
+              tick={{
+                fontSize: Math.max(
+                  9,
+                  Math.min(11, Math.floor(200 / rows.length)),
+                ),
+                fill: "#6b7280",
+              }}
+              angle={0}
+              textAnchor="middle"
+              interval={0}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              allowDecimals={false}
+            />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+            <Bar
+              dataKey="Cleared"
+              stackId="a"
+              fill={STATUS_COLORS.cleared}
+              maxBarSize={48}
+            />
+            <Bar
+              dataKey="Solved"
+              stackId="a"
+              fill={STATUS_COLORS.solved}
+              maxBarSize={48}
+            />
+            <Bar
+              dataKey="Under Inv."
+              stackId="a"
+              fill={STATUS_COLORS.underInvestigation}
+              radius={[3, 3, 0, 0]}
+              maxBarSize={48}
+              shape={
+                <TopLabelBar
+                  fill={STATUS_COLORS.underInvestigation}
+                  radius={[3, 3, 0, 0]}
+                />
+              }
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };
@@ -1203,9 +1206,8 @@ const CrimeTrends = ({ appliedFilters, data }) => {
 
   const tickInterval = (() => {
     const n = data.length;
-    if (n <= 30) return 0;
-    if (n <= 52) return Math.floor(n / 12);
-    return Math.floor(n / 12);
+    if (n <= 16) return 0;
+    return Math.ceil(n / 16) - 1;
   })();
 
   const MONTHS = [
@@ -1228,13 +1230,11 @@ const CrimeTrends = ({ appliedFilters, data }) => {
 
   const fmtLabel = (iso) => {
     if (!iso) return "";
-
     if (granularity === "monthly") {
       const [y, m] = iso.split("-");
       const monthStr = MONTHS[parseInt(m, 10) - 1];
       return multiYear ? `${monthStr} ${y}` : monthStr;
     }
-
     const [y, m, d] = iso.split("-");
     return multiYear ? `${m}/${d}/${y.slice(2)}` : `${m}/${d}`;
   };
@@ -1272,7 +1272,6 @@ const CrimeTrends = ({ appliedFilters, data }) => {
             <button className="cd-trends-showall-btn" onClick={toggleAllCrimes}>
               {allCrimesVisible ? "Hide All" : "Show All"}
             </button>
-
             {activeCrimes.map((key) => {
               const hidden = hiddenCrimes.has(key);
               return (
@@ -1295,47 +1294,68 @@ const CrimeTrends = ({ appliedFilters, data }) => {
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 10, right: 24, left: 0, bottom: 10 }}
+      <div style={{ overflowX: "auto", overflowY: "hidden" }}>
+        <ResponsiveContainer
+          width="100%"
+          minWidth={
+            data.length *
+            (granularity === "monthly" && multiYear
+              ? 80
+              : granularity === "daily"
+                ? 30
+                : 50)
+          }
+          height={320}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            interval={tickInterval}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            allowDecimals={false}
-          />
-          <Tooltip content={<TrendsTooltip />} />
-
-          <Line
-            type="linear"
-            dataKey="Total"
-            stroke={CRIME_COLORS.Total}
-            strokeWidth={3}
-            dot={{ r: 5, fill: CRIME_COLORS.Total, strokeWidth: 0 }}
-            activeDot={{ r: 5 }}
-            hide={mode !== "total"}
-          />
-
-          {activeCrimes.map((key) => (
-            <Line
-              key={key}
-              type="linear"
-              dataKey={key}
-              stroke={CRIME_COLORS[key]}
-              strokeWidth={1.8}
-              dot={{ r: 3, fill: CRIME_COLORS[key], strokeWidth: 0 }}
-              activeDot={{ r: 4, fill: CRIME_COLORS[key] }}
-              hide={mode !== "crime" || hiddenCrimes.has(key)}
+          <LineChart
+            data={chartData}
+            margin={{ top: 10, right: 24, left: 0, bottom: 10 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              interval={tickInterval}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              allowDecimals={false}
+            />
+            <Tooltip content={<TrendsTooltip />} />
+
+            <Line
+              type="linear"
+              dataKey="Total"
+              stroke={CRIME_COLORS.Total}
+              strokeWidth={3}
+              dot={
+                data.length <= 24
+                  ? { r: 5, fill: CRIME_COLORS.Total, strokeWidth: 0 }
+                  : false
+              }
+              activeDot={{ r: 5, fill: CRIME_COLORS.Total }}
+              hide={mode !== "total"}
+            />
+
+            {activeCrimes.map((key) => (
+              <Line
+                key={key}
+                type="linear"
+                dataKey={key}
+                stroke={CRIME_COLORS[key]}
+                strokeWidth={1.8}
+                dot={
+                  data.length <= 24
+                    ? { r: 3, fill: CRIME_COLORS[key], strokeWidth: 0 }
+                    : false
+                }
+                activeDot={{ r: 4, fill: CRIME_COLORS[key] }}
+                hide={mode !== "crime" || hiddenCrimes.has(key)}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };
@@ -1899,8 +1919,10 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
         : "→ Stable";
 
   const isRetrospective = mode === "retrospective";
-  const hasEnoughData = typeof lr?.confidence === "number" && lr.confidence >= 50;
-  const insufficientForecast = !lr || lr?.predicted_next_week === null || lr?.confidence === 0;
+  const hasEnoughData =
+    typeof lr?.confidence === "number" && lr.confidence >= 50;
+  const insufficientForecast =
+    !lr || lr?.predicted_next_week === null || lr?.confidence === 0;
 
   const tickInterval =
     crimeRows.length <= 8
@@ -1942,7 +1964,7 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
               ) : (
                 <>
                   Forecast: <strong>{lr.predicted_next_week}</strong> next week
-                · {lr.confidence}% confidence
+                  · {lr.confidence}% confidence
                 </>
               )}
             </span>
@@ -2521,7 +2543,19 @@ const CrimeDashboard = () => {
 
                 <div className="cd-ai-quad-item">
                   <span className="cd-ai-quad-label">Operations</span>
-                  <p>{crime.operations}</p>
+                  <p>
+                    {crime.operations
+                      .split("\n")
+                      .filter(Boolean)
+                      .map((line, i) => (
+                        <span
+                          key={i}
+                          style={{ display: "block", marginBottom: "6px" }}
+                        >
+                          {line.replace(/\*\*/g, "")}
+                        </span>
+                      ))}
+                  </p>
                 </div>
 
                 <div className="cd-ai-quad-item">

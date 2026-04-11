@@ -109,8 +109,11 @@ const buildWhere = (query) => {
     }
   }
 
-  const where =
-    conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  conditions.push(
+    `LOWER(TRIM(be.status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')`,
+  );
+
+  const where = "WHERE " + conditions.join(" AND ");
   return { where, params, nextP: p };
 };
 
@@ -124,11 +127,12 @@ const querySummary = async (where, params, nextP) => {
       COUNT(*) FILTER (WHERE LOWER(be.status) IN ('cleared', 'cce')) AS cleared,
       COUNT(*) FILTER (WHERE LOWER(be.status) IN ('solved', 'cse')) AS solved,
       COUNT(*) FILTER (
-        WHERE LOWER(be.status) NOT IN ('cleared','cce','solved','cse','closed')
+        WHERE LOWER(be.status) IN ('under investigation', 'ui', 'for investigation', 'active', 'ongoing')
       ) AS under_investigation
      FROM blotter_analytics_view be
      ${where}
      ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
+       AND LOWER(TRIM(be.status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
      GROUP BY UPPER(be.incident_type)`,
     [...params, INDEX_CRIMES],
   );
@@ -437,13 +441,13 @@ const queryCompleteData = async (where, params, nextP) => {
   );
 
   return result.rows.map((r) => ({
-    barangay:    r.barangay    || "",
+    barangay: r.barangay || "",
     typeOfPlace: r.type_of_place || "",
-    date:        r.date        || "",
-    time:        r.time        || "",
+    date: r.date || "",
+    time: r.time || "",
     crimeOffense: r.crime_offense || "",
-    modus:       r.modus       || "",
-    caseStatus:  r.case_status || "",
+    modus: r.modus || "",
+    caseStatus: r.case_status || "",
   }));
 };
 
@@ -453,17 +457,25 @@ const getOverview = async (req, res) => {
     const { where, params, nextP } = buildWhere(req.query);
     const { granularity = "monthly", date_from, date_to } = req.query;
 
-    const [summary, trends, hourly, byDay, place, barangay, modus, completeData] =
-      await Promise.all([
-        querySummary(where, params, nextP),
-        queryTrends(where, params, nextP, granularity, date_from, date_to),
-        queryHourly(where, params, nextP),
-        queryByDay(where, params, nextP),
-        queryPlace(where, params, nextP),
-        queryBarangay(where, params, nextP),
-        queryModus(where, params, nextP),
-        queryCompleteData(where, params, nextP),
-      ]);
+    const [
+      summary,
+      trends,
+      hourly,
+      byDay,
+      place,
+      barangay,
+      modus,
+      completeData,
+    ] = await Promise.all([
+      querySummary(where, params, nextP),
+      queryTrends(where, params, nextP, granularity, date_from, date_to),
+      queryHourly(where, params, nextP),
+      queryByDay(where, params, nextP),
+      queryPlace(where, params, nextP),
+      queryBarangay(where, params, nextP),
+      queryModus(where, params, nextP),
+      queryCompleteData(where, params, nextP),
+    ]);
 
     res.json({
       success: true,

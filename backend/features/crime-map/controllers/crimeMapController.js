@@ -16,6 +16,7 @@ const getBoundaries = async (req, res) => {
     COUNT(*) as crime_count
   FROM blotter_analytics_view
   WHERE lat IS NOT NULL
+    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
 `;
     const params = [];
     let p = 1;
@@ -25,7 +26,7 @@ const getBoundaries = async (req, res) => {
       params.push(date_from);
     }
     if (date_to) {
-      crimeQuery += ` AND date_time_commission <= $${p++}`;
+      crimeQuery += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
     if (incident_type) {
@@ -108,6 +109,7 @@ const getPins = async (req, res) => {
   FROM blotter_analytics_view
   WHERE lat IS NOT NULL 
     AND lng IS NOT NULL
+    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
 `;
     const params = [];
     let p = 1;
@@ -116,8 +118,8 @@ const getPins = async (req, res) => {
       query += ` AND date_time_commission >= $${p++}`;
       params.push(date_from);
     }
-    if (date_to) {
-      query += ` AND date_time_commission <= $${p++}`;
+     if (date_to) {
+      query += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
     if (incident_type) {
@@ -236,7 +238,7 @@ const getStatistics = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
 
-    let baseWhere = `WHERE lat IS NOT NULL`;
+    let baseWhere = `WHERE lat IS NOT NULL AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')`;
     const params = [];
     let p = 1;
 
@@ -245,7 +247,7 @@ const getStatistics = async (req, res) => {
       params.push(date_from);
     }
     if (date_to) {
-      baseWhere += ` AND date_time_commission <= $${p++}`;
+      baseWhere += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
     if (incident_type) {
@@ -278,7 +280,7 @@ const getStatistics = async (req, res) => {
             `SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_analytics_view ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`,
             params,
           ),
-          client.query(`SELECT COUNT(*) FROM blotter_analytics_view`),
+          client.query(`SELECT COUNT(*) FROM blotter_analytics_view WHERE LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')`),
         ]);
     } finally {
       client.release();
@@ -315,6 +317,7 @@ const getHeatmap = async (req, res) => {
     let baseWhere = `
   WHERE lat IS NOT NULL
     AND lng IS NOT NULL
+    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
 `;
     const params = [];
     let p = 1;
