@@ -256,10 +256,10 @@ class Blotter {
     }
 
     if (filters.search) {
-      query += ` AND (blotter_entry_number ILIKE $${paramCount} OR narrative ILIKE $${paramCount})`;
-      params.push(`%${filters.search}%`);
-      paramCount++;
-    }
+  query += ` AND blotter_entry_number ILIKE $${paramCount}`;
+  params.push(`%${filters.search}%`);
+  paramCount++;
+}
 
     if (filters.date_from) {
       query += ` AND date_time_reported >= $${paramCount}`;

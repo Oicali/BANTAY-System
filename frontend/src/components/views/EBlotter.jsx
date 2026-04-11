@@ -560,7 +560,7 @@ function EBlotter() {
       if (data.success) {
         setComplainants(data.data.complainants);
         setSuspects(data.data.suspects);
-        setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
+        setHasSuspect(true);
         const hasNoPsgcCodes = data.data.complainants.every(
           (c) => !c.region_code && !c.province_code && !c.municipality_code,
         );
@@ -1149,22 +1149,11 @@ function EBlotter() {
 
         // Location if arrested — required only when status is arrested/custody/detained
         if (
-          (s.status === "Arrested" ||
-            s.status === "In Custody" ||
-            s.status === "Detained") &&
-          (!s.location_if_arrested ||
-            s.location_if_arrested.trim().length === 0)
-        ) {
-          errors[`${p}_location_if_arrested`] = "Required when arrested";
-        } else if (
           s.location_if_arrested &&
-          s.location_if_arrested.trim().length > 0
+          s.location_if_arrested.trim().length > 0 &&
+          s.location_if_arrested.trim().length < 5
         ) {
-          if (s.location_if_arrested.trim().length < 5) {
-            errors[`${p}_location_if_arrested`] = "At least 5 characters";
-          } else if (s.location_if_arrested.trim().length > 200) {
-            errors[`${p}_location_if_arrested`] = "Maximum 200 characters";
-          }
+          errors[`${p}_location_if_arrested`] = "At least 5 characters";
         }
 
         // Gender — optional, validate only if provided
@@ -3418,15 +3407,48 @@ function EBlotter() {
                         <div className="eb-suspect-entry" key={i}>
                           <div className="eb-entry-header">
                             <h4 className="eb-entry-title">Suspect #{i + 1}</h4>
-                            {suspects.length > 1 && (
-                              <button
-                                type="button"
-                                className="eb-btn-remove-entry"
-                                onClick={() => removeSuspect(i)}
-                              >
-                                Remove
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="eb-btn-remove-entry"
+                              onClick={() => {
+                                if (suspects.length === 1) {
+                                  setHasSuspect(false);
+                                  setSuspects([
+                                    {
+                                      first_name: "",
+                                      middle_name: "",
+                                      last_name: "",
+                                      qualifier: "",
+                                      alias: "",
+                                      gender: "Male",
+                                      birthday: "",
+                                      age: "",
+                                      birth_place: "",
+                                      nationality: "FILIPINO",
+                                      region_code: "",
+                                      province_code: "",
+                                      municipality_code: "",
+                                      barangay_code: "",
+                                      house_street: "",
+                                      status: "At Large",
+                                      location_if_arrested: "",
+                                      degree_participation: "Principal",
+                                      category_drug_case: "",
+                                      relation_to_victim: "",
+                                      educational_attainment: "",
+                                      height_cm: "",
+                                      drug_used: false,
+                                      motive: "",
+                                      occupation: "",
+                                    },
+                                  ]);
+                                } else {
+                                  removeSuspect(i);
+                                }
+                              }}
+                            >
+                              Remove
+                            </button>
                           </div>
                           <div className="eb-modal-form-grid">
                             {/* Row 1 - Name */}
@@ -4345,7 +4367,11 @@ function EBlotter() {
                         type="button"
                         className="eb-btn-add-more"
                         onClick={() => {
-                          setHasSuspect(true);
+                          if (!hasSuspect) {
+                            setHasSuspect(true);
+                          } else {
+                            addSuspect();
+                          }
                         }}
                       >
                         Add Suspect

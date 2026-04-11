@@ -473,6 +473,7 @@ function CaseManagement() {
           name="search"
           value={filters.search || ""}
           onChange={handleFilterChange}
+          autoComplete="off"
         />
         <select
           className="cm-filter-input"
