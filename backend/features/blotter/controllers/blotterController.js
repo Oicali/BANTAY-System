@@ -174,9 +174,9 @@ const validateSuspect = (suspect, index) => {
   }
   
   // If arrested, location is required
-  if ((suspect.status === 'Arrested' || suspect.status === 'In Custody') && !suspect.location_if_arrested) {
-    errors.push(`${prefix} Location is required when status is Arrested/In Custody`);
-  }
+  // if ((suspect.status === 'Arrested' || suspect.status === 'In Custody') && !suspect.location_if_arrested) {
+  //   errors.push(`${prefix} Location is required when status is Arrested/In Custody`);
+  // }
   
   return errors;
 };

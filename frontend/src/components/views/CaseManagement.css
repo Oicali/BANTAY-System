@@ -788,3 +788,9 @@ body {
   color: #4f46e5;
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
+.cm-modal-input:-webkit-autofill,
+.cm-modal-input:-webkit-autofill:hover,
+.cm-modal-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: var(--gray-900) !important;
+}

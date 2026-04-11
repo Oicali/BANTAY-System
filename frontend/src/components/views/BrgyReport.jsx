@@ -300,15 +300,15 @@ function BrgyReport() {
                   onChange={(e) => update("incident_type", e.target.value)}
                 >
                   <option value="">Select Crime Type</option>
-                  <option>Murder</option>
+                  <option value="Carnapping - MC">Carnapping - MC</option>
+                  <option value="Carnapping - MV">Carnapping - MV</option>
                   <option>Homicide</option>
+                  <option>Murder</option>
                   <option>Physical Injury</option>
                   <option>Rape</option>
                   <option>Robbery</option>
-                  <option>Theft</option>
-                  <option value="Carnapping - MC">Carnapping - MC</option>
-                  <option value="Carnapping - MV">Carnapping - MV</option>
                   <option>Special Complex Crime</option>
+                  <option>Theft</option>
                 </select>
                 {errors.incident_type && (
                   <span className="br-error">{errors.incident_type}</span>
