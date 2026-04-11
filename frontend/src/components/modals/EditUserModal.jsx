@@ -10,9 +10,9 @@ import LoadingModal from "../modals/LoadingModal";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
-const API_URL = import.meta.env.VITE_API_URL; // ← add here
+const API_URL = import.meta.env.VITE_API_URL;
 
-const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
+const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -32,9 +32,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     barangay_code: "",
     address_line: "",
     role: "",
-    rank: "",
-    mobile_patrol: "",
-    department: "",
+    rank_id: "",
     assigned_barangay_code: "",
   });
 
@@ -42,6 +40,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // ── Resend verification state ────────────────────────────────────────
+  const [isResending, setIsResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   // Password change
   const [showPasswordFields, setShowPasswordFields] = useState(false);
@@ -61,6 +63,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const [allRoles, setAllRoles] = useState([]);
   const [availableRoles, setAvailableRoles] = useState([]);
 
+  // Ranks
+  const [ranks, setRanks] = useState([]);
+  const [loadingRanks, setLoadingRanks] = useState(false);
+
   // PSGC — PNP address cascade
   const [regions, setRegions] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -74,7 +80,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   // PSGC — Bacoor barangays for assigned barangay
   const [bacoorBarangays, setBacoorBarangays] = useState([]);
   const [loadingBacoorBarangays, setLoadingBacoorBarangays] = useState(false);
-  // replaced by CURRENT_BARANGAYS static list
 
   // Lock/Unlock
   const [isLocking, setIsLocking] = useState(false);
@@ -94,7 +99,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const modalContentRef = useRef(null);
   const errorRefs = useRef({});
 
-  // Field order for scroll priority
   const FIELD_ORDER = [
     "profilePicture",
     "email",
@@ -111,9 +115,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     "barangay_code",
     "address_line",
     "role",
-    "rank",
-    "mobile_patrol",
-    "department",
+    "rank_id",
     "assigned_barangay_code",
     "new_password",
     "confirm_password",
@@ -123,6 +125,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     setCurrentUser(getUserFromToken());
   }, []);
 
+  // ── Fetch roles ────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -138,6 +141,27 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       }
     };
     fetchRoles();
+  }, []);
+
+  // ── Fetch ranks ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchRanks = async () => {
+      try {
+        setLoadingRanks(true);
+        const res = await fetch(`${API_URL}/user-management/ranks`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRanks(data.ranks || []);
+        }
+      } catch (err) {
+        console.error("Error fetching ranks:", err);
+      } finally {
+        setLoadingRanks(false);
+      }
+    };
+    fetchRanks();
   }, []);
 
   useEffect(() => {
@@ -175,10 +199,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       barangay_code: user.address_barangay_code || "",
       address_line: user.address_line || "",
       role: user.role || "",
-      rank: user.rank || "",
-      mobile_patrol:
-        user.mobile_patrol != null ? String(user.mobile_patrol) : "",
-      department: user.department || "",
+      rank_id: user.rank_id ? String(user.rank_id) : "",
       assigned_barangay_code: user.assigned_barangay_code || "",
     });
 
@@ -193,14 +214,14 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     setShouldScrollToError(false);
     setProfilePicture(null);
     setProfilePicturePreview(user.profile_picture || null);
+    setResendMessage("");
+    setIsResending(false);
 
     if (user.user_type === "police") {
       fetchRegions();
       if (user.region_code) fetchProvinces(user.region_code);
       if (user.province_code) fetchMunicipalities(user.province_code);
       if (user.municipality_code) fetchAddressBarangays(user.municipality_code);
-    } else if (user.user_type === "barangay") {
-      // barangay list is static — no fetch needed
     }
   }, [user, isOpen]);
 
@@ -268,26 +289,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     }
   };
 
-  const fetchBacoorBarangays = async () => {
-    try {
-      setLoadingBacoorBarangays(true);
-      setBacoorBarangays([]);
-      let res = await fetch(
-        `${PSGC_BASE}/cities-municipalities/${BACOOR_CITY_CODE}/barangays/`,
-      );
-      if (!res.ok) {
-        res = await fetch(`${PSGC_BASE}/cities/${BACOOR_CITY_CODE}/barangays/`);
-      }
-      if (!res.ok) throw new Error(`PSGC returned ${res.status}`);
-      const data = await res.json();
-      setBacoorBarangays(data.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (err) {
-      console.error("Failed to fetch Bacoor barangays:", err);
-    } finally {
-      setLoadingBacoorBarangays(false);
-    }
-  };
-
   useEffect(() => {
     if (serverError) {
       const t = setTimeout(() => setServerError(""), 5000);
@@ -295,7 +296,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     }
   }, [serverError]);
 
-  // ── Scroll to first error field inside the modal container ─────────────
+  // ── Scroll to first error ──────────────────────────────────────────────
   useEffect(() => {
     if (!shouldScrollToError) return;
     const errorKeys = Object.keys(errors).filter((k) => errors[k]);
@@ -312,7 +313,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       if (container && el) {
         const containerRect = container.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        // Calculate offset relative to the modal's own scroll position
         const scrollTarget =
           elRect.top - containerRect.top + container.scrollTop - 80;
         container.scrollTo({ top: scrollTarget, behavior: "smooth" });
@@ -331,6 +331,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
   const isPNP = user.user_type === "police";
   const isBarangay = user.user_type === "barangay";
   const isLocked = user.status === "locked";
+  const isUnverified = user.status === "unverified";
 
   // ── Masking helpers ────────────────────────────────────────────────────
   const maskPhone = (phone) => {
@@ -378,6 +379,34 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       setServerError("Server error. Please try again.");
     } finally {
       setIsLocking(false);
+    }
+  };
+
+  // ── Resend verification email ─────────────────────────────────────────
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/user-management/users/${user.user_id}/resend-verification`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
+      const data = await res.json();
+      if (res.ok) {
+        handleClose();
+        onResendSuccess?.(`Verification email resent to ${user.email}`);
+      } else {
+        setResendMessage(data.message || "Failed to resend verification email");
+      }
+    } catch (err) {
+      console.error("Resend error:", err);
+      setResendMessage("Server error. Please try again.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -553,13 +582,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       clearError("email");
       return;
     }
-    if (name === "mobile_patrol") {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value.replace(/\D/g, "").slice(0, 6),
-      }));
-      return;
-    }
     if (name === "address_line") {
       setFormData((prev) => ({ ...prev, [name]: value.slice(0, 255) }));
       return;
@@ -609,11 +631,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       return;
     }
     if (name === "role") {
-      setFormData((prev) => ({
-        ...prev,
-        role: value,
-        mobile_patrol: value !== "Patrol" ? "" : prev.mobile_patrol,
-      }));
+      setFormData((prev) => ({ ...prev, role: value }));
       return;
     }
 
@@ -658,6 +676,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     setPhoneChanged(false);
     setAltPhoneChanged(false);
     setEmailChanged(false);
+    setResendMessage("");
+    setIsResending(false);
     onClose();
   };
 
@@ -667,7 +687,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
 
     const isValid = validateForm();
     if (!isValid) {
-      // Scroll to first error — no banner message
       setShouldScrollToError(true);
       return;
     }
@@ -676,7 +695,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
     setServerError("");
 
     try {
-      // 1. Upload profile picture first if selected
       if (profilePicture) {
         const picFd = new FormData();
         picFd.append("profilePicture", profilePicture);
@@ -700,7 +718,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         }
       }
 
-      // 2. Save profile data
       let formattedSuffix = formData.suffix.trim();
       if (formattedSuffix) {
         const low = formattedSuffix.toLowerCase();
@@ -750,6 +767,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
         fd.append("province_code", formData.province_code);
         fd.append("municipality_code", formData.municipality_code);
         fd.append("barangay_code", formData.barangay_code);
+        fd.append("rank_id", formData.rank_id || "");
       } else if (isBarangay) {
         fd.append("region_code", "040000000");
         fd.append("province_code", "042100000");
@@ -759,12 +777,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
       }
 
       fd.append("address_line", formData.address_line?.trim() || "");
-
-      if (isPNP) {
-        fd.append("rank", formData.rank?.trim() || "");
-        fd.append("mobile_patrol", formData.mobile_patrol || "");
-        fd.append("department", formData.department?.trim() || "");
-      }
 
       if (showPasswordFields && passwordData.new_password) {
         fd.append("new_password", passwordData.new_password);
@@ -807,7 +819,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
           setErrors(newErrors);
           setShouldScrollToError(true);
         }
-        // Server errors (duplicate email/phone etc.) still show the banner
         setServerError(data.message || "Failed to update user");
         setIsSubmitting(false);
       }
@@ -1491,60 +1502,27 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                       )}
                     </select>
                   </div>
-                  <div className="eum-form-group">
+                  <div
+                    className="eum-form-group"
+                    ref={(el) => (errorRefs.current["rank_id"] = el)}
+                  >
                     <label className="eum-form-label">Rank</label>
-                    <input
-                      type="text"
-                      name="rank"
-                      value={formData.rank}
+                    <select
+                      name="rank_id"
+                      value={formData.rank_id}
                       onChange={handleChange}
-                      disabled={isSubmitting}
-                      maxLength="100"
+                      disabled={isSubmitting || loadingRanks}
                       className="eum-form-input"
-                      placeholder="e.g., Police Officer III"
-                    />
-                  </div>
-                </div>
-                <div className="eum-form-row">
-                  <div className="eum-form-group">
-                    <label className="eum-form-label">
-                      Mobile Patrol No.
-                      {formData.role !== "Patrol" && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 400,
-                            color: "#6c757d",
-                          }}
-                        >
-                          {" "}
-                          (Patrol role only)
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="text"
-                      name="mobile_patrol"
-                      value={formData.mobile_patrol}
-                      onChange={handleChange}
-                      disabled={isSubmitting || formData.role !== "Patrol"}
-                      maxLength="6"
-                      className="eum-form-input"
-                      placeholder="e.g., 101"
-                    />
-                  </div>
-                  <div className="eum-form-group">
-                    <label className="eum-form-label">Department</label>
-                    <input
-                      type="text"
-                      name="department"
-                      value={formData.department}
-                      onChange={handleChange}
-                      disabled={isSubmitting}
-                      maxLength="100"
-                      className="eum-form-input"
-                      placeholder="e.g., Investigation Division"
-                    />
+                    >
+                      <option value="">
+                        {loadingRanks ? "Loading ranks..." : "No rank assigned"}
+                      </option>
+                      {ranks.map((r) => (
+                        <option key={r.rank_id} value={r.rank_id}>
+                          {r.abbreviation}. — {r.rank_name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1673,7 +1651,45 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
 
             {/* ── Actions ── */}
             <div className="eum-modal-actions">
-              {(user.status === "active" || user.status === "locked") && (
+
+              {/* Resend verification — only for unverified accounts */}
+              {isUnverified && (
+                <button
+                  type="button"
+                  className="eum-btn eum-btn-resend"
+                  onClick={handleResendVerification}
+                  disabled={isResending || isSubmitting}
+                  style={{ marginRight: "auto" }}
+                >
+                  {isResending ? (
+                    <>
+                      <span className="eum-btn-spinner" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ marginRight: 6 }}
+                      >
+                        <path d="M22 2L11 13" />
+                        <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                      </svg>
+                      Resend Verification
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Lock/Unlock — only for verified or locked accounts */}
+              {(user.status === "verified" || user.status === "locked") && (
                 <button
                   type="button"
                   className={`eum-btn ${isLocked ? "eum-btn-unlock" : "eum-btn-lock"}`}
@@ -1702,14 +1718,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                         viewBox="0 0 24 24"
                         style={{ marginRight: "6px" }}
                       >
-                        <rect
-                          x="3"
-                          y="11"
-                          width="18"
-                          height="11"
-                          rx="2"
-                          ry="2"
-                        />
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                         <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                       </svg>
                       Unlock Account
@@ -1728,14 +1737,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                         viewBox="0 0 24 24"
                         style={{ marginRight: "6px" }}
                       >
-                        <rect
-                          x="3"
-                          y="11"
-                          width="18"
-                          height="11"
-                          rx="2"
-                          ry="2"
-                        />
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                       Lock Account
@@ -1743,6 +1745,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated }) => {
                   )}
                 </button>
               )}
+
               <button
                 type="submit"
                 className="eum-btn eum-btn-primary"

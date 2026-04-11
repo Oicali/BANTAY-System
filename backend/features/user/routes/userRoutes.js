@@ -17,6 +17,7 @@ const {
   unlockUser,
   restoreUser,
   getAllRoles,
+  getRanks
 } = require("../controllers/userController");
 
 // Multer setup for file uploads
@@ -93,5 +94,7 @@ router.post("/users/:id/resend-verification", authenticate, resendVerificationEm
 
 // GET  /roles
 router.get("/roles", authenticate, getAllRoles);
+
+router.get("/ranks", authenticate, getRanks);
 
 module.exports = router;

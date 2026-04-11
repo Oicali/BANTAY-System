@@ -7,10 +7,8 @@ import {
 } from "../../utils/barangayOptions";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
-const API_URL = import.meta.env.VITE_API_URL; // ← add here
+const API_URL = import.meta.env.VITE_API_URL;
 
-// ✅ FIXED: Bacoor is a CITY with code "042103000"
-// "042105" was City of Cavite — wrong code entirely
 const BACOOR_CITY_CODE = "042103000";
 
 const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
@@ -18,30 +16,22 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   const [shouldScrollToError, setShouldScrollToError] = useState(false);
 
   const [formData, setFormData] = useState({
-    // Personal fields
     first_name: "",
     last_name: "",
     middle_name: "",
     suffix: "",
     date_of_birth: "",
     gender: "Male",
-    // Contact fields
     email: "",
     phone: "",
     alternate_phone: "",
-    // Address fields (PSGC)
     region_code: "",
     province_code: "",
     municipality_code: "",
     barangay_code: "",
     address_line: "",
-    // Role
     role: "Patrol",
-    // PNP specific fields
-    rank: "",
-    mobile_patrol: "",
-    department: "",
-    // Profile picture
+    rank_id: "",
     profilePicture: null,
   });
 
@@ -61,6 +51,10 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(false);
   const [loadingBarangays, setLoadingBarangays] = useState(false);
 
+  // Ranks
+  const [ranks, setRanks] = useState([]);
+  const [loadingRanks, setLoadingRanks] = useState(false);
+
   const modalContentRef = useRef(null);
   const errorRefs = useRef({});
 
@@ -70,14 +64,14 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   useEffect(() => {
     if (isOpen && step === "pnp") {
       fetchRegions();
+      fetchRanks();
     }
     if (isOpen && step === "barangay") {
-      // ✅ FIXED: use /cities/ endpoint for Bacoor (it's a city, not a municipality)
       fetchBacoorBarangays();
       setFormData((prev) => ({
         ...prev,
-        region_code: "040000000", // CALABARZON
-        province_code: "042100000", // Cavite
+        region_code: "040000000",
+        province_code: "042100000",
         municipality_code: BACOOR_CITY_CODE,
       }));
     }
@@ -135,7 +129,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     }
   };
 
-  // Generic barangay fetcher for PNP address (municipality or city)
   const fetchBarangays = async (municipalityCode) => {
     try {
       setLoadingBarangays(true);
@@ -153,7 +146,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     }
   };
 
-  // ✅ FIXED: Bacoor is a CITY — must use /cities/{code}/barangays/ endpoint
   const fetchBacoorBarangays = async () => {
     try {
       setLoadingBarangays(true);
@@ -165,13 +157,29 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
         throw new Error(`PSGC API returned ${res.status}`);
       }
       const data = await res.json();
-      // Sort alphabetically by name
       setBarangays(data.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       console.error("Failed to fetch Bacoor barangays:", err);
       setBarangays([]);
     } finally {
       setLoadingBarangays(false);
+    }
+  };
+
+  const fetchRanks = async () => {
+    try {
+      setLoadingRanks(true);
+      const res = await fetch(`${API_URL}/user-management/ranks`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRanks(data.ranks || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch ranks:", err);
+    } finally {
+      setLoadingRanks(false);
     }
   };
 
@@ -290,7 +298,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       }
     }
 
-    // Address (PSGC) validation
     if (!formData.region_code) newErrors.region_code = "Region is required";
     if (!formData.province_code)
       newErrors.province_code = "Province is required";
@@ -313,7 +320,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
 
   const validateBarangayForm = () => {
     const newErrors = validateCommonFields();
-    // Region, province, municipality are pre-set for Bacoor — skip those validations
     delete newErrors.region_code;
     delete newErrors.province_code;
     delete newErrors.municipality_code;
@@ -412,18 +418,11 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       return;
     }
 
-    if (name === "mobile_patrol") {
-      const numbersOnly = value.replace(/\D/g, "").slice(0, 6);
-      setFormData((prev) => ({ ...prev, [name]: numbersOnly }));
-      return;
-    }
-
     if (name === "address_line") {
       setFormData((prev) => ({ ...prev, [name]: value.slice(0, 255) }));
       return;
     }
 
-    // PSGC cascading selects
     if (name === "region_code") {
       setFormData((prev) => ({
         ...prev,
@@ -476,13 +475,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       return;
     }
 
-    // Role change: clear mobile_patrol if switching away from Patrol
     if (name === "role") {
-      setFormData((prev) => ({
-        ...prev,
-        role: value,
-        mobile_patrol: value !== "Patrol" ? "" : prev.mobile_patrol,
-      }));
+      setFormData((prev) => ({ ...prev, role: value }));
       return;
     }
 
@@ -519,9 +513,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       barangay_code: "",
       address_line: "",
       role: "Patrol",
-      rank: "",
-      mobile_patrol: "",
-      department: "",
+      rank_id: "",
       profilePicture: null,
     });
     setProvinces([]);
@@ -574,7 +566,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
           formattedSuffix = formattedSuffix.toUpperCase();
       }
 
-      // Required common fields
       submitData.append("userType", step === "pnp" ? "police" : "barangay");
       submitData.append("email", formData.email.trim());
       submitData.append("firstName", formData.first_name.trim());
@@ -587,7 +578,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       submitData.append("gender", formData.gender);
       submitData.append("dateOfBirth", formData.date_of_birth);
 
-      // Address (PSGC codes)
       submitData.append("regionCode", formData.region_code);
       submitData.append("provinceCode", formData.province_code);
       submitData.append("municipalityCode", formData.municipality_code);
@@ -595,7 +585,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       if (formData.address_line.trim())
         submitData.append("addressLine", formData.address_line.trim());
 
-      // Optional common fields
       if (formData.middle_name.trim())
         submitData.append("middleName", formData.middle_name.trim());
       if (formattedSuffix) submitData.append("suffix", formattedSuffix);
@@ -606,14 +595,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
         );
       }
 
-      // PNP-specific fields
-      if (step === "pnp") {
-        if (formData.rank.trim())
-          submitData.append("rank", formData.rank.trim());
-        if (formData.mobile_patrol)
-          submitData.append("mobilePatrol", formData.mobile_patrol);
-        if (formData.department.trim())
-          submitData.append("department", formData.department.trim());
+      // PNP-specific: rank_id
+      if (step === "pnp" && formData.rank_id) {
+        submitData.append("rankId", formData.rank_id);
       }
 
       const response = await fetch(`${API_URL}/user-management/register`, {
@@ -625,7 +609,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Upload profile picture to Cloudinary if one was selected
         if (formData.profilePicture && data.user?.userId) {
           try {
             const picFd = new FormData();
@@ -642,7 +625,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             );
           } catch (picErr) {
             console.error("Profile picture upload failed:", picErr);
-            // Non-fatal — user was created, photo just didn't upload
           }
         }
 
@@ -957,7 +939,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     </div>
   );
 
-  // Full address renderer for PNP (region → province → municipality → barangay)
   const renderAddressInfo = () => (
     <div className="aum-form-section">
       <h3 className="aum-form-section-title">Address</h3>
@@ -1025,9 +1006,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             disabled={!formData.province_code || loadingMunicipalities}
           >
             <option value="">
-              {loadingMunicipalities
-                ? "Loading..."
-                : "Select City/Municipality"}
+              {loadingMunicipalities ? "Loading..." : "Select City/Municipality"}
             </option>
             {municipalities.map((m) => (
               <option key={m.code} value={m.code}>
@@ -1090,8 +1069,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     </div>
   );
 
-  // Simplified address renderer for Barangay users
-  // ✅ FIXED: barangays now loaded from correct Bacoor city endpoint, sorted A-Z
   const renderBarangayAddressInfo = () => (
     <div className="aum-form-section">
       <h3 className="aum-form-section-title">Address</h3>
@@ -1111,7 +1088,6 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             <option value="">
               {loadingBarangays ? "Loading barangays..." : "Select Barangay"}
             </option>
-            {/* ✅ Already sorted A-Z by fetchBacoorBarangays */}
             {CURRENT_BARANGAYS.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -1286,52 +1262,24 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                         <option value="Patrol">Patrol</option>
                       </select>
                     </div>
-                  </div>
-                  <div className="aum-form-row-triple">
                     <div className="aum-form-group">
                       <label className="aum-form-label">Rank</label>
-                      <input
-                        type="text"
-                        name="rank"
-                        value={formData.rank}
+                      <select
+                        name="rank_id"
+                        value={formData.rank_id}
                         onChange={handleChange}
+                        disabled={loadingRanks}
                         className="aum-form-input"
-                        placeholder="e.g., Police Officer III"
-                        maxLength="100"
-                      />
-                    </div>
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">
-                        Mobile Patrol No.
-                        {formData.role !== "Patrol" && (
-                          <span className="aum-field-note">
-                            {" "}
-                            (Patrol role only)
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="text"
-                        name="mobile_patrol"
-                        value={formData.mobile_patrol}
-                        onChange={handleChange}
-                        className="aum-form-input"
-                        placeholder="e.g., 101"
-                        maxLength="6"
-                        disabled={formData.role !== "Patrol"}
-                      />
-                    </div>
-                    <div className="aum-form-group">
-                      <label className="aum-form-label">Department</label>
-                      <input
-                        type="text"
-                        name="department"
-                        value={formData.department}
-                        onChange={handleChange}
-                        className="aum-form-input"
-                        placeholder="e.g., Investigation Division"
-                        maxLength="100"
-                      />
+                      >
+                        <option value="">
+                          {loadingRanks ? "Loading ranks..." : "No rank assigned"}
+                        </option>
+                        {ranks.map((r) => (
+                          <option key={r.rank_id} value={r.rank_id}>
+                            {r.abbreviation}. — {r.rank_name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
