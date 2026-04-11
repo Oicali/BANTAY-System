@@ -1948,8 +1948,7 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
         </span>
         {!hasEnoughData && (
           <span className="cd-ai-sparkline-warning">
-            ⚠ Only {crimeRows.length} week{crimeRows.length !== 1 ? "s" : ""} of
-            data — use a wider date range for reliable trend
+            ⚠ Only {crimeRows.length} incident week{crimeRows.length !== 1 ? "s" : ""} recorded — trend and forecast may not be reliable
           </span>
         )}
         {!insufficientForecast &&
@@ -2152,6 +2151,8 @@ const CrimeDashboard = () => {
     appliedFilters,
     chartRefs,
     setIsExportLoading,
+    assessment,
+    analysisData,
   );
 
   const fetchOverview = (filters, force = false) => {
@@ -2267,8 +2268,8 @@ const CrimeDashboard = () => {
     if (dayCount < 180) {
       const proceed = window.confirm(
         `Your selected range is only ${dayCount} days.\n\n` +
-          `For reliable Croston forecasting, at least 6 months (180 days) is recommended.\n\n` +
-          `The EMPO QUAD recommendations will still work, but trend forecasts may show "insufficient data".\n\n` +
+          `Short ranges may result in low forecast confidence for some crime types.\n\n` +
+          `The EMPO QUAD recommendations will still work, but trend forecasts may show "insufficient data" warnings per crime type.\n\n` +
           `Continue anyway?`,
       );
       if (!proceed) return;
@@ -2442,7 +2443,8 @@ const CrimeDashboard = () => {
                   Generates an AI-powered EMPO QUAD assessment based on current
                   filters.{" "}
                   <b>
-                    Requires at least 6 months of data for reliable forecasting.
+                    More historical data improves forecast confidence and trend
+                    accuracy.
                   </b>
                 </p>
               </>

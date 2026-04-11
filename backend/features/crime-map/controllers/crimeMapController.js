@@ -463,6 +463,7 @@ const getHeatmap = async (req, res) => {
         rank: i + 1,
         crime_types: c.crime_types,
         dominant_modus: c.dominant_modus,
+        radius_m: c.radius_m ?? 100,
       },
     }));
 

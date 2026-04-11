@@ -542,6 +542,224 @@ function buildCompleteDataTable(completeData) {
   });
 }
 
+function buildAssessmentSection(assessment, analysisData) {
+  if (!assessment) return [];
+
+  const elements = [];
+
+  elements.push(sectionHeading("10. AI Crime Assessment"));
+
+  // Scope block
+  if (assessment.scope) {
+    const COL = [2400, 8066];
+    elements.push(
+      new Table({
+        width: { size: COL[0] + COL[1], type: WidthType.DXA },
+        columnWidths: COL,
+        rows: [
+          new TableRow({
+            children: [
+              dCell("Date Range", COL[0], { alt: false }),
+              dCell(assessment.scope.dateRange || "-", COL[1], { alt: false }),
+            ],
+          }),
+          new TableRow({
+            children: [
+              dCell("Crime Type", COL[0], { alt: true }),
+              dCell(assessment.scope.crimes || "-", COL[1], { alt: true }),
+            ],
+          }),
+          new TableRow({
+            children: [
+              dCell("Barangay", COL[0], { alt: false }),
+              dCell(assessment.scope.barangays || "-", COL[1], { alt: false }),
+            ],
+          }),
+        ],
+      }),
+    );
+    elements.push(spacer(80));
+  }
+
+  // Stats row
+  if (assessment.stats) {
+    const stats = [
+      ["Total Incidents", String(assessment.stats.total ?? 0)],
+      ["CCE %", `${assessment.stats.cce ?? "0.0"}%`],
+      ["CSE %", `${assessment.stats.cse ?? "0.0"}%`],
+      ["Under Investigation", String(assessment.stats.ui ?? 0)],
+    ];
+    const COL = [2400, 2400];
+    elements.push(
+      new Table({
+        width: { size: COL[0] * 2, type: WidthType.DXA },
+        columnWidths: COL,
+        rows: stats.map(
+          ([label, val], i) =>
+            new TableRow({
+              children: [
+                dCell(label, COL[0], { alt: i % 2 === 1 }),
+                dCell(val, COL[1], { bold: true, alt: i % 2 === 1 }),
+              ],
+            }),
+        ),
+      }),
+    );
+    elements.push(spacer(80));
+  }
+
+  // General assessment
+  if (assessment.general_assessment) {
+    elements.push(
+      new Paragraph({
+        spacing: { before: 160, after: 80 },
+        children: [
+          new TextRun({
+            text: "General Assessment",
+            bold: true,
+            size: 22,
+            font: "Arial",
+            color: DARK,
+          }),
+        ],
+      }),
+    );
+    elements.push(bodyText(assessment.general_assessment));
+    elements.push(spacer(80));
+  }
+
+  // Per-crime sections
+  const perCrime = assessment.per_crime || [];
+  for (const crime of perCrime) {
+    // Crime type heading
+    elements.push(
+      new Paragraph({
+        spacing: { before: 240, after: 80 },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 16, color: DARK, space: 4 },
+        },
+        indent: { left: 120 },
+        children: [
+          new TextRun({
+            text: crime.crime_type || "",
+            bold: true,
+            size: 24,
+            font: "Arial",
+            color: DARK,
+          }),
+        ],
+      }),
+    );
+
+    // Croston forecast data if available
+    const crostonEntry = analysisData?.croston?.per_crime?.find(
+      (c) => c.crime === crime.crime_type,
+    );
+    if (crostonEntry) {
+      const trendLabel =
+        crostonEntry.trend === "increasing"
+          ? "↑ Increasing"
+          : crostonEntry.trend === "decreasing"
+            ? "↓ Decreasing"
+            : crostonEntry.trend === "insufficient_data"
+              ? "Insufficient Data"
+              : "→ Stable";
+
+      const forecastText =
+        crostonEntry.predicted_next_week !== null &&
+        crostonEntry.predicted_next_week !== undefined
+          ? `${crostonEntry.predicted_next_week} incidents next week (${crostonEntry.confidence ?? 0}% confidence)`
+          : "Insufficient data for forecast";
+
+      const COL = [2400, 8066];
+      elements.push(
+        new Table({
+          width: { size: COL[0] + COL[1], type: WidthType.DXA },
+          columnWidths: COL,
+          rows: [
+            new TableRow({
+              children: [
+                dCell("Trend", COL[0], { alt: false }),
+                dCell(trendLabel, COL[1], { bold: true, alt: false }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                dCell("Forecast", COL[0], { alt: true }),
+                dCell(forecastText, COL[1], { alt: true }),
+              ],
+            }),
+          ],
+        }),
+      );
+      elements.push(spacer(80));
+    }
+
+    // QUAD sections
+    const quadSections = [
+      { label: "Crime Assessment", value: crime.general_assessment },
+      { label: "Operations", value: crime.operations },
+      { label: "Intelligence", value: crime.intelligence },
+      { label: "Investigations", value: crime.investigations },
+      {
+        label: "Police Community Relations",
+        value: crime.police_community_relations,
+      },
+    ];
+
+    for (const { label, value } of quadSections) {
+      if (!value) continue;
+
+      elements.push(
+        new Paragraph({
+          spacing: { before: 120, after: 40 },
+          children: [
+            new TextRun({
+              text: label,
+              bold: true,
+              size: 20,
+              font: "Arial",
+              color: "374151",
+            }),
+          ],
+        }),
+      );
+
+      // Operations has newline-separated lines — render each as its own paragraph
+      if (label === "Operations") {
+        const lines = value.split("\n").filter((l) => l.trim());
+        for (const line of lines) {
+          elements.push(
+            new Paragraph({
+              spacing: { after: 40 },
+              children: [
+                new TextRun({
+                  text: line.replace(/\*\*/g, ""),
+                  size: 18,
+                  font: "Arial",
+                }),
+              ],
+            }),
+          );
+        }
+      } else {
+        elements.push(
+          new Paragraph({
+            spacing: { after: 80 },
+            children: [
+              new TextRun({ text: value, size: 18, font: "Arial" }),
+            ],
+          }),
+        );
+      }
+    }
+
+    elements.push(spacer(80));
+  }
+
+  return elements;
+}
+
 // ─── DOCUMENT BUILDER ─────────────────────────────────────────────────────────
 
 async function buildExportDoc({
@@ -553,6 +771,8 @@ async function buildExportDoc({
   completeData = [],
   meta,
   images = {},
+  assessment = null,
+  analysisData = null,
 }) {
   const totals = summary.reduce(
     (acc, d) => ({
@@ -788,13 +1008,12 @@ async function buildExportDoc({
   // ── Landscape section children (section 9 — Complete Data) ────────────────
   const landscapeChildren = [
     sectionHeading("9. Complete Data"),
-    bodyText(
-      `${completeData.length} total records`,
-    ),
+    bodyText(`${completeData.length} total records`),
     spacer(60),
     ...(completeData.length > 0
       ? [buildCompleteDataTable(completeData), spacer()]
       : [bodyText("No records found for the selected filters.")]),
+    ...buildAssessmentSection(assessment, analysisData),
   ];
 
   const doc = new Document({
@@ -832,6 +1051,8 @@ const exportDashboard = async (req, res) => {
       completeData = [],
       meta = {},
       images = {},
+      assessment = null,
+      analysisData = null,
     } = req.body;
 
     const buffer = await buildExportDoc({
@@ -843,6 +1064,8 @@ const exportDashboard = async (req, res) => {
       completeData,
       meta,
       images,
+      assessment,
+      analysisData,
     });
 
     const dateStr =

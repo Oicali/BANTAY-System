@@ -119,31 +119,18 @@ const CLUSTER_CIRCLE_LAYER = {
   paint: {
     "circle-radius": [
       "interpolate",
-      ["linear"],
-      ["get", "intensity"],
-      0,
-      8,
-      0.5,
-      14,
-      1,
-      22,
+      ["exponential", 2],
+      ["zoom"],
+      10, ["/", ["get", "radius_m"], 12],
+      12, ["/", ["get", "radius_m"], 5],
+      14, ["/", ["get", "radius_m"], 1.8],
+      16, ["/", ["get", "radius_m"], 0.45],
+      18, ["/", ["get", "radius_m"], 0.11],
     ],
     "circle-color": "rgba(255,255,255,0.0)",
-    "circle-stroke-width": 1.5,
-    "circle-stroke-color": [
-      "interpolate",
-      ["linear"],
-      ["get", "intensity"],
-      0,
-      "#22ff44",
-      0.4,
-      "#ffff00",
-      0.7,
-      "#ff6600",
-      1,
-      "#ff2020",
-    ],
-    "circle-opacity": 0.85,
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#ff2020",
+    "circle-opacity": 0.9,
   },
 };
 
@@ -713,15 +700,15 @@ function CrimeMapping() {
             }
           >
             <option value="">All Crime Types</option>
-            <option value="ROBBERY">Robbery</option>
-            <option value="THEFT">Theft</option>
-            <option value="PHYSICAL INJURY">Physical Injury</option>
-            <option value="HOMICIDE">Homicide</option>
-            <option value="MURDER">Murder</option>
-            <option value="RAPE">Rape</option>
             <option value="CARNAPPING - MC">Carnapping - MC</option>
             <option value="CARNAPPING - MV">Carnapping - MV</option>
+            <option value="HOMICIDE">Homicide</option>
+            <option value="MURDER">Murder</option>
+            <option value="PHYSICAL INJURY">Physical Injury</option>
+            <option value="RAPE">Rape</option>
+            <option value="ROBBERY">Robbery</option>
             <option value="SPECIAL COMPLEX CRIME">Special Complex Crime</option>
+            <option value="THEFT">Theft</option>
           </select>
 
           {/* Barangay filter — locked for barangay users */}

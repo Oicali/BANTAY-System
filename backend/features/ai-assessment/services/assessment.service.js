@@ -63,19 +63,38 @@ const prettifyBarangay = (name = "") =>
 const parseJsonFromText = (text) => {
   if (!text || typeof text !== "string") return null;
 
+  // Direct parse first
   try {
     return JSON.parse(text);
-  } catch (_) {
-    // continue
-  }
+  } catch (_) {}
 
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
+  // Strip markdown code fences
+  let cleaned = text
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (_) {}
+
+  // Extract outermost {...} block
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
     return null;
   }
 
-  const candidate = text.slice(firstBrace, lastBrace + 1);
+  let candidate = cleaned.slice(firstBrace, lastBrace + 1);
+
+  try {
+    return JSON.parse(candidate);
+  } catch (_) {}
+
+  // Last resort: fix common LLM JSON issues
+  candidate = candidate
+    .replace(/,\s*([}\]])/g, "$1") // trailing commas
+    .replace(/\t/g, "\\t"); // literal tabs in strings
 
   try {
     return JSON.parse(candidate);
@@ -334,12 +353,14 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
         const crimeParsed = parseJsonFromText(crimeRawText);
 
         if (crimeParsed && crimeParsed.crime_type) {
-          // Flatten any nested object fields the LLM may have returned
           perCrimeResults.push(flattenCrimeFields(crimeParsed));
         } else {
-          // AI returned unparseable text — keep base draft for this crime
           console.warn(
             `[AI] Could not parse JSON for ${crimeBase.crime_type}, using base draft`,
+          );
+          console.warn(
+            `[AI] Raw output (first 500 chars):`,
+            crimeRawText?.slice(0, 500),
           );
           perCrimeResults.push(crimeBase);
         }
