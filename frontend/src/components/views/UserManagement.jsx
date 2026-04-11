@@ -339,6 +339,10 @@ const UserManagement = () => {
     setIsRestoreModalOpen(true);
   };
 
+  const handleResendSuccess = (message) => {
+    setSuccessMessage(message);
+  };
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
     fetchUsers(page);
@@ -373,14 +377,17 @@ const UserManagement = () => {
     lastName,
     suffix,
     username,
+    rankAbbreviation,
   ) => {
     if (firstName && lastName) {
+      const rankPrefix = rankAbbreviation ? `${rankAbbreviation}. ` : "";
       const parts = [firstName, middleName, lastName, suffix].filter(Boolean);
       const fullName = parts.join(" ");
-      if (fullName.length > 25) {
-        return fullName.substring(0, 22) + "...";
+      const display = rankPrefix + fullName;
+      if (display.length > 30) {
+        return rankPrefix + fullName.substring(0, 27 - rankPrefix.length) + "...";
       }
-      return fullName;
+      return display;
     }
     return username;
   };
@@ -397,29 +404,20 @@ const UserManagement = () => {
 
   const getStatusText = (userData) => {
     switch (userData.status) {
-      case "deactivated":
-        return "Deactivated";
-      case "locked":
-        return "Locked";
-      case "unverified":
-        return "Unverified";
-      case "verified":
-        return "Verified";
-      default:
-        return "Verified";
+      case "deactivated": return "Deactivated";
+      case "locked":      return "Locked";
+      case "unverified":  return "Unverified";
+      case "verified":    return "Verified";
+      default:            return "Verified";
     }
   };
 
   const getStatusBadgeClass = (userData) => {
     switch (userData.status) {
-      case "deactivated":
-        return "um-status-inactive";
-      case "locked":
-        return "um-status-locked";
-      case "unverified":
-        return "um-status-unverified";
-      default:
-        return "um-status-active";
+      case "deactivated": return "um-status-inactive";
+      case "locked":      return "um-status-locked";
+      case "unverified":  return "um-status-unverified";
+      default:            return "um-status-active";
     }
   };
 
@@ -625,6 +623,7 @@ const UserManagement = () => {
                                   userData.last_name,
                                   userData.suffix,
                                   userData.username,
+                                  userData.rank_abbreviation,
                                 )}
                                 {isCurrentUser(userData) && (
                                   <span className="um-you-badge">( YOU )</span>
@@ -763,6 +762,7 @@ const UserManagement = () => {
         onClose={() => setIsEditModalOpen(false)}
         user={selectedUser}
         onUserUpdated={handleUserUpdated}
+        onResendSuccess={handleResendSuccess}
       />
       <DeleteUserModal
         isOpen={isDeleteModalOpen}
