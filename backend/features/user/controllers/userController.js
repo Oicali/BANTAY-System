@@ -371,14 +371,14 @@ const verifyAccount = async (req, res) => {
       return res.redirect(`${frontendUrl}/verification-success?status=used`);
     if (new Date(tokenRow.expires_at) < new Date())
       return res.redirect(`${frontendUrl}/verification-success?status=expired`);
-    if (tokenRow.status === "active")
+    if (tokenRow.status === "verified")
       return res.redirect(`${frontendUrl}/verification-success?status=already_verified`);
 
     const userId = tokenRow.user_id;
 
     await client.query("BEGIN");
     await client.query(
-      `UPDATE users SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
+      `UPDATE users SET status = 'verified', updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
       [userId],
     );
     await client.query(
@@ -741,7 +741,7 @@ const unlockUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Account is not locked" });
 
     await pool.query(
-      `UPDATE users SET status = 'active', failed_login_attempts = 0, lockout_until = NULL,
+      `UPDATE users SET status = 'verified', failed_login_attempts = 0, lockout_until = NULL,
        updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
       [id],
     );
@@ -792,7 +792,7 @@ const restoreUser = async (req, res) => {
     if (targetResult.rows[0].status !== "deactivated")
       return res.status(400).json({ success: false, message: "User account is not deactivated" });
 
-    await pool.query("UPDATE users SET status = 'active', updated_at = NOW() WHERE user_id = $1", [id]);
+    await pool.query("UPDATE users SET status = 'verified', updated_at = NOW() WHERE user_id = $1", [id]);
     res.json({ success: true, message: "User account restored successfully" });
   } catch (error) {
     console.error("Restore user error:", error);

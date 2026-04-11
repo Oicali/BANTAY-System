@@ -84,14 +84,14 @@ const login = async (req, res) => {
         });
       }
 
-      // Timed lock expired — restore to active
+      // Timed lock expired — restore to verified
       await pool.query(
         `UPDATE users
-         SET status = 'active', lockout_until = NULL, failed_login_attempts = 0
+         SET status = 'verified', lockout_until = NULL, failed_login_attempts = 0
          WHERE user_id = $1`,
         [user.user_id],
       );
-      user.status = "active";
+      user.status = "verified";
     }
 
     // Permanent lock (lockout_until IS NULL but status = 'locked')
@@ -112,12 +112,12 @@ const login = async (req, res) => {
       let lockMinutes = 0;
 
       // 🔒 PROGRESSIVE LOCKOUT SYSTEM
-      // 3  attempts → 15 min lock
-      // 5  attempts → 1 hr lock
+      // 3  attempts → 5 min lock
+      // 5  attempts → 15min lock
       // 8 attempts → permanent lock (requires admin to unlock)
       if (attempts >= 8) lockMinutes = null;
-      else if (attempts === 5) lockMinutes = 60;
-      else if (attempts === 3) lockMinutes = 15;
+      else if (attempts === 5) lockMinutes = 15;
+      else if (attempts === 3) lockMinutes = 5;
 
       if (attempts >= 8) {
         await pool.query(
@@ -173,7 +173,7 @@ const login = async (req, res) => {
     await pool.query(
       `UPDATE users
        SET failed_login_attempts = 0,
-           status = 'active',
+           status = 'verified',
            lockout_until = NULL,
            last_login = NOW()
        WHERE user_id = $1`,
@@ -389,7 +389,7 @@ const resetPassword = async (req, res) => {
       `UPDATE users
        SET password = $1,
            failed_login_attempts = 0,
-           status = CASE WHEN status = 'locked' THEN 'active' ELSE status END,
+           status = CASE WHEN status = 'locked' THEN 'verified' ELSE status END,
            lockout_until = NULL,
            updated_at = NOW()
        WHERE user_id = $2`,
@@ -492,11 +492,73 @@ const changePassword = async (req, res) => {
   }
 };
 
+
+// ============================================================
+// MOBILE LOGIN (Admin + Patrol only)
+// ============================================================
+const mobileLogin = async (req, res) => {
+  const ALLOWED_ROLES = ['Admin', 'Patrol'];
+
+  // Run the same login logic first by calling login internally,
+  // but we need to intercept the response — so we duplicate the
+  // role check after credential validation instead.
+  // Easiest: call login, then check role before returning token.
+
+  // We'll reuse the exact same flow with one extra guard:
+  try {
+    const { username, password } = req.body;
+
+    const errors = validateLoginInput(username, password);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const result = await pool.query(
+      `SELECT
+        u.user_id, u.username, u.password, u.email,
+        u.first_name, u.last_name, u.user_type,
+        u.profile_picture,
+        u.status, u.lockout_until,
+        u.failed_login_attempts, u.last_login,
+        r.role_name,
+        bd.barangay_code AS assigned_barangay_code
+       FROM users u
+       JOIN roles r ON u.role_id = r.role_id
+       LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
+       WHERE u.username = $1`,
+      [username.trim()],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ success: false, message: 'Account does not exist' });
+    }
+
+    const user = result.rows[0];
+
+    // ── MOBILE ROLE GUARD ──────────────────────────────────────
+    if (!ALLOWED_ROLES.includes(user.role_name)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. This app is restricted to Admin and Patrol officers only.',
+      });
+    }
+
+    // ── Reuse the rest of the login logic ─────────────────────
+    // Forward to the existing login handler by re-calling it
+    return login(req, res);
+
+  } catch (error) {
+    console.error('Mobile login error:', error);
+    res.status(500).json({ success: false, message: 'Login failed' });
+  }
+};
+
 // ============================================================
 // EXPORTS
 // ============================================================
 module.exports = {
   login,
+  mobileLogin, 
   logout,
   logoutAll,
   sendOTP,
