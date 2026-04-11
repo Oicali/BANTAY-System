@@ -19,7 +19,7 @@ const BACOOR_CITY_CODE = "042103000";
 
 const STATUS_PARAM_MAP = {
   Default: null,
-  Active: "active",
+  Verified: "verified",
   Unverified: "unverified",
   Locked: "locked",
   Deactivated: "deactivated",
@@ -403,8 +403,10 @@ const UserManagement = () => {
         return "Locked";
       case "unverified":
         return "Unverified";
+      case "verified":
+        return "Verified";
       default:
-        return "Active";
+        return "Verified";
     }
   };
 
@@ -546,7 +548,7 @@ const UserManagement = () => {
             <option value="Default" style={{ color: "#adb5bd" }}>
               Select Status
             </option>
-            <option value="Active">Active</option>
+            <option value="Verified">Verified</option>
             <option value="Unverified">Unverified</option>
             <option value="Locked">Locked</option>
             <option value="Deactivated">Deactivated</option>
