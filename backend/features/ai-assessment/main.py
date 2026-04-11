@@ -414,7 +414,10 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         }
 
     coords = geo_df[["lat", "lng"]].values.astype(float)
-    db     = DBSCAN(eps=0.003, min_samples=3).fit(coords)
+    db = DBSCAN(eps=0.003, min_samples=3).fit(coords)
+    core_sample_indices = db.core_sample_indices_
+    print(f"Core points: {len(core_sample_indices)} out of {total_with_coords} total")
+    print(f"Noise/outliers: {list(db.labels_).count(-1)}, Border points: {total_with_coords - len(db.core_sample_indices_) - list(db.labels_).count(-1)}")
     geo_df = geo_df.copy()
     geo_df["cluster_label"] = db.labels_
 
@@ -426,8 +429,15 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
 
         cluster_rows = geo_df[geo_df["cluster_label"] == label]
 
-        centroid_lat = float(cluster_rows["lat"].mean())
-        centroid_lng = float(cluster_rows["lng"].mean())
+        coords_cluster = cluster_rows[["lat", "lng"]].values
+        eps = 0.003
+        neighbor_counts = []
+        for pt in coords_cluster:
+            dists = np.sqrt(((coords_cluster - pt) ** 2).sum(axis=1))
+            neighbor_counts.append((dists < eps).sum())
+        densest_idx = cluster_rows.index[np.argmax(neighbor_counts)]
+        centroid_lat = float(cluster_rows.loc[densest_idx, "lat"])
+        centroid_lng = float(cluster_rows.loc[densest_idx, "lng"])
 
         dominant_crime = (
             cluster_rows["incident_type"].mode().iloc[0]
@@ -466,11 +476,27 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
             else None
         )
 
+        def haversine(lat1, lon1, lat2, lon2):
+            R = 6371000  # Earth radius in meters
+            phi1, phi2 = math.radians(lat1), math.radians(lat2)
+            dphi = math.radians(lat2 - lat1)
+            dlambda = math.radians(lon2 - lon1)
+            a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+            return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        radius_m = float(cluster_rows.apply(
+            lambda row: haversine(centroid_lat, centroid_lng, row["lat"], row["lng"]),
+            axis=1
+        ).max())
+        # Add a small padding so the ring doesn't clip the outermost points
+        radius_m = max(min(radius_m * 1.2, 100), 50)  # min 50m, max 100m radius
+
         clusters.append({
             "cluster_id":           int(label),
             "count":                int(len(cluster_rows)),
             "centroid_lat":         round(centroid_lat, 7),
             "centroid_lng":         round(centroid_lng, 7),
+            "radius_m":             round(radius_m, 1),
             "dominant_crime":       dominant_crime,
             "dominant_modus":       dominant_modus,
             "dominant_barangay":    dominant_barangay,

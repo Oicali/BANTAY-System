@@ -39,6 +39,8 @@ export function useExportDashboard(
   appliedFilters,
   chartRefs = {},
   setIsExportLoading,
+  assessment = null,
+  analysisData = null,
 ) {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -65,7 +67,9 @@ export function useExportDashboard(
         place: dashData.place ?? [],
         barangay: dashData.barangay ?? [],
         modus: dashData.modus ?? [],
-        completeData: dashData.completeData ?? [], // ← add this
+        completeData: dashData.completeData ?? [],
+        assessment: assessment ?? null,
+        analysisData: analysisData ?? null,
         meta: {
           dateFrom: appliedFilters.dateFrom ?? null,
           dateTo: appliedFilters.dateTo ?? null,
