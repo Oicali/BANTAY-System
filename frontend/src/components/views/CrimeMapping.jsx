@@ -196,6 +196,7 @@ function CrimeMapping() {
     const phtToday = new Date(phtMs);
     const oneYearAgo = new Date(phtToday);
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    oneYearAgo.setDate(oneYearAgo.getDate() + 1); // fix off-by-one
     return oneYearAgo.toISOString().slice(0, 10);
   };
 
@@ -794,13 +795,10 @@ function CrimeMapping() {
               })()}
               onChange={(e) => {
                 const from = e.target.value;
-                const autoTo = (() => {
-                  const d = new Date(from);
-                  d.setFullYear(d.getFullYear() + 1);
-                  const cap = getPHTDate(0);
-                  const computed = d.toISOString().slice(0, 10);
-                  return computed <= cap ? computed : cap;
-                })();
+                const autoTo =
+                  filters.date_to && filters.date_to > from
+                    ? filters.date_to
+                    : getPHTToday();
                 setFilters((f) => ({ ...f, date_from: from, date_to: autoTo }));
               }}
             />
