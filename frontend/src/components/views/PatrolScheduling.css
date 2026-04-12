@@ -1,11 +1,8 @@
-/* === COLOR VARIABLES === */
 :root {
   --navy-dark:    #0a1628;
   --navy-primary: #1e3a5f;
-  --red-primary:  #c1272d;
   --white:        #ffffff;
   --gray-50:      #f8f9fa;
-  --gray-100:     #e9ecef;
   --gray-200:     #dee2e6;
   --gray-300:     #ced4da;
   --gray-400:     #adb5bd;
@@ -14,36 +11,24 @@
   --gray-900:     #212529;
 }
 
-body {
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--gray-50);
-  color: var(--gray-900);
-  line-height: 1.6;
-}
+body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: var(--gray-50); color: var(--gray-900); line-height: 1.6; }
 
-/* === LAYOUT === */
 .psch-content-area { padding: 32px; width: 100%; }
 
-/* === PAGE HEADER === */
 .psch-page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
 .psch-page-header-left h1 { font-family: "Inter", sans-serif; font-size: 28px; font-weight: 700; color: var(--navy-dark); margin-bottom: 6px; }
 .psch-page-header-left p  { color: var(--gray-600); font-size: 15px; }
 
-/* === BUTTONS === */
 .psch-btn { padding: 10px 20px; border: none; border-radius: 6px; font-family: "DM Sans", sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .psch-btn-primary { background: var(--navy-primary); color: var(--white); }
 .psch-btn-primary:hover { background: var(--navy-dark); }
 
-/* === FILTERS === */
-.psch-filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-.psch-search-box { flex: 1; min-width: 240px; }
+.psch-filters { display: flex; gap: 12px; margin-bottom: 20px; }
+.psch-search-box { flex: 1; }
 .psch-search-box input { width: 100%; padding: 10px 14px; border: 1px solid var(--gray-300); border-radius: 7px; font-size: 14px; color: var(--gray-900); outline: none; font-family: inherit; background: var(--white); transition: border-color 0.2s; }
 .psch-search-box input:focus { border-color: var(--navy-primary); box-shadow: 0 0 0 3px rgba(30,58,95,0.08); }
 .psch-search-box input::placeholder { color: var(--gray-400); }
-.psch-filter-select { padding: 10px 14px; border: 1px solid var(--gray-300); border-radius: 7px; font-size: 14px; color: var(--gray-900); background: var(--white); outline: none; cursor: pointer; font-family: inherit; transition: border-color 0.2s; }
-.psch-filter-select:focus { border-color: var(--navy-primary); }
 
-/* === TABLE CARD === */
 .psch-table-card { background: var(--white); border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden; }
 .psch-table-container { overflow-x: auto; }
 .psch-data-table { width: 100%; border-collapse: collapse; }
@@ -54,31 +39,21 @@ body {
 .psch-data-table tbody tr:last-child td { border-bottom: none; }
 .psch-empty-row { text-align: center; color: var(--gray-400); padding: 48px 20px !important; font-size: 14px; }
 
-/* === TABLE CELL CONTENT === */
-.psch-patrol-name  { font-weight: 700; color: var(--gray-900); }
-.psch-unit-text    { font-weight: 600; color: var(--navy-primary); }
+.psch-patrol-name   { font-weight: 700; color: var(--gray-900); }
+.psch-unit-text     { font-weight: 600; color: var(--navy-primary); }
 .psch-duration-text { font-size: 13px; font-weight: 600; color: var(--navy-primary); white-space: nowrap; }
-.psch-none-text    { font-size: 13px; color: var(--gray-400); font-style: italic; }
-.psch-area-summary { font-size: 13px; color: var(--gray-700); line-height: 1.6; }
+.psch-none-text     { font-size: 13px; color: var(--gray-400); font-style: italic; }
+.psch-area-summary  { font-size: 13px; color: var(--gray-700); line-height: 1.6; }
 
-/* === SHIFT BADGES === */
-.psch-shift-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.shift-morning { background: rgba(251,191,36,0.12); color: #d97706; }
-.shift-night   { background: rgba(99,102,241,0.12);  color: #4f46e5; }
-
-/* === PATROLLER STACK === */
 .psch-patroller-stack { display: flex; flex-direction: column; gap: 6px; }
 .psch-patroller-row   { display: flex; align-items: center; gap: 8px; }
 .psch-avatar { width: 28px; height: 28px; background: var(--navy-primary); color: var(--white); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
 .psch-officer-name { font-size: 13px; font-weight: 600; color: var(--gray-900); }
 
-/* === VIEW BUTTON === */
 .psch-view-btn { padding: 6px 16px; background: var(--navy-primary); color: var(--white); border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-family: inherit; }
 .psch-view-btn:hover { background: var(--navy-dark); }
 
-/* === RESPONSIVE === */
 @media (max-width: 768px) {
   .psch-content-area { padding: 20px; }
   .psch-page-header  { flex-direction: column; gap: 16px; }
-  .psch-filters      { flex-direction: column; }
 }

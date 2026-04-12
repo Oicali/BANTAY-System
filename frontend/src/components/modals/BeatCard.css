@@ -11,11 +11,8 @@
 .bc-header-left { display: flex; flex-direction: column; gap: 8px; }
 .bc-patrol-name { font-family: "Inter", sans-serif; font-size: 22px; font-weight: 700; color: #0a1628; margin: 0; }
 .bc-header-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.bc-shift-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.bc-shift-morning { background: rgba(251,191,36,0.12); color: #d97706; }
-.bc-shift-night   { background: rgba(99,102,241,0.12);  color: #4f46e5; }
 .bc-duration { font-size: 13px; font-weight: 600; color: #1e3a5f; }
-.bc-unit     { font-size: 13px; color: #6c757d; }
+.bc-unit { font-size: 13px; color: #6c757d; font-weight: 500; }
 .bc-header-actions { display: flex; align-items: center; gap: 8px; }
 .bc-btn { padding: 8px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; font-family: inherit; }
 .bc-btn-edit   { background: #1e3a5f; color: #fff; }
@@ -26,45 +23,52 @@
 .bc-btn-close:hover { background: #f8f9fa; }
 
 /* ── BODY ── */
-.bc-body { display: grid; grid-template-columns: 1fr 400px; flex: 1; min-height: 0; overflow: hidden; }
+.bc-body { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; overflow: hidden; }
 .bc-map-panel { position: relative; overflow: hidden; border-right: 1px solid #dee2e6; }
 .bc-info-panel { display: flex; flex-direction: column; overflow: hidden; }
 
 /* ── SECTIONS ── */
-.bc-section { padding: 16px 20px; border-bottom: 1px solid #dee2e6; flex-shrink: 0; }
-.bc-section-grow { flex: 1; overflow-y: auto; border-bottom: none; display: flex; flex-direction: column; min-height: 0; }
-.bc-section-title { font-family: "Inter", sans-serif; font-size: 11px; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; flex-shrink: 0; }
+.bc-section { padding: 14px 18px; border-bottom: 1px solid #dee2e6; flex-shrink: 0; }
+.bc-section-grow { flex: 1; overflow-y: auto; border-bottom: none; display: flex; flex-direction: column; gap: 8px; padding: 14px 18px; min-height: 0; }
+.bc-section-title { font-size: 11px; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; flex-shrink: 0; }
 
-/* ── PATROLLERS ── */
-.bc-patroller-list { display: flex; flex-direction: column; gap: 8px; }
-.bc-patroller-row  { display: flex; align-items: center; gap: 10px; }
-.bc-avatar { width: 34px; height: 34px; background: #1e3a5f; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-.bc-patroller-name { font-size: 14px; font-weight: 600; color: #212529; }
+/* ── PATROLLERS TABLE ── */
+.bc-patroller-table-wrap { overflow-x: auto; max-height: 180px; overflow-y: auto; }
+.bc-patroller-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.bc-patroller-table thead { background: #f8f9fa; position: sticky; top: 0; }
+.bc-patroller-table th { padding: 7px 10px; text-align: left; font-size: 10px; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #dee2e6; white-space: nowrap; }
+.bc-patroller-table td { padding: 8px 10px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+.bc-patroller-table tbody tr:last-child td { border-bottom: none; }
+.bc-pt-date    { font-size: 11px; font-weight: 600; color: #1e3a5f; white-space: nowrap; border-right: 1px solid #dee2e6; }
+.bc-pt-name    { font-size: 12px; font-weight: 600; color: #212529; }
+.bc-pt-contact { font-size: 12px; color: #6c757d; }
 
 /* ── DATE TABS ── */
-.bc-date-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid #dee2e6; margin-bottom: 12px; flex-shrink: 0; }
+.bc-date-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid #dee2e6; flex-shrink: 0; }
 .bc-date-tab { padding: 6px 12px; background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 12px; font-weight: 500; color: #6c757d; cursor: pointer; transition: all 0.2s; font-family: inherit; }
 .bc-date-tab:hover { color: #0a1628; }
 .bc-date-tab-active { color: #1e3a5f; border-bottom-color: #1e3a5f; font-weight: 700; }
 
+/* ── SHIFT TABS ── */
+.bc-timetable-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.bc-shift-tabs { display: flex; gap: 4px; }
+.bc-shift-tab { padding: 5px 14px; border: 1px solid #dee2e6; border-radius: 20px; font-size: 12px; font-weight: 600; background: transparent; color: #6c757d; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.bc-shift-tab:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.bc-shift-active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+
 /* ── TIMETABLE ── */
-.bc-timetable-wrap { overflow-x: auto; }
+.bc-timetable-wrap { overflow-x: auto; flex: 1; }
 .bc-timetable { width: 100%; border-collapse: collapse; font-size: 13px; }
-.bc-timetable thead { background: #f8f9fa; }
+.bc-timetable thead { background: #f8f9fa; position: sticky; top: 0; }
 .bc-timetable th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700; color: #6c757d; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #dee2e6; }
-.bc-timetable td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; vertical-align: middle; }
+.bc-timetable td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; vertical-align: top; }
 .bc-timetable tbody tr:last-child td { border-bottom: none; }
 .bc-timetable tbody tr:hover { background: #f8f9fa; }
-.bc-tt-time { font-size: 12px; font-weight: 700; color: #1e3a5f; white-space: nowrap; }
-.bc-tt-brgy { font-size: 13px; font-weight: 600; color: #212529; }
-.bc-tt-notes { min-width: 140px; }
-
-/* ── NOTES — read only ── */
-.bc-notes-text { font-size: 12px; color: #495057; line-height: 1.5; }
-.bc-notes-empty { font-size: 12px; color: #adb5bd; font-style: italic; }
+.bc-tt-time { font-size: 12px; font-weight: 700; color: #1e3a5f; white-space: nowrap; min-width: 110px; }
+.bc-tt-task { font-size: 13px; color: #212529; line-height: 1.5; }
 
 /* ── EMPTY ── */
-.bc-empty { font-size: 13px; color: #adb5bd; font-style: italic; margin: 8px 0; }
+.bc-empty { font-size: 13px; color: #adb5bd; font-style: italic; margin: 4px 0; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
