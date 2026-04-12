@@ -1,6 +1,6 @@
 // backend/features/dashboard/controllers/exportDashboardController.js
-// Generates a .docx report from the crime dashboard data.
-// Sections 1-8: portrait. Section 9 (Complete Data): landscape.
+// Generates a .pdf report from the crime dashboard data.
+// Internally builds .docx first, then converts to PDF via LibreOffice.
 
 const {
   Document,
@@ -20,6 +20,15 @@ const {
   Header,
   Footer,
 } = require("docx");
+
+const libre = require("libreoffice-convert");
+const libreConvert = (buf, ext, opt) =>
+  new Promise((resolve, reject) =>
+    libre.convert(buf, ext, opt, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    })
+  );
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -66,8 +75,8 @@ const GRAY = "F3F4F6";
 const CONTENT_WIDTH = 10466;
 
 // Full-width image: 17.23 cm × 5.15 cm in EMU
-const FULL_W_EMU = 6680400;  // ~17.01cm — fits 10466 DXA content width
-const FULL_H_EMU = 1854000;  // height unchanged
+const FULL_W_EMU = 6680400; // ~17.01cm — fits 10466 DXA content width
+const FULL_H_EMU = 1854000; // height unchanged
 
 const emuToPx = (emu) => Math.round(emu / 9525);
 
@@ -435,10 +444,9 @@ function buildBarangayTable(barangay) {
 
 // Complete Data table — uses smaller font (size 14 = 7pt) to fit landscape page
 function buildCompleteDataTable(completeData) {
-  // Landscape content width: 14678 DXA split across 9 columns
-  // barangay | typeOfPlace | date | time | crimeOffense | modus | lat | lng | caseStatus
+  // Landscape content width: 14678 DXA split across 7 columns
+  // barangay | typeOfPlace | date | time | crimeOffense | modus | caseStatus
   const COL = [1800, 1500, 900, 800, 1800, 2666, 1000];
-  // Total: 12678 — leave some breathing room on the page
   const TWIDTH = COL.reduce((a, b) => a + b, 0);
 
   const smH = (text, w, opts = {}) =>
@@ -746,9 +754,7 @@ function buildAssessmentSection(assessment, analysisData) {
         elements.push(
           new Paragraph({
             spacing: { after: 80 },
-            children: [
-              new TextRun({ text: value, size: 18, font: "Arial" }),
-            ],
+            children: [new TextRun({ text: value, size: 18, font: "Arial" })],
           }),
         );
       }
@@ -1055,7 +1061,8 @@ const exportDashboard = async (req, res) => {
       analysisData = null,
     } = req.body;
 
-    const buffer = await buildExportDoc({
+    // Step 1: Build the .docx buffer (same as before)
+    const docxBuffer = await buildExportDoc({
       summary,
       byDay,
       place,
@@ -1068,20 +1075,21 @@ const exportDashboard = async (req, res) => {
       analysisData,
     });
 
+    // Step 2: Convert .docx → .pdf via LibreOffice
+    const pdfBuffer = await libreConvert(docxBuffer, ".pdf", undefined);
+    console.log("PDF buffer size:", pdfBuffer?.length);
+
     const dateStr =
       meta.dateFrom && meta.dateTo
         ? `${meta.dateFrom}_to_${meta.dateTo}`
         : new Date().toISOString().slice(0, 10);
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    );
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="crime_dashboard_${dateStr}.docx"`,
+      `attachment; filename="crime_dashboard_${dateStr}.pdf"`,
     );
-    res.send(buffer);
+    res.send(pdfBuffer);
   } catch (err) {
     console.error("exportDashboard error:", err);
     res.status(500).json({ success: false, message: err.message });

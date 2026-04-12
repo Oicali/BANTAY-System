@@ -1686,18 +1686,6 @@ export default function ProfileSettings() {
                   {profileData?.rank || "—"}
                 </span>
               </div>
-              <div className="ps-official-row">
-                <span className="ps-official-key">Department</span>
-                <span className="ps-official-value">
-                  {profileData?.department || "—"}
-                </span>
-              </div>
-              <div className="ps-official-row">
-                <span className="ps-official-key">Mobile Patrol No.</span>
-                <span className="ps-official-value">
-                  {profileData?.mobile_patrol ?? "—"}
-                </span>
-              </div>
             </>
           )}
           {isBarangayRole() && (
@@ -1841,8 +1829,9 @@ export default function ProfileSettings() {
                 getInitials()
               )}
             </div>
-            <h2 className="ps-profile-name">{getFullName()}</h2>
+            <h2 className="ps-profile-name">{profileData.rank_abbreviation}. {getFullName()}</h2>
             <div className="ps-profile-badge">{profileData.role || "N/A"}</div>
+            
 
             <div className="ps-username-display">
               <div className="ps-username-label">Username</div>
@@ -2232,21 +2221,10 @@ export default function ProfileSettings() {
                           <div className="ps-official-row">
                             <span className="ps-official-key">Rank</span>
                             <span className="ps-official-value">
-                              {profileData?.rank || "—"}
-                            </span>
-                          </div>
-                          <div className="ps-official-row">
-                            <span className="ps-official-key">Department</span>
-                            <span className="ps-official-value">
-                              {profileData?.department || "—"}
-                            </span>
-                          </div>
-                          <div className="ps-official-row">
-                            <span className="ps-official-key">
-                              Mobile Patrol No.
-                            </span>
-                            <span className="ps-official-value">
-                              {profileData?.mobile_patrol ?? "—"}
+                              {profileData?.rank_abbreviation &&
+                              profileData?.rank
+                                ? `${profileData.rank_abbreviation}. — ${profileData.rank}`
+                                : profileData?.rank || "—"}
                             </span>
                           </div>
                         </>

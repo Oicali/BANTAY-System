@@ -112,7 +112,7 @@ export function useExportDashboard(
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `crime_dashboard_${dateStr}.docx`;
+      link.download = `crime_dashboard_${dateStr}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();

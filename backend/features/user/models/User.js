@@ -9,35 +9,39 @@ class User {
   // GET CURRENT USER PROFILE
   // =====================================================
   static async getProfile(userId) {
-    try {
-      const result = await pool.query(
-        `SELECT 
-          u.user_id, u.username, u.email, 
-          u.first_name, u.last_name, u.middle_name, u.suffix, 
-          u.phone, u.alternate_phone,
-          u.gender, 
-          TO_CHAR(u.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
-          u.profile_picture, u.user_type, u.status, u.created_at,
-          r.role_name AS role,
-          ua.region_code, ua.province_code,
-          ua.municipality_code, ua.barangay_code,
-          ua.address_line,
-          pd.rank, pd.mobile_patrol, pd.department,
-          bd.barangay_code AS assigned_barangay_code
-        FROM users u
-        LEFT JOIN roles r ON u.role_id = r.role_id
-        LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
-        LEFT JOIN police_details pd ON u.user_id = pd.user_id
-        LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
-        WHERE u.user_id = $1`,
-        [userId],
-      );
-      return result.rows[0] || null;
-    } catch (error) {
-      console.error("Get profile error:", error);
-      throw error;
-    }
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.user_id, u.username, u.email, 
+        u.first_name, u.last_name, u.middle_name, u.suffix, 
+        u.phone, u.alternate_phone,
+        u.gender, 
+        TO_CHAR(u.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
+        u.profile_picture, u.user_type, u.status, u.created_at,
+        u.rank_id,
+        r.role_name AS role,
+        pr.rank_name AS rank,
+        pr.abbreviation AS rank_abbreviation,
+        ua.region_code, ua.province_code,
+        ua.municipality_code, ua.barangay_code,
+        ua.address_line,
+        bd.barangay_code AS assigned_barangay_code
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
+      LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
+      LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
+      WHERE u.user_id = $1`,
+      [userId],
+    );
+
+    const profile = result.rows[0] || null;
+    return profile;
+  } catch (error) {
+    console.error("Get profile error:", error);
+    throw error;
   }
+}
 
   // =====================================================
   // CHECK PHONE AVAILABILITY
@@ -206,58 +210,62 @@ class User {
   // GET ALL USERS
   // =====================================================
   static async getAllUsers() {
-    try {
-      const result = await pool.query(
-        `SELECT 
-          u.user_id, u.username, u.email, 
-          u.first_name, u.last_name, u.middle_name, u.suffix,
-          u.phone, u.status, u.last_login, u.created_at, u.user_type,
-          r.role_name AS role,
-          pd.rank, pd.mobile_patrol, pd.department,
-          bd.barangay_code AS assigned_barangay_code,
-          ua.region_code, ua.province_code, ua.municipality_code, ua.barangay_code, ua.address_line
-        FROM users u
-        LEFT JOIN roles r ON u.role_id = r.role_id
-        LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
-        LEFT JOIN police_details pd ON u.user_id = pd.user_id
-        LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
-        ORDER BY u.created_at DESC`,
-      );
-      return result.rows;
-    } catch (error) {
-      console.error("Get all users error:", error);
-      throw error;
-    }
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.user_id, u.username, u.email, 
+        u.first_name, u.last_name, u.middle_name, u.suffix,
+        u.phone, u.status, u.last_login, u.created_at, u.user_type,
+        u.rank_id,
+        r.role_name AS role,
+        pr.rank_name AS rank,
+        pr.abbreviation AS rank_abbreviation,
+        bd.barangay_code AS assigned_barangay_code,
+        ua.region_code, ua.province_code, ua.municipality_code, ua.barangay_code, ua.address_line
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
+      LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
+      LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
+      ORDER BY u.created_at DESC`,
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Get all users error:", error);
+    throw error;
   }
+}
 
   // =====================================================
   // GET USER DETAILS BY ID
   // =====================================================
   static async getUserDetailsById(userId) {
-    try {
-      const result = await pool.query(
-        `SELECT 
-          u.user_id, u.username, u.email, 
-          u.first_name, u.last_name, u.middle_name, u.suffix,
-          u.phone, u.status, u.last_login, u.created_at, u.user_type,
-          r.role_name AS role,
-          pd.rank, pd.mobile_patrol, pd.department,
-          bd.barangay_code AS assigned_barangay_code,
-          ua.region_code, ua.province_code, ua.municipality_code, ua.barangay_code, ua.address_line
-        FROM users u
-        LEFT JOIN roles r ON u.role_id = r.role_id
-        LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
-        LEFT JOIN police_details pd ON u.user_id = pd.user_id
-        LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
-        WHERE u.user_id = $1`,
-        [userId],
-      );
-      return result.rows[0] || null;
-    } catch (error) {
-      console.error("Get user details error:", error);
-      throw error;
-    }
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.user_id, u.username, u.email, 
+        u.first_name, u.last_name, u.middle_name, u.suffix,
+        u.phone, u.status, u.last_login, u.created_at, u.user_type,
+        u.rank_id,
+        r.role_name AS role,
+        pr.rank_name AS rank,
+        pr.abbreviation AS rank_abbreviation,
+        bd.barangay_code AS assigned_barangay_code,
+        ua.region_code, ua.province_code, ua.municipality_code, ua.barangay_code, ua.address_line
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
+      LEFT JOIN user_addresses ua ON u.user_id = ua.user_id
+      LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
+      WHERE u.user_id = $1`,
+      [userId],
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error("Get user details error:", error);
+    throw error;
   }
+}
 
   // =====================================================
   // UPDATE PROFILE PICTURE
