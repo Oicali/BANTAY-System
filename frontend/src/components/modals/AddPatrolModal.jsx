@@ -1,16 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./AddPatrolModal.css";
+import "./PatrolModal.css";
 import LoadingModal from "./LoadingModal";
 import Notification from "./Notification";
-
-const API_BASE = import.meta.env.VITE_API_URL;
-
-const SHIFTS = ["Morning", "Night"];
-const SHIFT_LABELS = { Morning: "Morning", Night: "Night" };
-
-const emptyStop = { barangay: "", notes: "", time_start: "", time_end: "" };
+import TimePicker from "./TimePicker";
 
 const fillLayer    = { id: "apm-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.45 } };
 const outlineLayer = { id: "apm-outline", type: "line",   paint: { "line-color": "#1e3a5f", "line-width": 1.2, "line-opacity": 0.6 } };
@@ -20,147 +14,90 @@ const labelLayer   = {
   paint:  { "text-color": "#0a1628", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.5 },
 };
 
-// ── Date helpers ───────────────────────────────────────────
 const parseLocalDate = (d) => {
   if (!d) return null;
   const dt = new Date(d);
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
 };
-const toLocalDateStr = (d) => {
-  const dt = parseLocalDate(d);
-  if (!dt) return null;
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
-};
-const generateDateRange = (start, end) => {
-  if (!start || !end) return [];
-  const dates = [], cur = parseLocalDate(start), last = parseLocalDate(end);
-  if (!cur || !last) return [];
-  while (cur <= last) { dates.push(toLocalDateStr(cur)); cur.setDate(cur.getDate()+1); }
-  return dates;
-};
-const formatDate    = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"; };
-const formatTabDate = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"; };
-const formatTime    = (t) => t ? t.substring(0, 5) : "—";
 
-const AddPatrolModal = ({
-  mode,
-  patrol,
-  mobileUnits,
-  availablePatrollers,
-  geoJSONData,
-  onClose,
-  onSave,
-}) => {
-  const mapRef    = useRef(null);
-  const saveTimers = useRef({});
-  const [loading, setLoading] = useState(false);
-  const [notif, setNotif]     = useState(null);
+const AddPatrolModal = ({ mobileUnits, availablePatrollers, geoJSONData, onClose, onSave }) => {
+  const mapRef = useRef(null);
+  const [loading, setLoading]         = useState(false);
+  const [notif, setNotif]             = useState(null);
+  const [activeShift, setActiveShift] = useState("AM");
+  const [hoveredBrgy, setHoveredBrgy] = useState(null);
 
-  // ── Form state ─────────────────────────────────────────
   const [form, setForm] = useState({
-    patrol_name:    patrol?.patrol_name    || "",
-    mobile_unit_id: patrol?.mobile_unit_id || "",
-    shift:          patrol?.shift          || "",
-    start_date:     toLocalDateStr(patrol?.start_date) || new Date().toISOString().split("T")[0],
-    end_date:       toLocalDateStr(patrol?.end_date)   || new Date().toISOString().split("T")[0],
+    patrol_name:    "",
+    mobile_unit_id: "",
+    start_date:     new Date().toISOString().split("T")[0],
+    end_date:       new Date().toISOString().split("T")[0],
   });
 
-  const [selectedPatrollerIds, setSelectedPatrollerIds] = useState(
-    (patrol?.patrollers || []).map((p) => p.active_patroller_id)
-  );
-  const [patrollerSearch, setPatrollerSearch] = useState("");
+  const [selectedPatrollerIds, setSelectedPatrollerIds] = useState([]);
+  const [patrollerSearch, setPatrollerSearch]           = useState("");
+  const [barangays, setBarangays]                       = useState([]);
+  const [tasks, setTasks]                               = useState([]);
 
-  // ── ADD MODE: simple stops ─────────────────────────────
-  const [stops, setStops] = useState(() => {
-    if (mode !== "add") return [];
-    if (!patrol?.routes?.length) return [{ ...emptyStop }];
-    const seen = new Set();
-    return patrol.routes.reduce((acc, r) => {
-      if (!seen.has(r.barangay)) {
-        seen.add(r.barangay);
-        acc.push({ barangay: r.barangay, notes: r.notes || "", time_start: r.time_start || "", time_end: r.time_end || "" });
-      }
-      return acc;
-    }, []);
-  });
+  const amTasks      = tasks.filter((t) => t.shift === "AM");
+  const pmTasks      = tasks.filter((t) => t.shift === "PM");
+  const currentTasks = activeShift === "AM" ? amTasks : pmTasks;
 
-  // ── EDIT MODE: local routes per date ───────────────────
-  const [localRoutes, setLocalRoutes] = useState(patrol?.routes || []);
-  const [activeDate, setActiveDate]   = useState(() => {
-    const dates = generateDateRange(patrol?.start_date, patrol?.end_date);
-    return dates[0] || null;
-  });
+  const addTask = () => {
+  const existing = tasks.filter((t) => t.shift === activeShift);
 
-  useEffect(() => {
-    if (patrol?.routes) setLocalRoutes(patrol.routes);
-  }, [patrol]);
+  let defaultStart;
+  if (existing.length === 0) {
+    // First task: 08:00 for AM, 20:00 for PM
+    defaultStart = activeShift === "AM" ? "08:00" : "20:00";
+  } else {
+    // Pick up from where the last task's time_end left off
+    const last = existing[existing.length - 1];
+    if (last.time_end) {
+      // Add 1 minute to last time_end
+      const [h, m] = last.time_end.split(":").map(Number);
+      const total = h * 60 + m + 1;
+      const nh = Math.floor(total / 60) % 24;
+      const nm = total % 60;
+      defaultStart = `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+    } else {
+      defaultStart = last.time_start || (activeShift === "AM" ? "08:00" : "20:00");
+    }
+  }
 
-  const dateRange = generateDateRange(form.start_date, form.end_date);
+  setTasks((prev) => [
+    ...prev,
+    {
+      shift:      activeShift,
+      time_start: defaultStart,
+      time_end:   "",
+      notes:      "",
+      stop_order: existing.length + 1,
+      _id:        Date.now(),
+    },
+  ]);
+};
 
-  const routesForDate = localRoutes
-    .filter((r) => toLocalDateStr(r.route_date) === activeDate)
-    .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
+  const removeTask  = (id)           => setTasks((prev) => prev.filter((t) => t._id !== id));
+  const updateTask  = (id, field, v) => setTasks((prev) => prev.map((t) => t._id === id ? { ...t, [field]: v } : t));
 
-  // ── Auto-save notes (edit mode) ────────────────────────
-  const handleNotesChange = (routeId, value) => {
-    setLocalRoutes((prev) =>
-      prev.map((r) => r.route_id === routeId ? { ...r, notes: value } : r)
-    );
-    clearTimeout(saveTimers.current[routeId]);
-    saveTimers.current[routeId] = setTimeout(async () => {
-      try {
-        const token = localStorage.getItem("token");
-        await fetch(`${API_BASE}/patrol/routes/${routeId}/notes`, {
-          method:  "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body:    JSON.stringify({ notes: value }),
-        });
-        setNotif({ message: "Notes saved.", type: "success" });
-      } catch (err) { console.error("Auto-save error:", err); }
-    }, 800);
-  };
-
-  // ── Auto-save time (edit mode) ─────────────────────────
-  const handleTimeChange = (routeId, field, value) => {
-    setLocalRoutes((prev) =>
-      prev.map((r) => r.route_id === routeId ? { ...r, [field]: value } : r)
-    );
-    clearTimeout(saveTimers.current[`${routeId}-${field}`]);
-    saveTimers.current[`${routeId}-${field}`] = setTimeout(async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const route = localRoutes.find((r) => r.route_id === routeId);
-        if (!route) return;
-        const updatedRoute = { ...route, [field]: value };
-        await fetch(`${API_BASE}/patrol/routes/${routeId}/time`, {
-          method:  "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body:    JSON.stringify({ time_start: updatedRoute.time_start, time_end: updatedRoute.time_end }),
-        });
-      } catch (err) { console.error("Time save error:", err); }
-    }, 800);
-  };
-
-  // ── Map / GeoJSON ──────────────────────────────────────
+  // Map click — toggle barangay
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData) return null;
-    const selected = mode === "add"
-      ? stops.map((s) => s.barangay).filter(Boolean)
-      : [...new Set(localRoutes.map((r) => r.barangay).filter(Boolean))];
     return {
       ...geoJSONData,
       features: geoJSONData.features.map((f) => ({
         ...f,
         properties: {
           ...f.properties,
-          fillColor: selected.includes(f.properties.name_db) ? "#1e3a5f" : "#adb5bd",
+          fillColor: barangays.includes(f.properties.name_db) ? "#1e3a5f" : "#adb5bd",
         },
       })),
     };
-  }, [geoJSONData, stops, localRoutes, mode]);
+  }, [geoJSONData, barangays]);
 
   const handleMapClick = useCallback((e) => {
-    if (mode !== "add" || !geoJSONData) return; // map only clickable in add mode
+    if (!geoJSONData) return;
     const { lng, lat } = e.lngLat;
     const inside = (pt, vs) => {
       let x = pt[0], y = pt[1], inside = false;
@@ -177,61 +114,69 @@ const AddPatrolModal = ({
       for (const ring of rings) {
         if (inside([lng, lat], ring)) {
           const name = f.properties.name_db;
-          if (stops.some((s) => s.barangay === name)) return;
-          setStops((prev) => [...prev, { ...emptyStop, barangay: name }]);
+          setBarangays((prev) =>
+            prev.includes(name) ? prev.filter((b) => b !== name) : [...prev, name]
+          );
           return;
         }
       }
     }
-  }, [geoJSONData, stops, mode]);
-
-  // ── Stop handlers (add mode) ───────────────────────────
-  const removeStop = (idx) => setStops((prev) => prev.filter((_, i) => i !== idx));
-  const updateStop = (idx, field, val) => setStops((prev) => prev.map((s, i) => i === idx ? { ...s, [field]: val } : s));
+  }, [geoJSONData]);
 
   const togglePatroller = (id) =>
     setSelectedPatrollerIds((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     );
 
-  // ── Submit ─────────────────────────────────────────────
+  const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
+
+  const filteredPatrollers = availablePatrollers.filter((p) =>
+    (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase())
+  );
+
   const handleSave = () => {
-    if (!form.patrol_name || !form.mobile_unit_id || !form.shift || !form.start_date || !form.end_date) {
+    if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
       setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
     }
     if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
       setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
     }
-
-    if (mode === "add") {
-      const validStops = stops.filter((s) => s.barangay && s.time_start && s.time_end);
-      if (validStops.length === 0) {
-        setNotif({ message: "Please add at least one stop with barangay and times.", type: "warning" }); return;
-      }
-      const dates  = generateDateRange(form.start_date, form.end_date);
-      const routes = [];
-      dates.forEach((date) => {
-        validStops.forEach((s, i) => routes.push({ ...s, route_date: date, stop_order: i+1 }));
-      });
-      setLoading(true);
-      onSave({ ...form, patroller_ids: selectedPatrollerIds, routes });
-    } else {
-      // Edit mode — only save the basic info + patrollers, routes already auto-saved
-      setLoading(true);
-      onSave({ ...form, patroller_ids: selectedPatrollerIds, routes: localRoutes });
+    if (barangays.length === 0) {
+      setNotif({ message: "Please select at least one barangay on the map.", type: "warning" }); return;
     }
+    if (selectedPatrollerIds.length === 0) {
+      setNotif({ message: "Please assign at least one patroller.", type: "warning" }); return;
+    }
+    // Validate tasks
+for (const task of tasks) {
+  if (!task.time_start || !task.time_end) {
+    setNotif({ message: "All tasks must have both a start and end time.", type: "warning" });
+    return;
+  }
+  const [sh, sm] = task.time_start.split(":").map(Number);
+  const [eh, em] = task.time_end.split(":").map(Number);
+  const startMins = sh * 60 + sm;
+  const endMins   = eh * 60 + em;
+  if (endMins <= startMins) {
+    setNotif({ message: `A task has an end time that is not after its start time.`, type: "warning" });
+    return;
+  }
+}
+    setLoading(true);
+    onSave({
+      ...form,
+      patroller_ids: selectedPatrollerIds,
+      barangays,
+      routes: tasks.map((t, i) => ({
+        shift:      t.shift,
+        time_start: t.time_start || null,
+        time_end:   t.time_end   || null,
+        notes:      t.notes      || null,
+        stop_order: i + 1,
+      })),
+    });
   };
 
-  const [hoveredBrgy, setHoveredBrgy] = useState(null);
-  const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
-
-  const filteredPatrollers = (
-    mode === "edit" && patrol
-      ? [...availablePatrollers, ...(patrol.patrollers || []).filter((p) => !availablePatrollers.find((a) => a.active_patroller_id === p.active_patroller_id))]
-      : availablePatrollers
-  ).filter((p) => (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase()));
-
-  // ── Render ─────────────────────────────────────────────
   return (
     <div className="apm-overlay" onClick={onClose}>
       <div className="apm-modal" onClick={(e) => e.stopPropagation()}>
@@ -243,7 +188,7 @@ const AddPatrolModal = ({
               <label>Patrol Name <span className="apm-req">*</span></label>
               <input type="text" value={form.patrol_name}
                 onChange={(e) => setForm((p) => ({ ...p, patrol_name: e.target.value }))}
-                placeholder="e.g. Beat 3" />
+                placeholder="e.g. Sector 6 Beat 2" />
             </div>
             <div className="apm-field">
               <label>Mobile Unit <span className="apm-req">*</span></label>
@@ -255,14 +200,6 @@ const AddPatrolModal = ({
                     {mu.mobile_unit_name} ({mu.plate_number})
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="apm-field">
-              <label>Shift <span className="apm-req">*</span></label>
-              <select value={form.shift}
-                onChange={(e) => setForm((p) => ({ ...p, shift: e.target.value }))}>
-                <option value="">— Select —</option>
-                {SHIFTS.map((s) => <option key={s} value={s}>{SHIFT_LABELS[s]}</option>)}
               </select>
             </div>
             <div className="apm-field">
@@ -278,10 +215,8 @@ const AddPatrolModal = ({
           </div>
           <div className="apm-topbar-actions">
             <button className="apm-btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="apm-btn-save" onClick={handleSave}>
-              {mode === "add" ? "Create Patrol" : "Save Changes"}
-            </button>
-            <button className="apm-btn-x" onClick={onClose}>✕</button>
+            <button className="apm-btn-save"   onClick={handleSave}>Create Patrol</button>
+            <button className="apm-btn-x"      onClick={onClose}>✕</button>
           </div>
         </div>
 
@@ -290,15 +225,10 @@ const AddPatrolModal = ({
 
           {/* LEFT — Map */}
           <div className="apm-map-panel">
-            {hoveredBrgy && mode === "add" && (
+            {hoveredBrgy && (
               <div className="apm-map-tooltip">
                 <strong>{hoveredBrgy}</strong>
-                {stops.some((s) => s.barangay === hoveredBrgy) ? " — Already added" : " — Click to add stop"}
-              </div>
-            )}
-            {hoveredBrgy && mode === "edit" && (
-              <div className="apm-map-tooltip">
-                <strong>{hoveredBrgy}</strong>
+                {barangays.includes(hoveredBrgy) ? " — Click to remove" : " — Click to add"}
               </div>
             )}
             <Map
@@ -312,13 +242,8 @@ const AddPatrolModal = ({
                 if (!geoJSONData) return;
                 const features = e.target.queryRenderedFeatures(e.point, { layers: ["apm-fill"] });
                 if (features.length > 0) {
-                  const name = features[0].properties.name_db;
-                  if (mode === "add") {
-                    e.target.getCanvas().style.cursor = stops.some((s) => s.barangay === name) ? "not-allowed" : "pointer";
-                  } else {
-                    e.target.getCanvas().style.cursor = "default";
-                  }
-                  setHoveredBrgy(name);
+                  e.target.getCanvas().style.cursor = "pointer";
+                  setHoveredBrgy(features[0].properties.name_db);
                 } else {
                   e.target.getCanvas().style.cursor = "";
                   setHoveredBrgy(null);
@@ -334,6 +259,16 @@ const AddPatrolModal = ({
                 </Source>
               )}
             </Map>
+            {barangays.length > 0 && (
+              <div className="apm-brgy-tags">
+                {barangays.map((b) => (
+                  <span key={b} className="apm-brgy-tag">
+                    {b}
+                    <button onClick={() => setBarangays((prev) => prev.filter((x) => x !== b))}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* RIGHT — Patrollers + Timetable */}
@@ -366,122 +301,67 @@ const AddPatrolModal = ({
               </div>
             </div>
 
-            {/* ── ADD MODE: Simple timetable ── */}
-            {mode === "add" && (
-              <div className="apm-section apm-section-grow">
-                <div className="apm-section-title">
-                  Time Table
-                  <span className="apm-hint"> — click map to add stops</span>
-                </div>
-                {stops.filter((s) => s.barangay).length === 0 ? (
-                  <p className="apm-empty">Click a barangay on the map to add a stop.</p>
-                ) : (
-                  <div className="apm-timetable-wrap">
-                    <table className="apm-timetable">
-                      <thead>
-                        <tr><th>Time</th><th>Notes</th><th>Barangay Area</th><th></th></tr>
-                      </thead>
-                      <tbody>
-                        {stops.map((stop, idx) => {
-                          if (!stop.barangay) return null;
-                          return (
-                            <tr key={idx}>
-                              <td className="apm-tt-time">
-                                <div className="apm-time-inputs">
-                                  <input type="time" value={stop.time_start}
-                                    onChange={(e) => updateStop(idx, "time_start", e.target.value)} />
-                                  <span>—</span>
-                                  <input type="time" value={stop.time_end}
-                                    onChange={(e) => updateStop(idx, "time_end", e.target.value)} />
-                                </div>
-                              </td>
-                              <td className="apm-tt-notes">
-                                <textarea className="apm-notes" value={stop.notes} placeholder="Add notes..." rows={1}
-                                  onChange={(e) => {
-                                    updateStop(idx, "notes", e.target.value);
-                                    e.target.style.height = "auto";
-                                    e.target.style.height = e.target.scrollHeight + "px";
-                                  }} />
-                              </td>
-                              <td className="apm-tt-brgy">{stop.barangay}</td>
-                              <td><button className="apm-remove" onClick={() => removeStop(idx)}>×</button></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── EDIT MODE: Date tabs + per-day timetable ── */}
-            {mode === "edit" && (
-              <div className="apm-section apm-section-grow">
+            {/* Timetable */}
+            <div className="apm-section apm-section-grow">
+              <div className="apm-timetable-header">
                 <div className="apm-section-title">Time Table</div>
-
-                {/* Date tabs */}
-                {dateRange.length > 0 && (
-                  <div className="apm-date-tabs">
-                    {dateRange.map((date) => (
-                      <button
-                        key={date}
-                        className={`apm-date-tab ${activeDate === date ? "apm-date-tab-active" : ""}`}
-                        onClick={() => setActiveDate(date)}
-                      >
-                        {formatTabDate(date)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Routes for active date */}
-                {routesForDate.length > 0 ? (
-                  <div className="apm-timetable-wrap">
-                    <table className="apm-timetable">
-                      <thead>
-                        <tr><th>Time</th><th>Notes</th><th>Barangay Area</th></tr>
-                      </thead>
-                      <tbody>
-                        {routesForDate.map((r) => (
-                          <tr key={r.route_id}>
-                            <td className="apm-tt-time">
-                              <div className="apm-time-inputs">
-                                <input type="time" value={r.time_start || ""}
-                                  onChange={(e) => handleTimeChange(r.route_id, "time_start", e.target.value)} />
-                                <span>—</span>
-                                <input type="time" value={r.time_end || ""}
-                                  onChange={(e) => handleTimeChange(r.route_id, "time_end", e.target.value)} />
-                              </div>
-                            </td>
-                            <td className="apm-tt-notes">
-                              <textarea className="apm-notes" value={r.notes || ""} placeholder="Add notes..." rows={1}
-                                onChange={(e) => {
-                                  handleNotesChange(r.route_id, e.target.value);
-                                  e.target.style.height = "auto";
-                                  e.target.style.height = e.target.scrollHeight + "px";
-                                }} />
-                            </td>
-                            <td className="apm-tt-brgy">{r.barangay}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="apm-empty">No stops for this date.</p>
-                )}
+                <div className="apm-shift-tabs">
+                  <button className={`apm-shift-tab ${activeShift === "AM" ? "apm-shift-active" : ""}`} onClick={() => setActiveShift("AM")}>AM Shift</button>
+                  <button className={`apm-shift-tab ${activeShift === "PM" ? "apm-shift-active" : ""}`} onClick={() => setActiveShift("PM")}>PM Shift</button>
+                </div>
               </div>
-            )}
 
+              {currentTasks.length === 0 ? (
+                <p className="apm-empty">No tasks yet. Click "+ Add Task" below.</p>
+              ) : (
+                <div className="apm-timetable-wrap">
+                  <table className="apm-timetable">
+                    <thead>
+                      <tr><th>Time</th><th>Task / Comment</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {currentTasks.map((task) => (
+                        <tr key={task._id}>
+                          <td className="apm-tt-time">
+                           <div className="apm-time-inputs">
+  <TimePicker
+    value={task.time_start}
+    onChange={(v) => updateTask(task._id, "time_start", v)}
+    baseHour={activeShift === "AM" ? 8 : 8}
+  />
+  <span>—</span>
+  <TimePicker
+  value={task.time_end || task.time_start}
+  onChange={(v) => updateTask(task._id, "time_end", v)}
+  baseHour={task.time_start ? parseInt(task.time_start.split(":")[0]) % 12 || 12 : 8}
+/>
+</div>
+                          </td>
+                          <td className="apm-tt-notes">
+                            <textarea className="apm-notes" value={task.notes} placeholder="Enter task or comment..." rows={1}
+                              onChange={(e) => {
+                                updateTask(task._id, "notes", e.target.value);
+                                e.target.style.height = "auto";
+                                e.target.style.height = e.target.scrollHeight + "px";
+                              }} />
+                          </td>
+                          <td>
+                            <button className="apm-remove" onClick={() => removeTask(task._id)}>×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <button className="apm-add-task-btn" onClick={addTask}>+ Add Task</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <LoadingModal isOpen={loading} message="Saving patrol..." />
-      {notif && (
-        <Notification message={notif.message} type={notif.type} onClose={() => setNotif(null)} duration={2000} />
-      )}
+      <LoadingModal isOpen={loading} message="Creating patrol..." />
+      {notif && <Notification message={notif.message} type={notif.type} onClose={() => setNotif(null)} duration={3000} />}
     </div>
   );
 };
