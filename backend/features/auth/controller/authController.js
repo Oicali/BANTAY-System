@@ -497,7 +497,7 @@ const changePassword = async (req, res) => {
 // MOBILE LOGIN (Admin + Patrol only)
 // ============================================================
 const mobileLogin = async (req, res) => {
-  const ALLOWED_ROLES = ['Admin', 'Patrol'];
+  const ALLOWED_ROLES = ['Administrator', 'Patrol'];
 
   // Run the same login logic first by calling login internally,
   // but we need to intercept the response — so we duplicate the
