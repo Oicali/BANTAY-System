@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./BeatCard.css";
+import "./PatrolModal.css";
 
 const fillLayer    = { id: "bc-brgy-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.5 } };
 const outlineLayer = { id: "bc-brgy-outline", type: "line",   paint: { "line-color": "#1e3a5f", "line-width": 1.5, "line-opacity": 0.7 } };
@@ -10,8 +10,6 @@ const labelLayer   = {
   layout: { "text-field": ["get", "name_db"], "text-size": 10, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"], "text-max-width": 8, "text-anchor": "center", "text-allow-overlap": false },
   paint: { "text-color": "#0a1628", "text-halo-color": "rgba(255,255,255,0.85)", "text-halo-width": 1.5 },
 };
-
-const SHIFT_LABELS = { Morning: "Morning", Night: "Night" };
 
 const parseLocalDate = (d) => {
   if (!d) return null;
@@ -30,40 +28,45 @@ const generateDateRange = (start, end) => {
   while (cur <= last) { dates.push(toLocalDateStr(cur)); cur.setDate(cur.getDate()+1); }
   return dates;
 };
+const formatTabDate  = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"; };
+const formatFullDate = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "—"; };
+const formatDate     = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"; };
+const formatTime     = (t) => t ? t.substring(0, 5) : "—";
 
 const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
   const mapRef = useRef(null);
 
   const dateRange = generateDateRange(patrol?.start_date, patrol?.end_date);
-  const [activeDate, setActiveDate] = useState(dateRange[0] || null);
+  const [activeDate, setActiveDate]   = useState(dateRange[0] || null);
+  const [activeShift, setActiveShift] = useState("AM");
 
   useEffect(() => {
     if (dateRange.length > 0) setActiveDate(dateRange[0]);
   }, [patrol]);
 
-  const routesForDate = (patrol?.routes || [])
-    .filter((r) => toLocalDateStr(r.route_date) === activeDate)
+  // Timetable routes for current date + shift (stop_order > 0)
+  const routesForDateShift = (patrol?.routes || [])
+    .filter((r) => toLocalDateStr(r.route_date) === activeDate && r.shift === activeShift && (r.stop_order || 0) > 0)
     .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
+
+  // Barangays for map (stop_order <= 0)
+  const barangays = [...new Set(
+    (patrol?.routes || []).filter((r) => (r.stop_order || 0) <= 0 && r.barangay).map((r) => r.barangay).filter(Boolean)
+  )];
 
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData || !patrol) return null;
-    const assigned = [...new Set((patrol.routes || []).map((r) => r.barangay).filter(Boolean))];
     return {
       ...geoJSONData,
       features: geoJSONData.features.map((f) => ({
         ...f,
         properties: {
           ...f.properties,
-          fillColor: assigned.includes(f.properties.name_db) ? "#1e3a5f" : "#e9ecef",
+          fillColor: barangays.includes(f.properties.name_db) ? "#1e3a5f" : "#e9ecef",
         },
       })),
     };
   }, [geoJSONData, patrol]);
-
-  const getInitials   = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
-  const formatDate    = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"; };
-  const formatTabDate = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"; };
-  const formatTime    = (t) => t ? t.substring(0, 5) : "—";
 
   if (!patrol) return null;
 
@@ -76,9 +79,6 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
           <div className="bc-header-left">
             <h2 className="bc-patrol-name">{patrol.patrol_name}</h2>
             <div className="bc-header-meta">
-              <span className={`bc-shift-badge bc-shift-${patrol.shift?.toLowerCase()}`}>
-                {SHIFT_LABELS[patrol.shift] || patrol.shift}
-              </span>
               <span className="bc-duration">{formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}</span>
               <span className="bc-unit">{patrol.mobile_unit_name}</span>
             </div>
@@ -112,67 +112,88 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
             </Map>
           </div>
 
-          {/* RIGHT — Patrollers + Timetable */}
+          {/* RIGHT */}
           <div className="bc-info-panel">
 
-            {/* Patrollers */}
+            {/* Patrollers — table form */}
             <div className="bc-section">
               <div className="bc-section-title">Assigned Patrollers</div>
               {patrol.patrollers?.length > 0 ? (
-                <div className="bc-patroller-list">
-                  {patrol.patrollers.map((p) => (
-                    <div key={p.active_patroller_id} className="bc-patroller-row">
-                      <div className="bc-avatar">{getInitials(p.officer_name)}</div>
-                      <span className="bc-patroller-name">{p.officer_name}</span>
-                    </div>
-                  ))}
+                <div className="bc-patroller-table-wrap">
+                  <table className="bc-patroller-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Rank &amp; Name</th>
+                        <th>Contact Number</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dateRange.map((date) =>
+                        patrol.patrollers.map((p, pi) => (
+                          <tr key={`${date}-${p.active_patroller_id}`}>
+                            {pi === 0 && (
+                              <td rowSpan={patrol.patrollers.length} className="bc-pt-date">
+                                {formatFullDate(date)}
+                              </td>
+                            )}
+                            <td className="bc-pt-name">{p.rank ? `${p.rank} ${p.officer_name}` : p.officer_name}</td>
+                            <td className="bc-pt-contact">{p.contact_number || "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               ) : <p className="bc-empty">No patrollers assigned.</p>}
             </div>
 
-            {/* Time Table — read only */}
+            {/* Timetable — date tabs + AM/PM shift tabs */}
             <div className="bc-section bc-section-grow">
-              <div className="bc-section-title">Time Table</div>
 
+              {/* Date tabs */}
               {dateRange.length > 0 && (
                 <div className="bc-date-tabs">
                   {dateRange.map((date) => (
-                    <button
-                      key={date}
+                    <button key={date}
                       className={`bc-date-tab ${activeDate === date ? "bc-date-tab-active" : ""}`}
-                      onClick={() => setActiveDate(date)}
-                    >
+                      onClick={() => setActiveDate(date)}>
                       {formatTabDate(date)}
                     </button>
                   ))}
                 </div>
               )}
 
-              {routesForDate.length > 0 ? (
+              {/* AM/PM shift tabs */}
+              <div className="bc-timetable-header">
+                <div className="bc-section-title">Time Table</div>
+                <div className="bc-shift-tabs">
+                  <button className={`bc-shift-tab ${activeShift === "AM" ? "bc-shift-active" : ""}`} onClick={() => setActiveShift("AM")}>AM Shift</button>
+                  <button className={`bc-shift-tab ${activeShift === "PM" ? "bc-shift-active" : ""}`} onClick={() => setActiveShift("PM")}>PM Shift</button>
+                </div>
+              </div>
+
+              {routesForDateShift.length > 0 ? (
                 <div className="bc-timetable-wrap">
                   <table className="bc-timetable">
                     <thead>
                       <tr>
                         <th>Time</th>
-                        <th>Notes</th>
-                        <th>Barangay Area</th>
+                        <th>Task / Comment</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {routesForDate.map((r) => (
+                      {routesForDateShift.map((r) => (
                         <tr key={r.route_id}>
                           <td className="bc-tt-time">{formatTime(r.time_start)} — {formatTime(r.time_end)}</td>
-                          <td className="bc-tt-notes">
-                            <span className="bc-notes-text">{r.notes || <em className="bc-notes-empty">No notes</em>}</span>
-                          </td>
-                          <td className="bc-tt-brgy">{r.barangay}</td>
+                          <td className="bc-tt-task">{r.notes || <em className="bc-empty">No task</em>}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <p className="bc-empty">No stops for this date.</p>
+                <p className="bc-empty">No tasks for this date and shift.</p>
               )}
             </div>
           </div>
