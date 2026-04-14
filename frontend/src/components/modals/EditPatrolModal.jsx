@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import LoadingModal from "./LoadingModal";
 import Notification from "./Notification";
-import TimePicker from "./TimePicker";
+import TimePicker from "./TimePicker.jsx";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 

@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import LoadingModal from "./LoadingModal";
 import Notification from "./Notification";
-import TimePicker from "./Timepicker";
+import TimePicker from "./TimePicker";
 
 const fillLayer    = { id: "apm-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.45 } };
 const outlineLayer = { id: "apm-outline", type: "line",   paint: { "line-color": "#1e3a5f", "line-width": 1.2, "line-opacity": 0.6 } };
