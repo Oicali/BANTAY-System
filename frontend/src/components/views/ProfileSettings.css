@@ -378,7 +378,7 @@ textarea.ps-form-input:disabled {
 }
 .ps-phone-input-wrapper:focus-within {
   border-color: var(--navy-primary);
-  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+  /* box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1); FIX */
 }
 .ps-phone-wrapper-error {
   border-color: var(--error-border) !important;

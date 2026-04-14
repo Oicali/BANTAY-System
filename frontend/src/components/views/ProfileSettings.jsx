@@ -508,8 +508,8 @@ export default function ProfileSettings() {
     setLoadingEditSetup(true);
     setFormData((prev) => ({
       ...prev,
-      phone: "",
-      alternate_phone: "",
+      // phone: "",
+      // alternate_phone: "", // FIX: clear phone fields on edit to avoid accidental exposure of sensitive info, and show placeholders instead to indicate required format (primary) or optionality (alternate)
       email: "",
       region_code: originalFormData.region_code || "",
       province_code: originalFormData.province_code || "",
@@ -591,24 +591,6 @@ export default function ProfileSettings() {
       setIsUploadingPhoto(false);
       e.target.value = "";
     }
-  };
-
-  const maskPhone = (phone) => {
-    if (!phone) return "";
-    const d = phone.replace(/\D/g, "").replace(/^63/, "");
-    if (d.length < 3) return "*".repeat(d.length);
-    return "*".repeat(d.length - 3) + d.slice(-3);
-  };
-  const maskEmail = (email) => {
-    if (!email) return "";
-    const at = email.indexOf("@");
-    if (at < 0) return email;
-    const local = email.slice(0, at);
-    const domain = email.slice(at);
-    if (local.length <= 2) return local[0] + "*" + domain;
-    if (local.length <= 4)
-      return local[0] + "*".repeat(local.length - 1) + domain;
-    return local[0] + "*".repeat(local.length - 3) + local.slice(-2) + domain;
   };
 
   const formatDateAdded = (d) =>
@@ -1170,7 +1152,7 @@ export default function ProfileSettings() {
         setEmailModalErr(d.message || "Failed to send code");
         return;
       }
-      setEmailOldMasked(d.maskedEmail || "");
+      setEmailOldMasked(d.maskedEmail || originalFormData.email || "");
       const oldResendsLeft = d.resendsLeft ?? 2;
       setEmailOldResendsLeft(oldResendsLeft);
       emailOldResendsLeftRef.current = oldResendsLeft; // sync ref immediately — timer needs this
@@ -1578,7 +1560,7 @@ export default function ProfileSettings() {
             <input
               type="text"
               className="ps-form-input ps-phone-input"
-              value={maskPhone(originalFormData.phone)}
+              value={originalFormData.phone ? `${originalFormData.phone}` : ""}
               disabled
             />
           </div>
@@ -1592,7 +1574,7 @@ export default function ProfileSettings() {
               className="ps-form-input ps-phone-input"
               value={
                 originalFormData.alternate_phone
-                  ? maskPhone(originalFormData.alternate_phone)
+                  ? `${originalFormData.alternate_phone}`
                   : ""
               }
               disabled
@@ -1604,7 +1586,7 @@ export default function ProfileSettings() {
           <input
             type="text"
             className="ps-form-input"
-            value={maskEmail(originalFormData.email)}
+            value={originalFormData.email || ""}
             disabled
           />
         </div>
@@ -1829,9 +1811,10 @@ export default function ProfileSettings() {
                 getInitials()
               )}
             </div>
-            <h2 className="ps-profile-name">{profileData.rank_abbreviation}. {getFullName()}</h2>
+            <h2 className="ps-profile-name">
+              {profileData.rank_abbreviation}. {getFullName()}
+            </h2>
             <div className="ps-profile-badge">{profileData.role || "N/A"}</div>
-            
 
             <div className="ps-username-display">
               <div className="ps-username-label">Username</div>
@@ -1998,7 +1981,8 @@ export default function ProfileSettings() {
                     >
                       <label className="ps-form-label">Phone Number *</label>
                       <div
-                        className={`ps-phone-input-wrapper ${validationErrors.phone ? "ps-phone-wrapper-error" : ""} ${!phoneChanged ? "ps-sensitive-idle" : "ps-sensitive-active"}`}
+                        // className={`ps-phone-input-wrapper ${validationErrors.phone ? "ps-phone-wrapper-error" : ""} ${!phoneChanged ? "ps-sensitive-idle" : "ps-sensitive-active"}`} // FIX: only apply sensitive styling when there's an existing number and it hasn't been changed yet
+                        className={`ps-phone-input-wrapper ${validationErrors.phone ? "ps-phone-wrapper-error" : ""}`}
                       >
                         <span className="ps-phone-prefix">+63</span>
                         <input
@@ -2009,9 +1993,8 @@ export default function ProfileSettings() {
                           value={formData.phone}
                           onChange={handlePhoneInput}
                           maxLength="10"
-                          placeholder={
-                            maskPhone(originalFormData.phone) || "9XXXXXXXXX"
-                          }
+                          // placeholder={originalFormData.phone || "9XXXXXXXXX"} FIX: always show "9XXXXXXXXX" placeholder to indicate required format, even if there's no existing number
+                          placeholder="9XXXXXXXXX"
                           disabled={isBusy}
                         />
                       </div>
@@ -2019,10 +2002,10 @@ export default function ProfileSettings() {
                         <div
                           className={`ps-keep-hint ${phoneChanged ? "ps-keep-hint-changed" : ""}`}
                         >
-                          <span className="ps-keep-dot" />
+                          {/* <span className="ps-keep-dot" />
                           {phoneChanged
                             ? "New number will replace the current one on save"
-                            : "Leave blank to keep current primary phone number"}
+                            : "Leave blank to keep current primary phone number"} */}
                         </div>
                       )}
                       <FieldError name="phone" />
@@ -2033,7 +2016,8 @@ export default function ProfileSettings() {
                     >
                       <label className="ps-form-label">Alternate Phone</label>
                       <div
-                        className={`ps-phone-input-wrapper ${validationErrors.alternate_phone ? "ps-phone-wrapper-error" : ""} ${!altPhoneChanged && originalFormData.alternate_phone ? "ps-sensitive-idle" : altPhoneChanged ? "ps-sensitive-active" : ""}`}
+                        // className={`ps-phone-input-wrapper ${validationErrors.alternate_phone ? "ps-phone-wrapper-error" : ""} ${!altPhoneChanged && originalFormData.alternate_phone ? "ps-sensitive-idle" : altPhoneChanged ? "ps-sensitive-active" : ""}`} FIX: only apply sensitive styling when there's an existing number and it hasn't been changed yet
+                        className={`ps-phone-input-wrapper ${validationErrors.alternate_phone ? "ps-phone-wrapper-error" : ""}`}
                       >
                         <span className="ps-phone-prefix">+63</span>
                         <input
@@ -2044,11 +2028,12 @@ export default function ProfileSettings() {
                           value={formData.alternate_phone}
                           onChange={handlePhoneInput}
                           maxLength="10"
-                          placeholder={
-                            originalFormData.alternate_phone
-                              ? maskPhone(originalFormData.alternate_phone)
-                              : "Optional"
-                          }
+                          // placeholder={
+                          //   originalFormData.alternate_phone
+                          //     ? originalFormData.alternate_phone
+                          //     : "Optional"
+                          // } FIX: always show "Optional" placeholder for alternate phone to indicate it's not required, even if there's no existing number
+                          placeholder="Optional"
                           disabled={isBusy}
                         />
                       </div>
@@ -2057,10 +2042,10 @@ export default function ProfileSettings() {
                           <div
                             className={`ps-keep-hint ${altPhoneChanged ? "ps-keep-hint-changed" : ""}`}
                           >
-                            <span className="ps-keep-dot" />
+                            {/* <span className="ps-keep-dot" />
                             {altPhoneChanged
                               ? "New number will replace the current one on save"
-                              : "Leave blank to keep current alternate phone number"}
+                              : "Leave blank to keep current alternate phone number"} */}
                           </div>
                         )}
                       <FieldError name="alternate_phone" />
@@ -2079,8 +2064,8 @@ export default function ProfileSettings() {
                           className={`ps-form-input ps-email-readonly ${validationErrors.email ? "ps-input-error" : ""}`}
                           value={
                             verifiedEmail
-                              ? maskEmail(verifiedEmail)
-                              : maskEmail(originalFormData.email || "")
+                              ? verifiedEmail
+                              : originalFormData.email || ""
                           }
                           placeholder="No email on file"
                         />
@@ -2370,7 +2355,7 @@ export default function ProfileSettings() {
               {/* CHECKING */}
               {emailStep === "checking" && (
                 <div className="em-center">
-                  <div className="em-checking-spinner" />
+                  {/* <div className="em-checking-spinner" /> */}
                   <p
                     style={{
                       color: "#6c757d",
@@ -2636,11 +2621,11 @@ export default function ProfileSettings() {
                     >
                       {emailModalLoading ? (
                         <>
-                          <span className="em-spinner" />
+                          {/* <span className="em-spinner" /> */}
                           Verifying…
                         </>
                       ) : (
-                        "Verify & Continue →"
+                        "Verify & Continue"
                       )}
                     </button>
                   </div>
@@ -2674,9 +2659,7 @@ export default function ProfileSettings() {
                       Current email
                     </span>
                     <span className="em-email-preview-value">
-                      {maskEmail(
-                        originalFormData.email || profileData?.email || "",
-                      )}
+                      {originalFormData.email || ""}
                     </span>
                   </div>
                   <div className="em-footer">
@@ -2687,11 +2670,11 @@ export default function ProfileSettings() {
                     >
                       {emailModalLoading ? (
                         <>
-                          <span className="em-spinner" />
+                          {/* <span className="em-spinner" /> */}
                           Sending…
                         </>
                       ) : (
-                        "Send Verification Code →"
+                        "Send Verification Code"
                       )}
                     </button>
                   </div>
@@ -2705,7 +2688,7 @@ export default function ProfileSettings() {
                     <div className="em-otp-info-icon">✉</div>
                     <div>
                       <p className="em-otp-info-title">
-                        Code sent to <strong>{emailOldMasked}</strong>
+                        Code sent to <strong>{originalFormData.email}</strong>
                       </p>
                       <p className="em-otp-info-sub">
                         This code expires in <strong>2 minutes</strong>. Do not
@@ -2787,11 +2770,11 @@ export default function ProfileSettings() {
                     >
                       {emailModalLoading ? (
                         <>
-                          <span className="em-spinner" />
+                          {/* <span className="em-spinner" /> */}
                           Verifying…
                         </>
                       ) : (
-                        "Confirm →"
+                        "Confirm"
                       )}
                     </button>
                   )}
@@ -2873,11 +2856,11 @@ export default function ProfileSettings() {
                     >
                       {emailModalLoading ? (
                         <>
-                          <span className="em-spinner" />
+                          {/* <span className="em-spinner" /> */}
                           Sending…
                         </>
                       ) : (
-                        "Send Verification Code →"
+                        "Send Verification Code"
                       )}
                     </button>
                   </div>
@@ -2891,7 +2874,7 @@ export default function ProfileSettings() {
                     <div className="em-otp-info-icon">✉</div>
                     <div>
                       <p className="em-otp-info-title">
-                        Code sent to <strong>{emailNewOtpMasked}</strong>
+                        Code sent to <strong>{emailNewInput}</strong>
                       </p>
                       <p className="em-otp-info-sub">
                         This code expires in <strong>2 minutes</strong>. Do not
@@ -2973,11 +2956,11 @@ export default function ProfileSettings() {
                     >
                       {emailModalLoading ? (
                         <>
-                          <span className="em-spinner" />
+                          {/* <span className="em-spinner" /> */}
                           Verifying…
                         </>
                       ) : (
-                        "Confirm New Email →"
+                        "Confirm New Email"
                       )}
                     </button>
                   )}
@@ -3016,7 +2999,7 @@ export default function ProfileSettings() {
                     }}
                     disabled={emailModalLoading}
                   >
-                    ← Try a different email
+                    Try a different email
                   </button>
                 </>
               )}

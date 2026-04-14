@@ -1096,7 +1096,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
               <div className="cpm-otp-info-icon">✉</div>
               <div>
                 <p className="cpm-otp-info-title">
-                  Code sent to <strong>{otpMasked}</strong>
+                  Code sent to your registered email address
                 </p>
                 <p className="cpm-otp-info-sub">
                   This code expires in <strong>2 minutes</strong>. Do not share

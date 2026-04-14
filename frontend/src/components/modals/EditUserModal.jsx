@@ -84,16 +84,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
   // Lock/Unlock
   const [isLocking, setIsLocking] = useState(false);
 
-  // Sensitive field change tracking
-  const [phoneChanged, setPhoneChanged] = useState(false);
-  const [altPhoneChanged, setAltPhoneChanged] = useState(false);
-  const [emailChanged, setEmailChanged] = useState(false);
-
-  // Store originals for masking hints
-  const [originalPhone, setOriginalPhone] = useState("");
-  const [originalAltPhone, setOriginalAltPhone] = useState("");
-  const [originalEmail, setOriginalEmail] = useState("");
-
   // Scroll-to-error
   const [shouldScrollToError, setShouldScrollToError] = useState(false);
   const modalContentRef = useRef(null);
@@ -178,21 +168,17 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
       ? user.alternate_phone.replace(/^\+63/, "")
       : "";
 
-    setOriginalPhone(cleanPhone);
-    setOriginalAltPhone(cleanAltPhone);
-    setOriginalEmail(user.email || "");
-
     setFormData({
       username: user.username || "",
-      email: "",
+      email: user.email || "",
       first_name: user.first_name || "",
       last_name: user.last_name || "",
       middle_name: user.middle_name || "",
       suffix: user.suffix || "",
       date_of_birth: user.date_of_birth ? user.date_of_birth.split("T")[0] : "",
       gender: user.gender || "Male",
-      phone: "",
-      alternate_phone: "",
+      phone: cleanPhone,
+      alternate_phone: cleanAltPhone,
       region_code: user.region_code || "",
       province_code: user.province_code || "",
       municipality_code: user.municipality_code || "",
@@ -203,9 +189,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
       assigned_barangay_code: user.assigned_barangay_code || "",
     });
 
-    setPhoneChanged(false);
-    setAltPhoneChanged(false);
-    setEmailChanged(false);
     setPasswordData({ new_password: "", confirm_password: "" });
     setErrors({});
     setServerError("");
@@ -333,24 +316,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
   const isLocked = user.status === "locked";
   const isUnverified = user.status === "unverified";
 
-  // ── Masking helpers ────────────────────────────────────────────────────
-  const maskPhone = (phone) => {
-    if (!phone) return "";
-    const d = phone.replace(/\D/g, "").replace(/^63/, "");
-    if (d.length < 3) return "*".repeat(d.length);
-    return "*".repeat(d.length - 3) + d.slice(-3);
-  };
-
-  const maskEmail = (email) => {
-    if (!email) return "";
-    const at = email.indexOf("@");
-    if (at < 0) return email;
-    const local = email.slice(0, at);
-    const domain = email.slice(at);
-    if (local.length <= 3) return "*".repeat(local.length) + domain;
-    return "*".repeat(local.length - 3) + local.slice(-3) + domain;
-  };
-
   // ── Lock / Unlock ──────────────────────────────────────────────────────
   const handleLockToggle = async () => {
     setIsLocking(true);
@@ -468,10 +433,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
   const validateForm = () => {
     const e = {};
 
-    if (emailChanged && formData.email) {
-      const emailErr = validateEmail(formData.email);
-      if (emailErr) e.email = emailErr;
-    }
+    const emailErr = validateEmail(formData.email);
+    if (emailErr) e.email = emailErr;
 
     const fnErr = validateName(formData.first_name, "First name");
     if (fnErr) e.first_name = fnErr;
@@ -487,27 +450,24 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
     const sufErr = validateSuffix(formData.suffix);
     if (sufErr) e.suffix = sufErr;
 
-    if (phoneChanged && formData.phone) {
+    if (formData.phone) {
       const phErr = validatePhone(formData.phone, "Phone number");
       if (phErr) e.phone = phErr;
     }
 
-    if (altPhoneChanged && formData.alternate_phone) {
+    if (formData.alternate_phone) {
       const altErr = validatePhone(
         formData.alternate_phone,
         "Alternate phone number",
       );
       if (altErr) {
         e.alternate_phone = altErr;
-      } else {
-        const effectivePhone =
-          phoneChanged && formData.phone
-            ? formData.phone.replace(/\D/g, "")
-            : originalPhone.replace(/\D/g, "");
-        if (formData.alternate_phone.replace(/\D/g, "") === effectivePhone) {
-          e.alternate_phone =
-            "Alternate phone cannot be the same as primary phone";
-        }
+      } else if (
+        formData.alternate_phone.replace(/\D/g, "") ===
+        formData.phone.replace(/\D/g, "")
+      ) {
+        e.alternate_phone =
+          "Alternate phone cannot be the same as primary phone";
       }
     }
 
@@ -565,20 +525,17 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
     if (name === "phone") {
       const digits = value.replace(/\D/g, "").slice(0, 10);
       setFormData((prev) => ({ ...prev, phone: digits }));
-      setPhoneChanged(digits.length > 0);
       clearError("phone");
       return;
     }
     if (name === "alternate_phone") {
       const digits = value.replace(/\D/g, "").slice(0, 10);
       setFormData((prev) => ({ ...prev, alternate_phone: digits }));
-      setAltPhoneChanged(digits.length > 0);
       clearError("alternate_phone");
       return;
     }
     if (name === "email") {
       setFormData((prev) => ({ ...prev, email: value }));
-      setEmailChanged(value.length > 0);
       clearError("email");
       return;
     }
@@ -673,9 +630,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
     setProfilePicture(null);
     setProfilePicturePreview(null);
     setShouldScrollToError(false);
-    setPhoneChanged(false);
-    setAltPhoneChanged(false);
-    setEmailChanged(false);
     setResendMessage("");
     setIsResending(false);
     onClose();
@@ -729,34 +683,22 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
 
       const fd = new FormData();
 
-      fd.append(
-        "email",
-        emailChanged && formData.email
-          ? formData.email.trim().toLowerCase()
-          : originalEmail.toLowerCase(),
-      );
-
+      fd.append("email", formData.email.trim().toLowerCase());
       fd.append("first_name", formData.first_name.trim());
       fd.append("last_name", formData.last_name.trim());
       fd.append("middle_name", formData.middle_name?.trim() || "");
       fd.append("suffix", formattedSuffix || "");
       fd.append("gender", formData.gender);
-
-      const effectivePhone =
-        phoneChanged && formData.phone
-          ? `+63${formData.phone.replace(/\D/g, "")}`
-          : originalPhone
-            ? `+63${originalPhone}`
-            : "";
-      fd.append("phone", effectivePhone);
-
-      const effectiveAltPhone =
-        altPhoneChanged && formData.alternate_phone
+      fd.append(
+        "phone",
+        formData.phone ? `+63${formData.phone.replace(/\D/g, "")}` : "",
+      );
+      fd.append(
+        "alternate_phone",
+        formData.alternate_phone
           ? `+63${formData.alternate_phone.replace(/\D/g, "")}`
-          : originalAltPhone
-            ? `+63${originalAltPhone}`
-            : "";
-      fd.append("alternate_phone", effectiveAltPhone);
+          : "",
+      );
 
       if (formData.date_of_birth)
         fd.append("date_of_birth", formData.date_of_birth);
@@ -954,21 +896,9 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                     value={formData.email}
                     onChange={handleChange}
                     disabled={isSubmitting}
-                    className={`eum-form-input${errors.email ? " eum-error" : ""}${!emailChanged ? " eum-sensitive-idle" : " eum-sensitive-active"}`}
-                    placeholder={
-                      maskEmail(originalEmail) || "Enter email address"
-                    }
+                    className={`eum-form-input${errors.email ? " eum-error" : ""}`}
+                    placeholder="Enter email address"
                   />
-                  {!errors.email && (
-                    <div
-                      className={`eum-keep-hint${emailChanged ? " eum-keep-hint-changed" : ""}`}
-                    >
-                      <span className="eum-keep-dot" />
-                      {emailChanged
-                        ? "New email will replace the current one on save"
-                        : "Leave blank to keep current email address"}
-                    </div>
-                  )}
                   {errors.email && (
                     <span className="eum-error-text">{errors.email}</span>
                   )}
@@ -1241,7 +1171,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                 >
                   <label className="eum-form-label">Mobile Number *</label>
                   <div
-                    className={`eum-phone-input-wrapper${errors.phone ? " eum-phone-error" : ""}${!phoneChanged ? " eum-sensitive-idle-phone" : " eum-sensitive-active-phone"}`}
+                    className={`eum-phone-input-wrapper${errors.phone ? " eum-phone-error" : ""}`}
                   >
                     <span className="eum-phone-prefix">+63</span>
                     <input
@@ -1251,20 +1181,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                       onChange={handleChange}
                       disabled={isSubmitting}
                       maxLength="10"
-                      placeholder={maskPhone(originalPhone) || "9XXXXXXXXX"}
+                      placeholder="9XXXXXXXXX"
                       className="eum-form-input eum-phone-input"
                     />
                   </div>
-                  {!errors.phone && (
-                    <div
-                      className={`eum-keep-hint${phoneChanged ? " eum-keep-hint-changed" : ""}`}
-                    >
-                      <span className="eum-keep-dot" />
-                      {phoneChanged
-                        ? "New number will replace the current one on save"
-                        : "Leave blank to keep current phone number"}
-                    </div>
-                  )}
                   {errors.phone && (
                     <span className="eum-error-text">{errors.phone}</span>
                   )}
@@ -1275,7 +1195,7 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                 >
                   <label className="eum-form-label">Alternate Phone</label>
                   <div
-                    className={`eum-phone-input-wrapper${errors.alternate_phone ? " eum-phone-error" : ""}${!altPhoneChanged && originalAltPhone ? " eum-sensitive-idle-phone" : altPhoneChanged ? " eum-sensitive-active-phone" : ""}`}
+                    className={`eum-phone-input-wrapper${errors.alternate_phone ? " eum-phone-error" : ""}`}
                   >
                     <span className="eum-phone-prefix">+63</span>
                     <input
@@ -1285,24 +1205,10 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                       onChange={handleChange}
                       disabled={isSubmitting}
                       maxLength="10"
-                      placeholder={
-                        originalAltPhone
-                          ? maskPhone(originalAltPhone)
-                          : "9XXXXXXXXX (optional)"
-                      }
+                      placeholder="9XXXXXXXXX (optional)"
                       className="eum-form-input eum-phone-input"
                     />
                   </div>
-                  {originalAltPhone && !errors.alternate_phone && (
-                    <div
-                      className={`eum-keep-hint${altPhoneChanged ? " eum-keep-hint-changed" : ""}`}
-                    >
-                      <span className="eum-keep-dot" />
-                      {altPhoneChanged
-                        ? "New number will replace the current one on save"
-                        : "Leave blank to keep current alt. phone number"}
-                    </div>
-                  )}
                   {errors.alternate_phone && (
                     <span className="eum-error-text">
                       {errors.alternate_phone}
@@ -1745,6 +1651,15 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                   )}
                 </button>
               )}
+
+              <button
+                type="button"
+                className="eum-btn eum-btn-secondary"
+                onClick={handleClose}
+                disabled={isSubmitting || isLocking}
+              >
+                Cancel
+              </button>
 
               <button
                 type="submit"

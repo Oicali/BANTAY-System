@@ -5,19 +5,45 @@ const fetch = (...args) =>
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 
-// GET /crime-map/boundaries
+function getRiskThresholds(dateFrom, dateTo) {
+  const days = Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
+  if (days <= 29)  return { lowMax: 1, medMax: 2 };   // ≤29 days → 7-day thresholds
+  if (days <= 91)  return { lowMax: 2, medMax: 4 };   // 30–91 days → 30-day thresholds
+  if (days <= 364) return { lowMax: 3, medMax: 6 };   // 92–364 days → 3-month thresholds
+  return               { lowMax: 4, medMax: 8 };      // 365+ days → 1-year thresholds
+}
+
+function getRiskColor(crimeCount, dateFrom, dateTo) {
+  const { lowMax, medMax } = getRiskThresholds(dateFrom, dateTo);
+
+  if (crimeCount === 0) return { color: "#adb5bd", risk: "None" };
+  if (crimeCount <= lowMax) return { color: "#eab308", risk: "Low" };
+  if (crimeCount <= medMax) return { color: "#f97316", risk: "Medium" };
+  return { color: "#b91c1c", risk: "High" };
+}
+
+function getAtRiskMinCount(dateFrom, dateTo) {
+  const { lowMax } = getRiskThresholds(dateFrom, dateTo);
+  return lowMax + 1;
+}
+
+function getHighRiskMinCount(dateFrom, dateTo) {
+  const { medMax } = getRiskThresholds(dateFrom, dateTo);
+  return medMax + 1;
+}
+
 const getBoundaries = async (req, res) => {
   try {
     const { date_from, date_to, incident_type } = req.query;
 
     let crimeQuery = `
-  SELECT 
-    UPPER(TRIM(place_barangay)) as barangay,
-    COUNT(*) as crime_count
-  FROM blotter_analytics_view
-  WHERE lat IS NOT NULL
-    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
-`;
+      SELECT 
+        UPPER(TRIM(place_barangay)) as barangay,
+        COUNT(*) as crime_count
+      FROM blotter_analytics_view
+      WHERE lat IS NOT NULL
+        AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
+    `;
     const params = [];
     let p = 1;
 
@@ -51,24 +77,16 @@ const getBoundaries = async (req, res) => {
 
     const crimeMap = {};
     crimeResult.rows.forEach((r) => {
-      crimeMap[r.barangay] = parseInt(r.crime_count);
+      crimeMap[r.barangay] = parseInt(r.crime_count, 10);
     });
 
     const boundaries = barangayResult.rows.map((b) => {
       const count = crimeMap[b.name_db.toUpperCase()] || 0;
-      let color = "#9ca3af";
-      let risk = "None";
-
-      if (count >= 4) {
-        color = "#b91c1c";
-        risk = "High";
-      } else if (count >= 2) {
-        color = "#f97316";
-        risk = "Medium";
-      } else if (count >= 1) {
-        color = "#eab308";
-        risk = "Low";
-      }
+      const { color, risk } = getRiskColor(
+        count,
+        date_from || "2000-01-01",
+        date_to || new Date().toISOString().slice(0, 10),
+      );
 
       return {
         name_db: b.name_db,
@@ -88,29 +106,28 @@ const getBoundaries = async (req, res) => {
   }
 };
 
-// GET /crime-map/pins
 const getPins = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
 
     let query = `
-  SELECT 
-    blotter_id,
-    blotter_entry_number,
-    incident_type,
-    place_barangay,
-    place_street,
-    type_of_place,
-    modus,
-    status,
-    date_time_commission,
-    lat,
-    lng
-  FROM blotter_analytics_view
-  WHERE lat IS NOT NULL 
-    AND lng IS NOT NULL
-    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
-`;
+      SELECT 
+        blotter_id,
+        blotter_entry_number,
+        incident_type,
+        place_barangay,
+        place_street,
+        type_of_place,
+        modus,
+        status,
+        date_time_commission,
+        lat,
+        lng
+      FROM blotter_analytics_view
+      WHERE lat IS NOT NULL 
+        AND lng IS NOT NULL
+        AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
+    `;
     const params = [];
     let p = 1;
 
@@ -118,7 +135,7 @@ const getPins = async (req, res) => {
       query += ` AND date_time_commission >= $${p++}`;
       params.push(date_from);
     }
-     if (date_to) {
+    if (date_to) {
       query += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
@@ -132,16 +149,16 @@ const getPins = async (req, res) => {
     }
     if (req.query.modus) {
       query += ` AND EXISTS (
-    SELECT 1 FROM crime_modus cm
-    JOIN crime_modus_reference cmr ON cm.modus_reference_id = cmr.id
-    WHERE cm.blotter_id = blotter_analytics_view.blotter_id
-    AND UPPER(cmr.modus_name) = UPPER($${p++})
-  )`;
+        SELECT 1 FROM crime_modus cm
+        JOIN crime_modus_reference cmr ON cm.modus_reference_id = cmr.id
+        WHERE cm.blotter_id = blotter_analytics_view.blotter_id
+        AND UPPER(cmr.modus_name) = UPPER($${p++})
+      )`;
       params.push(req.query.modus);
     }
     if (req.query.hour !== undefined && req.query.hour !== "") {
       query += ` AND EXTRACT(HOUR FROM date_time_commission) = $${p++}`;
-      params.push(parseInt(req.query.hour));
+      params.push(parseInt(req.query.hour, 10));
     }
     if (req.query.day) {
       query += ` AND TRIM(TO_CHAR(date_time_commission, 'Day')) = $${p++}`;
@@ -172,9 +189,7 @@ const getPins = async (req, res) => {
           [user_id],
         );
         if (patrolRes.rows.length > 0) {
-          const areas = patrolRes.rows.map((r) =>
-            r.barangay_area.toUpperCase(),
-          );
+          const areas = patrolRes.rows.map((r) => r.barangay_area.toUpperCase());
           query += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
           params.push(areas);
         }
@@ -190,6 +205,7 @@ const getPins = async (req, res) => {
       ROBBERY: "#ef4444",
       THEFT: "#f97316",
       "PHYSICAL INJURIES": "#eab308",
+      "PHYSICAL INJURY": "#eab308",
       HOMICIDE: "#8b5cf6",
       MURDER: "#7c3aed",
       RAPE: "#ec4899",
@@ -233,7 +249,6 @@ const getPins = async (req, res) => {
   }
 };
 
-// GET /crime-map/statistics
 const getStatistics = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
@@ -259,46 +274,88 @@ const getStatistics = async (req, res) => {
       params.push(barangay);
     }
 
+    const atRiskMin = getAtRiskMinCount(
+      date_from || "2000-01-01",
+      date_to || new Date().toISOString().slice(0, 10),
+    );
+    const highRiskMin = getHighRiskMinCount(
+      date_from || "2000-01-01",
+      date_to || new Date().toISOString().slice(0, 10),
+    );
+
     const client = await pool.connect();
-    let totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters;
+    let totalPins, byIncidentType, atRiskBarangays, highRiskBarangays, recentIncidents, totalBlotters;
     try {
-      [totalPins, byIncidentType, hotspots, recentIncidents, totalBlotters] =
-        await Promise.all([
-          client.query(
-            `SELECT COUNT(*) FROM blotter_analytics_view ${baseWhere}`,
-            params,
-          ),
-          client.query(
-            `SELECT incident_type, COUNT(*) as count FROM blotter_analytics_view ${baseWhere} GROUP BY incident_type ORDER BY count DESC`,
-            params,
-          ),
-          client.query(
-            `SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count FROM blotter_analytics_view ${baseWhere} GROUP BY UPPER(TRIM(place_barangay)) HAVING COUNT(*) >= 4 ORDER BY count DESC`,
-            params,
-          ),
-          client.query(
-            `SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_analytics_view ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`,
-            params,
-          ),
-          client.query(`SELECT COUNT(*) FROM blotter_analytics_view WHERE LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')`),
-        ]);
+      [
+        totalPins,
+        byIncidentType,
+        atRiskBarangays,
+        highRiskBarangays,
+        recentIncidents,
+        totalBlotters,
+      ] = await Promise.all([
+        client.query(
+          `SELECT COUNT(*) FROM blotter_analytics_view ${baseWhere}`,
+          params,
+        ),
+        client.query(
+          `SELECT incident_type, COUNT(*) as count FROM blotter_analytics_view ${baseWhere} GROUP BY incident_type ORDER BY count DESC`,
+          params,
+        ),
+        client.query(
+          `SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count
+           FROM blotter_analytics_view ${baseWhere}
+           GROUP BY UPPER(TRIM(place_barangay))
+           HAVING COUNT(*) >= $${params.length + 1}::int
+           ORDER BY count DESC, barangay ASC`,
+          [...params, atRiskMin],
+        ),
+        client.query(
+          `SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count
+           FROM blotter_analytics_view ${baseWhere}
+           GROUP BY UPPER(TRIM(place_barangay))
+           HAVING COUNT(*) >= $${params.length + 1}::int
+           ORDER BY count DESC, barangay ASC`,
+          [...params, highRiskMin],
+        ),
+        client.query(
+          `SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_analytics_view ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`,
+          params,
+        ),
+        client.query(
+          `SELECT COUNT(*) FROM blotter_analytics_view WHERE LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')`,
+        ),
+      ]);
     } finally {
       client.release();
     }
 
+    const atRiskWithRisk = atRiskBarangays.rows.map((row) => {
+      const count = parseInt(row.count, 10);
+      const { risk } = getRiskColor(
+        count,
+        date_from || "2000-01-01",
+        date_to || new Date().toISOString().slice(0, 10),
+      );
+      return {
+        barangay: row.barangay,
+        count,
+        risk,
+      };
+    });
+
     res.json({
       success: true,
       data: {
-        total_pins: parseInt(totalPins.rows[0].count),
-        total_blotters: parseInt(totalBlotters.rows[0].count),
-        barangays_with_crimes: [
-          ...new Set(byIncidentType.rows.map((r) => r.incident_type)),
-        ].length,
-        high_risk_count: hotspots.rows.length,
+        total_pins: parseInt(totalPins.rows[0].count, 10),
+        total_blotters: parseInt(totalBlotters.rows[0].count, 10),
+        barangays_with_crimes: atRiskWithRisk.length,
+        at_risk_count: atRiskWithRisk.length,
+        high_risk_count: highRiskBarangays.rows.length,
         top_crime: byIncidentType.rows[0]?.incident_type || null,
-        top_barangay: hotspots.rows[0]?.barangay || null,
+        top_barangay: atRiskWithRisk[0]?.barangay || null,
         by_incident_type: byIncidentType.rows,
-        hotspots: hotspots.rows,
+        at_risk_barangays: atRiskWithRisk,
         recent_incidents: recentIncidents.rows,
       },
     });
@@ -308,17 +365,15 @@ const getStatistics = async (req, res) => {
   }
 };
 
-// GET /crime-map/heatmap
 const getHeatmap = async (req, res) => {
   try {
     const { date_from, date_to, incident_type, barangay } = req.query;
 
-    // ── 1. Build base filter ───────────────────────────────────────────────────
     let baseWhere = `
-  WHERE lat IS NOT NULL
-    AND lng IS NOT NULL
-    AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
-`;
+      WHERE lat IS NOT NULL
+        AND lng IS NOT NULL
+        AND LOWER(TRIM(status)) IN ('cleared','cce','solved','cse','under investigation','ui','for investigation','active','ongoing')
+    `;
     const params = [];
     let p = 1;
 
@@ -339,19 +394,18 @@ const getHeatmap = async (req, res) => {
       params.push(barangay);
     }
 
-    // ── 2. Raw points query ────────────────────────────────────────────────────
     const pointsSQL = `
-  SELECT
-    blotter_id,
-    UPPER(TRIM(incident_type))     AS incident_type,
-    UPPER(TRIM(place_barangay))    AS place_barangay,
-    date_time_commission,
-    lat::float,
-    lng::float
-  FROM blotter_analytics_view
-  ${baseWhere}
-  ORDER BY date_time_commission DESC
-`;
+      SELECT
+        blotter_id,
+        UPPER(TRIM(incident_type)) AS incident_type,
+        UPPER(TRIM(place_barangay)) AS place_barangay,
+        date_time_commission,
+        lat::float,
+        lng::float
+      FROM blotter_analytics_view
+      ${baseWhere}
+      ORDER BY date_time_commission DESC
+    `;
 
     const client = await pool.connect();
     let pointsResult;
@@ -378,14 +432,12 @@ const getHeatmap = async (req, res) => {
           `SELECT mu.barangay_area
            FROM active_patroller ap
            JOIN mobile_unit_patroller mup ON ap.active_patroller_id = mup.active_patroller_id
-           JOIN mobile_unit mu             ON mup.mobile_unit_id = mu.mobile_unit_id
+           JOIN mobile_unit mu ON mup.mobile_unit_id = mu.mobile_unit_id
            WHERE ap.officer_id = $1 AND ap.status = 'Active'`,
           [user_id],
         );
         if (patrolRes.rows.length > 0) {
-          const areas = patrolRes.rows.map((r) =>
-            r.barangay_area.toUpperCase(),
-          );
+          const areas = patrolRes.rows.map((r) => r.barangay_area.toUpperCase());
           const patrolWhere = ` AND UPPER(TRIM(place_barangay)) = ANY($${p}::text[])`;
           params.push(areas);
           pointsResult = await client.query(
@@ -402,7 +454,6 @@ const getHeatmap = async (req, res) => {
       client.release();
     }
 
-    // ── 3. Call Python DBSCAN service for clusters ─────────────────────────────
     const aiPayload = {
       date_from: date_from || "2000-01-01",
       date_to: date_to || new Date().toISOString().slice(0, 10),
@@ -421,14 +472,12 @@ const getHeatmap = async (req, res) => {
       const aiData = await aiRes.json();
       dbscanClusters = aiData.clusters || [];
     } catch (aiErr) {
-      // AI service unavailable — heatmap points still render, rings won't show
       console.warn(
         "DBSCAN service unavailable, skipping clusters:",
         aiErr.message,
       );
     }
 
-    // ── 4. Build heatmap points GeoJSON ───────────────────────────────────────
     const pointFeatures = pointsResult.rows.map((r) => ({
       type: "Feature",
       geometry: {
@@ -443,7 +492,6 @@ const getHeatmap = async (req, res) => {
       },
     }));
 
-    // ── 5. Convert DBSCAN clusters → GeoJSON features ─────────────────────────
     const maxCount = dbscanClusters.length
       ? Math.max(...dbscanClusters.map((c) => c.count))
       : 1;

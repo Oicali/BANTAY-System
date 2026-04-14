@@ -1856,7 +1856,13 @@ const BarangayTable = ({ data }) => {
 };
 
 // ─── TREND SPARKLINE ──────────────────────────────────────────────────────────
-const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
+const TrendSparkline = ({
+  crimeType,
+  weeklyRows,
+  linregData,
+  mode,
+  forecastState = "full",
+}) => {
   const crimeRows = useMemo(() => {
     if (!weeklyRows?.length) return [];
     return weeklyRows
@@ -1922,7 +1928,12 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
   const hasEnoughData =
     typeof lr?.confidence === "number" && lr.confidence >= 50;
   const insufficientForecast =
-    !lr || lr?.predicted_next_week === null || lr?.confidence === 0;
+    !lr ||
+    lr?.predicted_next_week === null ||
+    lr?.confidence === 0 ||
+    forecastState === "insufficient";
+
+  const isLimitedForecast = forecastState === "limited";
 
   const tickInterval =
     crimeRows.length <= 8
@@ -1948,7 +1959,9 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
         </span>
         {!hasEnoughData && (
           <span className="cd-ai-sparkline-warning">
-            ⚠ Only {crimeRows.length} incident week{crimeRows.length !== 1 ? "s" : ""} recorded — trend and forecast may not be reliable
+            ⚠ Only {crimeRows.length} incident week
+            {crimeRows.length !== 1 ? "s" : ""} recorded — trend and forecast
+            may not be reliable
           </span>
         )}
         {!insufficientForecast &&
@@ -1959,6 +1972,12 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
                 <>
                   Historical projection:{" "}
                   <strong>{lr.predicted_next_week}</strong> (period ended)
+                </>
+              ) : isLimitedForecast ? (
+                <>
+                  Forecast: <strong>{lr.predicted_next_week}</strong> next week
+                  · {lr.confidence}% confidence{" "}
+                  <span style={{ color: "#f59e0b" }}>⚠ Limited data</span>
                 </>
               ) : (
                 <>
@@ -2037,14 +2056,16 @@ const TrendSparkline = ({ crimeType, weeklyRows, linregData, mode }) => {
             dot={false}
             activeDot={false}
           />
-          <Line
-            type="linear"
-            dataKey="predicted"
-            stroke="#f59e0b"
-            strokeWidth={0}
-            dot={{ r: 5, fill: "#f59e0b", strokeWidth: 2, stroke: "#fff" }}
-            activeDot={{ r: 6 }}
-          />
+          {!isLimitedForecast && (
+            <Line
+              type="linear"
+              dataKey="predicted"
+              stroke="#f59e0b"
+              strokeWidth={0}
+              dot={{ r: 5, fill: "#f59e0b", strokeWidth: 2, stroke: "#fff" }}
+              activeDot={{ r: 6 }}
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
 
@@ -2266,12 +2287,11 @@ const CrimeDashboard = () => {
         86400000,
     );
     if (dayCount < 180) {
-      const proceed = window.confirm(
-        `Your selected range is only ${dayCount} days.\n\n` +
-          `Short ranges may result in low forecast confidence for some crime types.\n\n` +
-          `The EMPO QUAD recommendations will still work, but trend forecasts may show "insufficient data" warnings per crime type.\n\n` +
-          `Continue anyway?`,
-      );
+      // const proceed = window.confirm(
+      //   `Your selected range is only ${dayCount} days.\n\n` +
+      //     `Short ranges may result in low forecast confidence for some crime types.\n\n` +
+      //     `Continue anyway?`,
+      // );
       if (!proceed) return;
     }
 
@@ -2521,9 +2541,9 @@ const CrimeDashboard = () => {
             )}
 
             <div className="cd-ai-block">
-              <h4>General Assessment</h4>
+              <h4>Overall Assessment</h4>
               <p>
-                {assessment.general_assessment || "No assessment generated."}
+                {assessment.overall_assessment || "No assessment generated."}
               </p>
             </div>
 
@@ -2531,16 +2551,27 @@ const CrimeDashboard = () => {
               <div key={idx} className="cd-ai-block cd-ai-crime-block">
                 <h4>{crime.crime_type}</h4>
 
-                <TrendSparkline
-                  crimeType={crime.crime_type}
-                  weeklyRows={analysisData?.historical_weekly_rows}
-                  linregData={analysisData?.croston}
-                  mode={analysisData?.mode}
-                />
+                {(() => {
+                  const crimeForecast = analysisData?.croston?.per_crime?.find(
+                    (c) => c.crime === crime.crime_type,
+                  );
+                  const forecastState =
+                    crimeForecast?.forecast_state || "insufficient";
+                  if (forecastState === "insufficient") return null;
+                  return (
+                    <TrendSparkline
+                      crimeType={crime.crime_type}
+                      weeklyRows={analysisData?.historical_weekly_rows}
+                      linregData={analysisData?.croston}
+                      mode={analysisData?.mode}
+                      forecastState={forecastState}
+                    />
+                  );
+                })()}
 
                 <div className="cd-ai-quad-item">
                   <span className="cd-ai-quad-label">Crime Assessment</span>
-                  <p>{crime.general_assessment}</p>
+                  <p>{crime.crime_assessment}</p>
                 </div>
 
                 <div className="cd-ai-quad-item">
