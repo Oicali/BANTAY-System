@@ -63,27 +63,29 @@ const prettifyBarangay = (name = "") =>
 const parseJsonFromText = (text) => {
   if (!text || typeof text !== "string") return null;
 
-  // Direct parse first
   try {
     return JSON.parse(text);
   } catch (_) {}
 
-  // Strip markdown code fences
   let cleaned = text
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
+    .replace(/`/g, "")
     .trim();
+
+  // Fix unescaped newlines inside JSON string values
+  cleaned = cleaned.replace(
+    /"((?:[^"\\]|\\.)*)"/g,
+    (match) => match.replace(/\n/g, "\\n").replace(/\r/g, "\\r")
+  );
 
   try {
     return JSON.parse(cleaned);
   } catch (_) {}
 
-  // Extract outermost {...} block
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    return null;
-  }
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
 
   let candidate = cleaned.slice(firstBrace, lastBrace + 1);
 
@@ -91,10 +93,7 @@ const parseJsonFromText = (text) => {
     return JSON.parse(candidate);
   } catch (_) {}
 
-  // Last resort: fix common LLM JSON issues
-  candidate = candidate
-    .replace(/,\s*([}\]])/g, "$1") // trailing commas
-    .replace(/\t/g, "\\t"); // literal tabs in strings
+  candidate = candidate.replace(/,\s*([}\]])/g, "$1").replace(/\t/g, "\\t");
 
   try {
     return JSON.parse(candidate);
@@ -104,9 +103,6 @@ const parseJsonFromText = (text) => {
 };
 
 // ─── FLATTEN NESTED OBJECT FIELDS ────────────────────────────────────────────
-// The LLM sometimes returns structured objects (e.g. Five-Part Plan as
-// { Situation: "...", Mission: "...", ... }) instead of a flat string.
-// This converts any nested object fields to a readable flat string.
 const flattenCrimeFields = (parsed) => {
   if (!parsed || typeof parsed !== "object") return parsed;
 
@@ -115,7 +111,8 @@ const flattenCrimeFields = (parsed) => {
     "intelligence",
     "investigations",
     "police_community_relations",
-    "general_assessment",
+    "crime_assessment", // ← renamed from general_assessment
+    "overall_assessment", // ← overall
   ];
 
   FIELDS.forEach((field) => {
@@ -162,6 +159,7 @@ const fetchModusDescriptions = async (crimeTypes = []) => {
   }
 };
 
+// ─── BUILD BASE ASSESSMENT ────────────────────────────────────────────────────
 const buildBaseAssessment = (analysis) => {
   const filters = analysis.filters || {};
   const overall = analysis.stats?.overall || {};
@@ -172,6 +170,7 @@ const buildBaseAssessment = (analysis) => {
   const clusterList = Array.isArray(analysis.clusters?.clusters)
     ? analysis.clusters.clusters
     : [];
+  const overallForecast = analysis.overall_forecast || null;
 
   const sortedCrimes = perCrime.sort((a, b) => (b.total || 0) - (a.total || 0));
   const topCrime = sortedCrimes[0] || null;
@@ -186,59 +185,79 @@ const buildBaseAssessment = (analysis) => {
       ? filters.barangays.map(prettifyBarangay).join(", ")
       : "All barangays";
 
-  // ── General assessment draft ──────────────────────────────────────────────
+  // ── Overall assessment draft ──────────────────────────────────────────────
   const overviewParts = [
-    `From ${formatDate(filters.date_from)} to ${formatDate(filters.date_to)}, a total of ${overall.total || 0} incidents were recorded for the selected dashboard view.`,
-    `Case clearance efficiency is ${pctText(overall.cce_percent)}% and case solution efficiency is ${pctText(overall.cse_percent)}%.`,
+    `From ${formatDate(filters.date_from)} to ${formatDate(filters.date_to)}, a total of ${overall.total || 0} incidents were recorded.`,
+    `Overall CCE is ${pctText(overall.cce_percent)}% and CSE is ${pctText(overall.cse_percent)}%.`,
   ];
 
   if (topCrime) {
     overviewParts.push(
-      `${prettifyCrime(topCrime.crime)} is the highest-volume offense with ${topCrime.total} incident${topCrime.total === 1 ? "" : "s"}.`,
+      `${prettifyCrime(topCrime.crime)} is the highest-volume offense with ${topCrime.total} incident(s).`,
     );
   }
 
   if (temporalOverall.peak_day && temporalOverall.peak_month) {
     overviewParts.push(
-      `The most active period appears around ${temporalOverall.peak_day}s, with ${temporalOverall.peak_month} showing the highest monthly concentration in the selected range.`,
+      `Peak activity is on ${temporalOverall.peak_day}s, with ${temporalOverall.peak_month} showing the highest monthly concentration.`,
     );
   }
 
+  // ── Overall forecast in base draft ────────────────────────────────────────
+  if (overallForecast && overallForecast.forecast_state !== "insufficient") {
+    const stateNote =
+      overallForecast.forecast_state === "limited" ? " (limited data)" : "";
+    overviewParts.push(
+      `Combined forecast for next week: ${overallForecast.predicted_next_week} incident(s) at ${overallForecast.confidence}% confidence${stateNote}. Overall trend: ${overallForecast.trend}.`,
+    );
+  }
+
+  // ── Top hotspot barangay ──────────────────────────────────────────────────
   if (clusterList.length > 0) {
     const topCluster = [...clusterList].sort(
       (a, b) => (b.count || 0) - (a.count || 0),
     )[0];
     overviewParts.push(
-      `${clusterList.length} geographic hotspot cluster${clusterList.length === 1 ? "" : "s"} detected; largest in ${topCluster.dominant_barangay} with ${topCluster.count} incident${topCluster.count === 1 ? "" : "s"}.`,
+      `${clusterList.length} geographic hotspot cluster(s) detected; ${topCluster.dominant_barangay} requires immediate attention with ${topCluster.count} incident(s) concentrated in that area.`,
     );
   }
 
   // ── Per-crime base drafts ─────────────────────────────────────────────────
   const perCrimeBase = sortedCrimes.map((crime) => {
-    const crimeLinreg =
-      (analysis.croston?.per_crime || []).find(
-        (l) => l.crime === crime.crime,
-      ) || {};
     const crimeCluster = clusterList.find(
       (c) => c.dominant_crime === crime.crime,
     );
 
+    const hotspotBarangay = crimeCluster
+      ? crimeCluster.dominant_barangay
+      : filters.barangays?.length
+        ? filters.barangays[0]
+        : "the filtered area";
+
     const peakHour =
       crime.peak_hour !== undefined && crime.peak_hour !== null
-        ? String(crime.peak_hour).padStart(2, "0") + ":00"
+        ? (() => {
+            const h = crime.peak_hour;
+            const start = h % 12 || 12;
+            const suffix = h < 12 ? "AM" : "PM";
+            return `${start}:00 ${suffix}`;
+          })()
         : "peak hours";
 
     const peakDay = crime.peak_day || "peak days";
+    const peakMonth = crime.peak_month || "peak month";
 
-    const forecastText =
-      crimeLinreg.predicted_next_week !== null &&
-      crimeLinreg.predicted_next_week !== undefined
-        ? ` Forecast: ${crimeLinreg.predicted_next_week} incident${crimeLinreg.predicted_next_week === 1 ? "" : "s"} next week (${crimeLinreg.confidence ?? 0}% confidence, Croston method).`
-        : " Insufficient data for reliable forecast.";
+    // ── Forecast text based on forecast_state ─────────────────────────────
+    let forecastText;
+    const forecastState = crime.forecast_state || "insufficient";
 
-    const clusterText = crimeCluster
-      ? ` in ${crimeCluster.dominant_barangay}`
-      : "";
+    if (forecastState === "full") {
+      forecastText = ` Forecast: ${crime.predicted_next_week} incident(s) next week (${crime.confidence}% confidence).`;
+    } else if (forecastState === "limited") {
+      forecastText = ` Forecast: ${crime.predicted_next_week} incident(s) next week (${crime.confidence}% confidence — limited data).`;
+    } else {
+      forecastText = " Insufficient data for forecast.";
+    }
 
     const trendLabel =
       {
@@ -246,18 +265,27 @@ const buildBaseAssessment = (analysis) => {
         decreasing: "decreasing",
         stable: "stable",
         insufficient_data: "insufficient data",
-      }[crimeLinreg.trend] ?? "stable";
+      }[crime.trend] ?? "stable";
+
+    // ── Crime assessment — strategic implication ──────────────────────────
+    const crimeAssessment =
+      `${prettifyCrime(crime.crime)}: ${crime.total} incident(s), CCE ${pctText(crime.cce_percent)}%, CSE ${pctText(crime.cse_percent)}%. ` +
+      `Trend is ${trendLabel}.${forecastText} ` +
+      `${crime.is_ecp ? "Warrants ECP declaration. " : ""}` +
+      `Concentration in ${hotspotBarangay} during ${peakDay}s around ${peakHour} in ${peakMonth} indicates a patrol gap requiring targeted deployment.`;
 
     return {
       crime_type: crime.crime,
-      general_assessment: `${prettifyCrime(crime.crime)}: ${crime.total} incident(s), CCE ${pctText(crime.cce_percent)}%, CSE ${pctText(crime.cse_percent)}%. Trend is ${trendLabel}.${forecastText}`,
-      operations: `Deploy patrol on ${peakDay} around ${peakHour}${clusterText}.`,
-      intelligence: `${crime.is_ecp ? "FLAG AS EMERGING CRIME PROBLEM. " : ""}Monitor ${crime.top_3_modus?.[0]?.modus || "dominant modus"} pattern. Develop informants near incident concentration areas.`,
+      crime_assessment: crimeAssessment, // ← renamed
+      operations: `Deploy patrol on ${peakDay}s around ${peakHour} at ${crime.top_place_type || "affected areas"} in ${hotspotBarangay}.`,
+      intelligence:
+        `${crime.is_ecp ? "FLAG AS ECP. " : ""}` +
+        `Monitor ${crime.top_3_modus?.[0]?.modus || "dominant modus"} pattern near ${hotspotBarangay}.`,
       investigations:
         crime.under_investigation > 0
-          ? `${crime.under_investigation} open case(s). Prioritize follow-up on ${crime.top_3_modus?.[0]?.modus || "dominant modus"} incidents.`
+          ? `${crime.under_investigation} open case(s) in ${hotspotBarangay}. Prioritize follow-up on ${crime.top_3_modus?.[0]?.modus || "dominant modus"} incidents.`
           : `All cases cleared or solved. No open cases requiring follow-up.`,
-      police_community_relations: `Conduct awareness activities before ${peakHour} targeting ${crime.top_place_type || "affected areas"}.`,
+      police_community_relations: `Conduct awareness activities before ${peakHour} targeting ${crime.top_place_type || "affected areas"} in ${hotspotBarangay}.`,
     };
   });
 
@@ -269,7 +297,7 @@ const buildBaseAssessment = (analysis) => {
       crimes: selectedCrimeText,
       barangays: selectedBarangayText,
     },
-    general_assessment: overviewParts.join(" "),
+    overall_assessment: overviewParts.join(" "), // ← renamed
     per_crime: perCrimeBase,
     stats: {
       total: overall.total || 0,
@@ -280,6 +308,7 @@ const buildBaseAssessment = (analysis) => {
   };
 };
 
+// ─── GROQ CALL ────────────────────────────────────────────────────────────────
 const callGroq = async (prompt) => {
   if (!GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY is missing");
@@ -304,15 +333,10 @@ const callGroq = async (prompt) => {
   return response.data?.choices?.[0]?.message?.content || "";
 };
 
-const callAI = async (prompt) => {
-  return callGroq(prompt);
-};
+const callAI = async (prompt) => callGroq(prompt);
 
-// ── Iterative per-crime AI generation ────────────────────────────────────────
-// Each crime type gets its own focused prompt → no context overflow → all crimes appear
+// ─── AI ENHANCEMENT ───────────────────────────────────────────────────────────
 const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
-  const provider = AI_PROVIDER;
-
   if (!GROQ_API_KEY) {
     return {
       providerUsed: "mock",
@@ -323,18 +347,21 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
   }
 
   try {
-    // ── Step 1: General assessment ────────────────────────────────────────
-    console.time("[AI] general_assessment");
+    // ── Step 1: Overall assessment ────────────────────────────────────────
+    console.time("[AI] overall_assessment");
     const generalPrompt = buildGeneralAssessmentPrompt({
       analysis,
       baseAssessment,
     });
     const generalRawText = await callAI(generalPrompt);
-    console.timeEnd("[AI] general_assessment");
+    console.timeEnd("[AI] overall_assessment");
 
     const generalParsed = parseJsonFromText(generalRawText);
-    const generalAssessment =
-      generalParsed?.general_assessment || baseAssessment.general_assessment;
+    // Support both field names during transition
+    const overallAssessment =
+      generalParsed?.overall_assessment ||
+      generalParsed?.general_assessment ||
+      baseAssessment.overall_assessment;
 
     // ── Step 2: One prompt per crime type ─────────────────────────────────
     const perCrimeResults = [];
@@ -353,6 +380,11 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
         const crimeParsed = parseJsonFromText(crimeRawText);
 
         if (crimeParsed && crimeParsed.crime_type) {
+          // Normalize field name — AI may return either key
+          if (crimeParsed.general_assessment && !crimeParsed.crime_assessment) {
+            crimeParsed.crime_assessment = crimeParsed.general_assessment;
+            delete crimeParsed.general_assessment;
+          }
           perCrimeResults.push(flattenCrimeFields(crimeParsed));
         } else {
           console.warn(
@@ -375,12 +407,12 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
     }
 
     return {
-      providerUsed: provider,
+      providerUsed: AI_PROVIDER,
       modelUsed: GROQ_MODEL,
       assessment: {
         ...(baseAssessment || {}),
         title: baseAssessment?.title || "AI Crime Assessment",
-        general_assessment: generalAssessment,
+        overall_assessment: overallAssessment,
         per_crime: perCrimeResults,
       },
       aiRawText: null,
@@ -397,6 +429,7 @@ const maybeEnhanceWithAI = async (analysis, baseAssessment, modusMap = {}) => {
   }
 };
 
+// ─── MAIN ENTRY ───────────────────────────────────────────────────────────────
 const generateAssessment = async ({
   barangays = [],
   date_from,

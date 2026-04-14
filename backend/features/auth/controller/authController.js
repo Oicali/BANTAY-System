@@ -15,7 +15,7 @@ const {
 } = require("../validators/authValidator");
 
 // ============================================================
-// LOGIN
+// LOGIN (web — 24h token)
 // ============================================================
 const login = async (req, res) => {
   try {
@@ -111,10 +111,6 @@ const login = async (req, res) => {
       let attempts = user.failed_login_attempts + 1;
       let lockMinutes = 0;
 
-      // 🔒 PROGRESSIVE LOCKOUT SYSTEM
-      // 3  attempts → 5 min lock
-      // 5  attempts → 15min lock
-      // 8 attempts → permanent lock (requires admin to unlock)
       if (attempts >= 8) lockMinutes = null;
       else if (attempts === 5) lockMinutes = 15;
       else if (attempts === 3) lockMinutes = 5;
@@ -153,7 +149,6 @@ const login = async (req, res) => {
         });
       }
 
-      // No lock yet — just increment counter
       await pool.query(
         `UPDATE users SET failed_login_attempts = $1 WHERE user_id = $2`,
         [attempts, user.user_id],
@@ -180,6 +175,7 @@ const login = async (req, res) => {
       [user.user_id],
     );
 
+    // Web token — 24h (default)
     const token = await tokenManager.createToken({
       user_id: user.user_id,
       username: user.username,
@@ -492,19 +488,13 @@ const changePassword = async (req, res) => {
   }
 };
 
-
 // ============================================================
-// MOBILE LOGIN (Admin + Patrol only)
+// MOBILE LOGIN (Admin + Patrol only — 30d token)
 // ============================================================
 const mobileLogin = async (req, res) => {
   const ALLOWED_ROLES = ['Administrator', 'Patrol'];
+  const MOBILE_TOKEN_EXPIRY = '30d'; // remember me — only expires on logout
 
-  // Run the same login logic first by calling login internally,
-  // but we need to intercept the response — so we duplicate the
-  // role check after credential validation instead.
-  // Easiest: call login, then check role before returning token.
-
-  // We'll reuse the exact same flow with one extra guard:
   try {
     const { username, password } = req.body;
 
@@ -534,6 +524,7 @@ const mobileLogin = async (req, res) => {
     }
 
     const user = result.rows[0];
+    const now = new Date();
 
     // ── MOBILE ROLE GUARD ──────────────────────────────────────
     if (!ALLOWED_ROLES.includes(user.role_name)) {
@@ -543,10 +534,122 @@ const mobileLogin = async (req, res) => {
       });
     }
 
-    // ── Reuse the rest of the login logic ─────────────────────
-    // Forward to the existing login handler by re-calling it
-    return login(req, res);
+    // ── STATUS CHECKS ──────────────────────────────────────────
+    if (user.status === "deactivated") {
+      return res.status(403).json({ success: false, message: "Account has been deactivated" });
+    }
 
+    if (user.status === "unverified") {
+      return res.status(403).json({ success: false, message: "Account is not yet verified" });
+    }
+
+    if (user.status === "locked" && user.lockout_until) {
+      if (now < new Date(user.lockout_until)) {
+        const diffMs = new Date(user.lockout_until) - now;
+        const minutes = Math.floor(diffMs / 60000);
+        const seconds = Math.floor((diffMs % 60000) / 1000);
+        return res.status(403).json({
+          success: false,
+          message: `Account locked. Try again in ${minutes}m ${seconds}s`,
+          lockout_until: user.lockout_until,
+        });
+      }
+      await pool.query(
+        `UPDATE users SET status = 'verified', lockout_until = NULL, failed_login_attempts = 0 WHERE user_id = $1`,
+        [user.user_id],
+      );
+      user.status = "verified";
+    }
+
+    if (user.status === "locked" && !user.lockout_until) {
+      return res.status(403).json({
+        success: false,
+        message: "Account is permanently locked. Please contact an administrator.",
+      });
+    }
+
+    // ── PASSWORD VERIFICATION ──────────────────────────────────
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      let attempts = user.failed_login_attempts + 1;
+      let lockMinutes = 0;
+
+      if (attempts >= 8) lockMinutes = null;
+      else if (attempts === 5) lockMinutes = 15;
+      else if (attempts === 3) lockMinutes = 5;
+
+      if (attempts >= 8) {
+        await pool.query(
+          `UPDATE users SET failed_login_attempts = $1, status = 'locked', lockout_until = NULL WHERE user_id = $2`,
+          [attempts, user.user_id],
+        );
+        return res.status(403).json({
+          success: false,
+          message: "Account permanently locked due to too many failed attempts. Contact an administrator.",
+        });
+      }
+
+      if (lockMinutes > 0) {
+        const lockUntil = new Date(Date.now() + lockMinutes * 60000);
+        await pool.query(
+          `UPDATE users SET failed_login_attempts = $1, status = 'locked', lockout_until = $2 WHERE user_id = $3`,
+          [attempts, lockUntil, user.user_id],
+        );
+        return res.status(403).json({
+          success: false,
+          message: `Account locked for ${lockMinutes} minutes`,
+          lockout_until: lockUntil,
+        });
+      }
+
+      await pool.query(
+        `UPDATE users SET failed_login_attempts = $1 WHERE user_id = $2`,
+        [attempts, user.user_id],
+      );
+
+      const attemptsLeft = attempts < 5 ? 5 - attempts : null;
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+        ...(attemptsLeft !== null && { attempts_left: attemptsLeft }),
+      });
+    }
+
+    // ── SUCCESS — reset security counters ─────────────────────
+    await pool.query(
+      `UPDATE users
+       SET failed_login_attempts = 0,
+           status = 'verified',
+           lockout_until = NULL,
+           last_login = NOW()
+       WHERE user_id = $1`,
+      [user.user_id],
+    );
+
+    // Mobile token — 30d (remember me until logout)
+    const token = await tokenManager.createToken({
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      role: user.role_name,
+      user_type: user.user_type,
+    }, { expiresIn: MOBILE_TOKEN_EXPIRY }); // 👈 30d instead of 24h
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        role: user.role_name,
+        user_type: user.user_type,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        profile_picture: user.profile_picture || null,
+        assigned_barangay_code: user.assigned_barangay_code || null,
+      },
+    });
   } catch (error) {
     console.error('Mobile login error:', error);
     res.status(500).json({ success: false, message: 'Login failed' });
@@ -554,11 +657,21 @@ const mobileLogin = async (req, res) => {
 };
 
 // ============================================================
+// VALIDATE TOKEN (used by mobile splash screen)
+// ============================================================
+const validateToken = async (req, res) => {
+  // If this function is reached, the authenticate middleware
+  // already confirmed the token is valid
+  res.status(200).json({ success: true, user: req.user });
+};
+
+// ============================================================
 // EXPORTS
 // ============================================================
 module.exports = {
   login,
-  mobileLogin, 
+  mobileLogin,
+  validateToken,
   logout,
   logoutAll,
   sendOTP,

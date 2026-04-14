@@ -18,7 +18,7 @@ from sklearn.cluster import DBSCAN
 
 load_dotenv()
 
-app = FastAPI(title="BANTAY AI Assessment Service", version="0.3.0")
+app = FastAPI(title="BANTAY AI Assessment Service", version="0.4.0")
 
 
 # ─── CRIME TYPE MAPPING ────────────────────────────────────────────────────────
@@ -162,6 +162,35 @@ def sanitize_for_json(value):
     return value
 
 
+# ─── RISK & CLUSTERING HELPERS ────────────────────────────────────────────────
+
+def get_risk_color(crime_count: int, date_from: str, date_to: str) -> str:
+    days  = (pd.Timestamp(date_to) - pd.Timestamp(date_from)).days + 1
+    weeks = max(days / 7, 1)
+    rate  = crime_count / weeks
+
+    if crime_count == 0:
+        return "#adb5bd"
+    elif rate < 0.15:
+        return "#eab308"
+    elif rate < 0.30:
+        return "#f97316"
+    else:
+        return "#b91c1c"
+
+
+def get_dbscan_eps(date_from: str, date_to: str) -> float:
+    days = (pd.Timestamp(date_to) - pd.Timestamp(date_from)).days + 1
+    if days <= 7:
+        return 0.005
+    elif days <= 30:
+        return 0.004
+    elif days <= 90:
+        return 0.004
+    else:
+        return 0.003
+
+
 # ─── DATA QUERIES ──────────────────────────────────────────────────────────────
 
 def get_incidents(
@@ -281,9 +310,7 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
         cce = round(((cleared + solved) / total) * 100, 1) if total else 0.0
         cse = round((solved / total) * 100, 1) if total else 0.0
 
-        # AFTER (clean)
         modus_vc = group["modus"].value_counts()
-        # Exclude 'Unknown' from both top list and percentage denominator
         known_modus_vc = modus_vc[modus_vc.index != "Unknown"]
         if len(known_modus_vc) > 0:
             top_modus = (
@@ -293,13 +320,13 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
             )
             total_modus = int(known_modus_vc.sum())
         else:
-            # All modus are Unknown — fall back to including it
             top_modus = (
                 modus_vc.head(min(3, len(modus_vc)))
                 .rename_axis("modus")
                 .reset_index(name="count")
             )
             total_modus = int(modus_vc.sum())
+
         top_modus_list = [
             {
                 "modus": row["modus"],
@@ -323,6 +350,11 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
             if not group["day_of_incident"].mode().empty
             else "Unknown"
         )
+        peak_month = (
+            group["month_of_incident"].mode().iloc[0]
+            if not group["month_of_incident"].mode().empty
+            else "Unknown"
+        )
 
         per_crime.append({
             "crime":               crime,
@@ -336,6 +368,7 @@ def compute_basic_stats(df: pd.DataFrame) -> dict[str, Any]:
             "top_place_type":      top_place_type,
             "peak_hour":           peak_hour,
             "peak_day":            peak_day,
+            "peak_month":          peak_month,
         })
 
     total_all   = int(len(df))
@@ -390,11 +423,11 @@ def compute_temporal(df: pd.DataFrame) -> dict[str, Any]:
         c_top3    = c_hourly.sort_values(ascending=False).head(3).index.tolist()
 
         per_crime.append({
-            "crime":      crime,
-            "peak_hour":  int(c_hourly.idxmax()) if not c_hourly.empty else None,
-            "top_3_hours":[int(h) for h in c_top3],
-            "peak_day":   c_daily.idxmax() if not c_daily.empty else "Unknown",
-            "peak_month": c_monthly.idxmax() if not c_monthly.empty else "Unknown",
+            "crime":        crime,
+            "peak_hour":    int(c_hourly.idxmax()) if not c_hourly.empty else None,
+            "top_3_hours":  [int(h) for h in c_top3],
+            "peak_day":     c_daily.idxmax() if not c_daily.empty else "Unknown",
+            "peak_month":   c_monthly.idxmax() if not c_monthly.empty else "Unknown",
         })
 
     return {"overall": overall, "per_crime": per_crime}
@@ -402,7 +435,7 @@ def compute_temporal(df: pd.DataFrame) -> dict[str, Any]:
 
 # ─── MODULE 3 — DBSCAN SPATIAL CLUSTERING ─────────────────────────────────────
 
-def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
+def compute_clusters(df: pd.DataFrame, eps: float = 0.003) -> dict[str, Any]:
     geo_df = df.dropna(subset=["lat", "lng"]).copy()
     total_with_coords = len(geo_df)
 
@@ -414,7 +447,7 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         }
 
     coords = geo_df[["lat", "lng"]].values.astype(float)
-    db = DBSCAN(eps=0.003, min_samples=3).fit(coords)
+    db = DBSCAN(eps=eps, min_samples=3).fit(coords)
     core_sample_indices = db.core_sample_indices_
     print(f"Core points: {len(core_sample_indices)} out of {total_with_coords} total")
     print(f"Noise/outliers: {list(db.labels_).count(-1)}, Border points: {total_with_coords - len(db.core_sample_indices_) - list(db.labels_).count(-1)}")
@@ -430,7 +463,6 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         cluster_rows = geo_df[geo_df["cluster_label"] == label]
 
         coords_cluster = cluster_rows[["lat", "lng"]].values
-        eps = 0.003
         neighbor_counts = []
         for pt in coords_cluster:
             dists = np.sqrt(((coords_cluster - pt) ** 2).sum(axis=1))
@@ -456,10 +488,6 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         )
         crime_types = cluster_rows["incident_type"].unique().tolist()
 
-        # ── Spatiotemporal: peak hour and day within this cluster ─────────────
-        # Only report if cluster has enough incidents for a meaningful pattern.
-        # With fewer than 5 incidents, mode() is not reliable — one incident
-        # on a Friday doesn't mean "this cluster peaks on Fridays."
         has_temporal_pattern = len(cluster_rows) >= 5
 
         cluster_hours = cluster_rows["hour"].value_counts()
@@ -477,7 +505,7 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
         )
 
         def haversine(lat1, lon1, lat2, lon2):
-            R = 6371000  # Earth radius in meters
+            R = 6371000
             phi1, phi2 = math.radians(lat1), math.radians(lat2)
             dphi = math.radians(lat2 - lat1)
             dlambda = math.radians(lon2 - lon1)
@@ -488,8 +516,7 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
             lambda row: haversine(centroid_lat, centroid_lng, row["lat"], row["lng"]),
             axis=1
         ).max())
-        # Add a small padding so the ring doesn't clip the outermost points
-        radius_m = max(min(radius_m * 1.2, 100), 50)  # min 50m, max 100m radius
+        radius_m = max(min(radius_m * 1.2, 100), 50)
 
         clusters.append({
             "cluster_id":           int(label),
@@ -501,7 +528,6 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
             "dominant_modus":       dominant_modus,
             "dominant_barangay":    dominant_barangay,
             "crime_types":          crime_types,
-            # Spatiotemporal fields — None if insufficient incidents
             "peak_hour":            cluster_peak_hour,
             "peak_day":             cluster_peak_day,
             "has_temporal_pattern": has_temporal_pattern,
@@ -519,18 +545,12 @@ def compute_clusters(df: pd.DataFrame) -> dict[str, Any]:
 # ─── MODULE 4 — CROSTON FORECASTING ───────────────────────────────────────────
 
 def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
-    """
-    Croston's method for intermittent demand forecasting.
-    Designed for sparse count data — exactly the crime data profile.
-    Only uses non-zero weeks. No zero-filling needed.
-    """
     if weekly_df.empty:
         return {"per_crime": []}
 
     per_crime: list[dict[str, Any]] = []
 
     for crime, group in weekly_df.groupby("incident_type"):
-        # Only non-zero weeks — Croston handles intervals itself
         nonzero = (
             group[group["count"] > 0]
             .sort_values("week_start")
@@ -539,13 +559,13 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
         nonzero_count = int(len(nonzero))
         total_weeks   = int(len(group))
 
-        # Insufficient data — skip forecast entirely
         if nonzero_count < 4:
             per_crime.append({
                 "crime":               crime,
                 "trend":               "insufficient_data",
                 "predicted_next_week": None,
                 "confidence":          0,
+                "forecast_state":      "insufficient",
                 "nonzero_weeks":       nonzero_count,
                 "total_weeks":         total_weeks,
                 "method":              "none",
@@ -553,15 +573,9 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             })
             continue
 
-        # Confidence level based on non-zero observations
-        raw = math.log(nonzero_count + 1) / math.log(53 + 1)  # 53 = ~1 full year of weekly data
-        confidence_pct = round(min(raw * 100, 95))  # cap at 95% — never claim certainty
-
-        # ── Croston's method ──────────────────────────────────────────────────
         demands     = nonzero["count"].values.astype(float)
         week_starts = pd.to_datetime(nonzero["week_start"])
 
-        # Compute intervals between non-zero weeks (in weeks)
         if len(week_starts) > 1:
             intervals = [
                 max(1, (week_starts.iloc[i] - week_starts.iloc[i - 1]).days // 7)
@@ -570,24 +584,50 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
         else:
             intervals = [1.0]
 
-        # Exponential smoothing on demand sizes and intervals
-        alpha            = 0.3
-        smoothed_demand  = float(demands[0])
+        alpha = 0.3
+
+        if nonzero_count >= 6:
+            forecast_state = "full"
+            train_demands  = demands[:-4]
+            actual_demands = demands[-4:]
+            s_d = float(train_demands[0])
+            s_i = float(intervals[0]) if intervals else 1.0
+
+            for j in range(1, len(train_demands)):
+                s_d = alpha * train_demands[j] + (1 - alpha) * s_d
+                if j < len(intervals):
+                    s_i = alpha * intervals[j] + (1 - alpha) * s_i
+
+            holdout_pred = s_d / max(s_i, 1.0)
+            actual_mean  = actual_demands.mean()
+
+            if actual_mean > 0:
+                error_pct      = abs(holdout_pred - actual_mean) / actual_mean
+                accuracy       = max(0.0, 1.0 - error_pct)
+                volume_factor  = min(nonzero_count / 53, 1.0)
+                confidence_pct = round(min((accuracy * 0.7 + volume_factor * 0.3) * 100, 95))
+            else:
+                confidence_pct = round(min((nonzero_count / 53) * 100 * 0.5, 95))
+
+        else:
+            forecast_state = "limited"
+            raw = math.log(nonzero_count + 1) / math.log(53 + 1)
+            confidence_pct = round(min(raw * 100 * 0.6, 50))
+
+        smoothed_demand   = float(demands[0])
         smoothed_interval = float(intervals[0]) if intervals else 1.0
 
         for i in range(1, len(demands)):
             smoothed_demand = alpha * demands[i] + (1 - alpha) * smoothed_demand
-            if i - 1 < len(intervals):
-                smoothed_interval = alpha * intervals[i - 1] + (1 - alpha) * smoothed_interval
+            if i < len(intervals):
+                smoothed_interval = alpha * intervals[i] + (1 - alpha) * smoothed_interval
 
-        # Croston forecast = smoothed demand / smoothed interval
         croston_rate = smoothed_demand / max(smoothed_interval, 1.0)
         predicted    = max(0, round(croston_rate))
 
-        # ── Trend direction via moving average comparison ─────────────────────
         if nonzero_count >= 8:
             recent   = demands[-4:].mean()
-            previous = demands[-8:-4].mean() if nonzero_count >= 8 else demands.mean()
+            previous = demands[-8:-4].mean()
             if previous > 0:
                 pct_change = ((recent - previous) / previous) * 100
             else:
@@ -607,6 +647,7 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
             "trend":               trend,
             "predicted_next_week": int(predicted),
             "confidence":          confidence_pct,
+            "forecast_state":      forecast_state,
             "nonzero_weeks":       nonzero_count,
             "total_weeks":         total_weeks,
             "method":              "croston",
@@ -621,26 +662,22 @@ def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
 
 @app.get("/health")
 def health_check():
-    return {"ok": True, "service": "bantay-ai-assessment", "version": "0.3.0"}
+    return {"ok": True, "service": "bantay-ai-assessment", "version": "0.4.0"}
 
 
 # ─── /clusters — HEATMAP DBSCAN ENDPOINT ──────────────────────────────────────
 
 @app.post("/clusters")
 def get_clusters(payload: ClustersRequest):
-    """
-    Lightweight endpoint called by crimeMapController.js to get
-    DBSCAN cluster centroids for the heatmap ring layer.
-    Returns only cluster data — no trends, no stats.
-    """
     try:
-        incidents_df    = get_incidents(
+        incidents_df = get_incidents(
             barangays=payload.barangays,
             date_from=payload.date_from,
             date_to=payload.date_to,
             crime_types=payload.crime_types,
         )
-        clusters_result = compute_clusters(incidents_df)
+        eps             = get_dbscan_eps(payload.date_from, payload.date_to)
+        clusters_result = compute_clusters(incidents_df, eps=eps)
         return sanitize_for_json(clusters_result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -658,8 +695,6 @@ def analyze(payload: AnalyzeRequest):
             crime_types=payload.crime_types,
         )
 
-        # All historical data up to date_to — no date_from cap
-        # This gives Croston the full history regardless of display range
         historical_weekly_df = get_historical_weekly(
             barangays=payload.barangays,
             up_to_date=payload.date_to,
@@ -668,27 +703,66 @@ def analyze(payload: AnalyzeRequest):
 
         stats_result    = compute_basic_stats(incidents_df)
         temporal_result = compute_temporal(incidents_df)
-        clusters_result = compute_clusters(incidents_df)
-        croston_result  = compute_croston(historical_weekly_df)
+        eps             = get_dbscan_eps(payload.date_from, payload.date_to)
+        clusters_result = compute_clusters(incidents_df, eps=eps)
 
-        # Merge Croston results into per_crime stats
-        croston_map = {item["crime"]: item for item in croston_result.get("per_crime", [])}
+        # ── Barangay summary — total incidents per barangay ───────────────────
+        barangay_summary: list[dict[str, Any]] = []
+        if not incidents_df.empty and "place_barangay" in incidents_df.columns:
+            brgy_vc = (
+                incidents_df["place_barangay"]
+                .value_counts()
+                .reset_index()
+            )
+            brgy_vc.columns = ["barangay", "count"]
+            barangay_summary = brgy_vc.to_dict(orient="records")
 
+        # ── ALL_CRIMES combined weekly for overall forecast ───────────────────
+        if not historical_weekly_df.empty:
+            combined_weekly = (
+                historical_weekly_df
+                .groupby("week_start")["count"]
+                .sum()
+                .reset_index()
+            )
+            combined_weekly["incident_type"] = "ALL_CRIMES"
+            historical_with_combined = pd.concat(
+                [historical_weekly_df, combined_weekly],
+                ignore_index=True
+            )
+        else:
+            historical_with_combined = historical_weekly_df
+
+        croston_result = compute_croston(historical_with_combined)
+
+        # ── Separate ALL_CRIMES forecast from per-crime forecasts ─────────────
+        overall_forecast = next(
+            (x for x in croston_result["per_crime"] if x["crime"] == "ALL_CRIMES"),
+            None
+        )
+        per_crime_croston = {
+            item["crime"]: item
+            for item in croston_result["per_crime"]
+            if item["crime"] != "ALL_CRIMES"
+        }
+
+        # ── Merge Croston into per_crime stats ────────────────────────────────
         for crime_stat in stats_result.get("per_crime", []):
             crime = crime_stat["crime"]
-            cr    = croston_map.get(crime, {})
+            cr    = per_crime_croston.get(crime, {})
             crime_stat["trend"]               = cr.get("trend", "stable")
             crime_stat["predicted_next_week"] = cr.get("predicted_next_week", None)
-            crime_stat["confidence"]          = cr.get("confidence", "none")
+            crime_stat["confidence"]          = cr.get("confidence", 0)
+            crime_stat["forecast_state"]      = cr.get("forecast_state", "insufficient")
             crime_stat["nonzero_weeks"]       = cr.get("nonzero_weeks", 0)
             crime_stat["forecast_method"]     = cr.get("method", "none")
             crime_stat["is_ecp"]              = (
                 crime_stat["trend"] == "increasing"
                 and crime_stat["cse_percent"] < 30.0
-                and cr.get("confidence") not in ["none"]
+                and cr.get("forecast_state") in ["full", "limited"]
             )
 
-        # Merge temporal per_crime into stats per_crime
+        # ── Merge temporal per_crime into stats per_crime ─────────────────────
         temporal_map = {item["crime"]: item for item in temporal_result.get("per_crime", [])}
 
         for crime_stat in stats_result.get("per_crime", []):
@@ -697,9 +771,10 @@ def analyze(payload: AnalyzeRequest):
             if "peak_hour" not in crime_stat or crime_stat["peak_hour"] is None:
                 crime_stat["peak_hour"] = t.get("peak_hour")
             crime_stat["top_3_hours"] = t.get("top_3_hours", [])
+            if not crime_stat.get("peak_month") or crime_stat["peak_month"] == "Unknown":
+                crime_stat["peak_month"] = t.get("peak_month", "Unknown")
 
-        # Prepare historical rows for sparkline chart
-        # Keep only non-zero rows — frontend fills zeros for display
+        # ── Prepare historical rows for sparkline ─────────────────────────────
         historical_rows = historical_weekly_df.copy()
         if not historical_rows.empty:
             historical_rows["week_start"] = historical_rows["week_start"].dt.strftime("%Y-%m-%d")
@@ -717,7 +792,9 @@ def analyze(payload: AnalyzeRequest):
             "stats":                  stats_result,
             "temporal":               temporal_result,
             "clusters":               clusters_result,
-            "croston":                 croston_result,   # key kept as "linreg" so frontend doesn't need changes
+            "croston":                {"per_crime": list(per_crime_croston.values())},
+            "overall_forecast":       overall_forecast,
+            "barangay_summary":       barangay_summary,          # ← NEW
             "historical_weekly_rows": historical_rows.to_dict(orient="records"),
         }
 
