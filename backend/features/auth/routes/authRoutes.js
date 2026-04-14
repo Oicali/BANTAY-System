@@ -6,7 +6,8 @@ const router = require("express").Router();
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 const {
   login,
-  mobileLogin,  
+  mobileLogin,
+  validateToken, // ← add this
   logout,
   logoutAll,
   sendOTP,
@@ -14,7 +15,7 @@ const {
   resendOTP,
   resetPassword,
   changePassword,
-} = require("../controller/authController");
+} = require("../controllers/authController");
 
 // ============================================================
 // PUBLIC ROUTES (no auth required)
@@ -32,5 +33,6 @@ router.post("/password/reset",  resetPassword);
 router.post("/logout",                    authenticate, logout);
 router.post("/logout-all",                authenticate, logoutAll);
 router.post("/password/change",           authenticate, changePassword);
+router.get("/validate-token",             authenticate, validateToken);
 
 module.exports = router;
