@@ -314,7 +314,7 @@ input:focus-visible {
   top: 12px;
   right: 12px;
   bottom: 12px;
-  width: 290px;
+  width: 320px;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -358,12 +358,17 @@ input:focus-visible {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* ADD this after .crmap-tabs.three-tabs */
+.crmap-tabs.four-tabs {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .crmap-tab {
-  padding: 12px 4px;
+  padding: 10px 0;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  font-size: 11px;
+  font-size: 9.5px;
   font-family: "DM Sans", sans-serif;
   font-weight: 600;
   color: var(--gray-600);
@@ -372,7 +377,7 @@ input:focus-visible {
     color 0.15s,
     background 0.15s;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.2px;
 }
 
 .crmap-tab:hover {
@@ -1203,6 +1208,8 @@ input:focus-visible {
   background: #e5e7eb;
 }
 
+
+
 .crmap-risk-info-tooltip {
   position: fixed;
   width: 260px;
@@ -1548,7 +1555,7 @@ input:focus-visible {
   }
 
   .crmap-sidebar {
-    width: 250px;
+    width: 270px;
   }
 }
 
@@ -1588,6 +1595,6 @@ input:focus-visible {
   }
 
   .crmap-sidebar {
-    width: 250px;
+    width: 270px;
   }
 }
