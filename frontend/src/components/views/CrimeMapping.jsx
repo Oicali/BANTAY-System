@@ -743,6 +743,7 @@ function CrimeMapping() {
     { key: "legend", label: "Legend" },
     { key: "recent", label: "Recent" },
     { key: "at_risk", label: heatmapMode ? "Clusters" : "At-Risk" },
+    { key: "officers", label: "Patrol" },
   ];
 
   return (
@@ -1045,7 +1046,16 @@ function CrimeMapping() {
               </div>
             )}
 
-          <div className="crmap-map-inner">
+          <div
+            className="crmap-map-inner"
+            onMouseLeave={() => {
+              // ADD THIS
+              setHoveredBarangay(null);
+              if (mapRef.current?.getCanvas()) {
+                mapRef.current.getCanvas().style.cursor = "";
+              }
+            }}
+          >
             <Map
               ref={mapRef}
               mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
@@ -1073,7 +1083,10 @@ function CrimeMapping() {
                   return;
                 }
 
-                if (!geoJSONData || !boundaries.length) return;
+                if (!geoJSONData || !boundaries.length) {
+                  setHoveredBarangay(null); // ADD THIS
+                  return;
+                }
 
                 const features = e.target.queryRenderedFeatures(e.point, {
                   layers: ["barangay-fill"],
@@ -1105,9 +1118,7 @@ function CrimeMapping() {
               }}
               onMouseLeave={() => {
                 setHoveredBarangay(null);
-                if (mapRef.current?.getCanvas()) {
-                  mapRef.current.getCanvas().style.cursor = "";
-                }
+                
               }}
             >
               {geoJSON && (
@@ -1238,7 +1249,6 @@ function CrimeMapping() {
               )}
 
               {showOfficers &&
-                zoom >= 13 &&
                 officers.map((officer) => (
                   <Marker
                     key={`officer-${officer.user_id}`}
@@ -1345,13 +1355,17 @@ function CrimeMapping() {
               >
                 <div className="crmap-officer-tooltip-name">
                   👮{" "}
-                  {hoveredOfficer.officer.full_name ||
-                    hoveredOfficer.officer.name ||
+                  {
+                    `${hoveredOfficer.officer.abbreviation ?? ""} ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
+                    hoveredOfficer.officer.username ||
                     "Officer"}
                 </div>
-                <div className="crmap-officer-tooltip-detail">
-                  {hoveredOfficer.officer.rank || "PNP"} · Online
-                </div>
+                {/* <div className="crmap-officer-tooltip-detail">
+                  {hoveredOfficer.officer.abbreviation ||
+                    hoveredOfficer.officer.role_name ||
+                    "PNP"}{" "}
+                  · Online
+                </div> */}
               </div>
             )}
 
@@ -1629,7 +1643,7 @@ function CrimeMapping() {
             className="crmap-sidebar-toggle"
             onClick={() => setSidebarOpen((o) => !o)}
             title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-            style={{ right: sidebarOpen ? "314px" : "14px" }}
+            style={{ right: sidebarOpen ? "344px" : "14px" }}
           >
             <span />
             <span />
@@ -1642,7 +1656,13 @@ function CrimeMapping() {
             }`}
           >
             <div
-              className={`crmap-tabs ${sidebarTabs.length === 2 ? "two-tabs" : "three-tabs"}`}
+              className={`crmap-tabs ${
+                sidebarTabs.length === 2
+                  ? "two-tabs"
+                  : sidebarTabs.length === 3
+                    ? "three-tabs"
+                    : "four-tabs"
+              }`}
             >
               {sidebarTabs.map((t) => (
                 <button
@@ -2060,6 +2080,149 @@ function CrimeMapping() {
                   )}
                 </div>
               )}
+
+              {activeTab === "officers" && (
+                <div className="crmap-panel-section">
+                  {officers.length === 0 ? (
+                    <div className="crmap-empty">
+                      No officers currently online.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      {officers.map((officer) => (
+                        <div
+                          key={officer.user_id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 10px",
+                            background: "rgba(29,78,216,0.04)",
+                            borderRadius: 6,
+                            border: "1px solid rgba(29,78,216,0.15)",
+                            borderLeft: "3px solid #1d4ed8",
+                            cursor: "pointer",
+                            transition: "background 0.15s",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background =
+                              "rgba(29,78,216,0.10)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background =
+                              "rgba(29,78,216,0.04)")
+                          }
+                          onClick={() => {
+                            mapRef.current?.flyTo({
+                              center: [
+                                parseFloat(officer.longitude),
+                                parseFloat(officer.latitude),
+                              ],
+                              zoom: 16,
+                              duration: 800,
+                            });
+                          }}
+                        >
+                          {/* Shield icon */}
+                          <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="#1d4ed8"
+                            stroke="#ffffff"
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <path d="M12 2L4 5v6c0 4.97 3.4 9.13 8 10 4.6-.87 8-5.03 8-10V5l-8-3z" />
+                            <path
+                              d="M9 12l2 2 4-4"
+                              stroke="#ffffff"
+                              strokeWidth="1.8"
+                              fill="none"
+                            />
+                          </svg>
+
+                          {/* Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#111",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {officer.abbreviation
+                                ? `${officer.abbreviation}. ${officer.full_name}`
+                                : officer.full_name || officer.username}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: "#6b7280",
+                                marginTop: 2,
+                              }}
+                            >
+                              {officer.role_name}
+                            </div>
+                          </div>
+
+                          {/* Online badge + seconds ago */}
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: 3,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                background: "rgba(34,197,94,0.12)",
+                                borderRadius: 10,
+                                padding: "2px 6px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  background: "#22c55e",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: "#16a34a",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ONLINE
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2139,8 +2302,7 @@ function CrimeMapping() {
                 </div>
                 <div className="crmap-risk-tooltip-body">
                   Each incident is a weighted point — overlapping points build
-                  intensity. DBSCAN rings
-                  mark dense cluster zones.
+                  intensity. DBSCAN rings mark dense cluster zones.
                 </div>
               </>
             )}

@@ -51,8 +51,11 @@ const getActiveOfficers = async (req, res) => {
          ol.user_id,
          u.first_name,
          u.last_name,
+         TRIM(u.first_name || ' ' || u.last_name) AS full_name,
          u.username,
          r.role_name,
+         pr.abbreviation,
+         pr.rank_name,
          ol.latitude,
          ol.longitude,
          ol.heading,
@@ -62,6 +65,7 @@ const getActiveOfficers = async (req, res) => {
        FROM officer_locations ol
        JOIN users u ON u.user_id = ol.user_id
        JOIN roles r ON r.role_id = u.role_id
+       LEFT JOIN pnp_ranks pr ON pr.rank_id = u.rank_id
        WHERE ol.is_on_duty = true
          AND ol.updated_at > NOW() - INTERVAL '30 seconds'
        ORDER BY ol.updated_at DESC`
