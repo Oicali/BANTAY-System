@@ -64,7 +64,6 @@ const AddPatrolModal = ({ mobileUnits, availablePatrollers, geoJSONData, onClose
       defaultStart = last.time_start || (activeShift === "AM" ? "08:00" : "20:00");
     }
   }
-
   setTasks((prev) => [
     ...prev,
     {
@@ -162,6 +161,36 @@ for (const task of tasks) {
     return;
   }
 }
+// ── Overlap check ──────────────────────────────────────────
+for (const shift of ["AM", "PM"]) {
+  const group = tasks
+    .filter((t) => t.shift === shift)
+    .sort((a, b) => {
+      const [ah, am] = a.time_start.split(":").map(Number);
+      const [bh, bm] = b.time_start.split(":").map(Number);
+      return (ah * 60 + am) - (bh * 60 + bm);
+    });
+  for (let i = 0; i < group.length - 1; i++) {
+    const cur  = group[i];
+    const next = group[i + 1];
+    const [eh, em] = cur.time_end.split(":").map(Number);
+    const [sh, sm] = next.time_start.split(":").map(Number);
+    if ((eh * 60 + em) > (sh * 60 + sm)) {
+      const fmt = (t) => {
+        const [h, m] = t.split(":").map(Number);
+        const period = h < 12 ? "AM" : "PM";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${String(h12).padStart(2,"0")}:${String(m).padStart(2,"0")} ${period}`;
+      };
+      setNotif({
+        message: `Task overlap on ${shift} shift: ${fmt(cur.time_start)}–${fmt(cur.time_end)} overlaps with ${fmt(next.time_start)}–${fmt(next.time_end)}.`,
+        type: "warning",
+      });
+      return;
+    }
+  }
+}
+
     setLoading(true);
     onSave({
       ...form,

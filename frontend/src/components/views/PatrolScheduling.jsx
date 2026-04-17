@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
-import AddPatrolModal from "../modals/AddPatrolModal";
+import AddPatrolModal from "../modals/Addpatrolmodal"
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 
@@ -119,7 +119,6 @@ const PatrolScheduling = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this patrol?")) return;
     try {
       const res  = await fetch(`${API_BASE}/patrol/patrols/${id}`, {
         method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
