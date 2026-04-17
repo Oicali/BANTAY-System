@@ -147,21 +147,21 @@ function CaseManagement() {
   };
 
   const fetchInvestigators = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/user-management/users?userType=police&role=Investigator&limit=100`,
-        {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        },
-      );
-      const data = await res.json();
-      if (data.users) {
-        setInvestigators(data.users.filter((u) => u.status === "active"));
-      }
-    } catch (err) {
-      console.error(err);
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/user-management/users?userType=police&role=Investigator&limit=100`,
+      {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      },
+    );
+    const data = await res.json();
+    if (data.users) {
+      setInvestigators(data.users.filter((u) => u.status === "verified")); // ← changed from "active" to "verified"
     }
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const fetchCaseDetail = async (caseId) => {
     try {
