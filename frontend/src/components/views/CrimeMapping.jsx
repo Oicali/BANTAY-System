@@ -129,12 +129,11 @@ const CLUSTER_CIRCLE_LAYER = {
   },
 };
 
-const getRiskThresholds = (dateFrom, dateTo) => {
+const getIncidenceThresholds = (dateFrom, dateTo) => {
   const days =
     Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
 
   if (days <= 29)
-    // ≤7 days AND 8–29 days both use 7-day thresholds
     return {
       low: { min: 1, max: 1 },
       medium: { min: 2, max: 2 },
@@ -142,25 +141,22 @@ const getRiskThresholds = (dateFrom, dateTo) => {
       days,
     };
   if (days <= 91)
-    // 30–91 days → 30-day thresholds
     return {
-      low: { min: 1, max: 2 },
-      medium: { min: 3, max: 4 },
-      high: { min: 5 },
+      low: { min: 1, max: 1 },
+      medium: { min: 2, max: 3 },
+      high: { min: 4 },
       days,
     };
   if (days <= 364)
-    // 92–364 days → 3-month thresholds
     return {
-      low: { min: 1, max: 3 },
-      medium: { min: 4, max: 6 },
-      high: { min: 7 },
+      low: { min: 1, max: 2 },
+      medium: { min: 3, max: 5 },
+      high: { min: 6 },
       days,
     };
-  // 365+ days → 1-year thresholds
   return {
-    low: { min: 1, max: 4 },
-    medium: { min: 5, max: 8 },
+    low: { min: 1, max: 3 },
+    medium: { min: 4, max: 8 },
     high: { min: 9 },
     days,
   };
@@ -247,7 +243,7 @@ function CrimeMapping() {
   const [showMapOptions, setShowMapOptions] = useState(false);
   const [showPins, setShowPins] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
-  const [riskTooltip, setRiskTooltip] = useState({
+  const [incidenceTooltip, setIncidenceTooltip] = useState({
     visible: false,
     top: 0,
     left: 0,
@@ -255,7 +251,17 @@ function CrimeMapping() {
   });
 
   const mapRef = useRef(null);
-  const tooltipHideTimerRef = useRef(null);
+  const incidenceTooltipTimerRef = useRef(null);
+
+  // Helper to avoid repetition — define once above your return()
+  const LegendPin = ({ color }) => (
+    <div className="crmap-legend-pin-wrap">
+      <div className="crmap-legend-pin-body" style={{ background: color }}>
+        <div className="crmap-legend-pin-inner" />
+      </div>
+      <div className="crmap-legend-pin-tip" style={{ borderTopColor: color }} />
+    </div>
+  );
 
   const totalBarangays = geoJSONData
     ? new Set(geoJSONData.features.map((f) => f.properties.name_db)).size
@@ -294,19 +300,19 @@ function CrimeMapping() {
     });
   };
 
-  const closeRiskTooltip = useCallback(() => {
-    if (tooltipHideTimerRef.current) {
-      clearTimeout(tooltipHideTimerRef.current);
+  const closeIncidenceTooltip = useCallback(() => {
+    if (incidenceTooltipTimerRef.current) {
+      clearTimeout(incidenceTooltipTimerRef.current);
     }
-    tooltipHideTimerRef.current = setTimeout(() => {
-      setRiskTooltip((prev) => ({ ...prev, visible: false }));
+    incidenceTooltipTimerRef.current = setTimeout(() => {
+      setIncidenceTooltip((prev) => ({ ...prev, visible: false }));
     }, 150);
   }, []);
 
-  const openRiskTooltip = useCallback((e, type) => {
-    if (tooltipHideTimerRef.current) {
-      clearTimeout(tooltipHideTimerRef.current);
-      tooltipHideTimerRef.current = null;
+  const openIncidenceTooltip = useCallback((e, type) => {
+    if (incidenceTooltipTimerRef.current) {
+      clearTimeout(incidenceTooltipTimerRef.current);
+      incidenceTooltipTimerRef.current = null;
     }
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -324,7 +330,7 @@ function CrimeMapping() {
       window.innerHeight - estimatedHeight - viewportPadding,
     );
 
-    setRiskTooltip({
+    setIncidenceTooltip({
       visible: true,
       top,
       left,
@@ -737,12 +743,11 @@ function CrimeMapping() {
 
   const topCrime = stats?.by_incident_type?.[0];
   const clusterCount = clusterGeoJSON?.features?.length ?? 0;
-  const atRiskCount = stats?.at_risk_count ?? 0;
 
   const sidebarTabs = [
     { key: "legend", label: "Legend" },
     { key: "recent", label: "Recent" },
-    { key: "at_risk", label: heatmapMode ? "Clusters" : "At-Risk" },
+    { key: "at_risk", label: heatmapMode ? "Clusters" : "Incidence" },
     { key: "officers", label: "Patrol" },
   ];
 
@@ -760,15 +765,13 @@ function CrimeMapping() {
 
         <div className="crmap-stat-pills">
           {[
-            { val: stats?.total_pins ?? "—", lbl: "Total Pins", red: false },
+            { val: stats?.total_pins ?? "—", lbl: "Total Pins" },
             heatmapMode
-              ? { val: clusterCount, lbl: "Hotspot Clusters", red: true }
-              : { val: atRiskCount, lbl: "At-Risk Barangays", red: true },
-            {
-              val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
-              lbl: "Brgy. Affected",
-              red: false,
-            },
+              ? { val: clusterCount, lbl: "Clusters Found" }
+              : {
+                  val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
+                  lbl: "Brgy. Affected",
+                },
             {
               val: (() => {
                 const days =
@@ -780,13 +783,9 @@ function CrimeMapping() {
                 return `${days}`;
               })(),
               lbl: "Days",
-              red: false,
             },
           ].map((s) => (
-            <div
-              key={s.lbl}
-              className={`crmap-pill ${s.red ? "crmap-pill-red" : ""}`}
-            >
+            <div key={s.lbl} className="crmap-pill">
               <span className="crmap-pill-val">{s.val}</span>
               <span className="crmap-pill-lbl">{s.lbl}</span>
             </div>
@@ -1118,7 +1117,6 @@ function CrimeMapping() {
               }}
               onMouseLeave={() => {
                 setHoveredBarangay(null);
-                
               }}
             >
               {geoJSON && (
@@ -1155,15 +1153,26 @@ function CrimeMapping() {
                       setSelectedPin(pin);
                     }}
                   >
-                    <div
-                      className="crmap-pin"
-                      style={{
-                        background:
-                          INCIDENT_COLORS[pin.incident_type?.toUpperCase()] ||
-                          "#6b7280",
-                      }}
-                      title={pin.incident_type}
-                    />
+                    <div className="crmap-pin-wrap" title={pin.incident_type}>
+                      <div
+                        className="crmap-pin-body"
+                        style={{
+                          background:
+                            INCIDENT_COLORS[pin.incident_type?.toUpperCase()] ||
+                            "#6b7280",
+                        }}
+                      >
+                        <div className="crmap-pin-inner" />
+                      </div>
+                      <div
+                        className="crmap-pin-tip"
+                        style={{
+                          borderTopColor:
+                            INCIDENT_COLORS[pin.incident_type?.toUpperCase()] ||
+                            "#6b7280",
+                        }}
+                      />
+                    </div>
                   </Marker>
                 ))}
 
@@ -1355,8 +1364,7 @@ function CrimeMapping() {
               >
                 <div className="crmap-officer-tooltip-name">
                   👮{" "}
-                  {
-                    `${hoveredOfficer.officer.abbreviation ?? ""} ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
+                  {`${hoveredOfficer.officer.abbreviation ?? ""} ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
                     hoveredOfficer.officer.username ||
                     "Officer"}
                 </div>
@@ -1385,7 +1393,7 @@ function CrimeMapping() {
                     ? "No recorded incidents"
                     : `${hoveredBarangay.count} incident${
                         hoveredBarangay.count > 1 ? "s" : ""
-                      } · ${hoveredBarangay.risk} Risk`}
+                      } · ${hoveredBarangay.risk}`}
                 </div>
               </div>
             )}
@@ -1686,10 +1694,10 @@ function CrimeMapping() {
                         </div>
                         <button
                           type="button"
-                          className="crmap-risk-info-icon"
+                          className="crmap-incidence-info-icon"
                           aria-label="Show density scale info"
-                          onMouseEnter={(e) => openRiskTooltip(e, "heatmap")}
-                          onMouseLeave={closeRiskTooltip}
+                          onMouseEnter={(e) => openIncidenceTooltip(e, "heatmap")}
+                          onMouseLeave={closeIncidenceTooltip}
                         >
                           i
                         </button>
@@ -1729,15 +1737,7 @@ function CrimeMapping() {
                                 gap: 6,
                               }}
                             >
-                              <div
-                                style={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: "50%",
-                                  background: color,
-                                  flexShrink: 0,
-                                }}
-                              />
+                              <LegendPin color={color} />
                               <span className="crmap-severity-crime">
                                 {name}
                               </span>
@@ -1753,21 +1753,21 @@ function CrimeMapping() {
                     <div className="crmap-heat-sidebar-legend">
                       <div className="crmap-sidebar-title-row">
                         <div className="crmap-heat-sidebar-title">
-                          Barangay Risk Scale
+                          Barangay Crime Incidence
                         </div>
                         <button
                           type="button"
-                          className="crmap-risk-info-icon"
-                          aria-label="Show barangay risk scale info"
-                          onMouseEnter={(e) => openRiskTooltip(e, "choropleth")}
-                          onMouseLeave={closeRiskTooltip}
+                          className="crmap-incidence-info-icon"
+                          aria-label="Show Barangay Crime Incidence info"
+                          onMouseEnter={(e) => openIncidenceTooltip(e, "choropleth")}
+                          onMouseLeave={closeIncidenceTooltip}
                         >
                           i
                         </button>
                       </div>
 
                       {(() => {
-                        const t = getRiskThresholds(
+                         const t = getIncidenceThresholds(
                           appliedFilters.date_from,
                           appliedFilters.date_to,
                         );
@@ -1776,7 +1776,7 @@ function CrimeMapping() {
                           { color: "#adb5bd", label: "No crimes", range: "0" },
                           {
                             color: "#eab308",
-                            label: "Low risk",
+                            label: "Low Incidence",
                             range:
                               t.low.min === t.low.max
                                 ? `${t.low.min}`
@@ -1784,7 +1784,7 @@ function CrimeMapping() {
                           },
                           {
                             color: "#f97316",
-                            label: "Medium risk",
+                            label: "Moderate Incidence",
                             range:
                               t.medium.min === t.medium.max
                                 ? `${t.medium.min}`
@@ -1792,7 +1792,7 @@ function CrimeMapping() {
                           },
                           {
                             color: "#b91c1c",
-                            label: "High risk",
+                            label: "High Incidence",
                             range: `${t.high.min}+`,
                           },
                         ];
@@ -1859,10 +1859,7 @@ function CrimeMapping() {
                             <div className="crmap-legend-row" key={name}>
                               <div className="crmap-legend-top">
                                 <div className="crmap-legend-left">
-                                  <div
-                                    className="crmap-legend-dot"
-                                    style={{ background: color }}
-                                  />
+                                  <LegendPin color={color} />
                                   <span className="crmap-legend-name">
                                     {name}
                                   </span>
@@ -2033,51 +2030,56 @@ function CrimeMapping() {
                         No clusters detected for this filter.
                       </div>
                     )
-                  ) : // choropleth at-risk list stays exactly as it was
-                  stats?.at_risk_barangays?.length > 0 ? (
-                    stats.at_risk_barangays.map((h, i) => (
-                      <div className="crmap-hotspot-row" key={h.barangay}>
-                        <div className="crmap-hotspot-rank">#{i + 1}</div>
-                        <div className="crmap-hotspot-info">
-                          <div className="crmap-hotspot-name">{h.barangay}</div>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              marginBottom: 4,
-                              color:
-                                h.risk === "High"
-                                  ? "#b91c1c"
-                                  : h.risk === "Medium"
-                                    ? "#f97316"
-                                    : "#eab308",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {h.risk} Risk
+                  ) : (() => {
+                    const incidenceList = boundaries
+                      .filter((b) => b.crime_count >= 1)
+                      .sort((a, b) => b.crime_count - a.crime_count);
+                    const maxCount = incidenceList[0]?.crime_count ?? 1;
+
+                    return incidenceList.length > 0 ? (
+                      incidenceList.map((h, i) => {
+                        const barColor =
+                          h.risk === "High Incidence"
+                            ? "#b91c1c"
+                            : h.risk === "Moderate Incidence"
+                              ? "#f97316"
+                              : "#eab308";
+
+                        return (
+                          <div className="crmap-hotspot-row" key={h.name_db}>
+                            <div className="crmap-hotspot-rank">#{i + 1}</div>
+                            <div className="crmap-hotspot-info">
+                              <div className="crmap-hotspot-name">{h.name_db}</div>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  marginBottom: 4,
+                                  color: barColor,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {h.risk}
+                              </div>
+                              <div className="crmap-hotspot-bar-bg">
+                                <div
+                                  className="crmap-hotspot-bar-fill"
+                                  style={{
+                                    width: `${Math.min(100, (h.crime_count / maxCount) * 100)}%`,
+                                    background: barColor,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="crmap-hotspot-count">{h.crime_count}</div>
                           </div>
-                          <div className="crmap-hotspot-bar-bg">
-                            <div
-                              className="crmap-hotspot-bar-fill"
-                              style={{
-                                width: `${Math.min(100, (h.count / stats.at_risk_barangays[0].count) * 100)}%`,
-                                background:
-                                  h.risk === "High"
-                                    ? "#b91c1c"
-                                    : h.risk === "Medium"
-                                      ? "#f97316"
-                                      : "#eab308",
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="crmap-hotspot-count">{h.count}</div>
+                        );
+                      })
+                    ) : (
+                      <div className="crmap-empty">
+                        No barangays with recorded incidents for this period.
                       </div>
-                    ))
-                  ) : (
-                    <div className="crmap-empty">
-                      No at-risk barangays detected based on timeframe.
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2228,42 +2230,42 @@ function CrimeMapping() {
         </div>
       </div>
 
-      {riskTooltip.visible &&
+      {incidenceTooltip.visible &&
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="crmap-risk-info-tooltip crmap-risk-info-tooltip--portal"
+            className="crmap-incidence-info-tooltip crmap-incidence-info-tooltip--portal"
             style={{
-              top: riskTooltip.top,
-              left: riskTooltip.left,
+              top: incidenceTooltip.top,
+              left: incidenceTooltip.left,
               opacity: 1,
               transform: "translateY(0)",
               pointerEvents: "auto",
             }}
-            onMouseEnter={() => {
-              if (tooltipHideTimerRef.current) {
-                clearTimeout(tooltipHideTimerRef.current);
-                tooltipHideTimerRef.current = null;
+onMouseEnter={() => {
+              if (incidenceTooltipTimerRef.current) {
+                clearTimeout(incidenceTooltipTimerRef.current);
+                incidenceTooltipTimerRef.current = null;
               }
             }}
-            onMouseLeave={closeRiskTooltip}
-          >
-            {riskTooltip.type === "choropleth" ? (
+            onMouseLeave={closeIncidenceTooltip}          >
+            {incidenceTooltip.type === "choropleth" ? (
               <>
-                <div className="crmap-risk-tooltip-title">
+                <div className="crmap-incidence-tooltip-title">
                   Thresholds change by date range
                 </div>
-                <div className="crmap-risk-tooltip-body">
-                  These are your updated fixed windows for barangay risk
-                  scoring.
+                <div className="crmap-incidence-tooltip-body">
+                  Thresholds are calibrated from Bacoor City's actual crime
+                  baseline averaging 180–200 incidents annually across 47
+                  barangays.
                 </div>
 
-                <table className="crmap-risk-tooltip-table">
+                <table className="crmap-incidence-tooltip-table">
                   <thead>
                     <tr>
                       <th>Window</th>
                       <th>Low</th>
-                      <th>Medium</th>
+                      <th>Moderate</th>
                       <th>High</th>
                     </tr>
                   </thead>
@@ -2276,20 +2278,20 @@ function CrimeMapping() {
                     </tr>
                     <tr>
                       <td>30–91 days</td>
-                      <td>1–2</td>
-                      <td>3–4</td>
-                      <td>5+</td>
+                      <td>1</td>
+                      <td>2–3</td>
+                      <td>4+</td>
                     </tr>
                     <tr>
                       <td>92–364 days</td>
-                      <td>1–3</td>
-                      <td>4–6</td>
-                      <td>7+</td>
+                      <td>1–2</td>
+                      <td>3–5</td>
+                      <td>6+</td>
                     </tr>
                     <tr>
                       <td>365+ days</td>
-                      <td>1–4</td>
-                      <td>5–8</td>
+                      <td>1–3</td>
+                      <td>4–8</td>
                       <td>9+</td>
                     </tr>
                   </tbody>
@@ -2297,17 +2299,17 @@ function CrimeMapping() {
               </>
             ) : (
               <>
-                <div className="crmap-risk-tooltip-title">
+                <div className="crmap-incidence-tooltip-title">
                   How the heatmap works
                 </div>
-                <div className="crmap-risk-tooltip-body">
+                <div className="crmap-incidence-tooltip-body">
                   Each incident is a weighted point — overlapping points build
                   intensity. DBSCAN rings mark dense cluster zones.
                 </div>
               </>
             )}
           </div>,
-          document.body,
+          document.fullscreenElement ?? document.body,
         )}
     </div>
   );
