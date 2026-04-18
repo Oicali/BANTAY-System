@@ -911,7 +911,258 @@
   font-family: inherit;
 }
 .apd-btn-confirm:hover { background: #0a1628; }
+/*changessa patroller
 
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS
+   Append these rules to your existing PatrolModal.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel (shared by apm/epm/bc) ── */
+
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+/* reuse existing .apm-shift-active / .epm-shift-active / .bc-shift-active for the active state */
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Badge on shift tab showing assigned count ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked layout in checklist ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row that belongs to other shift — dimmed + amber indicator ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── BeatCard shift badge ── */
+.bc-shift-tabs-top {
+  padding: 8px 14px 0;
+}
+
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS (append to PatrolModal.css)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel ── */
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Count badge on shift tab ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked (name + other-shift label) ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row assigned to other shift — dimmed + amber ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── Dirty date indicator dot on date tabs ── */
+.epm-date-dirty,
+.bc-date-dirty {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE
