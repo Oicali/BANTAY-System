@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
-import AddPatrolModal from "../modals/Addpatrolmodal";
+import AddPatrolModal from "../modals/AddPatrolModal";
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 
