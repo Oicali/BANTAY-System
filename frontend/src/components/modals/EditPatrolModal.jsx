@@ -443,19 +443,29 @@ setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.of
       }
       await Promise.all(patchRequests);
 
-      // 3. Save patrollers — ONLY for dates the user actually touched
-      //    Each dirty date gets its own PATCH with only that date's patroller state
-      const dirtyDatesList = [...dirtyDates];
-      const patrollerResults = await Promise.all(
-        dirtyDatesList.map((date) => {
-          const dp = patrollersByDate[date] || { am: [], pm: [] };
-          return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
-            method:  "PATCH",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-            body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
-          }).then((r) => r.json());
-        })
-      );
+      // 3. Save patrollers for all selected dates using active date's state
+//    If patrollers were changed (dirtyDates has activeDate), apply to ALL selectedDates
+//    If patrollers were NOT changed, only save the individually dirty dates
+const patrollerDatestoSave = dirtyDates.has(activeDate)
+  ? [...new Set([...selectedDates, ...dirtyDates])]  // selectedDates + any other dirty dates
+  : [...dirtyDates];                                  // only individually toggled dates
+
+const activeDatePatrollerState = patrollersByDate[activeDate] || { am: [], pm: [] };
+
+const patrollerResults = await Promise.all(
+  patrollerDatestoSave.map((date) => {
+    // For dates in selectedDates, use active date's patroller state (apply-all behavior)
+    // For other dirty dates, use that date's own patroller state
+    const dp = selectedDates.includes(date)
+      ? activeDatePatrollerState
+      : (patrollersByDate[date] || { am: [], pm: [] });
+    return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
+    }).then((r) => r.json());
+  })
+);
 
       // If any conflict was returned, show it and stop
       const conflict = patrollerResults.find((r) => !r.success);
