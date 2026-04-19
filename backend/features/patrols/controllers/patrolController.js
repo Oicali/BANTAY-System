@@ -3,7 +3,7 @@ const pool = require("../../../config/database");
 // ── Helper: generate date range ────────────────────────────
 const getDateRange = (start_date, end_date) => {
   const dates = [];
-  const cur   = new Date(start_date + "T12:00:00"); // noon to avoid timezone issues
+  const cur   = new Date(start_date + "T12:00:00");
   const last  = new Date(end_date   + "T12:00:00");
   while (cur <= last) {
     dates.push(cur.toISOString().split("T")[0]);
@@ -22,17 +22,15 @@ const getPatrolStats = async (req, res) => {
       FROM patrol_assignment
       WHERE start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
     `);
-    const mobileUnits = await pool.query(`SELECT COUNT(*) AS mobile_units FROM mobile_unit`);
-   const totalOfficers = await pool.query(`
-  SELECT COUNT(*) AS total_officers FROM active_patroller
-`);
-const unassigned = await pool.query(`
-  SELECT COUNT(*) AS unassigned_patrollers
-  FROM active_patroller ap
-  WHERE ap.active_patroller_id NOT IN (
-    SELECT pap.active_patroller_id FROM patrol_assignment_patroller pap
-  )
-`);
+    const mobileUnits   = await pool.query(`SELECT COUNT(*) AS mobile_units FROM mobile_unit`);
+    const totalOfficers = await pool.query(`SELECT COUNT(*) AS total_officers FROM active_patroller`);
+    const unassigned    = await pool.query(`
+      SELECT COUNT(*) AS unassigned_patrollers
+      FROM active_patroller ap
+      WHERE ap.active_patroller_id NOT IN (
+        SELECT pap.active_patroller_id FROM patrol_assignment_patroller pap
+      )
+    `);
     res.json({
       success: true,
       data: {
@@ -78,20 +76,54 @@ const getActivePatrollers = async (req, res) => {
 // GET /patrol/available-patrollers
 // ─────────────────────────────────────────────
 const getAvailablePatrollers = async (req, res) => {
+  const { start, end, exclude_patrol_id } = req.query;
   try {
-    const result = await pool.query(`
-      SELECT
-        ap.active_patroller_id,
-        ap.officer_id,
-        TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-        u.phone AS contact_number
-      FROM active_patroller ap
-      JOIN users u ON ap.officer_id = u.user_id
-      WHERE ap.active_patroller_id NOT IN (
-        SELECT pap.active_patroller_id FROM patrol_assignment_patroller pap
-      )
-      ORDER BY officer_name ASC
-    `);
+    let result;
+    if (start && end) {
+      if (exclude_patrol_id) {
+  result = await pool.query(`
+    SELECT ap.active_patroller_id, ap.officer_id,
+      TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+      u.phone AS contact_number
+    FROM active_patroller ap
+    JOIN users u ON ap.officer_id = u.user_id
+    WHERE ap.active_patroller_id NOT IN (
+      SELECT DISTINCT pap.active_patroller_id
+      FROM patrol_assignment_patroller pap
+      JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+      WHERE pa.start_date <= $2
+        AND pa.end_date   >= $1
+        AND pa.patrol_id  != $3
+    )
+    ORDER BY officer_name ASC
+  `, [start, end, parseInt(exclude_patrol_id)]);
+} else {
+  result = await pool.query(`
+    SELECT ap.active_patroller_id, ap.officer_id,
+      TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+      u.phone AS contact_number
+    FROM active_patroller ap
+    JOIN users u ON ap.officer_id = u.user_id
+    WHERE ap.active_patroller_id NOT IN (
+      SELECT DISTINCT pap.active_patroller_id
+      FROM patrol_assignment_patroller pap
+      JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+      WHERE pa.start_date <= $2
+        AND pa.end_date   >= $1
+    )
+    ORDER BY officer_name ASC
+  `, [start, end]);
+}
+    } else {
+      result = await pool.query(`
+        SELECT ap.active_patroller_id, ap.officer_id,
+          TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+          u.phone AS contact_number
+        FROM active_patroller ap
+        JOIN users u ON ap.officer_id = u.user_id
+        ORDER BY officer_name ASC
+      `);
+    }
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error("Available patrollers error:", error);
@@ -182,6 +214,16 @@ const deleteMobileUnit = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // GET /patrol/patrols
+//
+// patrollers array has TWO parts:
+//   1. "summary" rows — DISTINCT per patroller+shift, no route_date.
+//      Used by PatrolScheduling table (no duplicates).
+//   2. "detail" rows  — one per patroller+shift+date.
+//      Used by EditPatrolModal and BeatCard to show per-date assignments.
+//
+// We return BOTH in one response to avoid a second API call:
+//   patrollers        → deduplicated list for the table column
+//   patrollers_detail → full per-date list for modals
 // ─────────────────────────────────────────────
 const getPatrols = async (req, res) => {
   try {
@@ -194,19 +236,50 @@ const getPatrols = async (req, res) => {
         pa.mobile_unit_id,
         mu.mobile_unit_name,
         mu.plate_number,
+
+        -- DEDUPLICATED list: one entry per unique patroller+shift pair
+        -- Used by the patrol table "Assigned Patrollers" column
+        (
+          SELECT COALESCE(JSON_AGG(
+    JSON_BUILD_OBJECT(
+      'active_patroller_id', sub.active_patroller_id,
+      'officer_name', sub.officer_name,
+      'contact_number', sub.contact_number,
+      'shift', sub.shift
+    )
+  ), '[]')
+  FROM (
+    SELECT DISTINCT ON (pap.active_patroller_id, pap.shift)
+      pap.active_patroller_id,
+      pap.shift,
+      TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+      u.phone AS contact_number
+    FROM patrol_assignment_patroller pap
+    JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
+    JOIN users u ON ap.officer_id = u.user_id
+    WHERE pap.patrol_id = pa.patrol_id
+    ORDER BY pap.active_patroller_id, pap.shift
+  ) sub
+) AS patrollers,
+
+        -- FULL detail list: one entry per patroller+shift+date
+        -- Used by EditPatrolModal and BeatCard for per-date display
         (
           SELECT COALESCE(JSON_AGG(
             JSON_BUILD_OBJECT(
               'active_patroller_id', ap.active_patroller_id,
               'officer_name', TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)),
-              'contact_number', u.phone
-            )
+              'contact_number', u.phone,
+              'shift', pap.shift,
+              'route_date', pap.route_date
+            ) ORDER BY pap.route_date, pap.shift, u.last_name
           ), '[]')
           FROM patrol_assignment_patroller pap
           JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
           JOIN users u ON ap.officer_id = u.user_id
           WHERE pap.patrol_id = pa.patrol_id
-        ) AS patrollers,
+        ) AS patrollers_detail,
+
         (
           SELECT COALESCE(JSON_AGG(
             JSON_BUILD_OBJECT(
@@ -223,6 +296,7 @@ const getPatrols = async (req, res) => {
           FROM patrol_assignment_route par
           WHERE par.patrol_id = pa.patrol_id
         ) AS routes
+
       FROM patrol_assignment pa
       JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
       ORDER BY pa.start_date DESC, pa.patrol_id DESC
@@ -235,10 +309,43 @@ const getPatrols = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
+
+const checkPatrollerConflicts = async (client, patroller_ids, start_date, end_date, exclude_patrol_id = null) => {
+  if (!patroller_ids || patroller_ids.length === 0) return [];
+  
+  const excludeClause = exclude_patrol_id 
+    ? `AND pa.patrol_id != ${exclude_patrol_id}` 
+    : "";
+
+  const result = await client.query(`
+    SELECT 
+      pap.active_patroller_id,
+      TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+      pa.patrol_name,
+      pa.start_date,
+      pa.end_date
+    FROM patrol_assignment_patroller pap
+    JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+    JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
+    JOIN users u ON ap.officer_id = u.user_id
+    WHERE pap.active_patroller_id = ANY($1::int[])
+      AND pa.start_date <= $2
+      AND pa.end_date   >= $3
+      ${excludeClause}
+    LIMIT 1
+  `, [patroller_ids, end_date, start_date]);
+
+  return result.rows;
+};
+
 // POST /patrol/patrols
+// AM/PM patrollers inserted for ALL dates in range
 // ─────────────────────────────────────────────
 const createPatrol = async (req, res) => {
-  const { patrol_name, mobile_unit_id, start_date, end_date, patroller_ids, barangays, routes } = req.body;
+  const {
+    patrol_name, mobile_unit_id, start_date, end_date,
+    patroller_ids_am, patroller_ids_pm, barangays, routes,
+  } = req.body;
   const created_by = req.user?.user_id || null;
 
   if (!patrol_name || !mobile_unit_id || !start_date || !end_date) {
@@ -247,40 +354,68 @@ const createPatrol = async (req, res) => {
 
   const client = await pool.connect();
   try {
+    // ── Conflict check BEFORE transaction ──────────────────────
+    const allIds = [...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])])];
+    const conflicts = await checkPatrollerConflicts(client, allIds, start_date, end_date);
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+      return res.status(400).json({
+        success: false,
+        message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
+      });
+    }
+    // ──────────────────────────────────────────────────────────
+
     await client.query("BEGIN");
 
-    // 1. Insert patrol
     const patrolResult = await client.query(
       `INSERT INTO patrol_assignment (patrol_name, mobile_unit_id, start_date, end_date, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING patrol_id`,
       [patrol_name, mobile_unit_id, start_date, end_date, created_by]
     );
     const patrol_id = patrolResult.rows[0].patrol_id;
+    const dates     = getDateRange(start_date, end_date);
 
-    // 2. Assign patrollers
-    if (patroller_ids?.length > 0) {
-      for (const active_patroller_id of patroller_ids) {
-        await client.query(
-          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id) VALUES ($1, $2)`,
-          [patrol_id, active_patroller_id]
-        );
+    // Insert AM patrollers for every date in range
+    if (patroller_ids_am?.length > 0) {
+      for (const date of dates) {
+        for (const active_patroller_id of patroller_ids_am) {
+          await client.query(
+            `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+             VALUES ($1, $2, 'AM', $3)`,
+            [patrol_id, active_patroller_id, date]
+          );
+        }
       }
     }
 
-    // 3. Insert barangay highlights (one row per barangay, only for start_date, stop_order = 0)
+    // Insert PM patrollers for every date in range
+    if (patroller_ids_pm?.length > 0) {
+      for (const date of dates) {
+        for (const active_patroller_id of patroller_ids_pm) {
+          await client.query(
+            `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+             VALUES ($1, $2, 'PM', $3)`,
+            [patrol_id, active_patroller_id, date]
+          );
+        }
+      }
+    }
+
+    // Barangay highlights
     if (barangays?.length > 0) {
       for (let i = 0; i < barangays.length; i++) {
         await client.query(
           `INSERT INTO patrol_assignment_route (patrol_id, route_date, barangay, shift, stop_order)
            VALUES ($1, $2, $3, 'AM', $4)`,
-          [patrol_id, start_date, barangays[i], -(i + 1)] // negative stop_order for barangays to avoid conflicts
+          [patrol_id, start_date, barangays[i], -(i + 1)]
         );
       }
     }
 
-    // 4. Insert timetable tasks — duplicate across all dates
+    // Timetable tasks duplicated across all dates
     if (routes?.length > 0) {
-      const dates = getDateRange(start_date, end_date);
       for (const date of dates) {
         for (let i = 0; i < routes.length; i++) {
           const task = routes[i];
@@ -299,9 +434,6 @@ const createPatrol = async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Create patrol error:", error);
-    if (error.code === "23505" && error.constraint?.includes("patroller")) {
-      return res.status(400).json({ success: false, message: "This patroller is already assigned to another patrol." });
-    }
     res.status(500).json({ success: false, message: "Server error: " + error.message });
   } finally {
     client.release();
@@ -310,12 +442,12 @@ const createPatrol = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // PUT /patrol/patrols/:id
-// Only updates basic info + patrollers
-// Tasks are auto-saved separately via PATCH
+// Updates basic info + barangays only.
+// Patrollers per date are managed via PATCH /patrollers/:date
 // ─────────────────────────────────────────────
 const updatePatrol = async (req, res) => {
   const { id } = req.params;
-  const { patrol_name, mobile_unit_id, start_date, end_date, patroller_ids, barangays } = req.body;
+  const { patrol_name, mobile_unit_id, start_date, end_date, barangays } = req.body;
 
   if (!patrol_name || !mobile_unit_id || !start_date || !end_date) {
     return res.status(400).json({ success: false, message: "All required fields must be filled." });
@@ -325,7 +457,6 @@ const updatePatrol = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // 1. Update patrol info
     await client.query(
       `UPDATE patrol_assignment
        SET patrol_name=$1, mobile_unit_id=$2, start_date=$3, end_date=$4, updated_at=CURRENT_TIMESTAMP
@@ -333,18 +464,6 @@ const updatePatrol = async (req, res) => {
       [patrol_name, mobile_unit_id, start_date, end_date, id]
     );
 
-    // 2. Replace patrollers only
-    await client.query(`DELETE FROM patrol_assignment_patroller WHERE patrol_id=$1`, [id]);
-    if (patroller_ids?.length > 0) {
-      for (const active_patroller_id of patroller_ids) {
-        await client.query(
-          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id) VALUES ($1, $2)`,
-          [id, active_patroller_id]
-        );
-      }
-    }
-
-    // 3. Replace barangay highlights only (stop_order < 0)
     if (barangays !== undefined) {
       await client.query(`DELETE FROM patrol_assignment_route WHERE patrol_id=$1 AND stop_order <= 0`, [id]);
       if (barangays?.length > 0) {
@@ -358,16 +477,76 @@ const updatePatrol = async (req, res) => {
       }
     }
 
-    // NOTE: Tasks (stop_order > 0) are NOT touched here — they are auto-saved via PATCH /routes/:id/task
-
     await client.query("COMMIT");
     res.json({ success: true, message: "Patrol updated successfully." });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Update patrol error:", error);
-    if (error.code === "23505" && error.constraint?.includes("patroller")) {
-      return res.status(400).json({ success: false, message: "This patroller is already assigned to another patrol." });
+    res.status(500).json({ success: false, message: "Server error: " + error.message });
+  } finally {
+    client.release();
+  }
+};
+
+// ─────────────────────────────────────────────
+// PATCH /patrol/patrols/:id/patrollers/:date
+// Replace patrollers for ONE specific date only.
+// Body: { patroller_ids_am: [], patroller_ids_pm: [] }
+// ─────────────────────────────────────────────
+const updatePatrollersForDate = async (req, res) => {
+  const { id, date } = req.params;
+  const { patroller_ids_am, patroller_ids_pm } = req.body;
+
+  const client = await pool.connect();
+  try {
+    // ── Conflict check — exclude current patrol ─────────────────
+    const allIds = [...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])])];
+    const conflicts = await checkPatrollerConflicts(client, allIds, date, date, parseInt(id));
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+      client.release();
+      return res.status(400).json({
+        success: false,
+        message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) on this date.`,
+      });
     }
+    // ──────────────────────────────────────────────────────────
+
+    await client.query("BEGIN");
+    // ... rest of updatePatrollersForDate unchanged
+
+    // Delete ONLY this patrol + this specific date — other dates untouched
+    await client.query(
+      `DELETE FROM patrol_assignment_patroller WHERE patrol_id=$1 AND route_date=$2`,
+      [id, date]
+    );
+
+    if (patroller_ids_am?.length > 0) {
+      for (const active_patroller_id of patroller_ids_am) {
+        await client.query(
+          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+           VALUES ($1, $2, 'AM', $3)`,
+          [id, active_patroller_id, date]
+        );
+      }
+    }
+
+    if (patroller_ids_pm?.length > 0) {
+      for (const active_patroller_id of patroller_ids_pm) {
+        await client.query(
+          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+           VALUES ($1, $2, 'PM', $3)`,
+          [id, active_patroller_id, date]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    res.json({ success: true, message: "Patrollers updated for date." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Update patrollers for date error:", error);
     res.status(500).json({ success: false, message: "Server error: " + error.message });
   } finally {
     client.release();
@@ -404,7 +583,6 @@ const updateRouteNotes = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // PATCH /patrol/routes/:routeId/task
-// Auto-save full task row (time + notes)
 // ─────────────────────────────────────────────
 const updateRouteTask = async (req, res) => {
   const { routeId } = req.params;
@@ -422,7 +600,6 @@ const updateRouteTask = async (req, res) => {
 
 // ─────────────────────────────────────────────
 // POST /patrol/routes/add
-// Add a new task row to an existing patrol date
 // ─────────────────────────────────────────────
 const addRouteTask = async (req, res) => {
   const { patrol_id, route_date, shift, time_start, time_end, notes, stop_order } = req.body;
@@ -440,6 +617,10 @@ const addRouteTask = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+// ─────────────────────────────────────────────
+// DELETE /patrol/routes/:routeId
+// ─────────────────────────────────────────────
 const removeRouteTask = async (req, res) => {
   const { routeId } = req.params;
   try {
@@ -462,6 +643,7 @@ module.exports = {
   getPatrols,
   createPatrol,
   updatePatrol,
+  updatePatrollersForDate,
   deletePatrol,
   updateRouteNotes,
   updateRouteTask,

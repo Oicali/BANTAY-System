@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
-import AddPatrolModal from "../modals/AddPatrolModal";
+import AddPatrolModal from "../modals/Addpatrolmodal";
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 
@@ -77,25 +77,27 @@ const PatrolScheduling = () => {
     setShowEditModal(true);
   };
 
-  const handleAddSave = async (formData) => {
-    try {
-      const res  = await fetch(`${API_BASE}/patrol/patrols`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(formData),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setShowAddModal(false);
-        fetchPatrols();
-        setNotif({ message: "Patrol created successfully!", type: "success" });
-      } else {
-        setNotif({ message: data.message || "Something went wrong.", type: "error" });
-      }
-    } catch (err) {
-      setNotif({ message: "Server error.", type: "error" });
+const handleAddSave = async (formData, onError) => {
+  try {
+    const res = await fetch(`${API_BASE}/patrol/patrols`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+      body: JSON.stringify(formData),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setShowAddModal(false);
+      fetchPatrols();
+      setNotif({ message: "Patrol created successfully!", type: "success" });
+    } else {
+      onError?.();
+      setNotif({ message: data.message || "Something went wrong.", type: "error" });
     }
-  };
+  } catch (err) {
+    onError?.();
+    setNotif({ message: "Server error.", type: "error" });
+  }
+};
 
   const handleEditSave = async (formData) => {
     try {
@@ -119,7 +121,6 @@ const PatrolScheduling = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this patrol?")) return;
     try {
       const res  = await fetch(`${API_BASE}/patrol/patrols/${id}`, {
         method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
@@ -188,36 +189,42 @@ const PatrolScheduling = () => {
               <tbody>
                 {filteredPatrols.length === 0 ? (
                   <tr><td colSpan={6} className="psch-empty-row">No patrols found.</td></tr>
-                ) : filteredPatrols.map((patrol) => (
-                  <tr key={patrol.patrol_id}>
-                    <td><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
-                    <td><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
-                    <td><span className="psch-duration-text">{formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}</span></td>
-                    <td>
-                      {patrol.patrollers?.length > 0 ? (
-                        <div className="psch-patroller-stack">
-                          {patrol.patrollers.map((p) => (
-                            <div key={p.active_patroller_id} className="psch-patroller-row">
-                              <div className="psch-avatar">{getInitials(p.officer_name)}</div>
-                              <span className="psch-officer-name">{p.officer_name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : <span className="psch-none-text">No patrollers</span>}
-                    </td>
-                    <td>
-                      {getAreaSummary(patrol.routes) !== "—"
-                        ? <span className="psch-area-summary">{getAreaSummary(patrol.routes)}</span>
-                        : <span className="psch-none-text">No area set</span>}
-                    </td>
-                    <td>
-                      <button className="psch-view-btn"
-                        onClick={() => { setBeatCardPatrol(patrol); setShowBeatCard(true); }}>
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                ) : filteredPatrols.map((patrol) => {
+                  // Use deduplicated patrollers for the table column (no date duplicates)
+                  const uniquePatrollers = patrol.patrollers || [];
+
+                  return (
+                    <tr key={patrol.patrol_id}>
+                      <td><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
+                      <td><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
+                      <td><span className="psch-duration-text">{formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}</span></td>
+                      <td>
+                        {uniquePatrollers.length > 0 ? (
+                          <div className="psch-patroller-stack">
+                            {uniquePatrollers.map((p, idx) => (
+                              <div key={`${p.active_patroller_id}-${p.shift}-${idx}`} className="psch-patroller-row">
+                                <div className="psch-avatar">{getInitials(p.officer_name)}</div>
+                                <span className="psch-officer-name">{p.officer_name}</span>
+                                <span className="psch-shift-badge">{p.shift}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : <span className="psch-none-text">No patrollers</span>}
+                      </td>
+                      <td>
+                        {getAreaSummary(patrol.routes) !== "—"
+                          ? <span className="psch-area-summary">{getAreaSummary(patrol.routes)}</span>
+                          : <span className="psch-none-text">No area set</span>}
+                      </td>
+                      <td>
+                        <button className="psch-view-btn"
+                          onClick={() => { setBeatCardPatrol(patrol); setShowBeatCard(true); }}>
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -225,24 +232,22 @@ const PatrolScheduling = () => {
       </div>
 
       {showAddModal && (
-        <AddPatrolModal
-          mobileUnits={mobileUnits}
-          availablePatrollers={availablePatrollers}
-          geoJSONData={geoJSONData}
-          onClose={() => setShowAddModal(false)}
-          onSave={handleAddSave}
-        />
+      <AddPatrolModal
+  mobileUnits={mobileUnits}
+  geoJSONData={geoJSONData}
+  onClose={() => setShowAddModal(false)}
+  onSave={handleAddSave}
+/>
       )}
 
       {showEditModal && editingPatrol && (
-        <EditPatrolModal
-          patrol={editingPatrol}
-          mobileUnits={mobileUnits}
-          availablePatrollers={availablePatrollers}
-          geoJSONData={geoJSONData}
-          onClose={() => { setShowEditModal(false); setEditingPatrol(null); }}
-          onSave={handleEditSave}
-        />
+       <EditPatrolModal
+  patrol={editingPatrol}
+  mobileUnits={mobileUnits}
+  geoJSONData={geoJSONData}
+  onClose={() => { setShowEditModal(false); setEditingPatrol(null); }}
+  onSave={handleEditSave}
+/>
       )}
 
       {showBeatCard && beatCardPatrol && (
