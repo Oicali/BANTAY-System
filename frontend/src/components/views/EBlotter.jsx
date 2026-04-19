@@ -2641,12 +2641,6 @@ function EBlotter() {
                           </span>
                         </div>
                         <div className="eb-view-item">
-                          <span className="eb-view-label">Offense:</span>
-                          <span className="eb-view-value">
-                            {offenses[0]?.offense_name || "N/A"}
-                          </span>
-                        </div>
-                        <div className="eb-view-item">
                           <span className="eb-view-label">
                             Stage of Felony:
                           </span>
@@ -3627,13 +3621,7 @@ function EBlotter() {
                                 type="date"
                                 className={`eb-modal-input ${fieldErrors[`suspect_${i}_birthday`] ? "error" : ""}`}
                                 value={s.birthday}
-                                max={
-                                  new Date(
-                                    new Date().getTime() + 24 * 60 * 60 * 1000,
-                                  )
-                                    .toISOString()
-                                    .split("T")[0]
-                                }
+                                max={new Date().toISOString().split("T")[0]}
                                 onKeyDown={(e) => e.preventDefault()}
                                 onChange={(e) => {
                                   updateSuspect(i, "birthday", e.target.value);
@@ -4440,7 +4428,7 @@ function EBlotter() {
                           }}
                         >
                           <option value="">Select Stage</option>
-                          <option>COMPLETED</option>
+                          <option>CONSUMMATED</option>
                           <option>ATTEMPTED</option>
                           <option>FRUSTRATED</option>
                         </select>
