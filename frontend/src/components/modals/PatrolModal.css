@@ -793,6 +793,376 @@
   font-style: italic;
   margin: 4px 0;
 }
+/* ── APPLY DATES DIALOG ── */
+.apd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.apd-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 340px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.apd-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0a1628;
+}
+.apd-sub {
+  font-size: 13px;
+  color: #6c757d;
+  margin-top: -8px;
+}
+.apd-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.apd-date-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+  color: #212529;
+  user-select: none;
+}
+.apd-date-item:hover { background: #f8f9fa; }
+.apd-current { cursor: default; }
+.apd-current:hover { background: transparent; }
+.apd-selected { background: rgba(30, 58, 95, 0.06); }
+.apd-check {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #ced4da;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.apd-check-on { background: #1e3a5f; border-color: #1e3a5f; }
+.apd-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #1e3a5f;
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-left: auto;
+}
+.apd-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #dee2e6;
+  padding-top: 14px;
+}
+.apd-btn-all {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a5f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.apd-btn-all:hover { text-decoration: underline; }
+.apd-btn-cancel {
+  padding: 7px 16px;
+  background: transparent;
+  border: 1px solid #ced4da;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  cursor: pointer;
+  font-family: inherit;
+}
+.apd-btn-confirm {
+  padding: 7px 18px;
+  background: #1e3a5f;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.apd-btn-confirm:hover { background: #0a1628; }
+/*changessa patroller
+
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS
+   Append these rules to your existing PatrolModal.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel (shared by apm/epm/bc) ── */
+
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+/* reuse existing .apm-shift-active / .epm-shift-active / .bc-shift-active for the active state */
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Badge on shift tab showing assigned count ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked layout in checklist ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row that belongs to other shift — dimmed + amber indicator ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── BeatCard shift badge ── */
+.bc-shift-tabs-top {
+  padding: 8px 14px 0;
+}
+
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS (append to PatrolModal.css)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel ── */
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Count badge on shift tab ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked (name + other-shift label) ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row assigned to other shift — dimmed + amber ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── Dirty date indicator dot on date tabs ── */
+.epm-date-dirty,
+.bc-date-dirty {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE
@@ -825,3 +1195,4 @@
     padding: 14px 16px;
   }
 }
+/* f59e0b */
