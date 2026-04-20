@@ -209,6 +209,11 @@ function EBlotter() {
     message: "",
     type: "success",
   });
+  const [referredCount, setReferredCount] = useState(0);
+  const [seenReferredCount, setSeenReferredCount] = useState(() =>
+    parseInt(localStorage.getItem("seen_referred_count") || "0"),
+  );
+  const hasNewReferral = referredCount > seenReferredCount;
 
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
@@ -362,6 +367,19 @@ function EBlotter() {
     const CALABARZON_CODE = "040000000";
     const CAVITE_CODE = "042100000";
     const BACOOR_CODE = "042103000";
+    const fetchReferredCount = async () => {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
+      const data = await res.json();
+      if (data.success) setReferredCount(data.count);
+    };
+    fetchReferredCount();
+    const interval = setInterval(fetchReferredCount, 30000);
+    return () => clearInterval(interval);
 
     fetchProvinces(CALABARZON_CODE).then((data) => setCaseProvinces(data));
     fetchCities(CAVITE_CODE).then((data) => setCaseCities(data));
@@ -6180,9 +6198,43 @@ function EBlotter() {
           onClick={() => {
             setActiveReportTab("referred");
             setCurrentPage(1);
+            setSeenReferredCount(referredCount);
+            localStorage.setItem("seen_referred_count", String(referredCount));
           }}
         >
-          Referred (Brgy)
+          <span
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            Referred (Brgy)
+            {hasNewReferral && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-8px",
+                  right: "-18px",
+                  backgroundColor: "#dc2626",
+                  color: "white",
+                  borderRadius: "50%",
+                  minWidth: "18px",
+                  height: "18px",
+                  fontSize: "10px",
+                  fontWeight: "800",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 4px",
+                  lineHeight: 1,
+                }}
+              >
+                {referredCount}
+              </span>
+            )}
+          </span>
         </button>
       </div>
 
