@@ -134,7 +134,7 @@ const validateSuspect = (suspect, index) => {
   
   errors.push(...validateName(suspect.first_name, `${prefix} First Name`, true));
   errors.push(...validateName(suspect.middle_name, `${prefix} Middle Name`, false));
-  errors.push(...validateName(suspect.last_name, `${prefix} Last Name`, true));
+  errors.push(...validateName(suspect.last_name, `${prefix} Last Name`, false));
   
   // gender, nationality, house_street are optional
   if (suspect.house_street && suspect.house_street.trim().length > 0) {
@@ -1250,9 +1250,24 @@ const getBrgyReports = async (req, res) => {
     res.status(500).json({ success: false, message: "Error fetching reports" });
   }
 };
+
+const getReferredCount = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM blotter_entries 
+       WHERE referred_by_barangay = true 
+         AND status = 'Pending' 
+         AND is_deleted = false`
+    );
+    res.json({ success: true, count: parseInt(result.rows[0].count) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 module.exports = {
   createBlotter,
-  getAllBlotters,
+  getAllBlotters, 
+  getReferredCount,
   getBlotterById,
   updateBlotterStatus,
   deleteBlotter,
