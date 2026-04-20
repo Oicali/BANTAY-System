@@ -210,8 +210,16 @@ function EBlotter() {
     type: "success",
   });
   const [referredCount, setReferredCount] = useState(0);
+  const getUserKey = () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("auth_user") || "{}");
+      return `seen_referred_count_${user?.user_id || "default"}`;
+    } catch {
+      return "seen_referred_count_default";
+    }
+  };
   const [seenReferredCount, setSeenReferredCount] = useState(() =>
-    parseInt(localStorage.getItem("seen_referred_count") || "0"),
+    parseInt(localStorage.getItem(getUserKey()) || "0"),
   );
   const hasNewReferral = referredCount > seenReferredCount;
 
@@ -6199,7 +6207,7 @@ function EBlotter() {
             setActiveReportTab("referred");
             setCurrentPage(1);
             setSeenReferredCount(referredCount);
-            localStorage.setItem("seen_referred_count", String(referredCount));
+            localStorage.setItem(getUserKey(), String(referredCount));
           }}
         >
           <span
