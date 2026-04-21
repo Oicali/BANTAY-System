@@ -382,6 +382,8 @@ body {
   color: #1e3a5f;
   border: 1px solid #93afc9;
 }
+.psch-btn-export { background: transparent; border: 1px solid #1e3a5f; color: #1e3a5f; }
+.psch-btn-export:hover { background: #1e3a5f; color: #fff; }
 
 /* ── MISC ────────────────────────────────────────────────────── */
 .psch-patrol-name   { font-weight: 700; color: var(--gray-900); }

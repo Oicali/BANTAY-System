@@ -3,6 +3,7 @@ import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import { createPortal } from "react-dom";
+import { exportBeatCardPDF } from "../views/BeatcardPDF";
 
 const fillLayer    = { id: "bc-brgy-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.5 } };
 const outlineLayer = { id: "bc-brgy-outline", type: "line",   paint: { "line-color": "#1e3a5f", "line-width": 1.5, "line-opacity": 0.7 } };
@@ -97,6 +98,7 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
           <div className="bc-header-actions">
             <button className="bc-btn bc-btn-edit"   onClick={onEdit}>Edit</button>
             <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+            <button className="bc-btn bc-btn-export" onClick={() => exportBeatCardPDF(patrol)}>Export PDF </button>
             <button className="bc-btn bc-btn-close"  onClick={onClose}>✕</button>
           </div>
         </div>

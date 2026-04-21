@@ -5,6 +5,7 @@ import AddPatrolModal from "../modals/AddPatrolModal";
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 import LoadingModal from "../modals/LoadingModal";
+import { exportPatrolSummaryPDF } from "./PatrolReportPDF";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -257,6 +258,9 @@ const PatrolScheduling = () => {
             <p>Manage patrol officer schedules and assignments</p>
           </div>
           <button className="psch-btn psch-btn-primary" onClick={openAddModal}>+ Add Patrol</button>
+          <button className="psch-btn psch-btn-export" onClick={() => exportPatrolSummaryPDF(patrols)}>
+  Export PDF
+</button>
         </div>
 
         {/* STAT BADGES */}
