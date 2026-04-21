@@ -292,8 +292,17 @@ const queryTrends = async (
   // completely outside the requested range. We keep a bucket if its label
   // (period start) is <= dateTo, since it may contain data up to dateTo.
   const trimmed = Object.values(skeleton)
-    .filter((row) => row.label <= dateTo)
-    .sort((a, b) => a.label.localeCompare(b.label));
+  .filter((row) => {
+    // For weekly: keep if the week START is on or before dateTo
+    // This naturally includes the partial week containing dateTo
+    // because we already extended 'end' by 6 days when building the skeleton
+    if (dateTrunc === "week") {
+      return row.label >= dateFrom && row.label <= dateTo;
+    }
+    // For daily and monthly: keep if label is within range
+    return row.label <= dateTo;
+  })
+  .sort((a, b) => a.label.localeCompare(b.label));
 
   return trimmed;
 };
