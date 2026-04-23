@@ -213,11 +213,6 @@ function EBlotter() {
   const [hasSeenReferral, setHasSeenReferral] = useState(false);
   const hasNewReferral = referredCount > 0 && !hasSeenReferral;
   const prevCountRef = useRef(0);
-
-  // Inside the fetchReferredCount function, after setReferredCount:
-  if (data.count > prevCountRef.current) {
-    setHasSeenReferral(false); // new referral came in, show dot again
-  }
   prevCountRef.current = data.count;
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
