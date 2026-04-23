@@ -210,19 +210,15 @@ function EBlotter() {
     type: "success",
   });
   const [referredCount, setReferredCount] = useState(0);
-  const getUserKey = () => {
-    try {
-      const user = JSON.parse(localStorage.getItem("auth_user") || "{}");
-      return `seen_referred_count_${user?.user_id || "default"}`;
-    } catch {
-      return "seen_referred_count_default";
-    }
-  };
-  const [seenReferredCount, setSeenReferredCount] = useState(() =>
-    parseInt(localStorage.getItem(getUserKey()) || "0"),
-  );
-  const hasNewReferral = referredCount > seenReferredCount;
+  const [hasSeenReferral, setHasSeenReferral] = useState(false);
+  const hasNewReferral = referredCount > 0 && !hasSeenReferral;
+  const prevCountRef = useRef(0);
 
+  // Inside the fetchReferredCount function, after setReferredCount:
+  if (data.count > prevCountRef.current) {
+    setHasSeenReferral(false); // new referral came in, show dot again
+  }
+  prevCountRef.current = data.count;
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
     setTimeout(
@@ -383,7 +379,13 @@ function EBlotter() {
         },
       );
       const data = await res.json();
-      if (data.success) setReferredCount(data.count);
+      if (data.success) {
+        setReferredCount(data.count);
+        if (data.count > prevCountRef.current) {
+          setHasSeenReferral(false);
+        }
+        prevCountRef.current = data.count;
+      }
     };
     fetchReferredCount();
     const interval = setInterval(fetchReferredCount, 30000);
@@ -2042,7 +2044,12 @@ function EBlotter() {
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
+    // Strip Z/timezone so it's treated as local time, not UTC
+    const cleaned = String(dateString)
+      .replace("Z", "")
+      .replace(/\+\d{2}:\d{2}$/, "");
+    const date = new Date(cleaned);
+    if (isNaN(date.getTime())) return String(dateString);
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
@@ -6206,6 +6213,7 @@ function EBlotter() {
           onClick={() => {
             setActiveReportTab("referred");
             setCurrentPage(1);
+            setHasSeenReferral(true);
             setSeenReferredCount(referredCount);
             localStorage.setItem(getUserKey(), String(referredCount));
           }}
