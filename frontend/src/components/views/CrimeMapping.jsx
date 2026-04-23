@@ -169,6 +169,7 @@ function CrimeMapping() {
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
   const [boundaries, setBoundaries] = useState([]);
+  const [showClusters, setShowClusters] = useState(true);
   const [pins, setPins] = useState([]);
   const [stats, setStats] = useState(null);
   const [geoJSONData, setGeoJSONData] = useState(null);
@@ -1133,7 +1134,7 @@ function CrimeMapping() {
                 </Source>
               )}
 
-              {heatmapMode && clusterGeoJSON && (
+              {heatmapMode && clusterGeoJSON && showClusters && (
                 <Source id="heat-clusters" type="geojson" data={clusterGeoJSON}>
                   <Layer {...CLUSTER_CIRCLE_LAYER} />
                 </Source>
@@ -1559,17 +1560,30 @@ function CrimeMapping() {
                   )}
 
                   {heatmapMode ? (
-                    <div className="crmap-map-option">
-                      <span className="crmap-map-option-lbl">
-                        Barangay Labels
-                      </span>
-                      <button
-                        className={`crmap-toggle ${showLabels ? "on" : ""}`}
-                        onClick={() => setShowLabels((v) => !v)}
-                      >
-                        <span className="crmap-toggle-knob" />
-                      </button>
-                    </div>
+                    <>
+                      <div className="crmap-map-option">
+                        <span className="crmap-map-option-lbl">
+                          Barangay Labels
+                        </span>
+                        <button
+                          className={`crmap-toggle ${showLabels ? "on" : ""}`}
+                          onClick={() => setShowLabels((v) => !v)}
+                        >
+                          <span className="crmap-toggle-knob" />
+                        </button>
+                      </div>
+                      <div className="crmap-map-option">
+                        <span className="crmap-map-option-lbl">
+                          Cluster Rings
+                        </span>
+                        <button
+                          className={`crmap-toggle ${showClusters ? "on" : ""}`}
+                          onClick={() => setShowClusters((v) => !v)}
+                        >
+                          <span className="crmap-toggle-knob" />
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     [
                       {
@@ -1696,7 +1710,9 @@ function CrimeMapping() {
                           type="button"
                           className="crmap-incidence-info-icon"
                           aria-label="Show density scale info"
-                          onMouseEnter={(e) => openIncidenceTooltip(e, "heatmap")}
+                          onMouseEnter={(e) =>
+                            openIncidenceTooltip(e, "heatmap")
+                          }
                           onMouseLeave={closeIncidenceTooltip}
                         >
                           i
@@ -1759,7 +1775,9 @@ function CrimeMapping() {
                           type="button"
                           className="crmap-incidence-info-icon"
                           aria-label="Show Barangay Crime Incidence info"
-                          onMouseEnter={(e) => openIncidenceTooltip(e, "choropleth")}
+                          onMouseEnter={(e) =>
+                            openIncidenceTooltip(e, "choropleth")
+                          }
                           onMouseLeave={closeIncidenceTooltip}
                         >
                           i
@@ -1767,7 +1785,7 @@ function CrimeMapping() {
                       </div>
 
                       {(() => {
-                         const t = getIncidenceThresholds(
+                        const t = getIncidenceThresholds(
                           appliedFilters.date_from,
                           appliedFilters.date_to,
                         );
@@ -2030,56 +2048,62 @@ function CrimeMapping() {
                         No clusters detected for this filter.
                       </div>
                     )
-                  ) : (() => {
-                    const incidenceList = boundaries
-                      .filter((b) => b.crime_count >= 1)
-                      .sort((a, b) => b.crime_count - a.crime_count);
-                    const maxCount = incidenceList[0]?.crime_count ?? 1;
+                  ) : (
+                    (() => {
+                      const incidenceList = boundaries
+                        .filter((b) => b.crime_count >= 1)
+                        .sort((a, b) => b.crime_count - a.crime_count);
+                      const maxCount = incidenceList[0]?.crime_count ?? 1;
 
-                    return incidenceList.length > 0 ? (
-                      incidenceList.map((h, i) => {
-                        const barColor =
-                          h.risk === "High Incidence"
-                            ? "#b91c1c"
-                            : h.risk === "Moderate Incidence"
-                              ? "#f97316"
-                              : "#eab308";
+                      return incidenceList.length > 0 ? (
+                        incidenceList.map((h, i) => {
+                          const barColor =
+                            h.risk === "High Incidence"
+                              ? "#b91c1c"
+                              : h.risk === "Moderate Incidence"
+                                ? "#f97316"
+                                : "#eab308";
 
-                        return (
-                          <div className="crmap-hotspot-row" key={h.name_db}>
-                            <div className="crmap-hotspot-rank">#{i + 1}</div>
-                            <div className="crmap-hotspot-info">
-                              <div className="crmap-hotspot-name">{h.name_db}</div>
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  marginBottom: 4,
-                                  color: barColor,
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {h.risk}
-                              </div>
-                              <div className="crmap-hotspot-bar-bg">
+                          return (
+                            <div className="crmap-hotspot-row" key={h.name_db}>
+                              <div className="crmap-hotspot-rank">#{i + 1}</div>
+                              <div className="crmap-hotspot-info">
+                                <div className="crmap-hotspot-name">
+                                  {h.name_db}
+                                </div>
                                 <div
-                                  className="crmap-hotspot-bar-fill"
                                   style={{
-                                    width: `${Math.min(100, (h.crime_count / maxCount) * 100)}%`,
-                                    background: barColor,
+                                    fontSize: 10,
+                                    marginBottom: 4,
+                                    color: barColor,
+                                    fontWeight: 600,
                                   }}
-                                />
+                                >
+                                  {h.risk}
+                                </div>
+                                <div className="crmap-hotspot-bar-bg">
+                                  <div
+                                    className="crmap-hotspot-bar-fill"
+                                    style={{
+                                      width: `${Math.min(100, (h.crime_count / maxCount) * 100)}%`,
+                                      background: barColor,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="crmap-hotspot-count">
+                                {h.crime_count}
                               </div>
                             </div>
-                            <div className="crmap-hotspot-count">{h.crime_count}</div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="crmap-empty">
-                        No barangays with recorded incidents for this period.
-                      </div>
-                    );
-                  })()}
+                          );
+                        })
+                      ) : (
+                        <div className="crmap-empty">
+                          No barangays with recorded incidents for this period.
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
               )}
 
@@ -2242,13 +2266,14 @@ function CrimeMapping() {
               transform: "translateY(0)",
               pointerEvents: "auto",
             }}
-onMouseEnter={() => {
+            onMouseEnter={() => {
               if (incidenceTooltipTimerRef.current) {
                 clearTimeout(incidenceTooltipTimerRef.current);
                 incidenceTooltipTimerRef.current = null;
               }
             }}
-            onMouseLeave={closeIncidenceTooltip}          >
+            onMouseLeave={closeIncidenceTooltip}
+          >
             {incidenceTooltip.type === "choropleth" ? (
               <>
                 <div className="crmap-incidence-tooltip-title">
