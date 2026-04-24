@@ -177,6 +177,58 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
                 </Source>
               )}
             </Map>
+            <div className="pm-map-controls">
+  <button className="pm-map-ctrl-btn" title="Zoom in"
+    onClick={() => mapRef.current?.getMap?.().zoomIn({ duration: 300 })}>
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+  <div className="pm-map-ctrl-divider"/>
+  <button className="pm-map-ctrl-btn" title="Zoom out"
+    onClick={() => mapRef.current?.getMap?.().zoomOut({ duration: 300 })}>
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+  <div className="pm-map-ctrl-divider"/>
+  <button className="pm-map-ctrl-btn" title="Fit to barangays"
+    onClick={() => {
+      const map = mapRef.current?.getMap?.();
+      if (!map || barangays.length === 0 || !geoJSONData) return;
+      const coords = [];
+      for (const f of geoJSONData.features) {
+        if (barangays.includes(f.properties.name_db)) {
+          const rings = f.geometry.type === "Polygon"
+            ? [f.geometry.coordinates[0]]
+            : f.geometry.coordinates.map((p) => p[0]);
+          for (const ring of rings) coords.push(...ring);
+        }
+      }
+      if (coords.length === 0) return;
+      const lngs = coords.map((c) => c[0]);
+      const lats = coords.map((c) => c[1]);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 60, duration: 800 }
+      );
+    }}>
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+    </svg>
+  </button>
+  <div className="pm-map-ctrl-divider"/>
+  <button className="pm-map-ctrl-btn" title="Fullscreen"
+    onClick={() => {
+      const el = document.querySelector(".bc-map-panel");
+      if (!document.fullscreenElement) el?.requestFullscreen();
+      else document.exitFullscreen();
+    }}>
+    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+    </svg>
+  </button>
+</div>
           </div>
 
           {/* RIGHT */}
