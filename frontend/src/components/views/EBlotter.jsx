@@ -210,9 +210,6 @@ function EBlotter() {
     type: "success",
   });
   const [referredCount, setReferredCount] = useState(0);
-  const [hasSeenReferral, setHasSeenReferral] = useState(false);
-  const hasNewReferral = referredCount > 0 && !hasSeenReferral;
-  const prevCountRef = useRef(0);
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
     setTimeout(
@@ -375,8 +372,6 @@ function EBlotter() {
       const data = await res.json();
       if (data.success) {
         setReferredCount(data.count);
-        if (data.count > prevCountRef.current) setHasSeenReferral(false);
-        prevCountRef.current = data.count;
       }
     };
     fetchReferredCount();
@@ -6098,20 +6093,22 @@ function EBlotter() {
               onChange={handleFilterChange}
             />
           </div>
-          <div className="eb-filter-group">
-            <label className="eb-filter-label">Status</label>
-            <select
-              className="eb-filter-input"
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-            >
-              <option value="">All Status</option>
-              <option>Under Investigation</option>
-              <option>Cleared</option>
-              <option>Solved</option>
-            </select>
-          </div>
+          {activeReportTab !== "referred" && (
+            <div className="eb-filter-group">
+              <label className="eb-filter-label">Status</label>
+              <select
+                className="eb-filter-input"
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+              >
+                <option value="">All Status</option>
+                <option>Under Investigation</option>
+                <option>Cleared</option>
+                <option>Solved</option>
+              </select>
+            </div>
+          )}
           <div className="eb-filter-group">
             <label className="eb-filter-label">Crime Type</label>
             <select
@@ -6155,20 +6152,22 @@ function EBlotter() {
               </optgroup>
             </select>
           </div>
-          <div className="eb-filter-group">
-            <label className="eb-filter-label">Source</label>
-            <select
-              className="eb-filter-input"
-              name="data_source"
-              value={filters.data_source}
-              onChange={handleFilterChange}
-            >
-              <option value="">All Records</option>
-              <option value="manual">Manual Entry</option>
-              <option value="bantay_import">Imported</option>
-              <option value="brgy_referral">Barangay Referred</option>
-            </select>
-          </div>
+          {activeReportTab !== "referred" && (
+            <div className="eb-filter-group">
+              <label className="eb-filter-label">Source</label>
+              <select
+                className="eb-filter-input"
+                name="data_source"
+                value={filters.data_source}
+                onChange={handleFilterChange}
+              >
+                <option value="">All Records</option>
+                <option value="manual">Manual Entry</option>
+                <option value="bantay_import">Imported</option>
+                <option value="brgy_referral">Barangay Referred</option>
+              </select>
+            </div>
+          )}
           <div className="eb-filter-group">
             <label className="eb-filter-label">Date From</label>
             <input
@@ -6243,9 +6242,6 @@ function EBlotter() {
           onClick={() => {
             setActiveReportTab("referred");
             setCurrentPage(1);
-            setHasSeenReferral(true);
-            setSeenReferredCount(referredCount);
-            localStorage.setItem(getUserKey(), String(referredCount));
           }}
         >
           <span
@@ -6257,7 +6253,7 @@ function EBlotter() {
             }}
           >
             Referred (Brgy)
-            {hasNewReferral && (
+            {referredCount > 0 && (
               <span
                 style={{
                   position: "absolute",
