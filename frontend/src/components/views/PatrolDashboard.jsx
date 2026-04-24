@@ -1,3 +1,4 @@
+// src/components/views/PatrolDashboard.jsx
 import { useState, useEffect } from "react";
 import "./PatrolDashboard.css";
 import LoadingModal from "../modals/LoadingModal";
@@ -8,24 +9,44 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL;
 const VEHICLE_TYPES = ["Car/Sedan", "SUV/Van"];
+const PAGE_SIZE = 5;
 
 const PatrollerDashboard = () => {
   const token = () => localStorage.getItem("token");
 
   // ── State ──────────────────────────────────────────────
-  const [loading, setLoading]         = useState(true);
+  const [loading, setLoading]             = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [notif, setNotif]             = useState(null);
-  const [activeTable, setActiveTable] = useState("patrollers");
-  const [patrollers, setPatrollers]   = useState([]);
-  const [mobileUnits, setMobileUnits] = useState([]);
-  const [stats, setStats]             = useState({
+  const [notif, setNotif]                 = useState(null);
+  const [activeTable, setActiveTable]     = useState("patrollers");
+  const [patrollers, setPatrollers]       = useState([]);
+  const [mobileUnits, setMobileUnits]     = useState([]);
+  const [stats, setStats]                 = useState({
     active_patrols_today:  0,
     unassigned_patrollers: 0,
     mobile_units:          0,
     total_officers:        0,
   });
+
+  // ── Patroller filters & pagination ────────────────────
   const [patrollerSearch, setPatrollerSearch] = useState("");
+  const [patrollerDateFrom, setPatrollerDateFrom] = useState("");
+  const [patrollerDateTo, setPatrollerDateTo]     = useState("");
+  const [appliedPatrollerFilters, setAppliedPatrollerFilters] = useState({
+    search: "", dateFrom: "", dateTo: "",
+  });
+  const [patrollerFiltersApplied, setPatrollerFiltersApplied] = useState(false);
+  const [patrollerPage, setPatrollerPage] = useState(1);
+
+  // ── Mobile unit filters & pagination ──────────────────
+  const [unitSearch, setUnitSearch]       = useState("");
+  const [unitDateFrom, setUnitDateFrom]   = useState("");
+  const [unitDateTo, setUnitDateTo]       = useState("");
+  const [appliedUnitFilters, setAppliedUnitFilters] = useState({
+    search: "", dateFrom: "", dateTo: "",
+  });
+  const [unitFiltersApplied, setUnitFiltersApplied] = useState(false);
+  const [unitPage, setUnitPage]           = useState(1);
 
   // ── Modal state ────────────────────────────────────────
   const [showModal, setShowModal]       = useState(false);
@@ -61,17 +82,15 @@ const PatrollerDashboard = () => {
   };
 
   useEffect(() => {
-  const loadData = async (isInitial = false) => {
-    if (isInitial) setLoading(true);
-    await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
-    if (isInitial) setLoading(false);
-  };
-
-  loadData(true); // ← shows loading only on first load
-
-  const interval = setInterval(() => loadData(false), 10000); // ← silent refresh
-  return () => clearInterval(interval);
-}, []);
+    const loadData = async (isInitial = false) => {
+      if (isInitial) setLoading(true);
+      await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
+      if (isInitial) setLoading(false);
+    };
+    loadData(true);
+    const interval = setInterval(() => loadData(false), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Modal handlers ─────────────────────────────────────
   const openAddModal = () => {
@@ -164,8 +183,154 @@ const PatrollerDashboard = () => {
   const formatTime     = (ts)   => ts ? new Date(ts).toLocaleString()     : "No Data";
   const formatDateTime = (ts)   => ts ? new Date(ts).toLocaleDateString() : "No Data";
 
-  const filteredPatrollers = patrollers.filter((o) =>
-    (o.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase())
+  const isInDateRange = (ts, from, to) => {
+    if (!ts) return !from && !to;
+    const d = new Date(ts);
+    d.setHours(0, 0, 0, 0);
+    if (from) {
+      const f = new Date(from); f.setHours(0, 0, 0, 0);
+      if (d < f) return false;
+    }
+    if (to) {
+      const t = new Date(to); t.setHours(23, 59, 59, 999);
+      if (d > t) return false;
+    }
+    return true;
+  };
+
+  // ── Patroller filter logic ─────────────────────────────
+  const applyPatrollerFilters = () => {
+    setAppliedPatrollerFilters({ search: patrollerSearch, dateFrom: patrollerDateFrom, dateTo: patrollerDateTo });
+    setPatrollerFiltersApplied(patrollerSearch !== "" || patrollerDateFrom !== "" || patrollerDateTo !== "");
+    setPatrollerPage(1);
+  };
+
+  const resetPatrollerFilters = () => {
+    setPatrollerSearch(""); setPatrollerDateFrom(""); setPatrollerDateTo("");
+    setAppliedPatrollerFilters({ search: "", dateFrom: "", dateTo: "" });
+    setPatrollerFiltersApplied(false);
+    setPatrollerPage(1);
+  };
+
+  const filteredPatrollers = patrollers.filter((o) => {
+    const { search: s, dateFrom: df, dateTo: dt } = appliedPatrollerFilters;
+    if (s && !(o.officer_name || "").toLowerCase().includes(s.toLowerCase())) return false;
+    if ((df || dt) && !isInDateRange(o.last_login, df, dt)) return false;
+    return true;
+  });
+
+  const totalPatrollerPages = Math.max(1, Math.ceil(filteredPatrollers.length / PAGE_SIZE));
+  const paginatedPatrollers = filteredPatrollers.slice(
+    (patrollerPage - 1) * PAGE_SIZE,
+    patrollerPage * PAGE_SIZE
+  );
+
+  // ── Mobile unit filter logic ───────────────────────────
+  const applyUnitFilters = () => {
+    setAppliedUnitFilters({ search: unitSearch, dateFrom: unitDateFrom, dateTo: unitDateTo });
+    setUnitFiltersApplied(unitSearch !== "" || unitDateFrom !== "" || unitDateTo !== "");
+    setUnitPage(1);
+  };
+
+  const resetUnitFilters = () => {
+    setUnitSearch(""); setUnitDateFrom(""); setUnitDateTo("");
+    setAppliedUnitFilters({ search: "", dateFrom: "", dateTo: "" });
+    setUnitFiltersApplied(false);
+    setUnitPage(1);
+  };
+
+  const sortedUnits = [...mobileUnits].sort((a, b) =>
+    a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, { numeric: true, sensitivity: "base" })
+  );
+
+  const filteredUnits = sortedUnits.filter((u) => {
+    const { search: s, dateFrom: df, dateTo: dt } = appliedUnitFilters;
+    if (s && !(u.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase()) &&
+             !(u.plate_number     || "").toLowerCase().includes(s.toLowerCase()) &&
+             !(u.vehicle_type     || "").toLowerCase().includes(s.toLowerCase())) return false;
+    if ((df || dt) && !isInDateRange(u.created_at, df, dt)) return false;
+    return true;
+  });
+
+  const totalUnitPages = Math.max(1, Math.ceil(filteredUnits.length / PAGE_SIZE));
+  const paginatedUnits = filteredUnits.slice(
+    (unitPage - 1) * PAGE_SIZE,
+    unitPage * PAGE_SIZE
+  );
+
+  // ── Pagination component ───────────────────────────────
+  const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
+    <div className="pd-table-footer">
+      <span className="pd-footer-count">
+        Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered)} – {Math.min(page * PAGE_SIZE, filtered)} of {filtered}
+        {filtered !== total && <span className="pd-filtered-label"> (filtered)</span>}
+      </span>
+      <div className="pd-pagination">
+        <button
+          className="pd-page-btn"
+          onClick={() => onPage(page - 1)}
+          disabled={page === 1}
+        >‹</button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <button
+            key={p}
+            className={`pd-page-btn ${p === page ? "pd-page-active" : ""}`}
+            onClick={() => onPage(p)}
+          >{p}</button>
+        ))}
+        <button
+          className="pd-page-btn"
+          onClick={() => onPage(page + 1)}
+          disabled={page === totalPages}
+        >›</button>
+      </div>
+    </div>
+  );
+
+  // ── Filter bar component ───────────────────────────────
+  const FilterBar = ({
+    search, onSearch, dateFrom, onDateFrom, dateTo, onDateTo,
+    onApply, onReset, filtersApplied, searchPlaceholder,
+    rightContent,
+  }) => (
+    <div className="pd-filter-bar">
+      <div className="pd-filter-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+      </div>
+      <input
+        className="pd-filter-search"
+        type="text"
+        placeholder={searchPlaceholder || "Search..."}
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onApply()}
+      />
+      <div className="pd-filter-date-group">
+        <input
+          type="date"
+          className="pd-filter-date"
+          value={dateFrom}
+          onChange={(e) => onDateFrom(e.target.value)}
+          title="From date"
+        />
+        <span className="pd-filter-arrow">→</span>
+        <input
+          type="date"
+          className="pd-filter-date"
+          value={dateTo}
+          min={dateFrom}
+          onChange={(e) => onDateTo(e.target.value)}
+          title="To date"
+        />
+      </div>
+      <button className="pd-filter-apply" onClick={onApply}>Apply</button>
+      {filtersApplied && (
+        <button className="pd-filter-reset" onClick={onReset} title="Reset filters">↺</button>
+      )}
+      {rightContent && <div className="pd-filter-right">{rightContent}</div>}
+    </div>
   );
 
   // ── Render ─────────────────────────────────────────────
@@ -213,84 +378,113 @@ const PatrollerDashboard = () => {
 
         {/* TABLE CARD */}
         <div className="table-card">
+          {/* Toggle */}
           <div className="table-header">
             <div className="table-toggle">
-              <button className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`} onClick={() => setActiveTable("patrollers")}>
-                Patrollers
-              </button>
-              <button className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`} onClick={() => setActiveTable("mobile")}>
-                Mobile Units
-              </button>
-            </div>
-            <div className="table-header-right">
-              {activeTable === "patrollers" && (
-                <div className="search-box">
-                  <Search size={16} />
-                  <input type="text" placeholder="Search officer..." value={patrollerSearch} onChange={(e) => setPatrollerSearch(e.target.value)} />
-                </div>
-              )}
-              {activeTable === "mobile" && (
-                <button className="add-btn" onClick={openAddModal}>+ Add Mobile Unit</button>
-              )}
+              <button
+                className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`}
+                onClick={() => setActiveTable("patrollers")}
+              >Patrollers</button>
+              <button
+                className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`}
+                onClick={() => setActiveTable("mobile")}
+              >Mobile Units</button>
             </div>
           </div>
 
-          {/* PATROLLERS TABLE */}
+          {/* ── PATROLLERS ── */}
           {activeTable === "patrollers" && (
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Officer</th>
-                    <th>Mobile Unit Assigned</th>
-                    <th>Last Login</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPatrollers.length === 0 ? (
-                    <tr><td colSpan={3} className="empty-row">No patrollers found.</td></tr>
-                  ) : filteredPatrollers.map((officer, index) => (
-                    <tr key={officer.officer_id || index}>
-                      <td>
-                        <div className="officer-info">
-                          <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
-                          <div className="officer-name">{officer.officer_name || "Unknown"}</div>
-                        </div>
-                      </td>
-                      <td>
-                        {officer.mobile_unit_assigned
-                          ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
-                          : <span className="unassigned-badge">Unassigned</span>}
-                      </td>
-                      <td>
-                        <span className="time-badge">{formatTime(officer.last_login)}</span>
-                      </td>
+            <>
+              <FilterBar
+                search={patrollerSearch}
+                onSearch={setPatrollerSearch}
+                dateFrom={patrollerDateFrom}
+                onDateFrom={setPatrollerDateFrom}
+                dateTo={patrollerDateTo}
+                onDateTo={setPatrollerDateTo}
+                onApply={applyPatrollerFilters}
+                onReset={resetPatrollerFilters}
+                filtersApplied={patrollerFiltersApplied}
+                searchPlaceholder="Search officer..."
+              />
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Officer</th>
+                      <th>Mobile Unit Assigned</th>
+                      <th>Last Login</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {paginatedPatrollers.length === 0 ? (
+                      <tr><td colSpan={3} className="empty-row">No patrollers found.</td></tr>
+                    ) : paginatedPatrollers.map((officer, index) => (
+                      <tr key={officer.officer_id || index}>
+                        <td>
+                          <div className="officer-info">
+                            <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
+                            <div className="officer-name">{officer.officer_name || "Unknown"}</div>
+                          </div>
+                        </td>
+                        <td>
+                          {officer.mobile_unit_assigned
+                            ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
+                            : <span className="unassigned-badge">Unassigned</span>}
+                        </td>
+                        <td>
+                          <span className="time-badge">{formatTime(officer.last_login)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredPatrollers.length > 0 && (
+                <Pagination
+                  page={patrollerPage}
+                  totalPages={totalPatrollerPages}
+                  onPage={setPatrollerPage}
+                  total={patrollers.length}
+                  filtered={filteredPatrollers.length}
+                />
+              )}
+            </>
           )}
 
-          {/* MOBILE UNITS TABLE */}
+          {/* ── MOBILE UNITS ── */}
           {activeTable === "mobile" && (
-            <div className="table-container">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Mobile Unit</th>
-                    <th>Vehicle Type</th>
-                    <th>Plate Number</th>
-                    <th>Created At</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mobileUnits.length === 0 ? (
-                    <tr><td colSpan={5} className="empty-row">No mobile units found.</td></tr>
-                  ) : [...mobileUnits]
-                    .sort((a, b) => a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, { numeric: true, sensitivity: "base" }))
-                    .map((unit, index) => (
+            <>
+              <FilterBar
+                search={unitSearch}
+                onSearch={setUnitSearch}
+                dateFrom={unitDateFrom}
+                onDateFrom={setUnitDateFrom}
+                dateTo={unitDateTo}
+                onDateTo={setUnitDateTo}
+                onApply={applyUnitFilters}
+                onReset={resetUnitFilters}
+                filtersApplied={unitFiltersApplied}
+                searchPlaceholder="Search unit, plate..."
+                rightContent={
+                  <button className="add-btn" onClick={openAddModal}>+ Add Mobile Unit</button>
+                }
+              />
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mobile Unit</th>
+                      <th>Vehicle Type</th>
+                      <th>Plate Number</th>
+                      <th>Created At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUnits.length === 0 ? (
+                      <tr><td colSpan={5} className="empty-row">No mobile units found.</td></tr>
+                    ) : paginatedUnits.map((unit, index) => (
                       <tr key={unit.mobile_unit_id || index}>
                         <td><span className="unit-badge">{unit.mobile_unit_name}</span></td>
                         <td>
@@ -307,11 +501,20 @@ const PatrollerDashboard = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredUnits.length > 0 && (
+                <Pagination
+                  page={unitPage}
+                  totalPages={totalUnitPages}
+                  onPage={setUnitPage}
+                  total={mobileUnits.length}
+                  filtered={filteredUnits.length}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
@@ -353,11 +556,9 @@ const PatrollerDashboard = () => {
         </div>
       )}
 
-      {/* ── LOADING ── */}
       <LoadingModal isOpen={loading}       message="Loading dashboard..." />
       <LoadingModal isOpen={submitLoading} message={modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."} />
 
-      {/* ── NOTIFICATION ── */}
       {notif && (
         <Notification
           message={notif.message}
