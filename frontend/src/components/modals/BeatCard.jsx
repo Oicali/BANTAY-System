@@ -3,7 +3,7 @@ import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import { createPortal } from "react-dom";
-import { useExportPatrolDetail } from "../../hooks/useExportPatrol";
+import { useExportPatrolDetail } from "../../hooks/Useexportpatrol";
 
 
 const fillLayer    = { id: "bc-brgy-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.5 } };
