@@ -911,9 +911,6 @@
   font-family: inherit;
 }
 .apd-btn-confirm:hover { background: #0a1628; }
-
-.bc-btn-export { background: transparent; border: 1px solid #1e3a5f; color: #1e3a5f; }
-.bc-btn-export:hover { background: #1e3a5f; color: #fff; }
 /*changessa patroller
 
 /* ═══════════════════════════════════════════════════════════════
