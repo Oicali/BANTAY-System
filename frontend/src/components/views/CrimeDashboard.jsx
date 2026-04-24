@@ -28,6 +28,7 @@ import {
 } from "../../utils/barangayOptions";
 import LoadingModal from "../modals/LoadingModal";
 import { useExportDashboard } from "../../hooks/useExportDashboard";
+import ShortRangeWarningModal from "../modals/ShortRangeWarningModal";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
@@ -2145,6 +2146,8 @@ const CrimeDashboard = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [showAiErrorModal, setShowAiErrorModal] = useState(false);
   const [aiErrorMessage, setAiErrorMessage] = useState("");
+  const [showShortRangeModal, setShowShortRangeModal] = useState(false);
+const [pendingDayCount, setPendingDayCount] = useState(0);
 
   const fetchIdRef = useRef(0);
 
@@ -2278,92 +2281,93 @@ const CrimeDashboard = () => {
   //   "Finalizing assessment...",
   // ];
 
-  const handleGenerateAssessment = async () => {
-    if (isLoading || !dashData.summary.length) return;
+  const runAssessment = async () => {
+  const crimes =
+    appliedFilters.crimeTypes.length > 0
+      ? appliedFilters.crimeTypes
+      : INDEX_CRIMES;
 
-    // Warn if date range is short — but don't block
-    const dayCount = Math.round(
-      (new Date(appliedFilters.dateTo) - new Date(appliedFilters.dateFrom)) /
-        86400000,
+  const phases = [
+    "Querying blotter records...",
+    "Running spatial clustering...",
+    "Computing forecasts...",
+    ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
+    "Finalizing assessment...",
+  ];
+
+  let phaseIndex = 0;
+  setAssessmentPhase(phases[0]);
+  const phaseInterval = setInterval(() => {
+    phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
+    setAssessmentPhase(phases[phaseIndex]);
+  }, 3200);
+
+  try {
+    setIsGeneratingAssessment(true);
+
+    const payload = {
+      barangays: appliedFilters.barangays || [],
+      crime_types: appliedFilters.crimeTypes || [],
+      date_from: appliedFilters.dateFrom,
+      date_to: appliedFilters.dateTo,
+      mode: getAssessmentMode(appliedFilters.dateTo),
+    };
+
+    const response = await fetch(`${AI_API}/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await response.json();
+
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || "Failed to generate assessment");
+    }
+
+    setAssessment(json.assessment);
+    setAnalysisData(json.analysis);
+    console.log("AI assessment response:", json);
+  } catch (err) {
+    console.error("Generate assessment error:", err);
+    const msg = err.message || "";
+    const isRateLimit =
+      msg.includes("429") ||
+      msg.includes("rate limit") ||
+      msg.includes("quota") ||
+      msg.includes("limit");
+    setAiErrorMessage(
+      isRateLimit
+        ? "The AI service has reached its daily request limit. Please try again tomorrow (resets at 8:00 AM Philippine Time)."
+        : "Something went wrong while generating the assessment. Please try again in a few moments.",
     );
-    if (dayCount < 180) {
-      // const proceed = window.confirm(
-      //   `Your selected range is only ${dayCount} days.\n\n` +
-      //     `Short ranges may result in low forecast confidence for some crime types.\n\n` +
-      //     `Continue anyway?`,
-      // );
-      if (!proceed) return;
-    }
+    setShowAiErrorModal(true);
+  } finally {
+    clearInterval(phaseInterval);
+    setAssessmentPhase("");
+    setIsGeneratingAssessment(false);
+  }
+};
 
-    // Start phase cycling
-    const crimes =
-      appliedFilters.crimeTypes.length > 0
-        ? appliedFilters.crimeTypes
-        : INDEX_CRIMES;
+const handleGenerateAssessment = () => {
+  if (isLoading || !dashData.summary.length) return;
 
-    const phases = [
-      "Querying blotter records...",
-      "Running spatial clustering...",
-      "Computing forecasts...",
-      ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
-      "Finalizing assessment...",
-    ];
-    let phaseIndex = 0;
-    setAssessmentPhase(phases[0]);
-    const phaseInterval = setInterval(() => {
-      phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
-      setAssessmentPhase(phases[phaseIndex]);
-    }, 3200);
+  const dayCount = Math.round(
+    (new Date(appliedFilters.dateTo) - new Date(appliedFilters.dateFrom)) /
+      86400000,
+  );
 
-    try {
-      setIsGeneratingAssessment(true);
+  if (dayCount < 180) {
+    setPendingDayCount(dayCount);
+    setShowShortRangeModal(true);
+    return;
+  }
 
-      const payload = {
-        barangays: appliedFilters.barangays || [],
-        crime_types: appliedFilters.crimeTypes || [],
-        date_from: appliedFilters.dateFrom,
-        date_to: appliedFilters.dateTo,
-        mode: getAssessmentMode(appliedFilters.dateTo),
-      };
-
-      const response = await fetch(`${AI_API}/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await response.json();
-
-      if (!response.ok || !json.success) {
-        throw new Error(json.message || "Failed to generate assessment");
-      }
-
-      setAssessment(json.assessment);
-      setAnalysisData(json.analysis);
-      console.log("AI assessment response:", json);
-    } catch (err) {
-      console.error("Generate assessment error:", err);
-      const msg = err.message || "";
-      const isRateLimit =
-        msg.includes("429") ||
-        msg.includes("rate limit") ||
-        msg.includes("quota") ||
-        msg.includes("limit");
-      setAiErrorMessage(
-        isRateLimit
-          ? "The AI service has reached its daily request limit. Please try again tomorrow (resets at 8:00 AM Philippine Time)."
-          : "Something went wrong while generating the assessment. Please try again in a few moments.",
-      );
-      setShowAiErrorModal(true);
-    } finally {
-      clearInterval(phaseInterval);
-      setAssessmentPhase("");
-      setIsGeneratingAssessment(false);
-    }
-  };
+  runAssessment();
+};
 
   return (
     <div className="content-area">
@@ -2635,6 +2639,17 @@ const CrimeDashboard = () => {
           </div>
         </div>
       )}
+
+      {showShortRangeModal && (
+  <ShortRangeWarningModal
+    dayCount={pendingDayCount}
+    onCancel={() => setShowShortRangeModal(false)}
+    onConfirm={() => {
+      setShowShortRangeModal(false);
+      runAssessment();
+    }}
+  />
+)}
 
       {errorMessage && (
         <div className="cd-toast cd-toast-error">

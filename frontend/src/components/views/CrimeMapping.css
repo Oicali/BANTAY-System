@@ -385,6 +385,84 @@ input:focus-visible {
   background: rgba(255, 255, 255, 0.5);
 }
 
+.crmap-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.crmap-pin-wrap:hover {
+  transform: scale(1.2) translateY(-2px);
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.38));
+}
+
+.crmap-pin-body {
+  width: 22px;
+  height: 22px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2.5px solid rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crmap-pin-inner {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  transform: rotate(45deg);
+}
+
+.crmap-pin-tip {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid;
+  margin-top: -2px;
+}
+
+.crmap-legend-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
+}
+
+.crmap-legend-pin-body {
+  width: 12px;
+  height: 12px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 1.5px solid rgba(255,255,255,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crmap-legend-pin-inner {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  transform: rotate(45deg);
+}
+
+.crmap-legend-pin-tip {
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid;
+  margin-top: -1px;
+}
+
 .crmap-tab.active {
   color: var(--navy-primary);
   border-bottom-color: var(--navy-primary);
@@ -1187,7 +1265,7 @@ input:focus-visible {
   color: var(--red-primary);
 }
 
-.crmap-risk-info-icon {
+.crmap-incidence-info-icon {
   width: 18px;
   height: 18px;
   border-radius: 999px;
@@ -1204,13 +1282,13 @@ input:focus-visible {
   line-height: 1;
 }
 
-.crmap-risk-info-icon:hover {
+.crmap-incidence-info-icon:hover {
   background: #e5e7eb;
 }
 
 
 
-.crmap-risk-info-tooltip {
+.crmap-incidence-info-tooltip {
   position: fixed;
   width: 260px;
   background: #fff;
@@ -1225,46 +1303,55 @@ input:focus-visible {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-.crmap-risk-tooltip-title {
+.crmap-incidence-tooltip-title {
   font-size: 11px;
   font-weight: 700;
   color: var(--gray-900);
   margin-bottom: 4px;
 }
 
-.crmap-risk-tooltip-body {
+.crmap-incidence-tooltip-body {
   font-size: 11px;
   color: var(--gray-600);
   margin-bottom: 8px;
   line-height: 1.5;
 }
 
-.crmap-risk-tooltip-table {
+.crmap-incidence-tooltip-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 10px;
 }
 
-.crmap-risk-tooltip-table th {
+.crmap-incidence-tooltip-table th {
   color: var(--gray-600);
   font-weight: 700;
-  text-align: left;
+  text-align: center;
   padding: 3px 3px;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.crmap-risk-tooltip-table td {
+.crmap-incidence-tooltip-table th:first-child {
+  text-align: left;
+}
+
+.crmap-incidence-tooltip-table td {
   padding: 3px 3px;
   color: var(--gray-900);
   border-bottom: 1px solid #f3f4f6;
+  text-align: center;
 }
 
-.crmap-risk-tooltip-table tr:last-child td {
+.crmap-incidence-tooltip-table td:first-child {
+  text-align: left;
+}
+
+.crmap-incidence-tooltip-table tr:last-child td {
   border-bottom: none;
 }
 
-.crmap-risk-tooltip-table th:first-child,
-.crmap-risk-tooltip-table td:first-child {
+.crmap-incidence-tooltip-table th:first-child,
+.crmap-incidence-tooltip-table td:first-child {
   width: 70px;
 }
 

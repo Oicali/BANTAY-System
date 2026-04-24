@@ -5,30 +5,32 @@ const fetch = (...args) =>
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 
-function getRiskThresholds(dateFrom, dateTo) {
-  const days = Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
-  if (days <= 29)  return { lowMax: 1, medMax: 2 };   // ≤29 days → 7-day thresholds
-  if (days <= 91)  return { lowMax: 2, medMax: 4 };   // 30–91 days → 30-day thresholds
-  if (days <= 364) return { lowMax: 3, medMax: 6 };   // 92–364 days → 3-month thresholds
-  return               { lowMax: 4, medMax: 8 };      // 365+ days → 1-year thresholds
+function getIncidenceThresholds(dateFrom, dateTo) {
+  const days =
+    Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
+  if (days <= 29) return { lowMax: 1, medMax: 2 }; // ≤29 days: Low=1, Medium=2, High=3+
+  if (days <= 91) return { lowMax: 1, medMax: 3 }; // 30–91 days: Low=1, Medium=2–3, High=4+
+  if (days <= 364) return { lowMax: 2, medMax: 5 }; // 92–364 days: Low=1–2, Medium=3–5, High=6+
+  return { lowMax: 3, medMax: 8 }; // 365+ days: Low=1–3, Medium=4–8, High=9+
 }
 
-function getRiskColor(crimeCount, dateFrom, dateTo) {
-  const { lowMax, medMax } = getRiskThresholds(dateFrom, dateTo);
+function getIncidenceColor(crimeCount, dateFrom, dateTo) {
+  const { lowMax, medMax } = getIncidenceThresholds(dateFrom, dateTo);
 
   if (crimeCount === 0) return { color: "#adb5bd", risk: "None" };
-  if (crimeCount <= lowMax) return { color: "#eab308", risk: "Low" };
-  if (crimeCount <= medMax) return { color: "#f97316", risk: "Medium" };
-  return { color: "#b91c1c", risk: "High" };
+  if (crimeCount <= lowMax) return { color: "#eab308", risk: "Low Incidence" };
+  if (crimeCount <= medMax)
+    return { color: "#f97316", risk: "Moderate Incidence" };
+  return { color: "#b91c1c", risk: "High Incidence" };
 }
 
-function getAtRiskMinCount(dateFrom, dateTo) {
-  const { lowMax } = getRiskThresholds(dateFrom, dateTo);
+function getIncidenceMinCount(dateFrom, dateTo) {
+  const { lowMax } = getIncidenceThresholds(dateFrom, dateTo);
   return lowMax + 1;
 }
 
-function getHighRiskMinCount(dateFrom, dateTo) {
-  const { medMax } = getRiskThresholds(dateFrom, dateTo);
+function getHighIncidenceMinCount(dateFrom, dateTo) {
+  const { medMax } = getIncidenceThresholds(dateFrom, dateTo);
   return medMax + 1;
 }
 
@@ -82,7 +84,7 @@ const getBoundaries = async (req, res) => {
 
     const boundaries = barangayResult.rows.map((b) => {
       const count = crimeMap[b.name_db.toUpperCase()] || 0;
-      const { color, risk } = getRiskColor(
+      const { color, risk } = getIncidenceColor(
         count,
         date_from || "2000-01-01",
         date_to || new Date().toISOString().slice(0, 10),
@@ -189,7 +191,9 @@ const getPins = async (req, res) => {
           [user_id],
         );
         if (patrolRes.rows.length > 0) {
-          const areas = patrolRes.rows.map((r) => r.barangay_area.toUpperCase());
+          const areas = patrolRes.rows.map((r) =>
+            r.barangay_area.toUpperCase(),
+          );
           query += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
           params.push(areas);
         }
@@ -274,23 +278,28 @@ const getStatistics = async (req, res) => {
       params.push(barangay);
     }
 
-    const atRiskMin = getAtRiskMinCount(
+    const incidenceMin = getIncidenceMinCount(
       date_from || "2000-01-01",
       date_to || new Date().toISOString().slice(0, 10),
     );
-    const highRiskMin = getHighRiskMinCount(
+    const highIncidenceMin = getHighIncidenceMinCount(
       date_from || "2000-01-01",
       date_to || new Date().toISOString().slice(0, 10),
     );
 
     const client = await pool.connect();
-    let totalPins, byIncidentType, atRiskBarangays, highRiskBarangays, recentIncidents, totalBlotters;
+    let totalPins,
+      byIncidentType,
+      incidenceBarangays,
+      highIncidenceBarangays,
+      recentIncidents,
+      totalBlotters;
     try {
       [
         totalPins,
         byIncidentType,
-        atRiskBarangays,
-        highRiskBarangays,
+        incidenceBarangays,
+        highIncidenceBarangays,
         recentIncidents,
         totalBlotters,
       ] = await Promise.all([
@@ -306,9 +315,9 @@ const getStatistics = async (req, res) => {
           `SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count
            FROM blotter_analytics_view ${baseWhere}
            GROUP BY UPPER(TRIM(place_barangay))
-           HAVING COUNT(*) >= $${params.length + 1}::int
+           HAVING COUNT(*) >= 1
            ORDER BY count DESC, barangay ASC`,
-          [...params, atRiskMin],
+          params,
         ),
         client.query(
           `SELECT UPPER(TRIM(place_barangay)) as barangay, COUNT(*) as count
@@ -316,7 +325,7 @@ const getStatistics = async (req, res) => {
            GROUP BY UPPER(TRIM(place_barangay))
            HAVING COUNT(*) >= $${params.length + 1}::int
            ORDER BY count DESC, barangay ASC`,
-          [...params, highRiskMin],
+          [...params, highIncidenceMin],
         ),
         client.query(
           `SELECT blotter_entry_number, incident_type, place_barangay, date_time_commission FROM blotter_analytics_view ${baseWhere} ORDER BY date_time_commission DESC LIMIT 5`,
@@ -330,9 +339,9 @@ const getStatistics = async (req, res) => {
       client.release();
     }
 
-    const atRiskWithRisk = atRiskBarangays.rows.map((row) => {
+    const incidenceWithLevel = incidenceBarangays.rows.map((row) => {
       const count = parseInt(row.count, 10);
-      const { risk } = getRiskColor(
+      const { risk } = getIncidenceColor(
         count,
         date_from || "2000-01-01",
         date_to || new Date().toISOString().slice(0, 10),
@@ -349,13 +358,13 @@ const getStatistics = async (req, res) => {
       data: {
         total_pins: parseInt(totalPins.rows[0].count, 10),
         total_blotters: parseInt(totalBlotters.rows[0].count, 10),
-        barangays_with_crimes: atRiskWithRisk.length,
-        at_risk_count: atRiskWithRisk.length,
-        high_risk_count: highRiskBarangays.rows.length,
+        barangays_with_crimes: incidenceWithLevel.length,
+        incidence_count: incidenceWithLevel.length,
+        high_incidence_count: highIncidenceBarangays.rows.length,
         top_crime: byIncidentType.rows[0]?.incident_type || null,
-        top_barangay: atRiskWithRisk[0]?.barangay || null,
+        top_barangay: incidenceWithLevel[0]?.barangay || null,
         by_incident_type: byIncidentType.rows,
-        at_risk_barangays: atRiskWithRisk,
+        incidence_barangays: incidenceWithLevel,
         recent_incidents: recentIncidents.rows,
       },
     });
@@ -437,7 +446,9 @@ const getHeatmap = async (req, res) => {
           [user_id],
         );
         if (patrolRes.rows.length > 0) {
-          const areas = patrolRes.rows.map((r) => r.barangay_area.toUpperCase());
+          const areas = patrolRes.rows.map((r) =>
+            r.barangay_area.toUpperCase(),
+          );
           const patrolWhere = ` AND UPPER(TRIM(place_barangay)) = ANY($${p}::text[])`;
           params.push(areas);
           pointsResult = await client.query(
