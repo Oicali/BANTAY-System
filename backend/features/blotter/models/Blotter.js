@@ -239,7 +239,17 @@ class Blotter {
 
   // Get all blotter entries with filters
   static async getAll(filters = {}) {
-    let query = `SELECT * FROM blotter_entries WHERE is_deleted = false`;
+    let query = `SELECT 
+  blotter_id, blotter_entry_number, incident_type, cop, status,
+  place_barangay, place_city_municipality, place_street,
+  place_region, place_district_province, data_source,
+  referred_by_barangay, referred_by_dilg,
+  TO_CHAR(date_time_commission, 'YYYY-MM-DD"T"HH24:MI') as date_time_commission,
+  TO_CHAR(date_time_reported, 'YYYY-MM-DD"T"HH24:MI') as date_time_reported,
+  TO_CHAR(deleted_at, 'YYYY-MM-DD"T"HH24:MI') as deleted_at,
+  lat, lng, amount_involved, narrative, type_of_place, modus,
+  is_private_place, created_at, updated_at
+FROM blotter_entries WHERE is_deleted = false`;
     const params = [];
     let paramCount = 1;
 

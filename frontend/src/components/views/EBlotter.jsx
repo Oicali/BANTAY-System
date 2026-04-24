@@ -213,7 +213,6 @@ function EBlotter() {
   const [hasSeenReferral, setHasSeenReferral] = useState(false);
   const hasNewReferral = referredCount > 0 && !hasSeenReferral;
   const prevCountRef = useRef(0);
-  prevCountRef.current = data.count;
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
     setTimeout(
@@ -883,7 +882,7 @@ function EBlotter() {
         }
         setViewMode(true);
         setEditMode(false);
-        setEditingBlotterId(null);
+        setEditingBlotterId(blotterId);
         setShowModal(true);
       }
     } catch (error) {
@@ -2259,6 +2258,29 @@ function EBlotter() {
                           ? "Edit Blotter Entry"
                           : "New Blotter Entry"}
                   </h2>
+                  {editingBlotterId && (viewMode || editMode || acceptMode) && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        background: "rgba(255,255,255,0.1)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        borderRadius: "6px",
+                        padding: "2px 8px",
+                        marginTop: "4px",
+                        fontFamily: "monospace",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        color: "rgba(255,255,255,0.85)",
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      #{" "}
+                      {blotters.find((b) => b.blotter_id === editingBlotterId)
+                        ?.blotter_entry_number || editingBlotterId}
+                    </span>
+                  )}
                   <p
                     style={{
                       margin: 0,
@@ -2559,6 +2581,7 @@ function EBlotter() {
                   <div className="eb-view-section-body">
                     <div className="eb-view-card">
                       <div className="eb-view-grid">
+                        {/* ROW 1: Crime Type, Index Type, Modus Operandi */}
                         <div className="eb-view-item">
                           <span className="eb-view-label">Crime Type:</span>
                           <span className="eb-view-value">
@@ -2566,9 +2589,33 @@ function EBlotter() {
                           </span>
                         </div>
                         <div className="eb-view-item">
-                          <span className="eb-view-label">COP:</span>
+                          <span className="eb-view-label">Index Type:</span>
                           <span className="eb-view-value">
-                            {caseDetail.cop || "N/A"}
+                            {offenses[0]?.index_type || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Modus Operandi:</span>
+                          <span className="eb-view-value">
+                            {(() => {
+                              const ids = offenseSelectedModus[0] || [];
+                              const names = (offenseModus[0] || [])
+                                .filter((m) => ids.includes(m.id))
+                                .map((m) => m.modus_name);
+                              if (names.length > 0) return names.join(", ");
+                              if (caseDetail.modus) return caseDetail.modus;
+                              return "N/A";
+                            })()}
+                          </span>
+                        </div>
+
+                        {/* ROW 2: Stage of Felony, Date Commission, Date Reported */}
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Stage of Felony:
+                          </span>
+                          <span className="eb-view-value">
+                            {offenses[0]?.stage_of_felony || "N/A"}
                           </span>
                         </div>
                         <div className="eb-view-item">
@@ -2587,7 +2634,36 @@ function EBlotter() {
                             {formatDate(caseDetail.date_time_reported)}
                           </span>
                         </div>
-                        <div className="eb-view-item eb-view-full">
+
+                        {/* ROW 3: COP, Private Place, Amount Involved */}
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">COP:</span>
+                          <span className="eb-view-value">
+                            {caseDetail.cop || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Private Place?</span>
+                          <span className="eb-view-value">
+                            {caseDetail.is_private_place || "N/A"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">
+                            Amount Involved:
+                          </span>
+                          <span className="eb-view-value">
+                            {caseDetail.amount_involved
+                              ? `₱${caseDetail.amount_involved}`
+                              : "N/A"}
+                          </span>
+                        </div>
+
+                        {/* ROW 4: Place of Commission (2-col) + Type of Place */}
+                        <div
+                          className="eb-view-item"
+                          style={{ gridColumn: "span 2" }}
+                        >
                           <span className="eb-view-label">
                             Place of Commission:
                           </span>
@@ -2599,6 +2675,16 @@ function EBlotter() {
                             {typeOfPlace || "N/A"}
                           </span>
                         </div>
+
+                        {/* ROW 5: Narrative full width */}
+                        <div className="eb-view-item eb-view-full">
+                          <span className="eb-view-label">Narrative:</span>
+                          <span className="eb-view-value">
+                            {caseDetail.narrative}
+                          </span>
+                        </div>
+
+                        {/* ROW 6: Map full width */}
                         {caseDetail.lat && caseDetail.lng && (
                           <div className="eb-view-item eb-view-full">
                             <span className="eb-view-label">Pin Location:</span>
@@ -2645,57 +2731,6 @@ function EBlotter() {
                             </div>
                           </div>
                         )}
-                        <div className="eb-view-item">
-                          <span className="eb-view-label">Private Place?</span>
-                          <span className="eb-view-value">
-                            {caseDetail.is_private_place || "N/A"}
-                          </span>
-                        </div>
-                        <div className="eb-view-item">
-                          <span className="eb-view-label">
-                            Amount Involved:
-                          </span>
-                          <span className="eb-view-value">
-                            {caseDetail.amount_involved
-                              ? `₱${caseDetail.amount_involved}`
-                              : "N/A"}
-                          </span>
-                        </div>
-
-                        <div className="eb-view-item eb-view-full">
-                          <span className="eb-view-label">Narrative:</span>
-                          <span className="eb-view-value">
-                            {caseDetail.narrative}
-                          </span>
-                        </div>
-                        <div className="eb-view-item">
-                          <span className="eb-view-label">
-                            Stage of Felony:
-                          </span>
-                          <span className="eb-view-value">
-                            {offenses[0]?.stage_of_felony || "N/A"}
-                          </span>
-                        </div>
-                        <div className="eb-view-item">
-                          <span className="eb-view-label">Index Type:</span>
-                          <span className="eb-view-value">
-                            {offenses[0]?.index_type || "N/A"}
-                          </span>
-                        </div>
-                        <div className="eb-view-item eb-view-full">
-                          <span className="eb-view-label">Modus Operandi:</span>
-                          <span className="eb-view-value">
-                            {(() => {
-                              const ids = offenseSelectedModus[0] || [];
-                              const names = (offenseModus[0] || [])
-                                .filter((m) => ids.includes(m.id))
-                                .map((m) => m.modus_name);
-                              if (names.length > 0) return names.join(", ");
-                              if (caseDetail.modus) return caseDetail.modus;
-                              return "N/A";
-                            })()}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   </div>
