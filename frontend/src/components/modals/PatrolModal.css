@@ -1163,6 +1163,39 @@
   position: relative;
   top: -1px;
 }
+/* ── MAP CONTROLS (patrol modals) ── */
+.pm-map-controls {
+  position: absolute;
+  bottom: 50px;
+  left: 10px;
+  z-index: 10;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: 1.5px solid #dee2e6;
+}
+.pm-map-ctrl-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e3a5f;
+  transition: background 0.15s;
+  padding: 0;
+}
+.pm-map-ctrl-btn:first-child { border-radius: 7px 7px 0 0; }
+.pm-map-ctrl-btn:last-child  { border-radius: 0 0 7px 7px; }
+.pm-map-ctrl-btn:hover { background: #f1f5f9; }
+.pm-map-ctrl-btn:hover svg { stroke: #c1272d; }
+.pm-map-ctrl-btn svg { display: block; flex-shrink: 0; stroke: #1e3a5f; fill: none; }
+.pm-map-ctrl-divider { height: 1px; background: #e9ecef; }
 
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE

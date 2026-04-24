@@ -1,3 +1,4 @@
+// src/components/views/PatrolScheduling.jsx
 import { useState, useEffect, useRef } from "react";
 import "./PatrolScheduling.css";
 import BeatCard from "../modals/BeatCard";
@@ -7,6 +8,8 @@ import Notification from "../modals/Notification";
 import LoadingModal from "../modals/LoadingModal";
 import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
 const API_BASE = import.meta.env.VITE_API_URL;
+
+const PATROLS_PER_PAGE = 5;
 
 const parseLocalDate = (d) => {
   if (!d) return null;
@@ -58,6 +61,132 @@ const HoverPopup = ({ anchor, children }) => {
   );
 };
 
+// ── Sort dropdown component ───────────────────────────────────────
+const SortDropdown = ({ sortOption, onSortChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const options = [
+    { value: "date_asc",  label: "Sort by Date (Earliest First)" },
+    { value: "date_desc", label: "Sort by Date (Latest First)" },
+    { value: "name_asc",  label: "Sort A → Z" },
+    { value: "name_desc", label: "Sort Z → A" },
+  ];
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const currentLabel = options.find((o) => o.value === sortOption)?.label || "Sort";
+
+  return (
+    <div className="psch-sort-wrapper" ref={ref}>
+      <button
+        className={`psch-sort-btn ${open ? "psch-sort-btn-open" : ""}`}
+        onClick={() => setOpen((v) => !v)}
+        title={currentLabel}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/>
+          <line x1="4" y1="12" x2="14" y2="12"/>
+          <line x1="4" y1="18" x2="9" y2="18"/>
+        </svg>
+        <svg
+          className={`psch-sort-chevron ${open ? "psch-sort-chevron-open" : ""}`}
+          width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="psch-sort-dropdown">
+          <div className="psch-sort-dropdown-title">Sort Options</div>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              className={`psch-sort-option ${sortOption === opt.value ? "psch-sort-option-active" : ""}`}
+              onClick={() => { onSortChange(opt.value); setOpen(false); }}
+            >
+              {sortOption === opt.value && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Pagination component ──────────────────────────────────────────
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+
+  const getPages = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("...");
+      const start = Math.max(2, currentPage - 1);
+      const end   = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  return (
+    <div className="psch-pagination">
+      <button
+        className="psch-page-btn psch-page-nav"
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        title="Previous page"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+
+      {getPages().map((page, i) =>
+        page === "..." ? (
+          <span key={`dots-${i}`} className="psch-page-dots">…</span>
+        ) : (
+          <button
+            key={page}
+            className={`psch-page-btn ${currentPage === page ? "psch-page-btn-active" : ""}`}
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </button>
+        )
+      )}
+
+      <button
+        className="psch-page-btn psch-page-nav"
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        title="Next page"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+    </div>
+  );
+};
+
 const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
 
@@ -73,6 +202,12 @@ const PatrolScheduling = () => {
   const [dateFrom, setDateFrom]     = useState("");
   const [dateTo, setDateTo]         = useState("");
   const [filtersApplied, setFiltersApplied] = useState(false);
+
+  // Sort — default: earliest date first
+  const [sortOption, setSortOption] = useState("date_asc");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Applied filter values (only change on Apply click)
   const [appliedFilters, setAppliedFilters] = useState({
@@ -92,7 +227,6 @@ const PatrolScheduling = () => {
   const [editingPatrol, setEditingPatrol]   = useState(null);
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
 
-  //
   const { exportPatrolList, isExporting } = useExportPatrolList(patrols);
 
   useEffect(() => {
@@ -198,21 +332,27 @@ const PatrolScheduling = () => {
         .filter(Boolean)
     )];
 
-  // Apply filters
   const handleApply = () => {
     setAppliedFilters({ search, status: statusFilter, dateFrom, dateTo });
     setFiltersApplied(
       search !== "" || statusFilter !== "all" || dateFrom !== "" || dateTo !== ""
     );
+    setCurrentPage(1);
   };
 
   const handleReset = () => {
     setSearch(""); setStatus("all"); setDateFrom(""); setDateTo("");
     setAppliedFilters({ search: "", status: "all", dateFrom: "", dateTo: "" });
     setFiltersApplied(false);
+    setCurrentPage(1);
   };
 
-  // Filter logic
+  const handleSortChange = (val) => {
+    setSortOption(val);
+    setCurrentPage(1);
+  };
+
+  // Filter
   const filteredPatrols = patrols.filter((p) => {
     const { search: s, status: st, dateFrom: df, dateTo: dt } = appliedFilters;
 
@@ -235,7 +375,28 @@ const PatrolScheduling = () => {
     return true;
   });
 
-  // Status counts for summary badges
+  // Sort
+  const sortedPatrols = [...filteredPatrols].sort((a, b) => {
+    if (sortOption === "name_asc") {
+      return (a.patrol_name || "").localeCompare(b.patrol_name || "");
+    }
+    if (sortOption === "name_desc") {
+      return (b.patrol_name || "").localeCompare(a.patrol_name || "");
+    }
+    // date_asc / date_desc
+    const dateA = parseLocalDate(a.start_date)?.getTime() ?? 0;
+    const dateB = parseLocalDate(b.start_date)?.getTime() ?? 0;
+    return sortOption === "date_asc" ? dateA - dateB : dateB - dateA;
+  });
+
+  // Pagination
+  const totalPages   = Math.max(1, Math.ceil(sortedPatrols.length / PATROLS_PER_PAGE));
+  const safePage     = Math.min(currentPage, totalPages);
+  const pagedPatrols = sortedPatrols.slice(
+    (safePage - 1) * PATROLS_PER_PAGE,
+    safePage * PATROLS_PER_PAGE
+  );
+
   const counts = {
     all:       patrols.length,
     active:    patrols.filter((p) => getPatrolStatus(p) === "active").length,
@@ -259,14 +420,25 @@ const PatrolScheduling = () => {
             <h1>Patrol Scheduling</h1>
             <p>Manage patrol officer schedules and assignments</p>
           </div>
-          <button className="psch-btn psch-btn-primary" onClick={openAddModal}>+ Add Patrol</button>
-          <button
-  className="psch-btn"
-  onClick={exportPatrolList}
-  disabled={isExporting}
->
-  {isExporting ? "Exporting..." : "Export PDF"}
-</button>
+          <div className="psch-header-actions">
+            <button className="psch-btn psch-btn-outline" onClick={exportPatrolList} disabled={isExporting}>
+              {isExporting ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export PDF
+                </>
+              )}
+            </button>
+            <button className="psch-btn psch-btn-primary" onClick={openAddModal}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Patrol
+            </button>
+          </div>
         </div>
 
         {/* STAT BADGES */}
@@ -280,11 +452,12 @@ const PatrolScheduling = () => {
             <div
               key={key}
               className={`psch-stat-card psch-stat-${color} ${appliedFilters.status === key ? "psch-stat-selected" : ""}`}
-             onClick={() => {
-  setStatus(key);
-  setAppliedFilters((prev) => ({ ...prev, status: key }));
-  setFiltersApplied(key !== "all");
-}}
+              onClick={() => {
+                setStatus(key);
+                setAppliedFilters((prev) => ({ ...prev, status: key }));
+                setFiltersApplied(key !== "all");
+                setCurrentPage(1);
+              }}
             >
               <span className="psch-stat-num">{counts[key]}</span>
               <span className="psch-stat-label">{label}</span>
@@ -299,6 +472,9 @@ const PatrolScheduling = () => {
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
             </svg>
           </div>
+
+          {/* Sort dropdown — sits right after filter icon */}
+          <SortDropdown sortOption={sortOption} onSortChange={handleSortChange} />
 
           <input
             className="psch-filter-search"
@@ -364,9 +540,9 @@ const PatrolScheduling = () => {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={7} className="psch-empty-row">Loading...</td></tr>
-                ) : filteredPatrols.length === 0 ? (
+                ) : pagedPatrols.length === 0 ? (
                   <tr><td colSpan={7} className="psch-empty-row">No patrols found.</td></tr>
-                ) : filteredPatrols.map((patrol) => {
+                ) : pagedPatrols.map((patrol) => {
                   const uniquePatrollers = patrol.patrollers || [];
                   const barangays        = getUniqueBarangays(patrol.routes);
                   const status           = getPatrolStatus(patrol);
@@ -376,7 +552,6 @@ const PatrolScheduling = () => {
                     <tr key={patrol.patrol_id}>
                       <td><span className="psch-patrol-name">{patrol.patrol_name}</span></td>
 
-                      {/* Status badge */}
                       <td>
                         <span className={`psch-status-badge ${statusCfg.className}`}>
                           {statusCfg.label}
@@ -386,7 +561,6 @@ const PatrolScheduling = () => {
                       <td><span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span></td>
                       <td><span className="psch-duration-text">{formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}</span></td>
 
-                      {/* Patrollers — count + hover */}
                       <td>
                         {uniquePatrollers.length > 0 ? (
                           <span
@@ -403,7 +577,6 @@ const PatrolScheduling = () => {
                         ) : <span className="psch-none-text">No patrollers</span>}
                       </td>
 
-                      {/* Barangays — count + hover */}
                       <td>
                         {barangays.length > 0 ? (
                           <span
@@ -432,19 +605,26 @@ const PatrolScheduling = () => {
             </table>
           </div>
 
-          {/* Result count */}
+          {/* TABLE FOOTER: count + pagination */}
           {!loading && (
             <div className="psch-table-footer">
-              Showing {filteredPatrols.length} of {patrols.length} patrol{patrols.length !== 1 ? "s" : ""}
-              {filtersApplied && <span className="psch-filtered-label"> (filtered)</span>}
+              <span>
+                Showing {sortedPatrols.length === 0 ? 0 : (safePage - 1) * PATROLS_PER_PAGE + 1}–{Math.min(safePage * PATROLS_PER_PAGE, sortedPatrols.length)} of {sortedPatrols.length} patrol{sortedPatrols.length !== 1 ? "s" : ""}
+                {filtersApplied && <span className="psch-filtered-label"> (filtered)</span>}
+                {" "}· {patrols.length} total
+              </span>
+              <Pagination
+                currentPage={safePage}
+                totalPages={totalPages}
+                onPageChange={(p) => setCurrentPage(p)}
+              />
             </div>
           )}
         </div>
       </div>
 
-<LoadingModal isOpen={loading} message="Loading patrols..." />
+      <LoadingModal isOpen={loading} message="Loading patrols..." />
 
-      {/* HOVER POPUPS — rendered via portal-like fixed positioning */}
       <HoverPopup anchor={patrollerAnchor}>
         <div className="psch-popup-title">Assigned Patrollers</div>
         {patrollerData.map((p, i) => (
@@ -478,7 +658,6 @@ const PatrolScheduling = () => {
           onSave={handleAddSave}
         />
       )}
-      
 
       {showEditModal && editingPatrol && (
         <EditPatrolModal
