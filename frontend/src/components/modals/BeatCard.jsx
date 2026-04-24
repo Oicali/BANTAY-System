@@ -1,3 +1,5 @@
+// BeatCard.jsx
+
 import { useRef, useCallback, useState, useEffect } from "react";
 import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
