@@ -153,22 +153,19 @@ const querySummary = async (where, params, nextP) => {
 
 // ─── queryTrends ──────────────────────────────────────────────────────────────
 // granularity values: "daily" | "weekly" | "monthly"
-// NOTE: "bidaily" has been removed. Last 30 days now uses "weekly".
 //
-// WEEK BOUNDARY FIX:
-//   Postgres DATE_TRUNC('week') starts on MONDAY by default.
-//   However, some Postgres server locales use SUNDAY as week start,
-//   which caused the skeleton to be off by one day.
-//   We detect which day Postgres actually uses by checking a known
-//   date and align our skeleton accordingly — ensuring skeleton keys
-//   always match exactly what Postgres returns.
+// ROOT CAUSE FIX (weekly key mismatch):
+//   Postgres DATE_TRUNC('week') snaps each record to the Monday (or Sunday)
+//   of its week, regardless of what dateFrom is. The old code built the
+//   skeleton starting at dateFrom (e.g. a Wednesday) and then tried to merge
+//   DB results using exact key matches — which always failed because the DB
+//   keys were week-boundary dates (e.g. Monday) while skeleton keys were
+//   offset by however many days dateFrom was past the boundary.
 //
-// END-OF-RANGE FIX:
-//   For weekly granularity, we extend the skeleton end by 6 days so
-//   the current partial week (e.g. Mon Apr 7 when today is Wed Apr 9)
-//   is always included as a bucket.
-//   For monthly granularity, we extend by 31 days so the current
-//   partial month is always included.
+//   The fix: for weekly granularity, instead of requiring exact key matches,
+//   we find the skeleton bucket whose start date is closest to and <= the DB
+//   label, then accumulate counts into that bucket. This correctly maps any
+//   DB week label to its containing skeleton bucket regardless of dateFrom.
 const queryTrends = async (
   where,
   params,
@@ -183,20 +180,6 @@ const queryTrends = async (
       : granularity === "weekly"
         ? "week"
         : "month";
-
-  // ── Detect Postgres week start day (Monday=1 or Sunday=0) ──────────────────
-  // DATE_TRUNC('week', '2024-01-07') → if Mon: '2024-01-01', if Sun: '2006-01-01'
-  // We use a known Sunday (2024-01-07) and see what Postgres truncates it to.
-  let pgWeekStartDay = 1; // default: Monday
-  if (dateTrunc === "week") {
-    const probe = await pool.query(
-      `SELECT TO_CHAR(DATE_TRUNC('week', '2024-01-07'::date), 'YYYY-MM-DD') AS ws`,
-    );
-    // 2024-01-07 is a Sunday.
-    // If Postgres week starts Monday → truncates to 2024-01-01 (Monday)
-    // If Postgres week starts Sunday → truncates to 2024-01-07 (Sunday itself)
-    pgWeekStartDay = probe.rows[0].ws === "2024-01-07" ? 0 : 1;
-  }
 
   const result = await pool.query(
     `SELECT
@@ -244,17 +227,8 @@ const queryTrends = async (
   if (dateTrunc === "month") {
     cursor.setDate(1);
   }
-  // Weekly: do NOT snap cursor back. Instead, remap the first DB bucket
-  // label to dateFrom so the chart starts exactly at the requested date.
-  // The data inside is still correct because buildWhere enforces date_from.
-  if (dateTrunc === "week" && Object.keys(dbMap).length > 0) {
-    const sortedDbKeys = Object.keys(dbMap).sort();
-    const firstKey = sortedDbKeys[0];
-    if (firstKey < dateFrom) {
-      dbMap[dateFrom] = { ...dbMap[firstKey], label: dateFrom };
-      delete dbMap[firstKey];
-    }
-  }
+  // For weekly: do NOT snap the cursor. We start from dateFrom as-is.
+  // The merge step below handles the key mismatch by proximity matching.
 
   // ── Build skeleton end — extend to include the period containing dateTo ────
   const end = new Date(dateTo + "T00:00:00");
@@ -268,29 +242,56 @@ const queryTrends = async (
 
   // ── Walk cursor and build skeleton ─────────────────────────────────────────
   const skeleton = {};
-  while (cursor <= end) {
-    const label = toLocalIso(cursor);
+  const skeletonKeys = []; // kept in sorted order for binary-search style lookup
+
+  const cursorClone = new Date(cursor);
+  while (cursorClone <= end) {
+    const label = toLocalIso(cursorClone);
     skeleton[label] = { label, Total: 0 };
     INDEX_CRIMES.forEach((c) => {
       skeleton[label][c] = 0;
     });
+    skeletonKeys.push(label);
 
-    if (dateTrunc === "day") cursor.setDate(cursor.getDate() + 1);
-    else if (dateTrunc === "week") cursor.setDate(cursor.getDate() + 7);
-    else cursor.setMonth(cursor.getMonth() + 1);
+    if (dateTrunc === "day") cursorClone.setDate(cursorClone.getDate() + 1);
+    else if (dateTrunc === "week") cursorClone.setDate(cursorClone.getDate() + 7);
+    else cursorClone.setMonth(cursorClone.getMonth() + 1);
   }
 
   // ── Merge DB data into skeleton ────────────────────────────────────────────
-  Object.keys(dbMap).forEach((label) => {
-    if (skeleton[label] !== undefined) {
-      skeleton[label] = dbMap[label];
-    }
-  });
+  if (dateTrunc === "week") {
+    // For weekly granularity, DB labels are snapped to week boundaries (Mon/Sun)
+    // by Postgres DATE_TRUNC, which may not align with our skeleton keys that
+    // start from dateFrom. We map each DB bucket to the skeleton bucket whose
+    // key is the largest value that is still <= the DB label (i.e. the skeleton
+    // week that "contains" this DB week).
+    Object.keys(dbMap).forEach((dbLabel) => {
+      let bestKey = null;
+      for (const sk of skeletonKeys) {
+        if (sk <= dbLabel) bestKey = sk;
+        else break;
+      }
+      if (bestKey !== null) {
+        const src = dbMap[dbLabel];
+        skeleton[bestKey].Total += src.Total;
+        INDEX_CRIMES.forEach((c) => {
+          skeleton[bestKey][c] = (skeleton[bestKey][c] || 0) + (src[c] || 0);
+        });
+      }
+    });
+  } else {
+    // For daily/monthly, Postgres truncation always produces keys that exactly
+    // match the skeleton keys, so a direct lookup is safe.
+    Object.keys(dbMap).forEach((label) => {
+      if (skeleton[label] !== undefined) {
+        skeleton[label] = dbMap[label];
+      }
+    });
+  }
 
   // ── Remove skeleton buckets that are entirely beyond dateTo ───────────────
-  // This trims any over-extended months/weeks that have no data and fall
-  // completely outside the requested range. We keep a bucket if its label
-  // (period start) is <= dateTo, since it may contain data up to dateTo.
+  // Keep a bucket if its label (period start) is <= dateTo, since it may
+  // contain data up to dateTo.
   const trimmed = Object.values(skeleton)
   .filter((row) => {
     // For weekly: keep if the week START is on or before dateTo
