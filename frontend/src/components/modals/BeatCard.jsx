@@ -3,6 +3,8 @@ import Map, { Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import { createPortal } from "react-dom";
+import { useExportPatrolDetail } from "../../hooks/Useexportpatrol";
+
 
 const fillLayer    = { id: "bc-brgy-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.5 } };
 const outlineLayer = { id: "bc-brgy-outline", type: "line",   paint: { "line-color": "#1e3a5f", "line-width": 1.5, "line-opacity": 0.7 } };
@@ -43,6 +45,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hoveredPatroller, setHoveredPatroller]   = useState(null);
   const [hoverAnchor, setHoverAnchor]             = useState(null);
+  const { exportPatrolDetail, isExporting } = useExportPatrolDetail();
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     if (dateRange.length > 0) setActiveDate(dateRange[0]);
@@ -95,6 +99,57 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
             </div>
           </div>
           <div className="bc-header-actions">
+            <button
+  className="bc-btn"
+  disabled={isExporting}
+  style={{ background: "#1e3a5f", color: "#fff", border: "none", fontWeight: 700 }}
+  onClick={async () => {
+  let mapImage = null;
+  try {
+    const mapInstance = mapRef.current?.getMap?.();
+    if (mapInstance) {
+      // Fit map to show all highlighted barangays before capturing
+      if (barangays.length > 0 && geoJSONData) {
+        const coords = [];
+        for (const f of geoJSONData.features) {
+          if (barangays.includes(f.properties.name_db)) {
+            const rings = f.geometry.type === "Polygon"
+              ? [f.geometry.coordinates[0]]
+              : f.geometry.coordinates.map((p) => p[0]);
+            for (const ring of rings) {
+              coords.push(...ring);
+            }
+          }
+        }
+        if (coords.length > 0) {
+          const lngs = coords.map((c) => c[0]);
+          const lats = coords.map((c) => c[1]);
+          mapInstance.fitBounds(
+            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+            { padding: 60, animate: false }
+          );
+        }
+      }
+
+      // Wait for map to fully idle after fitBounds
+      await new Promise((resolve) => {
+        if (mapInstance.loaded() && !mapInstance.isMoving()) resolve();
+        else mapInstance.once("idle", resolve);
+      });
+
+      // Extra buffer for tile rendering
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      mapImage = mapInstance.getCanvas().toDataURL("image/png").split(",")[1];
+    }
+  } catch (err) {
+    console.warn("Map capture failed:", err);
+  }
+  exportPatrolDetail(patrol, mapImage);
+}}
+>
+  {isExporting ? "Exporting..." : "Export PDF"}
+</button>
             <button className="bc-btn bc-btn-edit"   onClick={onEdit}>Edit</button>
             <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
             <button className="bc-btn bc-btn-close"  onClick={onClose}>✕</button>
@@ -107,12 +162,13 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
           {/* LEFT — Map */}
           <div className="bc-map-panel">
             <Map
-              ref={mapRef}
-              mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
-              initialViewState={{ longitude: 120.964, latitude: 14.4341, zoom: 12 }}
-              style={{ width: "100%", height: "100%" }}
-              mapStyle="mapbox://styles/mapbox/light-v11"
-            >
+  ref={mapRef}
+  mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+  initialViewState={{ longitude: 120.964, latitude: 14.4341, zoom: 12 }}
+  style={{ width: "100%", height: "100%" }}
+  mapStyle="mapbox://styles/mapbox/light-v11"
+  preserveDrawingBuffer={true}
+>
               {buildGeoJSON() && (
                 <Source id="bc-barangays" type="geojson" data={buildGeoJSON()}>
                   <Layer {...fillLayer} />

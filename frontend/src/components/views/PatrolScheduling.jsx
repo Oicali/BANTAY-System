@@ -5,7 +5,7 @@ import AddPatrolModal from "../modals/AddPatrolModal";
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 import LoadingModal from "../modals/LoadingModal";
-
+import { useExportPatrolList } from "../../hooks/Useexportpatrol";
 const API_BASE = import.meta.env.VITE_API_URL;
 
 const parseLocalDate = (d) => {
@@ -91,6 +91,9 @@ const PatrolScheduling = () => {
   const [showBeatCard, setShowBeatCard]     = useState(false);
   const [editingPatrol, setEditingPatrol]   = useState(null);
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
+
+  //
+  const { exportPatrolList, isExporting } = useExportPatrolList(patrols);
 
   useEffect(() => {
     fetch("/bacoor_barangays.geojson")
@@ -257,6 +260,13 @@ const PatrolScheduling = () => {
             <p>Manage patrol officer schedules and assignments</p>
           </div>
           <button className="psch-btn psch-btn-primary" onClick={openAddModal}>+ Add Patrol</button>
+          <button
+  className="psch-btn"
+  onClick={exportPatrolList}
+  disabled={isExporting}
+>
+  {isExporting ? "Exporting..." : "Export PDF"}
+</button>
         </div>
 
         {/* STAT BADGES */}
@@ -468,6 +478,7 @@ const PatrolScheduling = () => {
           onSave={handleAddSave}
         />
       )}
+      
 
       {showEditModal && editingPatrol && (
         <EditPatrolModal

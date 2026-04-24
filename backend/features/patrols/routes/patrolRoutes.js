@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router  = express.Router();
 const {
@@ -20,6 +21,8 @@ const {
 } = require("../controllers/patrolController");
 
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
+
+const { exportPatrolList, exportPatrolDetail } = require("../controllers/ExportPatrolController");
 
 // Stats & listings
 router.get("/stats",               authenticate, getPatrolStats);
@@ -48,5 +51,9 @@ router.patch ("/routes/:routeId/notes", authenticate, updateRouteNotes);
 router.patch ("/routes/:routeId/task",  authenticate, updateRouteTask);
 router.post  ("/routes/add",            authenticate, addRouteTask);
 router.delete("/routes/:routeId",       authenticate, removeRouteTask);
+
+//
+router.post("/export/list",   authenticate, exportPatrolList);
+router.post("/export/detail", authenticate, exportPatrolDetail);
 
 module.exports = router;
