@@ -355,7 +355,7 @@ function EBlotter() {
 
   useEffect(() => {
     fetchBlotters();
-    // Auto-open from Crime Mapping "View Full Case"
+
     const targetId = sessionStorage.getItem("openBlotterId");
     if (targetId) {
       sessionStorage.removeItem("openBlotterId");
@@ -364,7 +364,7 @@ function EBlotter() {
 
     const CALABARZON_CODE = "040000000";
     const CAVITE_CODE = "042100000";
-    const BACOOR_CODE = "042103000";
+
     const fetchReferredCount = async () => {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
@@ -375,18 +375,16 @@ function EBlotter() {
       const data = await res.json();
       if (data.success) {
         setReferredCount(data.count);
-        if (data.count > prevCountRef.current) {
-          setHasSeenReferral(false);
-        }
+        if (data.count > prevCountRef.current) setHasSeenReferral(false);
         prevCountRef.current = data.count;
       }
     };
     fetchReferredCount();
     const interval = setInterval(fetchReferredCount, 30000);
-    return () => clearInterval(interval);
 
     fetchProvinces(CALABARZON_CODE).then((data) => setCaseProvinces(data));
     fetchCities(CAVITE_CODE).then((data) => setCaseCities(data));
+
     fetch("/bacoor_barangays.geojson")
       .then((r) => r.json())
       .then((data) => {
@@ -394,11 +392,13 @@ function EBlotter() {
         const brgyList = data.features
           .map((f) => f.properties.name_db)
           .filter(Boolean)
-          .filter((name, index, self) => self.indexOf(name) === index) // removes duplicate KAINGIN
+          .filter((name, index, self) => self.indexOf(name) === index)
           .sort();
         setBacoorBarangays(brgyList);
       })
       .catch((err) => console.error("Failed to load barangay GeoJSON:", err));
+
+    return () => clearInterval(interval); // ← cleanup at the END
   }, [activeReportTab]);
 
   const fetchBlotters = async () => {
