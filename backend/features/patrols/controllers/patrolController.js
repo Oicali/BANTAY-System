@@ -632,7 +632,89 @@ const removeRouteTask = async (req, res) => {
   }
 };
 
+// GET /patrol/my-patrols
+// Returns only patrols where the logged-in user is an assigned patroller
+const getMyPatrols = async (req, res) => {
+  const userId = req.user?.user_id;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        pa.patrol_id,
+        pa.patrol_name,
+        pa.start_date,
+        pa.end_date,
+        pa.mobile_unit_id,
+        mu.mobile_unit_name,
+        mu.plate_number,
+
+        (
+          SELECT COALESCE(JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'active_patroller_id', sub.active_patroller_id,
+              'officer_name', sub.officer_name,
+              'contact_number', sub.contact_number,
+              'shift', sub.shift
+            )
+          ), '[]')
+          FROM (
+            SELECT DISTINCT ON (pap.active_patroller_id, pap.shift)
+              pap.active_patroller_id,
+              pap.shift,
+              TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+              u.phone AS contact_number
+            FROM patrol_assignment_patroller pap
+            JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
+            JOIN users u ON ap.officer_id = u.user_id
+            WHERE pap.patrol_id = pa.patrol_id
+            ORDER BY pap.active_patroller_id, pap.shift
+          ) sub
+        ) AS patrollers,
+
+        (
+          SELECT COALESCE(JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'route_id',   par.route_id,
+              'route_date', par.route_date,
+              'shift',      par.shift,
+              'barangay',   par.barangay,
+              'notes',      par.notes,
+              'time_start', par.time_start,
+              'time_end',   par.time_end,
+              'stop_order', par.stop_order
+            ) ORDER BY par.route_date, par.shift, par.stop_order
+          ), '[]')
+          FROM patrol_assignment_route par
+          WHERE par.patrol_id = pa.patrol_id
+        ) AS routes
+
+      FROM patrol_assignment pa
+      JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+
+      -- Only patrols where this user is an assigned patroller
+      WHERE pa.patrol_id IN (
+        SELECT DISTINCT pap.patrol_id
+        FROM patrol_assignment_patroller pap
+        JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
+        WHERE ap.officer_id = $1
+      )
+
+      ORDER BY pa.start_date DESC, pa.patrol_id DESC
+    `, [userId]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error("getMyPatrols error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 module.exports = {
+  getMyPatrols,
   getPatrolStats,
   getActivePatrollers,
   getAvailablePatrollers,

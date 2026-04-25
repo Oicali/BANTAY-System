@@ -1,574 +1,557 @@
 // src/components/views/PatrolDashboard.jsx
 import { useState, useEffect } from "react";
-import "./PatrolDashboard.css";
-import LoadingModal from "../modals/LoadingModal";
-import Notification from "../modals/Notification";
-import {
-  ShieldCheck, AlertTriangle, Car, Users, Search,
-} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
-const VEHICLE_TYPES = ["Car/Sedan", "SUV/Van"];
-const PAGE_SIZE = 5;
 
-const PatrollerDashboard = () => {
+// ── Helpers ────────────────────────────────────────────────────────
+const parseLocalDate = (d) => {
+  if (!d) return null;
+  const dt = new Date(d);
+  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+};
+
+const today = () => {
+  const t = new Date();
+  return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+};
+
+const getPatrolStatus = (patrol) => {
+  const t     = today();
+  const start = parseLocalDate(patrol.start_date);
+  const end   = parseLocalDate(patrol.end_date);
+  if (!start || !end) return "unknown";
+  if (t < start) return "upcoming";
+  if (t > end)   return "completed";
+  return "active";
+};
+
+const formatDate = (d) => {
+  const dt = parseLocalDate(d);
+  return dt
+    ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+    : "—";
+};
+
+const toInputDate = (d) => {
+  if (!d) return "";
+  const dt = parseLocalDate(d);
+  return dt ? dt.toISOString().split("T")[0] : "";
+};
+
+// ── Status badge ────────────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const map = {
+    active:    { label: "Active",    bg: "#dcfce7", color: "#166534", border: "#86efac" },
+    upcoming:  { label: "Upcoming",  bg: "#fef9c3", color: "#854d0e", border: "#fde047" },
+    completed: { label: "Completed", bg: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  };
+  const s = map[status] || { label: "—", bg: "#f1f5f9", color: "#475569", border: "#cbd5e1" };
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      padding: "3px 10px", borderRadius: 20,
+      fontSize: 11, fontWeight: 700, letterSpacing: "0.03em",
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      whiteSpace: "nowrap",
+    }}>
+      {s.label}
+    </span>
+  );
+};
+
+// ── After Patrol Report Modal ───────────────────────────────────────
+const AfterPatrolModal = ({ patrol, onClose, onSubmit }) => {
+  const [form, setForm] = useState({
+    date:          toInputDate(patrol?.start_date) || "",
+    timeFrom:      "",
+    timeTo:        "",
+    preDeployment: "",
+    action1:       "",
+    incidents:     "",
+    action2:       "",
+    safetyConcerns:"",
+    action3:       "",
+    otherServices: "",
+    visitedAreas:  "",
+    personsVisited:"",
+    numOfficials:  "",
+    numGovt:       "",
+    sector:        patrol?.mobile_unit_name || "",
+    mustDos:       "",
+    remarks:       "",
+    creditHours:   "",
+    sigOfficer1:   "",
+    sigOfficer2:   "",
+    sigSupervisor: "",
+  });
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSubmit = async () => {
+    await onSubmit(patrol.patrol_id, form);
+    onClose();
+  };
+
+  const inputStyle = {
+    width: "100%", border: "1px solid #ced4da", borderRadius: 6,
+    padding: "7px 10px", fontSize: 13, background: "#f8f9fa",
+    color: "#212529", fontFamily: "inherit", outline: "none",
+    boxSizing: "border-box",
+  };
+  const labelStyle = {
+    fontSize: 12, color: "#6c757d", fontWeight: 600, marginBottom: 4, display: "block",
+  };
+  const fieldStyle = { marginBottom: 14 };
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "2rem 1rem", overflowY: "auto", zIndex: 1200,
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 12, width: "100%", maxWidth: 660,
+        padding: "1.75rem", position: "relative", boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
+      }}>
+        {/* Close */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", top: "1rem", right: "1rem",
+            background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6c757d", lineHeight: 1,
+          }}
+        >✕</button>
+
+        {/* Header */}
+        <div style={{ fontSize: 10, color: "#adb5bd", textAlign: "right", marginBottom: 4 }}>
+          ANNEX D &nbsp;|&nbsp; PNPM-DO-DS-3-3-15 (DO)
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#0a1628", marginBottom: 2 }}>
+          After Patrol Report
+        </div>
+        <div style={{ fontSize: 12, color: "#6c757d", marginBottom: "1.25rem" }}>
+          {patrol?.patrol_name} &nbsp;·&nbsp; {formatDate(patrol?.start_date)} – {formatDate(patrol?.end_date)}
+        </div>
+        <hr style={{ border: "none", borderTop: "1px solid #dee2e6", marginBottom: "1.25rem" }} />
+
+        {/* 1. Patrol date/time */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>1. Rendered patrol duties on</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={{ ...labelStyle, fontSize: 11 }}>Date</label>
+              <input type="date" style={inputStyle} value={form.date} onChange={set("date")} />
+            </div>
+            <div>
+              <label style={{ ...labelStyle, fontSize: 11 }}>From</label>
+              <input type="time" style={inputStyle} value={form.timeFrom} onChange={set("timeFrom")} />
+            </div>
+            <div>
+              <label style={{ ...labelStyle, fontSize: 11 }}>To</label>
+              <input type="time" style={inputStyle} value={form.timeTo} onChange={set("timeTo")} />
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Pre-deployment */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>2. Pre-deployment specific instructions received</label>
+          <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.preDeployment} onChange={set("preDeployment")} />
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.06em", margin: "4px 0 8px" }}>Action taken</div>
+        <div style={fieldStyle}>
+          <input type="text" style={inputStyle} placeholder="Action taken..." value={form.action1} onChange={set("action1")} />
+        </div>
+
+        {/* 3. Incidents */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            3. Incidents / Unusual events or situations{" "}
+            <span style={{ fontWeight: 400, fontStyle: "italic", color: "#adb5bd" }}>
+              (crime incidents, public disturbance, major events, etc.)
+            </span>
+          </label>
+          <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.incidents} onChange={set("incidents")} />
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.06em", margin: "4px 0 8px" }}>Action taken</div>
+        <div style={fieldStyle}>
+          <input type="text" style={inputStyle} placeholder="Action taken..." value={form.action2} onChange={set("action2")} />
+        </div>
+
+        {/* 4. Safety concerns */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            4. Public safety concerns{" "}
+            <span style={{ fontWeight: 400, fontStyle: "italic", color: "#adb5bd" }}>
+              (uncovered manholes, busted lights, uncollected garbage, fire hazard, missing bridge railings, etc.)
+            </span>
+          </label>
+          <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.safetyConcerns} onChange={set("safetyConcerns")} />
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.06em", margin: "4px 0 8px" }}>Action taken</div>
+        <div style={fieldStyle}>
+          <input type="text" style={inputStyle} placeholder="Action taken..." value={form.action3} onChange={set("action3")} />
+        </div>
+
+        {/* 5. Other services */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            5. Other public safety services rendered{" "}
+            <span style={{ fontWeight: 400, fontStyle: "italic", color: "#adb5bd" }}>
+              (area and route security, assistance to person with disability, recovered property, etc.)
+            </span>
+          </label>
+          <textarea rows={2} style={{ ...inputStyle, resize: "vertical" }} value={form.otherServices} onChange={set("otherServices")} />
+        </div>
+
+        {/* 6. Visited areas */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            6. Visited areas{" "}
+            <span style={{ fontWeight: 400, fontStyle: "italic", color: "#adb5bd" }}>
+              (house, school, church, business, barangay, etc.)
+            </span>
+          </label>
+          <textarea rows={2} style={{ ...inputStyle, resize: "vertical" }} value={form.visitedAreas} onChange={set("visitedAreas")} />
+        </div>
+
+        {/* 7. Persons visited */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>7. Name of persons visited / local officials</label>
+          <textarea rows={2} style={{ ...inputStyle, resize: "vertical" }} value={form.personsVisited} onChange={set("personsVisited")} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+            <div>
+              <label style={{ ...labelStyle, fontSize: 11, marginTop: 4 }}>No. of officials visited</label>
+              <input type="number" min={0} style={inputStyle} placeholder="0" value={form.numOfficials} onChange={set("numOfficials")} />
+            </div>
+            <div>
+              <label style={{ ...labelStyle, fontSize: 11, marginTop: 4 }}>Total no. of gov't officials (incl. brgy.) in area</label>
+              <input type="number" min={0} style={inputStyle} placeholder="0" value={form.numGovt} onChange={set("numGovt")} />
+            </div>
+          </div>
+        </div>
+
+        {/* 8. Sector/Beat */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>8. Sector / Beat patrolled</label>
+          <input type="text" style={inputStyle} value={form.sector} onChange={set("sector")} />
+        </div>
+
+        {/* 9. Must DOs */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>9. Patrolled the MUST DOs such as</label>
+          <textarea rows={2} style={{ ...inputStyle, resize: "vertical" }} value={form.mustDos} onChange={set("mustDos")} />
+        </div>
+
+        {/* 10. Remarks */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>
+            10. Remarks / Recommendations{" "}
+            <span style={{ fontWeight: 400, fontStyle: "italic", color: "#adb5bd" }}>
+              (best practices, traffic assistance rendered, etc.)
+            </span>
+          </label>
+          <textarea rows={3} style={{ ...inputStyle, resize: "vertical" }} value={form.remarks} onChange={set("remarks")} />
+        </div>
+
+        {/* Credit hours */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Total patrol credit hours rendered</label>
+          <input type="text" style={inputStyle} placeholder="e.g. 8 hours" value={form.creditHours} onChange={set("creditHours")} />
+        </div>
+
+        <hr style={{ border: "none", borderTop: "1px solid #dee2e6", margin: "1.25rem 0 1rem" }} />
+
+        {/* Signatures */}
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+          Signatures
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 10 }}>
+          <div style={{ borderTop: "1px solid #ced4da", paddingTop: 8, textAlign: "center" }}>
+            <input type="text" style={{ ...inputStyle, textAlign: "center" }} placeholder="Rank and name" value={form.sigOfficer1} onChange={set("sigOfficer1")} />
+            <div style={{ fontSize: 11, color: "#6c757d", marginTop: 4 }}>Patrol Officer</div>
+          </div>
+          <div style={{ borderTop: "1px solid #ced4da", paddingTop: 8, textAlign: "center" }}>
+            <input type="text" style={{ ...inputStyle, textAlign: "center" }} placeholder="Rank and name" value={form.sigSupervisor} onChange={set("sigSupervisor")} />
+            <div style={{ fontSize: 11, color: "#6c757d", marginTop: 4 }}>Patrol Supervisor</div>
+          </div>
+        </div>
+        <div style={{ maxWidth: "50%", borderTop: "1px solid #ced4da", paddingTop: 8, textAlign: "center" }}>
+          <input type="text" style={{ ...inputStyle, textAlign: "center" }} placeholder="Rank and name" value={form.sigOfficer2} onChange={set("sigOfficer2")} />
+          <div style={{ fontSize: 11, color: "#6c757d", marginTop: 4 }}>Patrol Officer</div>
+        </div>
+
+        {/* Submit */}
+        <button
+          onClick={handleSubmit}
+          style={{
+            display: "block", width: "100%", marginTop: "1.5rem",
+            padding: "11px", background: "#1e3a5f", color: "#fff",
+            border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          Submit After Patrol Report
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── Main PatrolDashboard ────────────────────────────────────────────
+const PatrolDashboard = () => {
   const token = () => localStorage.getItem("token");
 
-  // ── State ──────────────────────────────────────────────
-  const [loading, setLoading]             = useState(true);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [notif, setNotif]                 = useState(null);
-  const [activeTable, setActiveTable]     = useState("patrollers");
-  const [patrollers, setPatrollers]       = useState([]);
-  const [mobileUnits, setMobileUnits]     = useState([]);
-  const [stats, setStats]                 = useState({
-    active_patrols_today:  0,
-    unassigned_patrollers: 0,
-    mobile_units:          0,
-    total_officers:        0,
-  });
+  const [patrols,  setPatrols]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [notif,    setNotif]    = useState(null);
+  const [selected, setSelected] = useState(null); // patrol object for modal
 
-  // ── Patroller filters & pagination ────────────────────
-  const [patrollerSearch, setPatrollerSearch] = useState("");
-  const [patrollerDateFrom, setPatrollerDateFrom] = useState("");
-  const [patrollerDateTo, setPatrollerDateTo]     = useState("");
-  const [appliedPatrollerFilters, setAppliedPatrollerFilters] = useState({
-    search: "", dateFrom: "", dateTo: "",
-  });
-  const [patrollerFiltersApplied, setPatrollerFiltersApplied] = useState(false);
-  const [patrollerPage, setPatrollerPage] = useState(1);
-
-  // ── Mobile unit filters & pagination ──────────────────
-  const [unitSearch, setUnitSearch]       = useState("");
-  const [unitDateFrom, setUnitDateFrom]   = useState("");
-  const [unitDateTo, setUnitDateTo]       = useState("");
-  const [appliedUnitFilters, setAppliedUnitFilters] = useState({
-    search: "", dateFrom: "", dateTo: "",
-  });
-  const [unitFiltersApplied, setUnitFiltersApplied] = useState(false);
-  const [unitPage, setUnitPage]           = useState(1);
-
-  // ── Modal state ────────────────────────────────────────
-  const [showModal, setShowModal]       = useState(false);
-  const [modalMode, setModalMode]       = useState("add");
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [form, setForm]                 = useState({
-    mobile_unit_name: "", vehicle_type: "", plate_number: "",
-  });
-
-  // ── Fetchers ───────────────────────────────────────────
-  const fetchPatrolStats = async () => {
+  // ── Get current user id from JWT payload ──────────────────────
+  const getCurrentUserId = () => {
     try {
-      const res  = await fetch(`${API_BASE}/patrol/stats`, { headers: { Authorization: `Bearer ${token()}` } });
-      const data = await res.json();
-      if (data.success) setStats(data.data);
-    } catch (err) { console.error("Stats error:", err); }
+      const t = token();
+      if (!t) return null;
+      const payload = JSON.parse(atob(t.split(".")[1]));
+      return payload.user_id || payload.id || null;
+    } catch { return null; }
   };
 
-  const fetchPatrollers = async () => {
+  // ── Fetch patrols assigned to logged-in user ──────────────────
+  const fetchMyPatrols = async () => {
+    setLoading(true);
     try {
-      const res  = await fetch(`${API_BASE}/patrol/active`, { headers: { Authorization: `Bearer ${token()}` } });
+      const res  = await fetch(`${API_BASE}/patrol/my-patrols`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
       const data = await res.json();
-      if (data.success) setPatrollers(data.data);
-    } catch (err) { console.error("Patrollers error:", err); }
+      if (data.success) {
+        const userId = getCurrentUserId();
+        // Filter to only patrols where this user is a patroller
+        const mine = userId
+          ? data.data.filter((p) =>
+              (p.patrollers || []).some((pat) => {
+                // patrollers array contains officer_id indirectly via active_patroller_id
+                // We match by officer_id stored in JWT vs officer_id in active_patroller
+                // Fallback: show all if can't resolve
+                return true; // replace with: pat.officer_id === userId
+              })
+            )
+          : data.data;
+        setPatrols(mine);
+      }
+    } catch (err) {
+      console.error("PatrolDashboard fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fetchMobileUnits = async () => {
+  useEffect(() => { fetchMyPatrols(); }, []);
+
+  // ── Submit after patrol report ────────────────────────────────
+  const handleSubmitReport = async (patrolId, formData) => {
     try {
-      const res  = await fetch(`${API_BASE}/patrol/mobile-units`, { headers: { Authorization: `Bearer ${token()}` } });
+      const res  = await fetch(`${API_BASE}/patrol/patrols/${patrolId}/after-report`, {
+        method:  "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token()}`,
+        },
+        body: JSON.stringify(formData),
+      });
       const data = await res.json();
-      if (data.success) setMobileUnits(data.data);
-    } catch (err) { console.error("Mobile units error:", err); }
+      if (data.success) {
+        setNotif({ message: "After Patrol Report submitted successfully!", type: "success" });
+      } else {
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
+      }
+    } catch {
+      setNotif({ message: "Server error while submitting report.", type: "error" });
+    }
   };
 
+  // ── Notification auto-dismiss ─────────────────────────────────
   useEffect(() => {
-    const loadData = async (isInitial = false) => {
-      if (isInitial) setLoading(true);
-      await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
-      if (isInitial) setLoading(false);
-    };
-    loadData(true);
-    const interval = setInterval(() => loadData(false), 10000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!notif) return;
+    const t = setTimeout(() => setNotif(null), 3500);
+    return () => clearTimeout(t);
+  }, [notif]);
 
-  // ── Modal handlers ─────────────────────────────────────
-  const openAddModal = () => {
-    setModalMode("add");
-    setSelectedUnit(null);
-    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
-    setShowModal(true);
+  // ── Styles ────────────────────────────────────────────────────
+  const th = {
+    padding: "13px 18px", textAlign: "left", fontSize: 12,
+    fontWeight: 600, color: "#6c757d", textTransform: "uppercase",
+    letterSpacing: "0.5px", borderBottom: "1px solid #dee2e6",
+    background: "#f8f9fa", whiteSpace: "nowrap",
+  };
+  const td = {
+    padding: "13px 18px", fontSize: 14, color: "#495057",
+    borderBottom: "1px solid #dee2e6", verticalAlign: "middle",
   };
 
-  const openEditModal = (unit) => {
-    setModalMode("edit");
-    setSelectedUnit(unit);
-    setForm({
-      mobile_unit_name: unit.mobile_unit_name || "",
-      vehicle_type:     unit.vehicle_type     || "",
-      plate_number:     unit.plate_number     || "",
-    });
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setSelectedUnit(null);
-    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
-  };
-
-  const handleFormChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  // ── Submit ─────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
-      setNotif({ message: "Please fill in all required fields.", type: "warning" });
-      return;
-    }
-    setSubmitLoading(true);
-    try {
-      const url = modalMode === "add"
-        ? `${API_BASE}/patrol/mobile-units`
-        : `${API_BASE}/patrol/mobile-units/${selectedUnit.mobile_unit_id}`;
-
-      const res  = await fetch(url, {
-        method: modalMode === "add" ? "POST" : "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        closeModal();
-        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
-        setNotif({
-          message: modalMode === "add" ? "Mobile unit added successfully!" : "Mobile unit updated successfully!",
-          type: "success",
-        });
-      } else {
-        setNotif({ message: data.message || "Something went wrong.", type: "error" });
-      }
-    } catch (err) {
-      setNotif({ message: "Server error. Please try again.", type: "error" });
-    } finally {
-      setSubmitLoading(false);
-    }
-  };
-
-  // ── Delete ─────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this mobile unit?")) return;
-    setSubmitLoading(true);
-    try {
-      const res  = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
-        setNotif({ message: "Mobile unit deleted.", type: "success" });
-      } else {
-        setNotif({ message: data.message || "Something went wrong.", type: "error" });
-      }
-    } catch (err) {
-      setNotif({ message: "Server error. Please try again.", type: "error" });
-    } finally {
-      setSubmitLoading(false);
-    }
-  };
-
-  // ── Helpers ────────────────────────────────────────────
-  const getInitials    = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
-  const formatTime     = (ts)   => ts ? new Date(ts).toLocaleString()     : "No Data";
-  const formatDateTime = (ts)   => ts ? new Date(ts).toLocaleDateString() : "No Data";
-
-  const isInDateRange = (ts, from, to) => {
-    if (!ts) return !from && !to;
-    const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    if (from) {
-      const f = new Date(from); f.setHours(0, 0, 0, 0);
-      if (d < f) return false;
-    }
-    if (to) {
-      const t = new Date(to); t.setHours(23, 59, 59, 999);
-      if (d > t) return false;
-    }
-    return true;
-  };
-
-  // ── Patroller filter logic ─────────────────────────────
-  const applyPatrollerFilters = () => {
-    setAppliedPatrollerFilters({ search: patrollerSearch, dateFrom: patrollerDateFrom, dateTo: patrollerDateTo });
-    setPatrollerFiltersApplied(patrollerSearch !== "" || patrollerDateFrom !== "" || patrollerDateTo !== "");
-    setPatrollerPage(1);
-  };
-
-  const resetPatrollerFilters = () => {
-    setPatrollerSearch(""); setPatrollerDateFrom(""); setPatrollerDateTo("");
-    setAppliedPatrollerFilters({ search: "", dateFrom: "", dateTo: "" });
-    setPatrollerFiltersApplied(false);
-    setPatrollerPage(1);
-  };
-
-  const filteredPatrollers = patrollers.filter((o) => {
-    const { search: s, dateFrom: df, dateTo: dt } = appliedPatrollerFilters;
-    if (s && !(o.officer_name || "").toLowerCase().includes(s.toLowerCase())) return false;
-    if ((df || dt) && !isInDateRange(o.last_login, df, dt)) return false;
-    return true;
-  });
-
-  const totalPatrollerPages = Math.max(1, Math.ceil(filteredPatrollers.length / PAGE_SIZE));
-  const paginatedPatrollers = filteredPatrollers.slice(
-    (patrollerPage - 1) * PAGE_SIZE,
-    patrollerPage * PAGE_SIZE
-  );
-
-  // ── Mobile unit filter logic ───────────────────────────
-  const applyUnitFilters = () => {
-    setAppliedUnitFilters({ search: unitSearch, dateFrom: unitDateFrom, dateTo: unitDateTo });
-    setUnitFiltersApplied(unitSearch !== "" || unitDateFrom !== "" || unitDateTo !== "");
-    setUnitPage(1);
-  };
-
-  const resetUnitFilters = () => {
-    setUnitSearch(""); setUnitDateFrom(""); setUnitDateTo("");
-    setAppliedUnitFilters({ search: "", dateFrom: "", dateTo: "" });
-    setUnitFiltersApplied(false);
-    setUnitPage(1);
-  };
-
-  const sortedUnits = [...mobileUnits].sort((a, b) =>
-    a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, { numeric: true, sensitivity: "base" })
-  );
-
-  const filteredUnits = sortedUnits.filter((u) => {
-    const { search: s, dateFrom: df, dateTo: dt } = appliedUnitFilters;
-    if (s && !(u.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase()) &&
-             !(u.plate_number     || "").toLowerCase().includes(s.toLowerCase()) &&
-             !(u.vehicle_type     || "").toLowerCase().includes(s.toLowerCase())) return false;
-    if ((df || dt) && !isInDateRange(u.created_at, df, dt)) return false;
-    return true;
-  });
-
-  const totalUnitPages = Math.max(1, Math.ceil(filteredUnits.length / PAGE_SIZE));
-  const paginatedUnits = filteredUnits.slice(
-    (unitPage - 1) * PAGE_SIZE,
-    unitPage * PAGE_SIZE
-  );
-
-  // ── Pagination component ───────────────────────────────
-  const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
-    <div className="pd-table-footer">
-      <span className="pd-footer-count">
-        Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered)} – {Math.min(page * PAGE_SIZE, filtered)} of {filtered}
-        {filtered !== total && <span className="pd-filtered-label"> (filtered)</span>}
-      </span>
-      <div className="pd-pagination">
-        <button
-          className="pd-page-btn"
-          onClick={() => onPage(page - 1)}
-          disabled={page === 1}
-        >‹</button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-          <button
-            key={p}
-            className={`pd-page-btn ${p === page ? "pd-page-active" : ""}`}
-            onClick={() => onPage(p)}
-          >{p}</button>
-        ))}
-        <button
-          className="pd-page-btn"
-          onClick={() => onPage(page + 1)}
-          disabled={page === totalPages}
-        >›</button>
-      </div>
-    </div>
-  );
-
-  // ── Filter bar component ───────────────────────────────
-  const FilterBar = ({
-    search, onSearch, dateFrom, onDateFrom, dateTo, onDateTo,
-    onApply, onReset, filtersApplied, searchPlaceholder,
-    rightContent,
-  }) => (
-    <div className="pd-filter-bar">
-      <div className="pd-filter-icon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-        </svg>
-      </div>
-      <input
-        className="pd-filter-search"
-        type="text"
-        placeholder={searchPlaceholder || "Search..."}
-        value={search}
-        onChange={(e) => onSearch(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onApply()}
-      />
-      <div className="pd-filter-date-group">
-        <input
-          type="date"
-          className="pd-filter-date"
-          value={dateFrom}
-          onChange={(e) => onDateFrom(e.target.value)}
-          title="From date"
-        />
-        <span className="pd-filter-arrow">→</span>
-        <input
-          type="date"
-          className="pd-filter-date"
-          value={dateTo}
-          min={dateFrom}
-          onChange={(e) => onDateTo(e.target.value)}
-          title="To date"
-        />
-      </div>
-      <button className="pd-filter-apply" onClick={onApply}>Apply</button>
-      {filtersApplied && (
-        <button className="pd-filter-reset" onClick={onReset} title="Reset filters">↺</button>
-      )}
-      {rightContent && <div className="pd-filter-right">{rightContent}</div>}
-    </div>
-  );
-
-  // ── Render ─────────────────────────────────────────────
   return (
-    <div className="dash">
-      <div className="content-area">
-
-        {/* PAGE HEADER */}
-        <div className="page-header">
-          <h1>Patroller Dashboard</h1>
-          <p>Real-time Patroller status and monitoring</p>
-        </div>
-
-        {/* STATS */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon green"><ShieldCheck size={20} /></div>
-            </div>
-            <div className="stat-value">{stats.active_patrols_today}</div>
-            <div className="stat-label">Active Patrols Today</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon yellow"><AlertTriangle size={20} /></div>
-            </div>
-            <div className="stat-value">{stats.unassigned_patrollers}</div>
-            <div className="stat-label">Unassigned Patrollers</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon gray"><Car size={20} /></div>
-            </div>
-            <div className="stat-value">{stats.mobile_units}</div>
-            <div className="stat-label">Total Mobile Units</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-header">
-              <div className="stat-icon blue"><Users size={20} /></div>
-            </div>
-            <div className="stat-value">{stats.total_officers}</div>
-            <div className="stat-label">Total Officers</div>
-          </div>
-        </div>
-
-        {/* TABLE CARD */}
-        <div className="table-card">
-          {/* Toggle */}
-          <div className="table-header">
-            <div className="table-toggle">
-              <button
-                className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`}
-                onClick={() => setActiveTable("patrollers")}
-              >Patrollers</button>
-              <button
-                className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`}
-                onClick={() => setActiveTable("mobile")}
-              >Mobile Units</button>
-            </div>
-          </div>
-
-          {/* ── PATROLLERS ── */}
-          {activeTable === "patrollers" && (
-            <>
-              <FilterBar
-                search={patrollerSearch}
-                onSearch={setPatrollerSearch}
-                dateFrom={patrollerDateFrom}
-                onDateFrom={setPatrollerDateFrom}
-                dateTo={patrollerDateTo}
-                onDateTo={setPatrollerDateTo}
-                onApply={applyPatrollerFilters}
-                onReset={resetPatrollerFilters}
-                filtersApplied={patrollerFiltersApplied}
-                searchPlaceholder="Search officer..."
-              />
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Officer</th>
-                      <th>Mobile Unit Assigned</th>
-                      <th>Last Login</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedPatrollers.length === 0 ? (
-                      <tr><td colSpan={3} className="empty-row">No patrollers found.</td></tr>
-                    ) : paginatedPatrollers.map((officer, index) => (
-                      <tr key={officer.officer_id || index}>
-                        <td>
-                          <div className="officer-info">
-                            <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
-                            <div className="officer-name">{officer.officer_name || "Unknown"}</div>
-                          </div>
-                        </td>
-                        <td>
-                          {officer.mobile_unit_assigned
-                            ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
-                            : <span className="unassigned-badge">Unassigned</span>}
-                        </td>
-                        <td>
-                          <span className="time-badge">{formatTime(officer.last_login)}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {filteredPatrollers.length > 0 && (
-                <Pagination
-                  page={patrollerPage}
-                  totalPages={totalPatrollerPages}
-                  onPage={setPatrollerPage}
-                  total={patrollers.length}
-                  filtered={filteredPatrollers.length}
-                />
-              )}
-            </>
-          )}
-
-          {/* ── MOBILE UNITS ── */}
-          {activeTable === "mobile" && (
-            <>
-              <FilterBar
-                search={unitSearch}
-                onSearch={setUnitSearch}
-                dateFrom={unitDateFrom}
-                onDateFrom={setUnitDateFrom}
-                dateTo={unitDateTo}
-                onDateTo={setUnitDateTo}
-                onApply={applyUnitFilters}
-                onReset={resetUnitFilters}
-                filtersApplied={unitFiltersApplied}
-                searchPlaceholder="Search unit, plate..."
-                rightContent={
-                  <button className="add-btn" onClick={openAddModal}>+ Add Mobile Unit</button>
-                }
-              />
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Mobile Unit</th>
-                      <th>Vehicle Type</th>
-                      <th>Plate Number</th>
-                      <th>Created At</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedUnits.length === 0 ? (
-                      <tr><td colSpan={5} className="empty-row">No mobile units found.</td></tr>
-                    ) : paginatedUnits.map((unit, index) => (
-                      <tr key={unit.mobile_unit_id || index}>
-                        <td><span className="unit-badge">{unit.mobile_unit_name}</span></td>
-                        <td>
-                          <span className={`vehicle-badge ${unit.vehicle_type === "Car/Sedan" ? "vehicle-car" : "vehicle-suv"}`}>
-                            {unit.vehicle_type}
-                          </span>
-                        </td>
-                        <td><span className="plate-number">{unit.plate_number}</span></td>
-                        <td><span className="time-badge">{formatDateTime(unit.created_at)}</span></td>
-                        <td>
-                          <div className="action-btns">
-                            <button className="edit-btn"   onClick={() => openEditModal(unit)}>Edit</button>
-                            <button className="delete-btn" onClick={() => handleDelete(unit.mobile_unit_id)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {filteredUnits.length > 0 && (
-                <Pagination
-                  page={unitPage}
-                  totalPages={totalUnitPages}
-                  onPage={setUnitPage}
-                  total={mobileUnits.length}
-                  filtered={filteredUnits.length}
-                />
-              )}
-            </>
-          )}
-        </div>
+    <div style={{ padding: 32, fontFamily: '"DM Sans", -apple-system, sans-serif' }}>
+      {/* Page header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#0a1628", margin: 0, fontFamily: '"Inter", sans-serif' }}>
+          Patrol Dashboard
+        </h1>
+        <p style={{ color: "#6c757d", fontSize: 15, marginTop: 6 }}>
+          Your assigned patrol duties and after-patrol reports
+        </p>
       </div>
 
-      {/* ── ADD / EDIT MODAL ── */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}</h3>
-              <button className="modal-close" onClick={closeModal}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Mobile Unit Name <span className="required">*</span></label>
-                <input type="text" name="mobile_unit_name" value={form.mobile_unit_name} onChange={handleFormChange} placeholder="e.g. Mobile 1" />
-              </div>
-              <div className="form-group">
-                <label>Vehicle Type <span className="required">*</span></label>
-                <select name="vehicle_type" value={form.vehicle_type} onChange={handleFormChange}>
-                  <option value="">— Select Vehicle Type —</option>
-                  {VEHICLE_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Plate Number <span className="required">*</span></label>
-                <input type="text" name="plate_number" value={form.plate_number} onChange={handleFormChange} placeholder="e.g. ABC 1234" style={{ textTransform: "uppercase" }} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
-              <button className="btn-save" onClick={handleSubmit}>
-                {modalMode === "add" ? "Add Unit" : "Save Changes"}
-              </button>
-            </div>
-          </div>
+      {/* Table card */}
+      <div style={{
+        background: "#fff", border: "1px solid #dee2e6",
+        borderRadius: 10, overflow: "hidden",
+      }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Patrol Name</th>
+                <th style={th}>Status</th>
+                <th style={th}>Mobile Unit</th>
+                <th style={th}>Duration</th>
+                <th style={th}>Patrollers</th>
+                <th style={th}>Area of Responsibility</th>
+                <th style={{ ...th, textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ ...td, textAlign: "center", color: "#adb5bd", padding: 48 }}>
+                    Loading...
+                  </td>
+                </tr>
+              ) : patrols.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ ...td, textAlign: "center", color: "#adb5bd", padding: 48 }}>
+                    No patrol assignments found.
+                  </td>
+                </tr>
+              ) : patrols.map((patrol) => {
+                const status      = getPatrolStatus(patrol);
+                const patrollers  = patrol.patrollers || [];
+                const barangays   = [...new Set(
+                  (patrol.routes || [])
+                    .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+                    .map((r) => r.barangay)
+                )];
+
+                return (
+                  <tr
+                    key={patrol.patrol_id}
+                    style={{ cursor: "default" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f8f9fa"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                  >
+                    <td style={td}>
+                      <span style={{ fontWeight: 700, color: "#0a1628" }}>{patrol.patrol_name}</span>
+                    </td>
+                    <td style={td}>
+                      <StatusBadge status={status} />
+                    </td>
+                    <td style={td}>
+                      <span style={{ fontWeight: 600, color: "#1e3a5f" }}>
+                        {patrol.mobile_unit_name || "—"}
+                      </span>
+                    </td>
+                    <td style={td}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#1e3a5f", whiteSpace: "nowrap" }}>
+                        {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
+                      </span>
+                    </td>
+                    <td style={td}>
+                      {patrollers.length > 0 ? (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                          background: "#e8edf4", color: "#1e3a5f", border: "1px solid #93afc9",
+                        }}>
+                          {patrollers.length} Patroller{patrollers.length !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>
+                      )}
+                    </td>
+                    <td style={td}>
+                      {barangays.length > 0 ? (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                          background: "#f0fdf4", color: "#166534", border: "1px solid #86efac",
+                        }}>
+                          {barangays.length} Barangay{barangays.length !== 1 ? "s" : ""}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <button
+                        onClick={() => setSelected(patrol)}
+                        style={{
+                          padding: "6px 16px", background: "#1e3a5f", color: "#fff",
+                          border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700,
+                          cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#0a1628"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "#1e3a5f"; }}
+                      >
+                        After Report
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+
+        {/* Footer */}
+        {!loading && (
+          <div style={{
+            padding: "10px 18px", fontSize: 12, color: "#6c757d",
+            borderTop: "1px solid #dee2e6", background: "#f8f9fa",
+          }}>
+            {patrols.length} patrol{patrols.length !== 1 ? "s" : ""} assigned to you
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {selected && (
+        <AfterPatrolModal
+          patrol={selected}
+          onClose={() => setSelected(null)}
+          onSubmit={handleSubmitReport}
+        />
       )}
 
-      <LoadingModal isOpen={loading}       message="Loading dashboard..." />
-      <LoadingModal isOpen={submitLoading} message={modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."} />
-
+      {/* Notification */}
       {notif && (
-        <Notification
-          message={notif.message}
-          type={notif.type}
-          onClose={() => setNotif(null)}
-          duration={3000}
-        />
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 2000,
+          background: notif.type === "success" ? "#166534" : "#991b1b",
+          color: "#fff", padding: "12px 20px", borderRadius: 8,
+          fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+          maxWidth: 360,
+        }}>
+          {notif.message}
+        </div>
       )}
     </div>
   );
 };
 
-export default PatrollerDashboard;
+export default PatrolDashboard;

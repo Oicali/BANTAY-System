@@ -2,6 +2,7 @@
 const express = require("express");
 const router  = express.Router();
 const {
+  getMyPatrols,
   getPatrolStats,
   getActivePatrollers,
   getAvailablePatrollers,
@@ -36,6 +37,7 @@ router.put   ("/mobile-units/:id", authenticate, updateMobileUnit);
 router.delete("/mobile-units/:id", authenticate, deleteMobileUnit);
 
 // Patrols
+router.get("/my-patrols", authenticate, getMyPatrols);
 router.get   ("/patrols",     authenticate, getPatrols);
 router.post  ("/patrols",     authenticate, createPatrol);
 router.put   ("/patrols/:id", authenticate, updatePatrol);
