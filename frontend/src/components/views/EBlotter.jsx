@@ -210,6 +210,7 @@ function EBlotter() {
     type: "success",
   });
   const [referredCount, setReferredCount] = useState(0);
+  const fetchControllerRef = useRef(null);
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
     setTimeout(
@@ -327,6 +328,10 @@ function EBlotter() {
       most_investigator: "",
     },
   ]);
+  const offensesRef = useRef(offenses);
+  useEffect(() => {
+    offensesRef.current = offenses;
+  });
 
   const [caseDetail, setCaseDetail] = useState({
     incident_type: "",
@@ -349,7 +354,18 @@ function EBlotter() {
 
   const totalSteps = 3;
   const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
-
+  const fetchReferredCount = useCallback(async () => {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
+      {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      },
+    );
+    const data = await res.json();
+    if (data.success) {
+      setReferredCount(data.count);
+    }
+  }, []);
   useEffect(() => {
     fetchBlotters();
 
@@ -362,18 +378,6 @@ function EBlotter() {
     const CALABARZON_CODE = "040000000";
     const CAVITE_CODE = "042100000";
 
-    const fetchReferredCount = async () => {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      );
-      const data = await res.json();
-      if (data.success) {
-        setReferredCount(data.count);
-      }
-    };
     fetchReferredCount();
     const interval = setInterval(fetchReferredCount, 30000);
 
@@ -398,6 +402,11 @@ function EBlotter() {
 
   const fetchBlotters = async () => {
     try {
+      if (fetchControllerRef.current) {
+        fetchControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      fetchControllerRef.current = controller;
       setLoading(true);
       setBlotters([]);
       const queryParams = new URLSearchParams();
@@ -419,6 +428,7 @@ function EBlotter() {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        signal: controller.signal,
       });
       const response = handleApiResponse(rawResponse);
       if (!response) return;
@@ -449,6 +459,7 @@ function EBlotter() {
         setCurrentPage(1);
       }
     } catch (error) {
+      if (error.name === "AbortError") return;
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -494,6 +505,7 @@ function EBlotter() {
         if (data.success) {
           showReactToast("Report deleted successfully.");
           fetchBlotters();
+          fetchReferredCount();
         }
       } catch (error) {
         alert("Error deleting report.");
@@ -511,6 +523,7 @@ function EBlotter() {
           showReactToast("Report restored successfully.");
           fetchDeletedBlotters();
           fetchBlotters();
+          fetchReferredCount();
         }
       } catch (error) {
         alert("Error restoring report.");
@@ -550,10 +563,19 @@ function EBlotter() {
 
   useEffect(() => {
     if (currentStep === 3) {
-      // Sync offense_name with incident_type if empty
+      // Sync offense_name with incident_type if empty — do it in one atomic update
       if (!offenses[0]?.offense_name && caseDetail.incident_type) {
-        updateOffense(0, "offense_name", caseDetail.incident_type);
-        updateOffense(0, "index_type", "Index");
+        setOffenses((prev) => {
+          const updated = [...prev];
+          if (!updated[0]) return prev;
+          updated[0] = {
+            ...updated[0],
+            offense_name: caseDetail.incident_type,
+            index_type: "Index",
+            // Preserve stage_of_felony — do NOT overwrite it
+          };
+          return updated;
+        });
       }
       if (
         caseDetail.incident_type &&
@@ -592,6 +614,8 @@ function EBlotter() {
           ...o,
           offense_name:
             OFFENSE_NORMALIZE[o.offense_name?.toLowerCase()] || o.offense_name,
+          stage_of_felony: o.stage_of_felony || "",
+          index_type: o.index_type || "Non-Index",
         }));
         setOffenses(normalizedOffenses);
         // Load modus for edit mode
@@ -808,6 +832,8 @@ function EBlotter() {
           ...o,
           offense_name:
             OFFENSE_NORMALIZE[o.offense_name?.toLowerCase()] || o.offense_name,
+          stage_of_felony: o.stage_of_felony || "",
+          index_type: o.index_type || "Non-Index",
         }));
         setOffenses(normalizedOffenses);
         setTypeOfPlace(data.data.type_of_place || "");
@@ -911,6 +937,8 @@ function EBlotter() {
           ...o,
           offense_name:
             OFFENSE_NORMALIZE[o.offense_name?.toLowerCase()] || o.offense_name,
+          stage_of_felony: "CONSUMMATED",
+          index_type: o.index_type || "Non-Index",
         }));
         setOffenses(normalizedOffenses);
         setTypeOfPlace(data.data.type_of_place || "");
@@ -1049,7 +1077,7 @@ function EBlotter() {
   const handleLettersOnly = (value) => value.replace(/[^A-Za-zÑñ\s'-]/g, "");
   const handleNumbersOnly = (value) => value.replace(/\D/g, "");
 
-  const validateCurrentStep = () => {
+  const validateCurrentStep = (currentOffenses = offensesRef.current) => {
     const errors = {};
 
     if (currentStep === 1) {
@@ -1366,9 +1394,9 @@ function EBlotter() {
       // Offense validations (merged into case detail)
       // Offense validations (merged into case detail)
       if (
-        !offenses[0] ||
-        !offenses[0].stage_of_felony ||
-        offenses[0].stage_of_felony === ""
+        !currentOffenses[0] ||
+        !currentOffenses[0].stage_of_felony ||
+        currentOffenses[0].stage_of_felony === ""
       ) {
         errors.stage_of_felony = "Stage of Felony is required";
       }
@@ -1406,7 +1434,7 @@ function EBlotter() {
   };
   const changeStep = (direction) => {
     if (direction === 1) {
-      const errors = validateCurrentStep();
+      const errors = validateCurrentStep(offensesRef.current);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
         setTimeout(() => {
@@ -1537,10 +1565,12 @@ function EBlotter() {
   };
 
   const updateOffense = (i, field, value) => {
-    const updated = [...offenses];
-    if (!updated[i]) return;
-    updated[i][field] = value;
-    setOffenses(updated);
+    setOffenses((prev) => {
+      const updated = [...prev];
+      if (!updated[i]) return prev;
+      updated[i] = { ...updated[i], [field]: value };
+      return updated;
+    });
   };
 
   const updateCaseDetail = (field, value) =>
@@ -1760,7 +1790,7 @@ function EBlotter() {
 
   const handleSubmit = async () => {
     // Validate Step 3 before submitting
-    const errors = validateCurrentStep();
+    const errors = validateCurrentStep(offenses);
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -1908,6 +1938,7 @@ function EBlotter() {
           showReactToast("Referral accepted! Case created automatically.");
           closeModal();
           fetchBlotters();
+          fetchReferredCount();
         } else {
           alert(data.message || "Failed to accept referral");
         }
@@ -2671,14 +2702,24 @@ function EBlotter() {
                           </span>
                         </div>
 
-                        {/* ROW 5: Narrative full width */}
-                        <div className="eb-view-item eb-view-full">
+                        <div
+                          className="eb-view-item"
+                          style={{ gridColumn: "span 2" }}
+                        >
                           <span className="eb-view-label">Narrative:</span>
                           <span className="eb-view-value">
                             {caseDetail.narrative}
                           </span>
                         </div>
 
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Coordinates:</span>
+                          <span className="eb-view-value">
+                            {caseDetail.lat && caseDetail.lng
+                              ? `${caseDetail.lat}, ${caseDetail.lng}`
+                              : "N/A"}
+                          </span>
+                        </div>
                         {/* ROW 6: Map full width */}
                         {caseDetail.lat && caseDetail.lng && (
                           <div className="eb-view-item eb-view-full">
@@ -2728,17 +2769,6 @@ function EBlotter() {
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* View Mode Footer */}
-                  <div className="eb-modal-footer">
-                    <button
-                      type="button"
-                      className="eb-btn eb-btn-secondary"
-                      onClick={closeModal}
-                    >
-                      Close
-                    </button>
                   </div>
                 </div>
               </div>
