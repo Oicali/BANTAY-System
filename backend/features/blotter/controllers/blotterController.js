@@ -483,14 +483,19 @@ const updateBlotter = async (req, res) => {
     }
     
     if (suspects && suspects.length > 0) {
-      suspects.forEach((suspect, index) => {
-        if (!suspect.first_name || suspect.first_name.trim() === "") return;
-        allErrors.push(...validateSuspect(suspect, index));
-      });
-    }
-    
-    
-    if (allErrors.length > 0) {
+  suspects.forEach((suspect, index) => {
+    if (!suspect.first_name || suspect.first_name.trim() === "") return;
+    allErrors.push(...validateSuspect(suspect, index));
+  });
+}
+
+if (offenses && offenses.length > 0) {
+  offenses.forEach((offense, index) => {
+    allErrors.push(...validateOffense(offense, index));
+  });
+}
+
+if (allErrors.length > 0) {
       return res.status(400).json({ success: false, errors: allErrors });
     }
     
