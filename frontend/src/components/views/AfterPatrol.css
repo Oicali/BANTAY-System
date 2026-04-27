@@ -1,0 +1,1401 @@
+/* ════════════════════════════════════════════════════════════════
+   PatrolModal.css
+   Shared styles for AddPatrolModal (apm-), EditPatrolModal (epm-),
+   and BeatCard (bc-).  All three use identical layout rules —
+   only the prefix differs so React scoping stays clean.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── DESIGN TOKENS ─────────────────────────────────────────────── */
+:root {
+  --pm-navy:          #1e3a5f;
+  --pm-navy-dark:     #0a1628;
+  --pm-navy-tint:     rgba(30, 58, 95, 0.07);
+  --pm-navy-ring:     rgba(30, 58, 95, 0.14);
+
+  --pm-red:           #dc2626;
+  --pm-red-tint:      #fef2f2;
+  --pm-red-border:    #fca5a5;
+
+  --pm-bg:            #ffffff;
+  --pm-surface:       #f8f9fa;
+  --pm-border:        #dee2e6;
+  --pm-border-input:  #ced4da;
+
+  --pm-text-primary:  #212529;
+  --pm-text-secondary:#495057;
+  --pm-text-muted:    #6c757d;
+  --pm-text-faint:    #adb5bd;
+
+  --pm-radius-sm:     5px;
+  --pm-radius-md:     7px;
+  --pm-radius-lg:     12px;
+  --pm-radius-pill:   20px;
+
+  --pm-transition:    0.18s ease;
+}
+
+/* ── OVERLAY ────────────────────────────────────────────────────── */
+.apm-overlay,
+.epm-overlay,
+.bc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.60);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: pm-fade 0.15s ease;
+}
+@keyframes pm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── MODAL SHELL ────────────────────────────────────────────────── */
+.apm-modal,
+.epm-modal,
+.bc-modal {
+  background: var(--pm-bg);
+  border-radius: var(--pm-radius-lg);
+  width: 95vw;
+  height: 95vh;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28), 0 4px 16px rgba(0, 0, 0, 0.10);
+  animation: pm-slide 0.20s ease;
+}
+@keyframes pm-slide {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TOP BAR  (apm / epm — the form bar at the top)
+   ══════════════════════════════════════════════════════════════════ */
+.apm-topbar,
+.epm-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.apm-topbar-fields,
+.epm-topbar-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.apm-topbar-actions,
+.epm-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── FIELD ──────────────────────────────────────────────────────── */
+.apm-field,
+.epm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.apm-field label,
+.epm-field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  white-space: nowrap;
+}
+.apm-req,
+.epm-req { color: var(--pm-red); margin-left: 2px; }
+
+.apm-field input,
+.apm-field select,
+.epm-field input,
+.epm-field select {
+  padding: 7px 11px;
+  border: 1px solid var(--pm-border-input);
+  border-radius: var(--pm-radius-sm);
+  font-size: 13px;
+  color: var(--pm-text-primary);
+  background: var(--pm-bg);
+  outline: none;
+  font-family: inherit;
+  transition: border-color var(--pm-transition), box-shadow var(--pm-transition);
+  min-width: 130px;
+}
+.apm-field input:focus,  .apm-field select:focus,
+.epm-field input:focus,  .epm-field select:focus {
+  border-color: var(--pm-navy);
+  box-shadow: 0 0 0 3px var(--pm-navy-ring);
+}
+.apm-field input[type="date"],
+.epm-field input[type="date"] {
+  color-scheme: light;
+  min-width: 150px;
+}
+.apm-field input[type="date"]::-webkit-calendar-picker-indicator,
+.epm-field input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  cursor: pointer;
+  filter: invert(15%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(60%);
+  width: 16px;
+  height: 16px;
+}
+
+/* ── HEADER  (bc- — the read-only patrol header) ────────────────── */
+.bc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 26px;
+  border-bottom: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bc-header-left { display: flex; flex-direction: column; gap: 6px; }
+.bc-patrol-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pm-navy-dark);
+  margin: 0;
+  line-height: 1.25;
+}
+.bc-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bc-duration { font-size: 13px; font-weight: 600; color: var(--pm-navy); }
+.bc-unit     { font-size: 13px; color: var(--pm-text-muted); font-weight: 500; }
+.bc-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════════════
+   SHARED BUTTONS
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Primary (navy fill) — Save */
+.apm-btn-save,
+.epm-btn-save {
+  padding: 8px 20px;
+  background: var(--pm-navy);
+  color: #fff;
+  border: none;
+  border-radius: var(--pm-radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--pm-transition);
+}
+.apm-btn-save:hover,
+.epm-btn-save:hover { background: var(--pm-navy-dark); }
+
+/* Edit — navy fill (declared after .bc-btn to win cascade) */
+.bc-btn.bc-btn-edit {
+  background: var(--pm-navy);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+}
+.bc-btn.bc-btn-edit:hover { background: var(--pm-navy-dark); color: #fff; }
+
+/* Ghost / cancel */
+.apm-btn-cancel,
+.epm-btn-cancel {
+  padding: 8px 18px;
+  background: transparent;
+  border: 1px solid var(--pm-border-input);
+  border-radius: var(--pm-radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pm-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--pm-transition);
+}
+.apm-btn-cancel:hover,
+.epm-btn-cancel:hover { background: var(--pm-surface); }
+
+/* Delete — red outline, fills red on hover */
+.bc-btn.bc-btn-delete {
+  background: transparent;
+  border: 1px solid var(--pm-red);
+  color: var(--pm-red);
+  font-weight: 600;
+  transition: background var(--pm-transition), color var(--pm-transition);
+}
+.bc-btn.bc-btn-delete:hover { background: var(--pm-red); color: #fff; }
+
+/* Close — red fill, white icon */
+.bc-btn.bc-btn-close {
+  background: var(--pm-red);
+  border: none;
+  color: #fff;
+}
+.bc-btn.bc-btn-close:hover { background: #b91c1c; color: #fff; }
+
+/* Base .bc-btn (fallback shared styles) */
+.bc-btn {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-radius-md);
+  font-size: 13px;
+  color: var(--pm-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: background var(--pm-transition), color var(--pm-transition);
+}
+
+/* apm close — red fill */
+.apm-btn-x {
+  padding: 8px 12px;
+  background: var(--pm-red);
+  border: none;
+  border-radius: var(--pm-radius-md);
+  font-size: 15px;
+  color: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: background var(--pm-transition);
+}
+.apm-btn-x:hover { background: #b91c1c; color: #ffffff; }
+
+/* epm close — ghost */
+.epm-btn-x {
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-radius-md);
+  font-size: 15px;
+  color: var(--pm-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: background var(--pm-transition), color var(--pm-transition);
+}
+.epm-btn-x:hover { background: var(--pm-surface); color: var(--pm-text-primary); }
+
+/* Add Task button — solid navy fill */
+.apm-add-task-btn,
+.epm-add-task-btn {
+  margin-top: 8px;
+  align-self: flex-start;
+  padding: 7px 16px;
+  background: var(--pm-navy);
+  border: none;
+  border-radius: var(--pm-radius-md);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--pm-transition);
+  flex-shrink: 0;
+}
+.apm-add-task-btn:hover,
+.epm-add-task-btn:hover { background: var(--pm-navy-dark); }
+
+/* Remove (×) inside timetable row */
+.apm-remove {
+  background: none;
+  border: none;
+  color: var(--pm-text-faint);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color var(--pm-transition);
+}
+.apm-remove:hover { color: var(--pm-red); }
+
+/* ══════════════════════════════════════════════════════════════════
+   BODY LAYOUT
+   ══════════════════════════════════════════════════════════════════ */
+.apm-body,
+.epm-body,
+.bc-body {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── MAP PANEL ──────────────────────────────────────────────────── */
+.apm-map-panel,
+.epm-map-panel,
+.bc-map-panel {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--pm-border);
+}
+
+/* Hover tooltip over map */
+.apm-map-tooltip,
+.epm-map-tooltip {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 22, 40, 0.82);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: var(--pm-radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: 0.15px;
+}
+
+/* Barangay tag chips below map */
+.apm-brgy-tags,
+.epm-brgy-tags {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+}
+.apm-brgy-tag,
+.epm-brgy-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pm-navy);
+  pointer-events: all;
+  backdrop-filter: blur(4px);
+}
+.apm-brgy-tag button,
+.epm-brgy-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--pm-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: color var(--pm-transition);
+}
+.apm-brgy-tag button:hover,
+.epm-brgy-tag button:hover { color: var(--pm-red); }
+
+/* ══════════════════════════════════════════════════════════════════
+   INFO PANEL  (right column)
+   ══════════════════════════════════════════════════════════════════ */
+.apm-info-panel,
+.epm-info-panel,
+.bc-info-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--pm-bg);
+}
+
+/* Section base */
+.apm-section,
+.epm-section,
+.bc-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--pm-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Scrollable section (timetable area) */
+.apm-section-grow,
+.epm-section-grow,
+.bc-section-grow {
+  flex: 1;
+  overflow-y: auto;
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  min-height: 0;
+}
+
+/* Section heading */
+.apm-section-title,
+.epm-section-title,
+.bc-section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+  flex-shrink: 0;
+}
+.apm-count,
+.epm-count { font-size: 11px; color: var(--pm-navy); font-weight: 600; }
+
+/* ── PATROLLER SEARCH INPUT ─────────────────────────────────────── */
+.apm-search,
+.epm-search {
+  padding: 7px 11px;
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-radius-sm);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  background: var(--pm-surface);
+  color: var(--pm-text-primary);
+  transition: border-color var(--pm-transition);
+  width: 100%;
+  box-sizing: border-box;
+}
+.apm-search:focus,
+.epm-search:focus { border-color: var(--pm-navy); }
+
+/* ── PATROLLER CHECKLIST ────────────────────────────────────────── */
+.apm-checklist,
+.epm-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 155px;
+  overflow-y: auto;
+}
+.apm-check-item,
+.epm-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--pm-radius-sm);
+  cursor: pointer;
+  transition: background var(--pm-transition);
+  user-select: none;
+}
+.apm-check-item:hover,
+.epm-check-item:hover { background: var(--pm-surface); }
+.apm-check-item.apm-checked,
+.epm-check-item.epm-checked { background: var(--pm-navy-tint); }
+
+.apm-avatar,
+.epm-avatar {
+  width: 30px;
+  height: 30px;
+  background: var(--pm-navy);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.apm-officer-name,
+.epm-officer-name { font-size: 13px; font-weight: 600; color: var(--pm-text-primary); flex: 1; }
+
+.apm-checkbox,
+.epm-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--pm-border-input);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all var(--pm-transition);
+}
+.apm-checkbox-on,
+.epm-checkbox-on { background: var(--pm-navy); border-color: var(--pm-navy); }
+
+/* ══════════════════════════════════════════════════════════════════
+   DATE TABS
+   ══════════════════════════════════════════════════════════════════ */
+.apm-date-tabs,
+.epm-date-tabs,
+.bc-date-tabs {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--pm-border);
+  flex-shrink: 0;
+}
+.apm-date-tab,
+.epm-date-tab,
+.bc-date-tab {
+  padding: 6px 13px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pm-text-muted);
+  cursor: pointer;
+  transition: color var(--pm-transition), border-color var(--pm-transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.apm-date-tab:hover,
+.epm-date-tab:hover,
+.bc-date-tab:hover { color: var(--pm-navy-dark); }
+.apm-date-tab-active,
+.epm-date-tab-active,
+.bc-date-tab-active {
+  color: var(--pm-navy);
+  border-bottom-color: var(--pm-navy);
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TIMETABLE HEADER + SHIFT TABS
+   ══════════════════════════════════════════════════════════════════ */
+.apm-timetable-header,
+.epm-timetable-header,
+.bc-timetable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.apm-shift-tabs,
+.epm-shift-tabs,
+.bc-shift-tabs { display: flex; gap: 4px; }
+.apm-shift-tab,
+.epm-shift-tab,
+.bc-shift-tab {
+  padding: 5px 15px;
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--pm-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--pm-transition);
+}
+.apm-shift-tab:hover,
+.epm-shift-tab:hover,
+.bc-shift-tab:hover { border-color: var(--pm-navy); color: var(--pm-navy); }
+.apm-shift-active,
+.epm-shift-active,
+.bc-shift-active {
+  background: var(--pm-navy);
+  color: #fff;
+  border-color: var(--pm-navy);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TIMETABLE TABLE
+   ══════════════════════════════════════════════════════════════════ */
+.apm-timetable-wrap,
+.epm-timetable-wrap,
+.bc-timetable-wrap {
+  overflow-y: auto;
+  flex: 1;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid var(--pm-border);
+}
+.apm-timetable,
+.epm-timetable,
+.bc-timetable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.apm-timetable thead,
+.epm-timetable thead,
+.bc-timetable thead {
+  background: var(--pm-surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.apm-timetable th,
+.epm-timetable th,
+.bc-timetable th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  border-bottom: 2px solid var(--pm-border);
+}
+.apm-timetable td,
+.epm-timetable td,
+.bc-timetable td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--pm-border);
+  vertical-align: middle;
+}
+.apm-timetable tbody tr:last-child td,
+.epm-timetable tbody tr:last-child td,
+.bc-timetable tbody tr:last-child td { border-bottom: none; }
+.apm-timetable tbody tr:hover,
+.epm-timetable tbody tr:hover,
+.bc-timetable tbody tr:hover { background: var(--pm-surface); }
+
+/* Time cell */
+.apm-tt-time,
+.epm-tt-time { white-space: nowrap; }
+.bc-tt-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pm-navy);
+  white-space: nowrap;
+  min-width: 115px;
+}
+
+/* Task/notes cell */
+.apm-tt-notes,
+.epm-tt-notes { min-width: 140px; }
+.bc-tt-task { font-size: 13px; color: var(--pm-text-primary); line-height: 1.5; }
+
+/* ── TIME INPUTS ────────────────────────────────────────────────── */
+.apm-time-inputs,
+.epm-time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.apm-time-inputs input[type="time"],
+.epm-time-inputs input[type="time"] {
+  padding: 4px 7px;
+  border: 1px solid var(--pm-border-input);
+  border-radius: var(--pm-radius-sm);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  width: 100px;
+  color: var(--pm-text-secondary);
+  background: var(--pm-surface);
+  color-scheme: light;
+  transition: border-color var(--pm-transition);
+}
+.apm-time-inputs input[type="time"]::-webkit-calendar-picker-indicator,
+.epm-time-inputs input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  cursor: pointer;
+  filter: invert(15%) sepia(50%) saturate(600%) hue-rotate(190deg) brightness(60%);
+  width: 14px;
+  height: 14px;
+}
+.apm-time-inputs input[type="time"]:focus,
+.epm-time-inputs input[type="time"]:focus { border-color: var(--pm-navy); }
+.apm-time-inputs span,
+.epm-time-inputs span { font-size: 11px; color: var(--pm-text-muted); }
+
+/* ── NOTES TEXTAREA ─────────────────────────────────────────────── */
+.apm-notes,
+.epm-notes {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  font-size: 12px;
+  color: var(--pm-text-secondary);
+  font-style: italic;
+  outline: none;
+  padding: 2px 0;
+  font-family: inherit;
+  resize: none;
+  overflow: hidden;
+  transition: border-color var(--pm-transition), color var(--pm-transition);
+}
+.apm-notes:focus,
+.epm-notes:focus {
+  border-bottom-color: var(--pm-navy);
+  color: var(--pm-text-primary);
+  font-style: normal;
+}
+.apm-notes::placeholder,
+.epm-notes::placeholder { color: var(--pm-text-faint); }
+
+/* ══════════════════════════════════════════════════════════════════
+   PATROLLERS TABLE  (BeatCard read-only view)
+   ══════════════════════════════════════════════════════════════════ */
+.bc-patroller-table-wrap {
+  overflow-x: auto;
+  max-height: 185px;
+  overflow-y: auto;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid var(--pm-border);
+}
+.bc-patroller-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.bc-patroller-table thead { background: var(--pm-surface); position: sticky; top: 0; z-index: 1; }
+.bc-patroller-table th {
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+  border-bottom: 2px solid var(--pm-border);
+  white-space: nowrap;
+}
+.bc-patroller-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--pm-border);
+  vertical-align: top;
+}
+.bc-patroller-table tbody tr:last-child td { border-bottom: none; }
+.bc-patroller-table tbody tr:hover { background: var(--pm-surface); }
+.bc-pt-date {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pm-navy);
+  white-space: nowrap;
+  border-right: 1px solid var(--pm-border);
+}
+.bc-pt-name    { font-size: 12px; font-weight: 600; color: var(--pm-text-primary); }
+.bc-pt-contact { font-size: 12px; color: var(--pm-text-muted); }
+
+/* ── EMPTY STATE ────────────────────────────────────────────────── */
+.apm-empty,
+.epm-empty,
+.bc-empty {
+  font-size: 13px;
+  color: var(--pm-text-faint);
+  font-style: italic;
+  margin: 4px 0;
+}
+/* ── APPLY DATES DIALOG ── */
+.apd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.apd-dialog {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 340px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.apd-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0a1628;
+}
+.apd-sub {
+  font-size: 13px;
+  color: #6c757d;
+  margin-top: -8px;
+}
+.apd-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.apd-date-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 13px;
+  color: #212529;
+  user-select: none;
+}
+.apd-date-item:hover { background: #f8f9fa; }
+.apd-current { cursor: default; }
+.apd-current:hover { background: transparent; }
+.apd-selected { background: rgba(30, 58, 95, 0.06); }
+.apd-check {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #ced4da;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.apd-check-on { background: #1e3a5f; border-color: #1e3a5f; }
+.apd-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #1e3a5f;
+  color: #fff;
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-left: auto;
+}
+.apd-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #dee2e6;
+  padding-top: 14px;
+}
+.apd-btn-all {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a5f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.apd-btn-all:hover { text-decoration: underline; }
+.apd-btn-cancel {
+  padding: 7px 16px;
+  background: transparent;
+  border: 1px solid #ced4da;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  cursor: pointer;
+  font-family: inherit;
+}
+.apd-btn-confirm {
+  padding: 7px 18px;
+  background: #1e3a5f;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.apd-btn-confirm:hover { background: #0a1628; }
+/*changessa patroller
+
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS
+   Append these rules to your existing PatrolModal.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel (shared by apm/epm/bc) ── */
+
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+/* reuse existing .apm-shift-active / .epm-shift-active / .bc-shift-active for the active state */
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Badge on shift tab showing assigned count ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked layout in checklist ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row that belongs to other shift — dimmed + amber indicator ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── BeatCard shift badge ── */
+.bc-shift-tabs-top {
+  padding: 8px 14px 0;
+}
+
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PATROL MODAL — CSS ADDITIONS (append to PatrolModal.css)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Shift tabs at the top of the right panel ── */
+.apm-shift-tabs-top,
+.epm-shift-tabs-top,
+.bc-shift-tabs-top {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.apm-shift-tab-top,
+.epm-shift-tab-top,
+.bc-shift-tab-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+
+.apm-shift-tab-top:hover,
+.epm-shift-tab-top:hover,
+.bc-shift-tab-top:hover {
+  color: #1e3a5f;
+  background: #e9ecef;
+}
+
+.apm-shift-tab-top.apm-shift-active,
+.epm-shift-tab-top.epm-shift-active,
+.bc-shift-tab-top.bc-shift-active {
+  color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  background: #fff;
+}
+
+/* ── Count badge on shift tab ── */
+.apm-shift-badge,
+.epm-shift-badge,
+.bc-shift-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Officer info stacked (name + other-shift label) ── */
+.apm-officer-info,
+.epm-officer-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.apm-other-shift-label,
+.epm-other-shift-label {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Patroller row assigned to other shift — dimmed + amber ── */
+.apm-check-item.apm-other-shift,
+.epm-check-item.epm-other-shift {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-left: 3px solid #f59e0b;
+}
+
+.apm-check-item.apm-other-shift:hover,
+.epm-check-item.epm-other-shift:hover {
+  background: #fffbeb;
+}
+
+/* ── Dirty date indicator dot on date tabs ── */
+.epm-date-dirty,
+.bc-date-dirty {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  margin-left: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+/* ── MAP CONTROLS (patrol modals) ── */
+.pm-map-controls {
+  position: absolute;
+  bottom: 50px;
+  left: 10px;
+  z-index: 10;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  border: 1.5px solid #dee2e6;
+}
+.pm-map-ctrl-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e3a5f;
+  transition: background 0.15s;
+  padding: 0;
+}
+.pm-map-ctrl-btn:first-child { border-radius: 7px 7px 0 0; }
+.pm-map-ctrl-btn:last-child  { border-radius: 0 0 7px 7px; }
+.pm-map-ctrl-btn:hover { background: #f1f5f9; }
+.pm-map-ctrl-btn:hover svg { stroke: #c1272d; }
+.pm-map-ctrl-btn svg { display: block; flex-shrink: 0; stroke: #1e3a5f; fill: none; }
+.pm-map-ctrl-divider { height: 1px; background: #e9ecef; }
+
+/* ════════════════════════════════════════════════════════════
+   AfterPatrol.css — ADDITIONS
+   Paste these at the bottom of your existing AfterPatrol.css
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Action button base ── */
+.pd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* View — navy ghost */
+.pd-action-btn-view {
+  background: rgba(30, 58, 95, 0.06);
+  color: #1e3a5f;
+  border-color: rgba(30, 58, 95, 0.2);
+}
+.pd-action-btn-view:hover {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+
+/* History — slate ghost */
+.pd-action-btn-history {
+  background: rgba(100, 116, 139, 0.07);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.22);
+}
+.pd-action-btn-history:hover {
+  background: #475569;
+  color: #fff;
+  border-color: #475569;
+}
+
+/* After Report — amber/gold filled */
+.pd-action-btn-report {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.pd-action-btn-report:hover {
+  background: #0a1628;
+  border-color: #0a1628;
+}
+
+/* Edit — amber ghost (used inside history modal) */
+.pd-action-btn-edit {
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.pd-action-btn-edit:hover {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+}
+
+/* Action links wrapper — keeps buttons in a neat row */
+.pd-action-links {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+/* ════════════════════════════════════════════════════════════
+   AfterPatrol.css — ADDITIONS
+   Paste these at the bottom of your existing AfterPatrol.css
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Action button base ── */
+.pd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* View — navy ghost */
+.pd-action-btn-view {
+  background: rgba(30, 58, 95, 0.06);
+  color: #1e3a5f;
+  border-color: rgba(30, 58, 95, 0.2);
+}
+.pd-action-btn-view:hover {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+
+/* History — slate ghost */
+.pd-action-btn-history {
+  background: rgba(100, 116, 139, 0.07);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.22);
+}
+.pd-action-btn-history:hover {
+  background: #475569;
+  color: #fff;
+  border-color: #475569;
+}
+
+/* After Report — amber/gold filled */
+.pd-action-btn-report {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.pd-action-btn-report:hover {
+  background: #0a1628;
+  border-color: #0a1628;
+}
+
+/* Edit — amber ghost (used inside history modal) */
+.pd-action-btn-edit {
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.pd-action-btn-edit:hover {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+}
+
+/* Action links wrapper — keeps buttons in a neat row */
+.pd-action-links {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+/* Delete — red ghost, fills red on hover */
+.pd-action-btn-delete {
+  background: rgba(220, 38, 38, 0.06);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+.pd-action-btn-delete:hover:not(:disabled) {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+.pd-action-btn-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .apm-modal,
+  .epm-modal,
+  .bc-modal {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .apm-body,
+  .epm-body,
+  .bc-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50% 50%;
+  }
+  .apm-map-panel,
+  .epm-map-panel,
+  .bc-map-panel {
+    border-right: none;
+    border-bottom: 1px solid var(--pm-border);
+  }
+  .apm-topbar,
+  .epm-topbar {
+    padding: 12px 16px;
+  }
+  .bc-header {
+    padding: 14px 16px;
+  }
+}
+/* f59e0b */

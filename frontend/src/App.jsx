@@ -16,7 +16,7 @@ import UserManagement from "./components/views/UserManagement";
 import ProfileSettings from "./components/views/ProfileSettings";
 import BrgyReport from "./components/views/BrgyReport";
 import VerificationSuccess from "./components/views/VerificationSucess";
-
+import AfterPatrol from "./components/views/AfterPatrol";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
 
@@ -42,6 +42,7 @@ function App() {
           <Route path="/crime-mapping" element={<CrimeMapping />} />
           <Route path="/patrol-dashboard" element={<PatrolDashboard />} />
           <Route path="/patrol-scheduling" element={<PatrolScheduling />} />
+          <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
           <Route path="/profile" element={<ProfileSettings />} />
           <Route path="/modus-management" element={<ModusManagement />} />

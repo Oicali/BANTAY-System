@@ -3,12 +3,16 @@ const express = require("express");
 const router  = express.Router();
 const {
   getMyPatrols,
+  getAfterPatrolReports,
+  getMyAfterPatrolReports,
   getPatrolStats,
   getActivePatrollers,
   getAvailablePatrollers,
   getMobileUnits,
   createMobileUnit,
+  submitAfterPatrolReport,
   updateMobileUnit,
+deleteAfterPatrolReport,
   deleteMobileUnit,
   getPatrols,
   createPatrol,
@@ -43,6 +47,7 @@ router.post  ("/patrols",     authenticate, createPatrol);
 router.put   ("/patrols/:id", authenticate, updatePatrol);
 router.delete("/patrols/:id", authenticate, deletePatrol);
 
+
 // ── Patrollers per date (new) ──────────────────────────────
 // PATCH /patrol/patrols/:id/patrollers/:date
 // Replace all patrollers for a specific patrol date
@@ -58,4 +63,9 @@ router.delete("/routes/:routeId",       authenticate, removeRouteTask);
 router.post("/export/list",   authenticate, exportPatrolList);
 router.post("/export/detail", authenticate, exportPatrolDetail);
 
+//
+ router.post("/patrols/:id/after-report", authenticate, submitAfterPatrolReport);
+router.get( "/patrols/:id/after-reports", authenticate, getAfterPatrolReports);
+router.get( "/patrols/:id/after-reports/mine", authenticate, getMyAfterPatrolReports);
+router.delete("/after-reports/:reportId", authenticate, deleteAfterPatrolReport)
 module.exports = router;
