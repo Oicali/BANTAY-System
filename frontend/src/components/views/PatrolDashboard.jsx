@@ -1,1015 +1,573 @@
-// src/components/views/PatrolDashboard.jsx
 import { useState, useEffect } from "react";
 import "./PatrolDashboard.css";
+import LoadingModal from "../modals/LoadingModal";
+import Notification from "../modals/Notification";
+import {
+  ShieldCheck, AlertTriangle, Car, Users, Search,
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
+const VEHICLE_TYPES = ["Car/Sedan", "SUV/Van"];
+const PAGE_SIZE = 5;
 
-// ── Helpers ────────────────────────────────────────────────────────
-const parseLocalDate = (d) => {
-  if (!d) return null;
-  const dt = new Date(d);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-};
+const PatrollerDashboard = () => {
+  const token = () => localStorage.getItem("token");
 
-const todayDate = () => {
-  const t = new Date();
-  return new Date(t.getFullYear(), t.getMonth(), t.getDate());
-};
-
-const getPatrolStatus = (patrol) => {
-  const t     = todayDate();
-  const start = parseLocalDate(patrol.start_date);
-  const end   = parseLocalDate(patrol.end_date);
-  if (!start || !end) return "unknown";
-  if (t < start) return "upcoming";
-  if (t > end)   return "completed";
-  return "active";
-};
-
-const formatDate = (d) => {
-  const dt = parseLocalDate(d);
-  return dt
-    ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
-    : "—";
-};
-
-const formatDateTime = (d) => {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return dt.toLocaleDateString("en-PH", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+  // ── State ──────────────────────────────────────────────
+  const [loading, setLoading]             = useState(true);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [notif, setNotif]                 = useState(null);
+  const [activeTable, setActiveTable]     = useState("patrollers");
+  const [patrollers, setPatrollers]       = useState([]);
+  const [mobileUnits, setMobileUnits]     = useState([]);
+  const [stats, setStats]                 = useState({
+    active_patrols_today:  0,
+    unassigned_patrollers: 0,
+    mobile_units:          0,
+    total_officers:        0,
   });
-};
 
-const toInputDate = (d) => {
-  if (!d) return "";
-  const dt = parseLocalDate(d);
-  return dt ? dt.toISOString().split("T")[0] : "";
-};
+  // ── Patroller filters & pagination ────────────────────
+  const [patrollerSearch, setPatrollerSearch] = useState("");
+  const [patrollerDateFrom, setPatrollerDateFrom] = useState("");
+  const [patrollerDateTo, setPatrollerDateTo]     = useState("");
+  const [appliedPatrollerFilters, setAppliedPatrollerFilters] = useState({
+    search: "", dateFrom: "", dateTo: "",
+  });
+  const [patrollerFiltersApplied, setPatrollerFiltersApplied] = useState(false);
+  const [patrollerPage, setPatrollerPage] = useState(1);
 
-const token = () => localStorage.getItem("token");
+  // ── Mobile unit filters & pagination ──────────────────
+  const [unitSearch, setUnitSearch]       = useState("");
+  const [unitDateFrom, setUnitDateFrom]   = useState("");
+  const [unitDateTo, setUnitDateTo]       = useState("");
+  const [appliedUnitFilters, setAppliedUnitFilters] = useState({
+    search: "", dateFrom: "", dateTo: "",
+  });
+  const [unitFiltersApplied, setUnitFiltersApplied] = useState(false);
+  const [unitPage, setUnitPage]           = useState(1);
 
-// ── Icons ──────────────────────────────────────────────────────────
-const ReportIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="16" y1="13" x2="8" y2="13"/>
-    <line x1="16" y1="17" x2="8" y2="17"/>
-    <polyline points="10 9 9 9 8 9"/>
-  </svg>
-);
+  // ── Modal state ────────────────────────────────────────
+  const [showModal, setShowModal]       = useState(false);
+  const [modalMode, setModalMode]       = useState("add");
+  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [form, setForm]                 = useState({
+    mobile_unit_name: "", vehicle_type: "", plate_number: "",
+  });
 
-const ViewIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-    <circle cx="12" cy="12" r="3"/>
-  </svg>
-);
-
-const HistoryIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
-  </svg>
-);
-
-const EditIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-  </svg>
-);
-
-// ── Status badge ───────────────────────────────────────────────────
-const StatusBadge = ({ status }) => {
-  const map    = { active: "pd-status-active", upcoming: "pd-status-upcoming", completed: "pd-status-completed" };
-  const labels = { active: "Active", upcoming: "Upcoming", completed: "Completed" };
-  return (
-    <span className={`pd-status-badge ${map[status] || "pd-status-completed"}`}>
-      {labels[status] || "Unknown"}
-    </span>
-  );
-};
-
-// ── Form helpers ───────────────────────────────────────────────────
-const emptyForm = (patrol) => ({
-  date:           toInputDate(patrol?.start_date) || "",
-  timeFrom:       "",
-  timeTo:         "",
-  preDeployment:  "",
-  action1:        "",
-  incidents:      "",
-  action2:        "",
-  safetyConcerns: "",
-  action3:        "",
-  otherServices:  "",
-  visitedAreas:   "",
-  personsVisited: "",
-  numOfficials:   "",
-  numGovt:        "",
-  sector:         patrol?.mobile_unit_name || "",
-  mustDos:        "",
-  remarks:        "",
-  creditHours:    "",
-  sigOfficer1:    "",
-  sigOfficer2:    "",
-  sigSupervisor:  "",
-});
-
-const dbRowToForm = (row) => ({
-  date:           toInputDate(row.patrol_date),
-  timeFrom:       row.time_from             || "",
-  timeTo:         row.time_to               || "",
-  preDeployment:  row.pre_deployment        || "",
-  action1:        row.action_pre_deployment || "",
-  incidents:      row.incidents             || "",
-  action2:        row.action_incidents      || "",
-  safetyConcerns: row.safety_concerns       || "",
-  action3:        row.action_safety         || "",
-  otherServices:  row.other_services        || "",
-  visitedAreas:   row.visited_areas         || "",
-  personsVisited: row.persons_visited       || "",
-  numOfficials:   row.num_officials         != null ? String(row.num_officials)       : "",
-  numGovt:        row.num_govt_officials    != null ? String(row.num_govt_officials)  : "",
-  sector:         row.sector_beat           || "",
-  mustDos:        row.must_dos              || "",
-  remarks:        row.remarks               || "",
-  creditHours:    row.credit_hours          || "",
-  sigOfficer1:    row.sig_officer_1         || "",
-  sigOfficer2:    row.sig_officer_2         || "",
-  sigSupervisor:  row.sig_supervisor        || "",
-});
-
-// ── After Patrol Report Modal ──────────────────────────────────────
-const AfterPatrolModal = ({ patrol, existingReport, onClose, onSubmit }) => {
-  const [form,       setForm]       = useState(existingReport ? dbRowToForm(existingReport) : emptyForm(patrol));
-  const [submitting, setSubmitting] = useState(false);
-
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const handleSubmit = async () => {
-    if (!form.date) { alert("Patrol date is required."); return; }
-    setSubmitting(true);
-    await onSubmit(patrol.patrol_id, form);
-    setSubmitting(false);
-    onClose();
+  // ── Fetchers ───────────────────────────────────────────
+  const fetchPatrolStats = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/patrol/stats`, { headers: { Authorization: `Bearer ${token()}` } });
+      const data = await res.json();
+      if (data.success) setStats(data.data);
+    } catch (err) { console.error("Stats error:", err); }
   };
 
-  const isEditing = !!existingReport;
+  const fetchPatrollers = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/patrol/active`, { headers: { Authorization: `Bearer ${token()}` } });
+      const data = await res.json();
+      if (data.success) setPatrollers(data.data);
+    } catch (err) { console.error("Patrollers error:", err); }
+  };
 
-  return (
-    <div className="pd-modal">
-      <div className="pd-modal-content">
-
-        {/* Header */}
-        <div className="pd-modal-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: 10,
-              background: "rgba(255,255,255,0.15)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, border: "1px solid rgba(255,255,255,0.2)",
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-              </svg>
-            </div>
-            <div>
-              <h2>{isEditing ? "Edit After Patrol Report" : "After Patrol Report"}</h2>
-              <div className="pd-modal-header-sub">
-                {patrol?.patrol_name} &nbsp;·&nbsp; {formatDate(patrol?.start_date)} – {formatDate(patrol?.end_date)}
-              </div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>
-                ANNEX D · PNPM-DO-DS-3-3-15 (DO)
-                {isEditing && (
-                  <span style={{
-                    marginLeft: 8, background: "rgba(245,158,11,0.3)", color: "#fde68a",
-                    padding: "1px 6px", borderRadius: 4, fontWeight: 700,
-                  }}>
-                    EDITING EXISTING REPORT
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <span className="pd-modal-close" onClick={onClose}>&times;</span>
-        </div>
-
-        {/* Body */}
-        <div className="pd-modal-body">
-
-          <h3 className="pd-section-title">1. Patrol Date & Time</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Date *</label>
-              <input type="date" className="pd-modal-input" value={form.date} onChange={set("date")}
-                min={toInputDate(patrol?.start_date)} max={toInputDate(patrol?.end_date)} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Time From</label>
-              <input type="time" className="pd-modal-input" value={form.timeFrom} onChange={set("timeFrom")} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Time To</label>
-              <input type="time" className="pd-modal-input" value={form.timeTo} onChange={set("timeTo")} />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">2. Pre-Deployment Instructions</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Specific instructions received</label>
-              <textarea className="pd-modal-input" rows={3} value={form.preDeployment} onChange={set("preDeployment")}
-                placeholder="Enter pre-deployment instructions..." />
-            </div>
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Action Taken</label>
-              <input type="text" className="pd-modal-input" placeholder="Action taken..." value={form.action1} onChange={set("action1")} />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">3. Incidents & Unusual Events</h3>
-          <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
-            Crime incidents, public disturbance, major events, etc.
-          </div>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Incidents / Unusual situations</label>
-              <textarea className="pd-modal-input" rows={3} value={form.incidents} onChange={set("incidents")}
-                placeholder="Describe incidents or unusual events..." />
-            </div>
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Action Taken</label>
-              <input type="text" className="pd-modal-input" placeholder="Action taken..." value={form.action2} onChange={set("action2")} />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">4. Public Safety Concerns</h3>
-          <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
-            Uncovered manholes, busted lights, uncollected garbage, fire hazard, missing bridge railings, etc.
-          </div>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Safety concerns observed</label>
-              <textarea className="pd-modal-input" rows={3} value={form.safetyConcerns} onChange={set("safetyConcerns")}
-                placeholder="Describe public safety concerns..." />
-            </div>
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Action Taken</label>
-              <input type="text" className="pd-modal-input" placeholder="Action taken..." value={form.action3} onChange={set("action3")} />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">5. Other Services & Visited Areas</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Other public safety services rendered</label>
-              <textarea className="pd-modal-input" rows={2} value={form.otherServices} onChange={set("otherServices")}
-                placeholder="Area and route security, assistance to PWD, recovered property, etc." />
-            </div>
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Visited areas</label>
-              <textarea className="pd-modal-input" rows={2} value={form.visitedAreas} onChange={set("visitedAreas")}
-                placeholder="House, school, church, business, barangay, etc." />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">6. Persons Visited</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Name of persons visited / local officials</label>
-              <textarea className="pd-modal-input" rows={2} value={form.personsVisited} onChange={set("personsVisited")}
-                placeholder="List persons visited..." />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">No. of officials visited</label>
-              <input type="number" min={0} className="pd-modal-input" placeholder="0"
-                value={form.numOfficials} onChange={set("numOfficials")} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Total gov't officials in area (incl. brgy.)</label>
-              <input type="number" min={0} className="pd-modal-input" placeholder="0"
-                value={form.numGovt} onChange={set("numGovt")} />
-            </div>
-            <div className="pd-form-group" />
-          </div>
-
-          <h3 className="pd-section-title">7. Patrol Information</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Sector / Beat Patrolled</label>
-              <input type="text" className="pd-modal-input" value={form.sector} onChange={set("sector")} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Total Patrol Credit Hours</label>
-              <input type="text" className="pd-modal-input" placeholder="e.g. 8 hours"
-                value={form.creditHours} onChange={set("creditHours")} />
-            </div>
-            <div className="pd-form-group" />
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Patrolled MUST DOs such as</label>
-              <textarea className="pd-modal-input" rows={2} value={form.mustDos} onChange={set("mustDos")}
-                placeholder="List MUST DOs patrolled..." />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">8. Remarks & Recommendations</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-              <label className="pd-modal-label">Remarks / Recommendations</label>
-              <textarea className="pd-modal-input" rows={3} value={form.remarks} onChange={set("remarks")}
-                placeholder="Best practices, traffic assistance rendered, etc." />
-            </div>
-          </div>
-
-          <h3 className="pd-section-title">9. Signatures</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Patrol Officer 1</label>
-              <input type="text" className="pd-modal-input" placeholder="Rank and name"
-                value={form.sigOfficer1} onChange={set("sigOfficer1")} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Patrol Officer 2</label>
-              <input type="text" className="pd-modal-input" placeholder="Rank and name"
-                value={form.sigOfficer2} onChange={set("sigOfficer2")} />
-            </div>
-            <div className="pd-form-group">
-              <label className="pd-modal-label">Patrol Supervisor</label>
-              <input type="text" className="pd-modal-input" placeholder="Rank and name"
-                value={form.sigSupervisor} onChange={set("sigSupervisor")} />
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer */}
-        <div className="pd-modal-footer">
-          <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="pd-btn pd-btn-navy" onClick={handleSubmit}
-            disabled={submitting} style={{ minWidth: 200 }}>
-            {submitting ? "Submitting..." : isEditing ? "Update After Patrol Report" : "Submit After Patrol Report"}
-          </button>
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-// ── My Reports History Modal ───────────────────────────────────────
-const MyReportsModal = ({ patrol, onClose, onEdit }) => {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const fetchMobileUnits = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/patrol/mobile-units`, { headers: { Authorization: `Bearer ${token()}` } });
+      const data = await res.json();
+      if (data.success) setMobileUnits(data.data);
+    } catch (err) { console.error("Mobile units error:", err); }
+  };
 
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const res  = await fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
-          headers: { Authorization: `Bearer ${token()}` },
-        });
-        const data = await res.json();
-        if (data.success) setReports(data.data);
-      } catch (err) {
-        console.error("Fetch my reports error:", err);
-      } finally {
-        setLoading(false);
-      }
+    const loadData = async (isInitial = false) => {
+      if (isInitial) setLoading(true);
+      await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
+      if (isInitial) setLoading(false);
     };
-    fetchReports();
-  }, [patrol.patrol_id]);
+    loadData(true);
+    const interval = setInterval(() => loadData(false), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
-  return (
-    <div className="pd-modal">
-      <div className="pd-modal-content" style={{ maxWidth: 700 }}>
-
-        <div className="pd-modal-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: 10,
-              background: "rgba(255,255,255,0.15)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, border: "1px solid rgba(255,255,255,0.2)",
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
-              </svg>
-            </div>
-            <div>
-              <h2>My Submitted Reports</h2>
-              <div className="pd-modal-header-sub">
-                {patrol?.patrol_name} &nbsp;·&nbsp; {formatDate(patrol?.start_date)} – {formatDate(patrol?.end_date)}
-              </div>
-            </div>
-          </div>
-          <span className="pd-modal-close" onClick={onClose}>&times;</span>
-        </div>
-
-        <div style={{ overflowY: "auto", flex: 1 }}>
-          <div style={{
-            fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700,
-            color: "white", padding: "10px 32px",
-            background: "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
-            textTransform: "uppercase", letterSpacing: "0.8px",
-          }}>
-            Report History — {reports.length} submission{reports.length !== 1 ? "s" : ""}
-          </div>
-
-          <div style={{ padding: "20px 32px 28px", background: "var(--gray-50)", minHeight: 120 }}>
-            {loading ? (
-              <div style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>Loading reports...</div>
-            ) : reports.length === 0 ? (
-              <div style={{
-                textAlign: "center", padding: 28, color: "#9ca3af",
-                background: "rgba(30,58,95,0.03)", borderRadius: 8,
-                border: "1px dashed #e5e7eb", fontSize: 13,
-              }}>
-                <div style={{ fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>No reports submitted yet</div>
-                <div style={{ fontSize: 12 }}>Use the "After Report" button on a patrol to submit your first report.</div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {reports.map((r) => (
-                  <div key={r.report_id} style={{
-                    background: "white", border: "1px solid var(--gray-200)",
-                    borderRadius: 8, overflow: "hidden",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                  }}>
-                    {/* Card header */}
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 20px",
-                      background: "linear-gradient(to right, rgba(30,58,95,0.06), transparent)",
-                      borderBottom: "1px solid var(--gray-200)",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700, color: "var(--navy-primary)" }}>
-                          {formatDate(r.patrol_date)}
-                        </span>
-                        {r.time_from && r.time_to && (
-                          <span style={{ fontSize: 11, color: "var(--gray-600)", fontWeight: 500, background: "var(--gray-100)", padding: "2px 8px", borderRadius: 4 }}>
-                            {r.time_from} – {r.time_to}
-                          </span>
-                        )}
-                        {r.credit_hours && (
-                          <span style={{
-                            fontSize: 11, color: "#16a34a", fontWeight: 700,
-                            background: "rgba(34,197,94,0.08)", padding: "2px 8px",
-                            borderRadius: 4, border: "1px solid #86efac",
-                          }}>
-                            {r.credit_hours}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 11, color: "var(--gray-400)" }}>
-                          Submitted {formatDateTime(r.submitted_at)}
-                        </span>
-                        <button className="pd-action-btn pd-action-btn-view" style={{ padding: "5px 10px" }}
-                          onClick={() => onEdit(patrol, r)}>
-                          <EditIcon /> Edit
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Summary grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-                      {[
-                        { label: "Sector / Beat",      value: r.sector_beat },
-                        { label: "Officials Visited",  value: r.num_officials != null ? String(r.num_officials) : null },
-                        { label: "Signatures",         value: [r.sig_officer_1, r.sig_officer_2, r.sig_supervisor].filter(Boolean).join(", ") || null },
-                        { label: "Incidents",          value: r.incidents, full: true },
-                        { label: "Remarks",            value: r.remarks,   full: true },
-                      ].map(({ label, value, full }, i) => (
-                        <div key={i} style={{
-                          padding: "10px 20px",
-                          gridColumn: full ? "1 / -1" : undefined,
-                          borderRight: !full && (i + 1) % 3 !== 0 ? "1px solid var(--gray-100)" : "none",
-                          borderBottom: "1px solid var(--gray-100)",
-                        }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 3 }}>
-                            {label}
-                          </div>
-                          <div style={{ fontSize: 13, color: value ? "var(--gray-900)" : "#9ca3af", fontStyle: value ? "normal" : "italic" }}>
-                            {value || "—"}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="pd-modal-footer">
-          <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Close</button>
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-// ── View Patrol Modal ──────────────────────────────────────────────
-const ViewPatrolModal = ({ patrol, onClose }) => {
-  const patrollers = patrol.patrollers || [];
-  const barangays  = [...new Set(
-    (patrol.routes || [])
-      .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-      .map((r) => r.barangay)
-  )];
-
-  const SectionHeader = ({ children }) => (
-    <div style={{
-      fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 700,
-      color: "white", padding: "10px 32px",
-      background: "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
-      textTransform: "uppercase", letterSpacing: "0.8px",
-    }}>
-      {children}
-    </div>
-  );
-
-  return (
-    <div className="pd-modal">
-      <div className="pd-modal-content" style={{ maxWidth: 640 }}>
-
-        <div className="pd-modal-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: 10,
-              background: "rgba(255,255,255,0.15)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, border: "1px solid rgba(255,255,255,0.2)",
-            }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </div>
-            <div>
-              <h2>View Patrol Assignment</h2>
-              <div className="pd-modal-header-sub">Read-only view of patrol record</div>
-              <span style={{
-                display: "inline-flex", alignItems: "center",
-                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)",
-                borderRadius: 6, padding: "2px 8px", marginTop: 4,
-                fontFamily: "monospace", fontSize: 12, fontWeight: 700,
-                color: "rgba(255,255,255,0.85)", letterSpacing: "0.5px",
-              }}>
-                # {patrol.patrol_name}
-              </span>
-            </div>
-          </div>
-          <span className="pd-modal-close" onClick={onClose}>&times;</span>
-        </div>
-
-        <div style={{ overflowY: "auto", flex: 1 }}>
-          <SectionHeader>Patrol Information</SectionHeader>
-          <div style={{ padding: "20px 32px 28px", background: "var(--gray-50)" }}>
-            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-                {[
-                  { label: "Patrol Name",      value: patrol.patrol_name },
-                  { label: "Status",           value: <StatusBadge status={getPatrolStatus(patrol)} /> },
-                  { label: "Mobile Unit",      value: patrol.mobile_unit_name || "—" },
-                  { label: "Start Date",       value: formatDate(patrol.start_date) },
-                  { label: "End Date",         value: formatDate(patrol.end_date) },
-                  { label: "Total Patrollers", value: patrollers.length || "—" },
-                ].map(({ label, value }, i) => (
-                  <div key={i} style={{
-                    display: "flex", flexDirection: "column", gap: 4, padding: "14px 20px",
-                    borderRight: (i + 1) % 3 !== 0 ? "1px solid var(--gray-100)" : "none",
-                    borderBottom: i < 3 ? "1px solid var(--gray-100)" : "none",
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.6px" }}>{label}</span>
-                    <span style={{ fontSize: 14, color: "var(--gray-900)", fontWeight: 500 }}>{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <SectionHeader>Patrollers Assigned</SectionHeader>
-          <div style={{ padding: "20px 32px 28px", background: "var(--gray-50)" }}>
-            {patrollers.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 28, color: "#9ca3af", background: "rgba(30,58,95,0.03)", borderRadius: 8, border: "1px dashed #e5e7eb", fontSize: 13 }}>
-                No patrollers assigned
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {patrollers.map((p, i) => (
-                  <div key={i} style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--navy-primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                      {(p.officer_name || "?").charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, color: "var(--gray-900)", fontSize: 14 }}>{p.officer_name || "Unknown"}</div>
-                      {p.shift && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700,
-                          background: p.shift === "AM" ? "#fef3c7" : "#e0e7f0",
-                          color: p.shift === "AM" ? "#92400e" : "#1e3a5f",
-                          padding: "1px 7px", borderRadius: 20,
-                          border: `1px solid ${p.shift === "AM" ? "#fcd34d" : "#93afc9"}`,
-                        }}>
-                          {p.shift}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {barangays.length > 0 && (
-            <>
-              <SectionHeader>Area of Responsibility</SectionHeader>
-              <div style={{ padding: "20px 32px 28px", background: "var(--gray-50)" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {barangays.map((b, i) => (
-                    <span key={i} className="pd-count-pill pd-count-barangay">{b}</span>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="pd-modal-footer">
-          <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Close</button>
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-// ── Main PatrolDashboard ───────────────────────────────────────────
-const PatrolDashboard = () => {
-  const [patrols,         setPatrols]         = useState([]);
-  const [loading,         setLoading]         = useState(false);
-  const [toast,           setToast]           = useState({ show: false, message: "", type: "success" });
-  const [selectedReport,  setSelectedReport]  = useState(null); // { patrol, existingReport? }
-  const [selectedView,    setSelectedView]    = useState(null); // patrol object
-  const [selectedHistory, setSelectedHistory] = useState(null); // patrol object
-  const [filters,         setFilters]         = useState({ search: "", status: "", date_from: "", date_to: "" });
-  const [currentPage,     setCurrentPage]     = useState(1);
-  const ITEMS_PER_PAGE = 15;
-
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3500);
+  // ── Modal handlers ─────────────────────────────────────
+  const openAddModal = () => {
+    setModalMode("add");
+    setSelectedUnit(null);
+    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
+    setShowModal(true);
   };
 
-  const fetchMyPatrols = async () => {
-    setLoading(true);
+  const openEditModal = (unit) => {
+    setModalMode("edit");
+    setSelectedUnit(unit);
+    setForm({
+      mobile_unit_name: unit.mobile_unit_name || "",
+      vehicle_type:     unit.vehicle_type     || "",
+      plate_number:     unit.plate_number     || "",
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedUnit(null);
+    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
+  };
+
+  const handleFormChange = (e) =>
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  // ── Submit ─────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
+      setNotif({ message: "Please fill in all required fields.", type: "warning" });
+      return;
+    }
+    setSubmitLoading(true);
     try {
-      const res  = await fetch(`${API_BASE}/patrol/my-patrols`, {
-        headers: { Authorization: `Bearer ${token()}` },
+      const url = modalMode === "add"
+        ? `${API_BASE}/patrol/mobile-units`
+        : `${API_BASE}/patrol/mobile-units/${selectedUnit.mobile_unit_id}`;
+
+      const res  = await fetch(url, {
+        method: modalMode === "add" ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (data.success) setPatrols(data.data);
+
+      if (data.success) {
+        closeModal();
+        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
+        setNotif({
+          message: modalMode === "add" ? "Mobile unit added successfully!" : "Mobile unit updated successfully!",
+          type: "success",
+        });
+      } else {
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
+      }
     } catch (err) {
-      console.error("PatrolDashboard fetch error:", err);
+      setNotif({ message: "Server error. Please try again.", type: "error" });
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
-  useEffect(() => { fetchMyPatrols(); }, []);
-
-  const handleSubmitReport = async (patrolId, formData) => {
+  // ── Delete ─────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    if (!confirm("Are you sure you want to delete this mobile unit?")) return;
+    setSubmitLoading(true);
     try {
-      const res  = await fetch(`${API_BASE}/patrol/patrols/${patrolId}/after-report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(formData),
+      const res  = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
       });
       const data = await res.json();
       if (data.success) {
-        showToast(data.message || "After Patrol Report submitted successfully!");
+        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
+        setNotif({ message: "Mobile unit deleted.", type: "success" });
       } else {
-        showToast(data.message || "Something went wrong.", "error");
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
       }
-    } catch {
-      showToast("Server error while submitting report.", "error");
+    } catch (err) {
+      setNotif({ message: "Server error. Please try again.", type: "error" });
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
-  // Open edit from history modal — close history first, then open form
-  const handleEditFromHistory = (patrol, existingReport) => {
-    setSelectedHistory(null);
-    setTimeout(() => setSelectedReport({ patrol, existingReport }), 150);
+  // ── Helpers ────────────────────────────────────────────
+  const getInitials    = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
+  const formatTime     = (ts)   => ts ? new Date(ts).toLocaleString()     : "No Data";
+  const formatDateTime = (ts)   => ts ? new Date(ts).toLocaleDateString() : "No Data";
+
+  const isInDateRange = (ts, from, to) => {
+    if (!ts) return !from && !to;
+    const d = new Date(ts);
+    d.setHours(0, 0, 0, 0);
+    if (from) {
+      const f = new Date(from); f.setHours(0, 0, 0, 0);
+      if (d < f) return false;
+    }
+    if (to) {
+      const t = new Date(to); t.setHours(23, 59, 59, 999);
+      if (d > t) return false;
+    }
+    return true;
   };
 
-  // ── Filter + paginate ──────────────────────────────────────────
-  const filtered = patrols.filter((p) => {
-    const status      = getPatrolStatus(p);
-    const matchSearch = !filters.search ||
-      (p.patrol_name     || "").toLowerCase().includes(filters.search.toLowerCase()) ||
-      (p.mobile_unit_name|| "").toLowerCase().includes(filters.search.toLowerCase());
-    const matchStatus = !filters.status    || status === filters.status;
-    const matchFrom   = !filters.date_from || new Date(p.start_date) >= new Date(filters.date_from);
-    const matchTo     = !filters.date_to   || new Date(p.end_date)   <= new Date(filters.date_to);
-    return matchSearch && matchStatus && matchFrom && matchTo;
+  // ── Patroller filter logic ─────────────────────────────
+  const applyPatrollerFilters = () => {
+    setAppliedPatrollerFilters({ search: patrollerSearch, dateFrom: patrollerDateFrom, dateTo: patrollerDateTo });
+    setPatrollerFiltersApplied(patrollerSearch !== "" || patrollerDateFrom !== "" || patrollerDateTo !== "");
+    setPatrollerPage(1);
+  };
+
+  const resetPatrollerFilters = () => {
+    setPatrollerSearch(""); setPatrollerDateFrom(""); setPatrollerDateTo("");
+    setAppliedPatrollerFilters({ search: "", dateFrom: "", dateTo: "" });
+    setPatrollerFiltersApplied(false);
+    setPatrollerPage(1);
+  };
+
+  const filteredPatrollers = patrollers.filter((o) => {
+    const { search: s, dateFrom: df, dateTo: dt } = appliedPatrollerFilters;
+    if (s && !(o.officer_name || "").toLowerCase().includes(s.toLowerCase())) return false;
+    if ((df || dt) && !isInDateRange(o.last_login, df, dt)) return false;
+    return true;
   });
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPatrollerPages = Math.max(1, Math.ceil(filteredPatrollers.length / PAGE_SIZE));
+  const paginatedPatrollers = filteredPatrollers.slice(
+    (patrollerPage - 1) * PAGE_SIZE,
+    patrollerPage * PAGE_SIZE
+  );
 
-  const stats = {
-    total:     patrols.length,
-    active:    patrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming:  patrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
-    completed: patrols.filter((p) => getPatrolStatus(p) === "completed").length,
+  // ── Mobile unit filter logic ───────────────────────────
+  const applyUnitFilters = () => {
+    setAppliedUnitFilters({ search: unitSearch, dateFrom: unitDateFrom, dateTo: unitDateTo });
+    setUnitFiltersApplied(unitSearch !== "" || unitDateFrom !== "" || unitDateTo !== "");
+    setUnitPage(1);
   };
 
-  const handleFilterChange = (e) => {
-    setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
-    setCurrentPage(1);
+  const resetUnitFilters = () => {
+    setUnitSearch(""); setUnitDateFrom(""); setUnitDateTo("");
+    setAppliedUnitFilters({ search: "", dateFrom: "", dateTo: "" });
+    setUnitFiltersApplied(false);
+    setUnitPage(1);
   };
 
-  const clearFilters = () => {
-    setFilters({ search: "", status: "", date_from: "", date_to: "" });
-    setCurrentPage(1);
-  };
+  const sortedUnits = [...mobileUnits].sort((a, b) =>
+    a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, { numeric: true, sensitivity: "base" })
+  );
 
-  return (
-    <div className="pd-content-area">
+  const filteredUnits = sortedUnits.filter((u) => {
+    const { search: s, dateFrom: df, dateTo: dt } = appliedUnitFilters;
+    if (s && !(u.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase()) &&
+             !(u.plate_number     || "").toLowerCase().includes(s.toLowerCase()) &&
+             !(u.vehicle_type     || "").toLowerCase().includes(s.toLowerCase())) return false;
+    if ((df || dt) && !isInDateRange(u.created_at, df, dt)) return false;
+    return true;
+  });
 
-      {/* Page Header */}
-      <div className="pd-page-header">
-        <div className="pd-page-header-left">
-          <h1>Patrol Dashboard</h1>
-          <p>Your assigned patrol duties and after-patrol reports</p>
-        </div>
-        <div className="pd-page-header-right">
-          <button className="pd-btn pd-btn-secondary" onClick={fetchMyPatrols}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-            </svg>
-            Refresh
-          </button>
-        </div>
-      </div>
+  const totalUnitPages = Math.max(1, Math.ceil(filteredUnits.length / PAGE_SIZE));
+  const paginatedUnits = filteredUnits.slice(
+    (unitPage - 1) * PAGE_SIZE,
+    unitPage * PAGE_SIZE
+  );
 
-      {/* Stat Row */}
-      <div className="pd-stat-row">
-        {[
-          {
-            label: "Total Assigned", num: stats.total, iconClass: "pd-stat-icon-navy",
-            icon: (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            ),
-          },
-          {
-            label: "Active Patrols", num: stats.active, iconClass: "pd-stat-icon-green",
-            icon: (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-            ),
-          },
-          {
-            label: "Upcoming", num: stats.upcoming, iconClass: "pd-stat-icon-amber",
-            icon: (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-            ),
-          },
-          {
-            label: "Completed", num: stats.completed, iconClass: "pd-stat-icon-gray",
-            icon: (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            ),
-          },
-        ].map(({ label, num, iconClass, icon }, i) => (
-          <div className="pd-stat-card" key={i}>
-            <div className={`pd-stat-icon ${iconClass}`}>{icon}</div>
-            <div>
-              <div className="pd-stat-num">{num}</div>
-              <div className="pd-stat-label">{label}</div>
-            </div>
-          </div>
+  // ── Pagination component ───────────────────────────────
+  const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
+    <div className="pd-table-footer">
+      <span className="pd-footer-count">
+        Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered)} – {Math.min(page * PAGE_SIZE, filtered)} of {filtered}
+        {filtered !== total && <span className="pd-filtered-label"> (filtered)</span>}
+      </span>
+      <div className="pd-pagination">
+        <button
+          className="pd-page-btn"
+          onClick={() => onPage(page - 1)}
+          disabled={page === 1}
+        >‹</button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <button
+            key={p}
+            className={`pd-page-btn ${p === page ? "pd-page-active" : ""}`}
+            onClick={() => onPage(p)}
+          >{p}</button>
         ))}
+        <button
+          className="pd-page-btn"
+          onClick={() => onPage(page + 1)}
+          disabled={page === totalPages}
+        >›</button>
+      </div>
+    </div>
+  );
+
+  // ── Filter bar component ───────────────────────────────
+  const FilterBar = ({
+    search, onSearch, dateFrom, onDateFrom, dateTo, onDateTo,
+    onApply, onReset, filtersApplied, searchPlaceholder,
+    rightContent,
+  }) => (
+    <div className="pd-filter-bar">
+      <div className="pd-filter-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+      </div>
+      <input
+        className="pd-filter-search"
+        type="text"
+        placeholder={searchPlaceholder || "Search..."}
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onApply()}
+      />
+      <div className="pd-filter-date-group">
+        <input
+          type="date"
+          className="pd-filter-date"
+          value={dateFrom}
+          onChange={(e) => onDateFrom(e.target.value)}
+          title="From date"
+        />
+        <span className="pd-filter-arrow">→</span>
+        <input
+          type="date"
+          className="pd-filter-date"
+          value={dateTo}
+          min={dateFrom}
+          onChange={(e) => onDateTo(e.target.value)}
+          title="To date"
+        />
+      </div>
+      <button className="pd-filter-apply" onClick={onApply}>Apply</button>
+      {filtersApplied && (
+        <button className="pd-filter-reset" onClick={onReset} title="Reset filters">↺</button>
+      )}
+      {rightContent && <div className="pd-filter-right">{rightContent}</div>}
+    </div>
+  );
+
+  // ── Render ─────────────────────────────────────────────
+  return (
+    <div className="dash">
+      <div className="content-area">
+
+        {/* PAGE HEADER */}
+        <div className="page-header">
+          <h1>Patroller Dashboard</h1>
+          <p>Real-time Patroller status and monitoring</p>
+        </div>
+
+        {/* STATS */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon green"><ShieldCheck size={20} /></div>
+            </div>
+            <div className="stat-value">{stats.active_patrols_today}</div>
+            <div className="stat-label">Active Patrols Today</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon yellow"><AlertTriangle size={20} /></div>
+            </div>
+            <div className="stat-value">{stats.unassigned_patrollers}</div>
+            <div className="stat-label">Unassigned Patrollers</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon gray"><Car size={20} /></div>
+            </div>
+            <div className="stat-value">{stats.mobile_units}</div>
+            <div className="stat-label">Total Mobile Units</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-icon blue"><Users size={20} /></div>
+            </div>
+            <div className="stat-value">{stats.total_officers}</div>
+            <div className="stat-label">Total Officers</div>
+          </div>
+        </div>
+
+        {/* TABLE CARD */}
+        <div className="table-card">
+          {/* Toggle */}
+          <div className="table-header">
+            <div className="table-toggle">
+              <button
+                className={`toggle-btn ${activeTable === "patrollers" ? "toggle-active" : ""}`}
+                onClick={() => setActiveTable("patrollers")}
+              >Patrollers</button>
+              <button
+                className={`toggle-btn ${activeTable === "mobile" ? "toggle-active" : ""}`}
+                onClick={() => setActiveTable("mobile")}
+              >Mobile Units</button>
+            </div>
+          </div>
+
+          {/* ── PATROLLERS ── */}
+          {activeTable === "patrollers" && (
+            <>
+              <FilterBar
+                search={patrollerSearch}
+                onSearch={setPatrollerSearch}
+                dateFrom={patrollerDateFrom}
+                onDateFrom={setPatrollerDateFrom}
+                dateTo={patrollerDateTo}
+                onDateTo={setPatrollerDateTo}
+                onApply={applyPatrollerFilters}
+                onReset={resetPatrollerFilters}
+                filtersApplied={patrollerFiltersApplied}
+                searchPlaceholder="Search officer..."
+              />
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Officer</th>
+                      <th>Mobile Unit Assigned</th>
+                      <th>Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedPatrollers.length === 0 ? (
+                      <tr><td colSpan={3} className="empty-row">No patrollers found.</td></tr>
+                    ) : paginatedPatrollers.map((officer, index) => (
+                      <tr key={officer.officer_id || index}>
+                        <td>
+                          <div className="officer-info">
+                            <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
+                            <div className="officer-name">{officer.officer_name || "Unknown"}</div>
+                          </div>
+                        </td>
+                        <td>
+                          {officer.mobile_unit_assigned
+                            ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
+                            : <span className="unassigned-badge">Unassigned</span>}
+                        </td>
+                        <td>
+                          <span className="time-badge">{formatTime(officer.last_login)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredPatrollers.length > 0 && (
+                <Pagination
+                  page={patrollerPage}
+                  totalPages={totalPatrollerPages}
+                  onPage={setPatrollerPage}
+                  total={patrollers.length}
+                  filtered={filteredPatrollers.length}
+                />
+              )}
+            </>
+          )}
+
+          {/* ── MOBILE UNITS ── */}
+          {activeTable === "mobile" && (
+            <>
+              <FilterBar
+                search={unitSearch}
+                onSearch={setUnitSearch}
+                dateFrom={unitDateFrom}
+                onDateFrom={setUnitDateFrom}
+                dateTo={unitDateTo}
+                onDateTo={setUnitDateTo}
+                onApply={applyUnitFilters}
+                onReset={resetUnitFilters}
+                filtersApplied={unitFiltersApplied}
+                searchPlaceholder="Search unit, plate..."
+                rightContent={
+                  <button className="add-btn" onClick={openAddModal}>+ Add Mobile Unit</button>
+                }
+              />
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Mobile Unit</th>
+                      <th>Vehicle Type</th>
+                      <th>Plate Number</th>
+                      <th>Created At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUnits.length === 0 ? (
+                      <tr><td colSpan={5} className="empty-row">No mobile units found.</td></tr>
+                    ) : paginatedUnits.map((unit, index) => (
+                      <tr key={unit.mobile_unit_id || index}>
+                        <td><span className="unit-badge">{unit.mobile_unit_name}</span></td>
+                        <td>
+                          <span className={`vehicle-badge ${unit.vehicle_type === "Car/Sedan" ? "vehicle-car" : "vehicle-suv"}`}>
+                            {unit.vehicle_type}
+                          </span>
+                        </td>
+                        <td><span className="plate-number">{unit.plate_number}</span></td>
+                        <td><span className="time-badge">{formatDateTime(unit.created_at)}</span></td>
+                        <td>
+                          <div className="action-btns">
+                            <button className="edit-btn"   onClick={() => openEditModal(unit)}>Edit</button>
+                            <button className="delete-btn" onClick={() => handleDelete(unit.mobile_unit_id)}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredUnits.length > 0 && (
+                <Pagination
+                  page={unitPage}
+                  totalPages={totalUnitPages}
+                  onPage={setUnitPage}
+                  total={mobileUnits.length}
+                  filtered={filteredUnits.length}
+                />
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="pd-filter-bar">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
-            stroke="var(--navy-primary)" strokeWidth="2.5" viewBox="0 0 24 24">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-primary)", textTransform: "uppercase", letterSpacing: 1 }}>
-            Filter Records
-          </span>
-        </div>
-        <div className="pd-filter-row">
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Search</label>
-            <input type="text" className="pd-filter-input" placeholder="Search by patrol name or unit"
-              name="search" value={filters.search} onChange={handleFilterChange} />
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Status</label>
-            <select className="pd-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Date From</label>
-            <input type="date" className="pd-filter-input" name="date_from"
-              value={filters.date_from} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Date To</label>
-            <input type="date" className="pd-filter-input" name="date_to"
-              value={filters.date_to} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
-          </div>
-          <div className="pd-filter-group" style={{ justifyContent: "flex-end" }}>
-            <label className="pd-filter-label">&nbsp;</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="pd-btn pd-btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 13 }}
-                onClick={() => setCurrentPage(1)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-                Apply
+      {/* ── ADD / EDIT MODAL ── */}
+      {showModal && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}</h3>
+              <button className="modal-close" onClick={closeModal}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Mobile Unit Name <span className="required">*</span></label>
+                <input type="text" name="mobile_unit_name" value={form.mobile_unit_name} onChange={handleFormChange} placeholder="e.g. Mobile 1" />
+              </div>
+              <div className="form-group">
+                <label>Vehicle Type <span className="required">*</span></label>
+                <select name="vehicle_type" value={form.vehicle_type} onChange={handleFormChange}>
+                  <option value="">— Select Vehicle Type —</option>
+                  {VEHICLE_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Plate Number <span className="required">*</span></label>
+                <input type="text" name="plate_number" value={form.plate_number} onChange={handleFormChange} placeholder="e.g. ABC 1234" style={{ textTransform: "uppercase" }} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+              <button className="btn-save" onClick={handleSubmit}>
+                {modalMode === "add" ? "Add Unit" : "Save Changes"}
               </button>
-              <button onClick={clearFilters} title="Clear filters" style={{
-                background: "var(--white)", color: "var(--gray-700)",
-                border: "1px solid var(--gray-300)", borderRadius: 6,
-                height: 40, width: 40, fontSize: 18, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>↻</button>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Table */}
-      <div className="pd-table-card">
-        <div className="pd-table-container">
-          <table className="pd-data-table">
-            <thead>
-              <tr>
-                <th>Patrol Name</th>
-                <th>Status</th>
-                <th>Mobile Unit</th>
-                <th>Duration</th>
-                <th>Patrollers</th>
-                <th>Area of Responsibility</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>Loading...</td></tr>
-              ) : paginated.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No patrol assignments found.</td></tr>
-              ) : paginated.map((patrol) => {
-                const status     = getPatrolStatus(patrol);
-                const patrollers = patrol.patrollers || [];
-                const barangays  = [...new Set(
-                  (patrol.routes || [])
-                    .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-                    .map((r) => r.barangay)
-                )];
-                return (
-                  <tr key={patrol.patrol_id}>
-                    <td>
-                      <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--navy-primary)", fontSize: 13, background: "rgba(30,58,95,0.07)", padding: "4px 10px", borderRadius: 6, display: "inline-block" }}>
-                        {patrol.patrol_name}
-                      </span>
-                    </td>
-                    <td><StatusBadge status={status} /></td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: "var(--navy-primary)", fontSize: 14 }}>
-                        {patrol.mobile_unit_name || "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--navy-primary)", whiteSpace: "nowrap" }}>
-                        {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
-                      </span>
-                    </td>
-                    <td>
-                      {patrollers.length > 0
-                        ? <span className="pd-count-pill pd-count-patroller">{patrollers.length} Patroller{patrollers.length !== 1 ? "s" : ""}</span>
-                        : <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>}
-                    </td>
-                    <td>
-                      {barangays.length > 0
-                        ? <span className="pd-count-pill pd-count-barangay">{barangays.length} Barangay{barangays.length !== 1 ? "s" : ""}</span>
-                        : <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>}
-                    </td>
-                    <td>
-                      <div className="pd-action-links">
-                        <button className="pd-action-btn pd-action-btn-view"
-                          onClick={() => setSelectedView(patrol)}>
-                          <ViewIcon /> View
-                        </button>
-                        <button className="pd-action-btn pd-action-btn-history"
-                          onClick={() => setSelectedHistory(patrol)}>
-                          <HistoryIcon /> History
-                        </button>
-                        <button className="pd-action-btn pd-action-btn-report"
-                          onClick={() => setSelectedReport({ patrol, existingReport: null })}>
-                          <ReportIcon /> After Report
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="pd-pagination">
-          <div className="pd-pagination-info">
-            Showing {filtered.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–
-            {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} records
-          </div>
-          <div className="pd-pagination-controls">
-            <button className="pd-pagination-btn" disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}>Previous</button>
-            <span className="pd-pagination-current">Page {currentPage} of {totalPages || 1}</span>
-            <button className="pd-pagination-btn" disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage((p) => p + 1)}>Next</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Modals ── */}
-      {selectedReport && (
-        <AfterPatrolModal
-          patrol={selectedReport.patrol}
-          existingReport={selectedReport.existingReport}
-          onClose={() => setSelectedReport(null)}
-          onSubmit={handleSubmitReport}
-        />
-      )}
-      {selectedView && (
-        <ViewPatrolModal
-          patrol={selectedView}
-          onClose={() => setSelectedView(null)}
-        />
-      )}
-      {selectedHistory && (
-        <MyReportsModal
-          patrol={selectedHistory}
-          onClose={() => setSelectedHistory(null)}
-          onEdit={handleEditFromHistory}
-        />
       )}
 
-      {/* Toast */}
-      {toast.show && (
-        <div className={`pd-toast ${toast.type === "error" ? "pd-toast-error" : ""} show`}>
-          {toast.message}
-        </div>
+      <LoadingModal isOpen={loading}       message="Loading dashboard..." />
+      <LoadingModal isOpen={submitLoading} message={modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."} />
+
+      {notif && (
+        <Notification
+          message={notif.message}
+          type={notif.type}
+          onClose={() => setNotif(null)}
+          duration={3000}
+        />
       )}
     </div>
   );
 };
 
-export default PatrolDashboard;
+export default PatrollerDashboard;
