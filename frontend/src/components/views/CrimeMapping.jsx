@@ -162,6 +162,151 @@ const getIncidenceThresholds = (dateFrom, dateTo) => {
   };
 };
 
+// ADD near the top of CrimeMapping.jsx, after the LEGEND_ITEMS constant:
+
+const INDEX_CRIMES = [
+  "MURDER",
+  "HOMICIDE",
+  "PHYSICAL INJURY",
+  "RAPE",
+  "ROBBERY",
+  "THEFT",
+  "CARNAPPING - MC",
+  "CARNAPPING - MV",
+  "SPECIAL COMPLEX CRIME",
+];
+
+const CRIME_DISPLAY = {
+  MURDER: "Murder",
+  HOMICIDE: "Homicide",
+  "PHYSICAL INJURY": "Physical Injury",
+  RAPE: "Rape",
+  ROBBERY: "Robbery",
+  THEFT: "Theft",
+  "CARNAPPING - MC": "Carnapping - MC",
+  "CARNAPPING - MV": "Carnapping - MV",
+  "SPECIAL COMPLEX CRIME": "Special Complex Crime",
+};
+
+const CRIME_SHORT = {
+  MURDER: "Murder",
+  HOMICIDE: "Homicide",
+  "PHYSICAL INJURY": "Phys. Inj.",
+  RAPE: "Rape",
+  ROBBERY: "Robbery",
+  THEFT: "Theft",
+  "CARNAPPING - MC": "Carnap MC",
+  "CARNAPPING - MV": "Carnap MV",
+  "SPECIAL COMPLEX CRIME": "Spec. Cmplx",
+};
+
+// ADD this component before function CrimeMapping():
+const CrimeTypeMultiSelect = ({ selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (c) =>
+    onChange(
+      selected.includes(c) ? selected.filter((x) => x !== c) : [...selected, c],
+    );
+
+  const removeOne = (c, e) => {
+    e.stopPropagation();
+    onChange(selected.filter((x) => x !== c));
+  };
+
+  const isAll = selected.length === 0;
+  const allSelected = selected.length === INDEX_CRIMES.length;
+
+  return (
+    <div
+      className="crmap-multisel-wrap"
+      ref={ref}
+      style={{ position: "relative" }}
+    >
+      <div
+        className="crmap-multisel-trigger"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {isAll ? (
+          <span style={{ color: "#6b7280", fontSize: 14 }}>
+            All Crime Types
+          </span>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              flexWrap: "wrap",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {selected.slice(0, 2).map((c) => (
+              <span key={c} className="crmap-multisel-pill">
+                {CRIME_SHORT[c] || c}
+                <span
+                  style={{ marginLeft: 3, cursor: "pointer", opacity: 0.7 }}
+                  onClick={(e) => removeOne(c, e)}
+                >
+                  ×
+                </span>
+              </span>
+            ))}
+            {selected.length > 2 && (
+              <span className="crmap-multisel-pill">
+                +{selected.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+        <span style={{ fontSize: 10, color: "#6b7280", flexShrink: 0 }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </div>
+
+      {open && (
+        <div className="crmap-multisel-dropdown">
+          <div className="crmap-multisel-actions">
+            <button
+              className="crmap-multisel-action-btn"
+              onClick={() => onChange(allSelected ? [] : [...INDEX_CRIMES])}
+            >
+              {allSelected ? "Clear all" : "Select all"}
+            </button>
+            {selected.length > 0 && (
+              <button
+                className="crmap-multisel-action-btn clear"
+                onClick={() => onChange([])}
+              >
+                Clear ({selected.length})
+              </button>
+            )}
+          </div>
+          {INDEX_CRIMES.map((c) => (
+            <label key={c} className="crmap-multisel-item">
+              <input
+                type="checkbox"
+                checked={selected.includes(c)}
+                onChange={() => toggle(c)}
+              />
+              <span>{CRIME_DISPLAY[c]}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function CrimeMapping() {
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
@@ -169,6 +314,7 @@ function CrimeMapping() {
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
   const [boundaries, setBoundaries] = useState([]);
+  const [mapReady, setMapReady] = useState(false);
   const [showClusters, setShowClusters] = useState(true);
   const [pins, setPins] = useState([]);
   const [stats, setStats] = useState(null);
@@ -191,11 +337,6 @@ function CrimeMapping() {
   const [zoom, setZoom] = useState(12);
   const [error, setError] = useState(null);
 
-  const [selectedCrimeTypes, setSelectedCrimeTypes] = useState([]);
-  const [selectedBarangays, setSelectedBarangays] = useState(
-    isBarangayUser && userBarangay ? [userBarangay] : [],
-  );
-
   const getPHTDate = (offsetDays = 0) => {
     const now = new Date();
     const phtMs = now.getTime() + 8 * 60 * 60 * 1000 + offsetDays * 86400000;
@@ -214,15 +355,10 @@ function CrimeMapping() {
     return oneYearAgo.toISOString().slice(0, 10);
   };
 
-  const offsetDate = (days) => {
-    const now = new Date();
-    const phtMs = now.getTime() + 8 * 60 * 60 * 1000 + days * 86400000;
-    return new Date(phtMs).toISOString().slice(0, 10);
-  };
-
   const defaultDateTo = getPHTToday();
   const defaultDateFrom = getPHTOneYearAgo();
 
+  // Single state
   const [filters, setFilters] = useState({
     incident_types: [],
     date_from: defaultDateFrom,
@@ -230,12 +366,8 @@ function CrimeMapping() {
     barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
   });
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    incident_types: [],
-    date_from: defaultDateFrom,
-    date_to: defaultDateTo,
-    barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
-  });
+  // Fetch trigger — only runs when this ref changes
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
   const [activeTab, setActiveTab] = useState("legend");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -348,7 +480,7 @@ function CrimeMapping() {
   }, []);
 
   useEffect(() => {
-    if (!isBarangayUser || !userBarangay || !geoJSONData || !mapRef.current) {
+    if (!isBarangayUser || !userBarangay || !geoJSONData || !mapReady) {
       return;
     }
 
@@ -373,22 +505,21 @@ function CrimeMapping() {
         duration: 1200,
       });
     }
-  }, [geoJSONData, isBarangayUser, userBarangay]);
+  }, [geoJSONData, isBarangayUser, userBarangay, mapReady]); // ← added mapReady
 
+  // REPLACE the entire fetchAll useCallback:
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
-      if (appliedFilters.incident_types?.length)
-        params.append("incident_type", appliedFilters.incident_types[0]);
-      if (appliedFilters.date_from)
-        params.append("date_from", appliedFilters.date_from);
-      if (appliedFilters.date_to)
-        params.append("date_to", appliedFilters.date_to);
-      if (appliedFilters.barangays?.length)
-        params.append("barangay", appliedFilters.barangays[0]);
+      if (filters.incident_types?.length)
+        params.append("incident_type", filters.incident_types.join(","));
+      if (filters.date_from) params.append("date_from", filters.date_from);
+      if (filters.date_to) params.append("date_to", filters.date_to);
+      if (filters.barangays?.length)
+        params.append("barangay", filters.barangays[0]);
 
       const q = params.toString() ? `?${params}` : "";
       const headers = { Authorization: `Bearer ${getToken()}` };
@@ -416,22 +547,21 @@ function CrimeMapping() {
     } finally {
       setLoading(false);
     }
-  }, [appliedFilters]); // <-- was [filters]
+  }, [filters]); // ← depends on filters directly
 
+  // REPLACE the entire fetchHeatmap useCallback:
   const fetchHeatmap = useCallback(async () => {
     setHeatLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
-      if (appliedFilters.incident_types?.length)
-        params.append("incident_type", appliedFilters.incident_types[0]);
-      if (appliedFilters.date_from)
-        params.append("date_from", appliedFilters.date_from);
-      if (appliedFilters.date_to)
-        params.append("date_to", appliedFilters.date_to);
-      if (appliedFilters.barangays?.length)
-        params.append("barangay", appliedFilters.barangays[0]);
+      if (filters.incident_types?.length)
+        params.append("incident_type", filters.incident_types.join(","));
+      if (filters.date_from) params.append("date_from", filters.date_from);
+      if (filters.date_to) params.append("date_to", filters.date_to);
+      if (filters.barangays?.length)
+        params.append("barangay", filters.barangays[0]);
 
       const q = params.toString() ? `?${params}` : "";
 
@@ -450,7 +580,7 @@ function CrimeMapping() {
     } finally {
       setHeatLoading(false);
     }
-  }, [appliedFilters]); // <-- was [filters]
+  }, [filters]); // ← depends on filters directly
 
   const fetchOfficers = useCallback(async () => {
     if (isBarangayUser) return;
@@ -499,7 +629,7 @@ function CrimeMapping() {
     };
   }, [fetchOfficers]);
 
-  // Watch appliedFilters instead of raw filters, and include all fields
+  // REPLACE the fetch effect that currently has no deps listed:
   useEffect(() => {
     if (heatmapMode) {
       fetchHeatmap();
@@ -507,16 +637,13 @@ function CrimeMapping() {
     } else {
       fetchAll();
     }
-  }, [appliedFilters, heatmapMode]);
+  }, [fetchTrigger, heatmapMode]);
+
   const handleModeToggle = useCallback(() => {
-    setHeatmapMode((m) => {
-      const next = !m;
-      if (next && !heatGeoJSON) fetchHeatmap();
-      return next;
-    });
+    setHeatmapMode((m) => !m);
     setSelectedPin(null);
     setSelectedCluster(null);
-  }, [heatGeoJSON, fetchHeatmap]);
+  }, []);
 
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData) return null;
@@ -767,15 +894,23 @@ function CrimeMapping() {
     },
   };
 
-  const topCrime = stats?.by_incident_type?.[0];
   const clusterCount = clusterGeoJSON?.features?.length ?? 0;
 
   const sidebarTabs = [
     { key: "legend", label: "Legend" },
     { key: "recent", label: "Recent" },
-    { key: "at_risk", label: heatmapMode ? "Clusters" : "Incidence" },
+    ...(!isBarangayUser
+      ? [{ key: "at_risk", label: heatmapMode ? "Clusters" : "Incidence" }]
+      : []),
     { key: "officers", label: "Patrol" },
   ];
+
+  // AND add this effect to auto-reset active tab if user lands on a hidden tab:
+  useEffect(() => {
+    if (isBarangayUser && activeTab === "at_risk") {
+      setActiveTab("legend");
+    }
+  }, [isBarangayUser, activeTab]);
 
   return (
     <div className="crmap-wrapper">
@@ -792,30 +927,33 @@ function CrimeMapping() {
         <div className="crmap-stat-pills">
           {[
             { val: stats?.total_pins ?? "—", lbl: "Total Pins" },
-            heatmapMode
-              ? { val: clusterCount, lbl: "Clusters Found" }
-              : {
-                  val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
-                  lbl: "Brgy. Affected",
-                },
+            !isBarangayUser
+              ? heatmapMode
+                ? { val: clusterCount, lbl: "Clusters Found" }
+                : {
+                    val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
+                    lbl: "Brgy. Affected",
+                  }
+              : null,
             {
               val: (() => {
                 const days =
                   Math.round(
-                    (new Date(appliedFilters.date_to) -
-                      new Date(appliedFilters.date_from)) /
+                    (new Date(filters.date_to) - new Date(filters.date_from)) /
                       86400000,
                   ) + 1;
                 return `${days}`;
               })(),
               lbl: "Days",
             },
-          ].map((s) => (
-            <div key={s.lbl} className="crmap-pill">
-              <span className="crmap-pill-val">{s.val}</span>
-              <span className="crmap-pill-lbl">{s.lbl}</span>
-            </div>
-          ))}
+          ]
+            .filter(Boolean)
+            .map((s) => (
+              <div key={s.lbl} className="crmap-pill">
+                <span className="crmap-pill-val">{s.val}</span>
+                <span className="crmap-pill-lbl">{s.lbl}</span>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -834,24 +972,12 @@ function CrimeMapping() {
             </svg>
           </div>
 
-          <select
-            className="crmap-fsel"
-            value={filters.incident_type}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, incident_type: e.target.value }))
+          <CrimeTypeMultiSelect
+            selected={filters.incident_types}
+            onChange={(val) =>
+              setFilters((f) => ({ ...f, incident_types: val }))
             }
-          >
-            <option value="">All Crime Types</option>
-            <option value="CARNAPPING - MC">Carnapping - MC</option>
-            <option value="CARNAPPING - MV">Carnapping - MV</option>
-            <option value="HOMICIDE">Homicide</option>
-            <option value="MURDER">Murder</option>
-            <option value="PHYSICAL INJURY">Physical Injury</option>
-            <option value="RAPE">Rape</option>
-            <option value="ROBBERY">Robbery</option>
-            <option value="SPECIAL COMPLEX CRIME">Special Complex Crime</option>
-            <option value="THEFT">Theft</option>
-          </select>
+          />
 
           {isBarangayUser && userBarangay ? (
             <div className="crmap-fsel crmap-fsel-locked">
@@ -861,10 +987,13 @@ function CrimeMapping() {
           ) : (
             <select
               className="crmap-fsel"
-              value={filters.barangay}
+              value={filters.barangays?.[0] || ""}
               onChange={(e) => {
                 const selected = e.target.value;
-                setFilters((f) => ({ ...f, barangay: selected }));
+                setFilters((f) => ({
+                  ...f,
+                  barangays: selected ? [selected] : [],
+                }));
 
                 if (selected && geoJSONData) {
                   const feature = geoJSONData.features.find(
@@ -953,52 +1082,26 @@ function CrimeMapping() {
 
           <button
             className="crmap-apply-btn"
-            onClick={() => {
-              setAppliedFilters({ ...filters });
-              heatmapMode ? fetchHeatmap() : fetchAll();
-            }}
+            onClick={() => setFetchTrigger((t) => t + 1)}
           >
             Apply Filters
           </button>
 
+          {/* // REPLACE the entire crmap-clear-btn onClick: */}
           <button
             className="crmap-clear-btn"
             onClick={() => {
               const clearTo = getPHTToday();
               const clearFrom = getPHTOneYearAgo();
-              const cleared = {
-                incident_type: "",
+
+              setFilters({
+                incident_types: [],
                 date_from: clearFrom,
                 date_to: clearTo,
-                barangay: isBarangayUser && userBarangay ? userBarangay : "",
-              };
-              setFilters(cleared);
-              setAppliedFilters(cleared);
+                barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+              });
 
-              // Fetch directly with cleared params, bypassing stale closure
-              const params = new URLSearchParams();
-              params.append("date_from", clearFrom);
-              params.append("date_to", clearTo);
-              const q = `?${params}`;
-              const headers = { Authorization: `Bearer ${getToken()}` };
-
-              setLoading(true);
-              Promise.all([
-                fetch(`${API}/boundaries${q}`, { headers }).then((r) =>
-                  r.json(),
-                ),
-                fetch(`${API}/pins${q}`, { headers }).then((r) => r.json()),
-                fetch(`${API}/statistics${q}`, { headers }).then((r) =>
-                  r.json(),
-                ),
-              ])
-                .then(([bData, pData, sData]) => {
-                  if (bData.success) setBoundaries(bData.data);
-                  if (pData.success) setPins(pData.data);
-                  if (sData.success) setStats(sData.data);
-                })
-                .finally(() => setLoading(false));
-
+              // Reset map view
               if (!isBarangayUser) {
                 mapRef.current?.flyTo({
                   center: [120.964, 14.4341],
@@ -1006,6 +1109,8 @@ function CrimeMapping() {
                   duration: 800,
                 });
               }
+
+              setFetchTrigger((t) => t + 1);
             }}
           >
             ↺
@@ -1047,10 +1152,10 @@ function CrimeMapping() {
             !error &&
             pins.length === 0 &&
             boundaries.every((b) => b.crime_count === 0) &&
-            (filters.incident_type ||
+            (filters.incident_types?.length > 0 ||
               filters.date_from ||
               filters.date_to ||
-              filters.barangay) && (
+              filters.barangays?.length > 0) && (
               <div className="crmap-empty-state">
                 <svg
                   width="32"
@@ -1084,6 +1189,7 @@ function CrimeMapping() {
             <Map
               ref={mapRef}
               mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+              onLoad={() => setMapReady(true)}
               initialViewState={{
                 longitude: 120.964,
                 latitude: 14.4341,
@@ -1759,17 +1865,16 @@ function CrimeMapping() {
                         Crime Types Mapped
                       </div>
 
-                      {(stats?.by_incident_type?.length > 0
-                        ? stats.by_incident_type
-                        : LEGEND_ITEMS.map((i) => ({
-                            incident_type: i.label,
-                            count: 0,
-                          }))
-                      ).map((item) => {
-                        const name = item.incident_type || item.label;
+                      {LEGEND_ITEMS.map((item) => {
+                        const name = item.label;
                         const color =
                           INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
-                        const count = parseInt(item.count) || 0;
+                        const statsEntry = stats?.by_incident_type?.find(
+                          (s) =>
+                            s.incident_type?.toUpperCase() ===
+                            name.toUpperCase(),
+                        );
+                        const count = parseInt(statsEntry?.count) || 0;
 
                         return (
                           <div className="crmap-severity-row" key={name}>
@@ -1813,8 +1918,8 @@ function CrimeMapping() {
 
                       {(() => {
                         const t = getIncidenceThresholds(
-                          appliedFilters.date_from,
-                          appliedFilters.date_to,
+                          filters.date_from,
+                          filters.date_to,
                         );
 
                         const levels = [
@@ -1888,17 +1993,16 @@ function CrimeMapping() {
                           Crime Types
                         </div>
 
-                        {(stats?.by_incident_type?.length > 0
-                          ? stats.by_incident_type
-                          : LEGEND_ITEMS.map((i) => ({
-                              incident_type: i.label,
-                              count: 0,
-                            }))
-                        ).map((item) => {
-                          const name = item.incident_type || item.label;
+                        {LEGEND_ITEMS.map((item) => {
+                          const name = item.label;
                           const color =
                             INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
-                          const count = parseInt(item.count) || 0;
+                          const statsEntry = stats?.by_incident_type?.find(
+                            (s) =>
+                              s.incident_type?.toUpperCase() ===
+                              name.toUpperCase(),
+                          );
+                          const count = parseInt(statsEntry?.count) || 0;
 
                           return (
                             <div className="crmap-legend-row" key={name}>

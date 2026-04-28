@@ -344,7 +344,6 @@ body {
 .cd-date-range-label   { font-weight: 600; color: var(--navy-primary); }
 
 /* === EXPORT BUTTON === */
-/* REPLACE */
 .cd-export-btn {
   height: 40px;
   padding: 0 20px;
@@ -358,6 +357,11 @@ body {
   cursor: pointer;
   align-self: center;
   transition: all 0.2s ease;
+
+  /* ADD THESE: */
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .cd-export-btn:hover:not(:disabled) {
