@@ -57,9 +57,16 @@ const getBoundaries = async (req, res) => {
       crimeQuery += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
-    if (incident_type) {
-      crimeQuery += ` AND UPPER(incident_type) = UPPER($${p++})`;
-      params.push(incident_type);
+    const rawTypes = req.query.incident_type;
+    const incidentTypes = rawTypes
+      ? (Array.isArray(rawTypes) ? rawTypes : rawTypes.split(","))
+          .map((t) => t.trim().toUpperCase())
+          .filter(Boolean)
+      : [];
+
+    if (incidentTypes.length) {
+      crimeQuery += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
+      params.push(incidentTypes);
     }
 
     crimeQuery += ` GROUP BY UPPER(TRIM(place_barangay))`;

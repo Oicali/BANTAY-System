@@ -584,7 +584,17 @@ const FilterBar = ({
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="cd-filter-bar-title">
-          <span className="cd-filter-icon">⚙</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="var(--navy-primary)"
+            strokeWidth="2.5"
+            viewBox="0 0 24 24"
+          >
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
           <span>Filters &amp; Options</span>
           {!expanded && !isDefault && (
             <span className="cd-filter-active-count">filtered</span>
@@ -2391,7 +2401,18 @@ const handleGenerateAssessment = () => {
             onClick={exportDoc}
             disabled={isExporting || isLoading}
           >
-            {isExporting ? "Exporting..." : "Export"}
+            
+            {isExporting ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export PDF
+                </>
+              )}
           </button>
         )}
       </div>

@@ -1640,7 +1640,7 @@ export default function ProfileSettings() {
           <input
             type="text"
             className="ps-form-input"
-            value={originalFormData.address_line || "—"}
+            value={originalFormData.address_line || ""}
             disabled
           />
         </div>
@@ -1812,7 +1812,10 @@ export default function ProfileSettings() {
               )}
             </div>
             <h2 className="ps-profile-name">
-              {profileData.rank_abbreviation}. {getFullName()}
+              {profileData.rank_abbreviation
+                ? `${profileData.rank_abbreviation}. `
+                : ""}
+              {getFullName()}
             </h2>
             <div className="ps-profile-badge">{profileData.role || "N/A"}</div>
 

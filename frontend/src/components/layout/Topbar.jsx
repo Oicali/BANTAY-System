@@ -66,7 +66,8 @@ const TopBar = ({ onMenuClick }) => {
   };
 
   const getDisplayName = () => {
-    if (!profileData) return user?.username || "User";
+    if (!profileData) return "User";
+    const rank = profileData.rank_abbreviation ? `${profileData.rank_abbreviation}. ` : "";
 
     const firstName = profileData.first_name || "";
     const lastName = profileData.last_name || "";
@@ -79,7 +80,7 @@ const TopBar = ({ onMenuClick }) => {
     let fullName = displayFirstName;
     if (displayLastName) fullName += " " + displayLastName;
 
-    return fullName.trim() || user?.username || "User";
+    return (rank + fullName).trim() || user?.username || "User";
   };
 
   return (
@@ -115,7 +116,7 @@ const TopBar = ({ onMenuClick }) => {
           <div className="user-info">
             <div className="user-name">{getDisplayName()}</div>
             <div className="user-role">
-              {profileData?.role || user?.role || "User Role"}
+              {profileData?.role || user?.role || "role"}
             </div>
           </div>
 
