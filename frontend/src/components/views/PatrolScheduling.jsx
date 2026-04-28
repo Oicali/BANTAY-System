@@ -6,10 +6,23 @@ import AddPatrolModal from "../modals/AddPatrolModal";
 import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 import LoadingModal from "../modals/LoadingModal";
+import PdfPreviewModal from "../modals/PdfPreviewModal";
 import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
+
 const API_BASE = import.meta.env.VITE_API_URL;
 
 const PATROLS_PER_PAGE = 5;
+
+const getMyRole = () => {
+  const raw = localStorage.getItem("token");
+  if (!raw) return null;
+  try {
+    const b64  = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(b64));
+    return json.role ?? json.user_role ?? json.roles ?? null;
+  } catch { return null; }
+};
+const isAdmin = getMyRole() === "admin";
 
 const parseLocalDate = (d) => {
   if (!d) return null;
@@ -227,7 +240,16 @@ const PatrolScheduling = () => {
   const [editingPatrol, setEditingPatrol]   = useState(null);
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
 
+  // PDF list preview state — { blobUrl, download, revoke }
+  const [listPdfPreview, setListPdfPreview] = useState(null);
+
   const { exportPatrolList, isExporting } = useExportPatrolList(patrols);
+
+  // Close + revoke helper
+  const closeListPreview = () => {
+    listPdfPreview?.revoke();
+    setListPdfPreview(null);
+  };
 
   useEffect(() => {
     fetch("/bacoor_barangays.geojson")
@@ -352,6 +374,49 @@ const PatrolScheduling = () => {
     setCurrentPage(1);
   };
 
+  /**
+   * Fetch the patrol list PDF and open the preview modal instead of
+   * downloading immediately. Falls back to direct download on failure.
+   */
+  const handleExportListClick = async () => {
+    if (isExporting) return;
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL;
+      const authToken    = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/patrol/export/list`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ patrols }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob    = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `patrol_list_${dateStr}.pdf`;
+
+      setListPdfPreview({
+        blobUrl,
+        download: () => {
+          const link = document.createElement("a");
+          link.href     = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        },
+        revoke: () => URL.revokeObjectURL(blobUrl),
+      });
+    } catch (err) {
+      console.error("[PatrolScheduling] export list preview failed:", err);
+      // Graceful fallback — use the original direct download
+      exportPatrolList();
+    }
+  };
+
   // Filter
   const filteredPatrols = patrols.filter((p) => {
     const { search: s, status: st, dateFrom: df, dateTo: dt } = appliedFilters;
@@ -383,7 +448,6 @@ const PatrolScheduling = () => {
     if (sortOption === "name_desc") {
       return (b.patrol_name || "").localeCompare(a.patrol_name || "");
     }
-    // date_asc / date_desc
     const dateA = parseLocalDate(a.start_date)?.getTime() ?? 0;
     const dateB = parseLocalDate(b.start_date)?.getTime() ?? 0;
     return sortOption === "date_asc" ? dateA - dateB : dateB - dateA;
@@ -421,23 +485,38 @@ const PatrolScheduling = () => {
             <p>Manage patrol officer schedules and assignments</p>
           </div>
           <div className="psch-header-actions">
-            <button className="psch-btn psch-btn-outline" onClick={exportPatrolList} disabled={isExporting}>
+            <button
+              className="psch-btn psch-btn-outline"
+              onClick={handleExportListClick}
+              disabled={isExporting}
+            >
               {isExporting ? (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
                   Exporting…
                 </>
               ) : (
                 <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
                   Export PDF
                 </>
               )}
             </button>
-            <button className="psch-btn psch-btn-primary" onClick={openAddModal}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Patrol
-            </button>
+            {isAdmin && (
+              <button className="psch-btn psch-btn-primary" onClick={openAddModal}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add Patrol
+              </button>
+            )}
           </div>
         </div>
 
@@ -473,7 +552,6 @@ const PatrolScheduling = () => {
             </svg>
           </div>
 
-          {/* Sort dropdown — sits right after filter icon */}
           <SortDropdown sortOption={sortOption} onSortChange={handleSortChange} />
 
           <input
@@ -676,11 +754,22 @@ const PatrolScheduling = () => {
           onClose={() => { setShowBeatCard(false); setBeatCardPatrol(null); }}
           onEdit={() => { setShowBeatCard(false); openEditModal(beatCardPatrol); }}
           onDelete={() => handleDelete(beatCardPatrol.patrol_id)}
+          hideEdit={!isAdmin}
+          hideDelete={!isAdmin}
         />
       )}
 
       {notif && (
         <Notification message={notif.message} type={notif.type} onClose={() => setNotif(null)} duration={3000} />
+      )}
+
+      {/* Patrol List PDF Preview */}
+      {listPdfPreview && (
+        <PdfPreviewModal
+          blobUrl={listPdfPreview.blobUrl}
+          onDownload={() => { listPdfPreview.download(); closeListPreview(); }}
+          onClose={closeListPreview}
+        />
       )}
     </div>
   );

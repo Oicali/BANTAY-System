@@ -5,6 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "./PatrolModal.css";
 import { createPortal } from "react-dom";
 import { useExportPatrolDetail } from "../../hooks/UseExportPatrol.js";
+import PdfPreviewModal from "./PdfPreviewModal.jsx";
 
 
 const fillLayer    = { id: "bc-brgy-fill",    type: "fill",   paint: { "fill-color": ["get", "fillColor"], "fill-opacity": 0.5 } };
@@ -46,12 +47,21 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = f
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hoveredPatroller, setHoveredPatroller]   = useState(null);
   const [hoverAnchor, setHoverAnchor]             = useState(null);
-  const { exportPatrolDetail, isExporting } = useExportPatrolDetail();
-  const [exportLoading, setExportLoading] = useState(false);
+
+  // PDF preview state
+  const [pdfPreview, setPdfPreview] = useState(null); // { blobUrl, download, revoke }
+
+  const { previewPatrolDetail, isPreviewing } = useExportPatrolDetail();
 
   useEffect(() => {
     if (dateRange.length > 0) setActiveDate(dateRange[0]);
   }, [patrol]);
+
+  // Clean up blob URL when preview is closed
+  const closePreview = () => {
+    pdfPreview?.revoke();
+    setPdfPreview(null);
+  };
 
   // Timetable routes for current date + shift (stop_order > 0)
   const routesForDateShift = (patrol?.routes || [])
@@ -64,10 +74,10 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = f
   )];
 
   // Patrollers split by shift
- const amPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
-  .filter((p) => p.shift === "AM" && (!p.route_date || toLocalDateStr(p.route_date) === activeDate));
-const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
-  .filter((p) => p.shift === "PM" && (!p.route_date || toLocalDateStr(p.route_date) === activeDate));
+  const amPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
+    .filter((p) => p.shift === "AM" && toLocalDateStr(p.route_date) === activeDate);
+  const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
+    .filter((p) => p.shift === "PM" && toLocalDateStr(p.route_date) === activeDate);
   const currentPatrollers = activeShift === "AM" ? amPatrollers : pmPatrollers;
 
   const buildGeoJSON = useCallback(() => {
@@ -83,6 +93,48 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
       })),
     };
   }, [geoJSONData, patrol]);
+
+  /** Capture map → fetch PDF → open preview modal */
+  const handleExportClick = async () => {
+    if (isPreviewing) return;
+
+    let mapImage = null;
+    try {
+      const mapInstance = mapRef.current?.getMap?.();
+      if (mapInstance) {
+        if (barangays.length > 0 && geoJSONData) {
+          const coords = [];
+          for (const f of geoJSONData.features) {
+            if (barangays.includes(f.properties.name_db)) {
+              const rings = f.geometry.type === "Polygon"
+                ? [f.geometry.coordinates[0]]
+                : f.geometry.coordinates.map((p) => p[0]);
+              for (const ring of rings) coords.push(...ring);
+            }
+          }
+          if (coords.length > 0) {
+            const lngs = coords.map((c) => c[0]);
+            const lats = coords.map((c) => c[1]);
+            mapInstance.fitBounds(
+              [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+              { padding: 60, animate: false }
+            );
+          }
+        }
+        await new Promise((resolve) => {
+          if (mapInstance.loaded() && !mapInstance.isMoving()) resolve();
+          else mapInstance.once("idle", resolve);
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        mapImage = mapInstance.getCanvas().toDataURL("image/png").split(",")[1];
+      }
+    } catch (err) {
+      console.warn("Map capture failed:", err);
+    }
+
+    const result = await previewPatrolDetail(patrol, mapImage);
+    if (result) setPdfPreview(result);
+  };
 
   if (!patrol) return null;
 
@@ -101,62 +153,15 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
           </div>
           <div className="bc-header-actions">
             <button
-  className="bc-btn"
-  disabled={isExporting}
-  style={{ background: "#1e3a5f", color: "#fff", border: "none", fontWeight: 700 }}
-  onClick={async () => {
-  let mapImage = null;
-  try {
-    const mapInstance = mapRef.current?.getMap?.();
-    if (mapInstance) {
-      // Fit map to show all highlighted barangays before capturing
-      if (barangays.length > 0 && geoJSONData) {
-        const coords = [];
-        for (const f of geoJSONData.features) {
-          if (barangays.includes(f.properties.name_db)) {
-            const rings = f.geometry.type === "Polygon"
-              ? [f.geometry.coordinates[0]]
-              : f.geometry.coordinates.map((p) => p[0]);
-            for (const ring of rings) {
-              coords.push(...ring);
-            }
-          }
-        }
-        if (coords.length > 0) {
-          const lngs = coords.map((c) => c[0]);
-          const lats = coords.map((c) => c[1]);
-          mapInstance.fitBounds(
-            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-            { padding: 60, animate: false }
-          );
-        }
-      }
-
-      // Wait for map to fully idle after fitBounds
-      await new Promise((resolve) => {
-        if (mapInstance.loaded() && !mapInstance.isMoving()) resolve();
-        else mapInstance.once("idle", resolve);
-      });
-
-      // Extra buffer for tile rendering
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      mapImage = mapInstance.getCanvas().toDataURL("image/png").split(",")[1];
-    }
-  } catch (err) {
-    console.warn("Map capture failed:", err);
-  }
-  exportPatrolDetail(patrol, mapImage);
-}}
->
-  {isExporting ? "Exporting..." : "Export PDF"}
-</button>
-           {!hideEdit && (
-  <button className="bc-btn bc-btn-edit" onClick={onEdit}>Edit</button>
-)}
-           {!hideDelete && (
-  <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
-)}
+              className="bc-btn"
+              disabled={isPreviewing}
+              style={{ background: "#1e3a5f", color: "#fff", border: "none", fontWeight: 700 }}
+              onClick={handleExportClick}
+            >
+              {isPreviewing ? "Generating…" : "Export PDF"}
+            </button>
+            {!hideEdit   && <button className="bc-btn bc-btn-edit"   onClick={onEdit}>Edit</button>}
+            {!hideDelete && <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>}
             <button className="bc-btn bc-btn-close"  onClick={onClose}>✕</button>
           </div>
         </div>
@@ -167,13 +172,13 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
           {/* LEFT — Map */}
           <div className="bc-map-panel">
             <Map
-  ref={mapRef}
-  mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
-  initialViewState={{ longitude: 120.964, latitude: 14.4341, zoom: 12 }}
-  style={{ width: "100%", height: "100%" }}
-  mapStyle="mapbox://styles/mapbox/light-v11"
-  preserveDrawingBuffer={true}
->
+              ref={mapRef}
+              mapboxAccessToken={import.meta.env.VITE_MAPBOX_TOKEN}
+              initialViewState={{ longitude: 120.964, latitude: 14.4341, zoom: 12 }}
+              style={{ width: "100%", height: "100%" }}
+              mapStyle="mapbox://styles/mapbox/light-v11"
+              preserveDrawingBuffer={true}
+            >
               {buildGeoJSON() && (
                 <Source id="bc-barangays" type="geojson" data={buildGeoJSON()}>
                   <Layer {...fillLayer} />
@@ -183,63 +188,63 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
               )}
             </Map>
             <div className="pm-map-controls">
-  <button className="pm-map-ctrl-btn" title="Zoom in"
-    onClick={() => mapRef.current?.getMap?.().zoomIn({ duration: 300 })}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Zoom out"
-    onClick={() => mapRef.current?.getMap?.().zoomOut({ duration: 300 })}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Fit to barangays"
-    onClick={() => {
-      const map = mapRef.current?.getMap?.();
-      if (!map || barangays.length === 0 || !geoJSONData) return;
-      const coords = [];
-      for (const f of geoJSONData.features) {
-        if (barangays.includes(f.properties.name_db)) {
-          const rings = f.geometry.type === "Polygon"
-            ? [f.geometry.coordinates[0]]
-            : f.geometry.coordinates.map((p) => p[0]);
-          for (const ring of rings) coords.push(...ring);
-        }
-      }
-      if (coords.length === 0) return;
-      const lngs = coords.map((c) => c[0]);
-      const lats = coords.map((c) => c[1]);
-      map.fitBounds(
-        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: 60, duration: 800 }
-      );
-    }}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Fullscreen"
-    onClick={() => {
-      const el = document.querySelector(".bc-map-panel");
-      if (!document.fullscreenElement) el?.requestFullscreen();
-      else document.exitFullscreen();
-    }}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-    </svg>
-  </button>
-</div>
+              <button className="pm-map-ctrl-btn" title="Zoom in"
+                onClick={() => mapRef.current?.getMap?.().zoomIn({ duration: 300 })}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Zoom out"
+                onClick={() => mapRef.current?.getMap?.().zoomOut({ duration: 300 })}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Fit to barangays"
+                onClick={() => {
+                  const map = mapRef.current?.getMap?.();
+                  if (!map || barangays.length === 0 || !geoJSONData) return;
+                  const coords = [];
+                  for (const f of geoJSONData.features) {
+                    if (barangays.includes(f.properties.name_db)) {
+                      const rings = f.geometry.type === "Polygon"
+                        ? [f.geometry.coordinates[0]]
+                        : f.geometry.coordinates.map((p) => p[0]);
+                      for (const ring of rings) coords.push(...ring);
+                    }
+                  }
+                  if (coords.length === 0) return;
+                  const lngs = coords.map((c) => c[0]);
+                  const lats = coords.map((c) => c[1]);
+                  map.fitBounds(
+                    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                    { padding: 60, duration: 800 }
+                  );
+                }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Fullscreen"
+                onClick={() => {
+                  const el = document.querySelector(".bc-map-panel");
+                  if (!document.fullscreenElement) el?.requestFullscreen();
+                  else document.exitFullscreen();
+                }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* RIGHT */}
           <div className="bc-info-panel">
 
-            {/* ── Date tabs — at very top of right panel ── */}
+            {/* ── Date tabs ── */}
             {dateRange.length > 0 && (
               <div className="bc-date-tabs">
                 {dateRange.map((date) => (
@@ -252,7 +257,7 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
               </div>
             )}
 
-            {/* ── Shift tabs — controls patrollers AND timetable ── */}
+            {/* ── Shift tabs ── */}
             <div className="bc-shift-tabs-top">
               <button
                 className={`bc-shift-tab-top ${activeShift === "AM" ? "bc-shift-active" : ""}`}
@@ -270,7 +275,7 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
               </button>
             </div>
 
-            {/* Patrollers — filtered by active shift, shown per date */}
+            {/* Patrollers */}
             <div className="bc-section">
               <div className="bc-section-title">{activeShift} Shift Patrollers</div>
               {currentPatrollers.length > 0 ? (
@@ -302,12 +307,11 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
               ) : <p className="bc-empty">No patrollers assigned to {activeShift} shift.</p>}
             </div>
 
-            {/* Timetable — filtered by activeDate + activeShift */}
+            {/* Timetable */}
             <div className="bc-section bc-section-grow">
               <div className="bc-timetable-header">
                 <div className="bc-section-title">{activeShift} Shift — {formatTabDate(activeDate)}</div>
               </div>
-
               {routesForDateShift.length > 0 ? (
                 <div className="bc-timetable-wrap">
                   <table className="bc-timetable">
@@ -344,6 +348,15 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
       )}
       {hoveredPatroller && hoverAnchor && (
         <PatrollerHoverCard patroller={hoveredPatroller} anchorEl={hoverAnchor} />
+      )}
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PdfPreviewModal
+          blobUrl={pdfPreview.blobUrl}
+          onDownload={() => { pdfPreview.download(); closePreview(); }}
+          onClose={closePreview}
+        />
       )}
     </div>
   );
