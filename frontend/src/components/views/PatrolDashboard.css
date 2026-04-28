@@ -1,4 +1,4 @@
-/* === PATROL DASHBOARD GLOBAL RESET === */
+/* === GLOBAL RESET === */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -212,6 +212,35 @@ body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; ba
   color: var(--white);
   font-weight: 700;
 }
+
+/**/
+.online-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.online-badge-on  { background: rgba(34,197,94,0.1);  color: #16a34a; border: 1px solid #86efac; }
+.online-badge-off { background: rgba(107,114,128,0.1); color: #6b7280; border: 1px solid #d1d5db; }
+
+.online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.online-dot-on  { background: #16a34a; box-shadow: 0 0 0 2px rgba(34,197,94,0.3); animation: pulse-dot 2s infinite; }
+.online-dot-off { background: #9ca3af; }
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.3); }
+  50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0.1); }
+}
+
+.location-text { font-size: 13px; color: var(--gray-700); font-weight: 500; }
 
 /* OFFICER INFO */
 .officer-info   { display: flex; align-items: center; gap: 12px; }

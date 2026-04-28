@@ -37,7 +37,7 @@ const formatFullDate = (d) => { const dt = parseLocalDate(d); return dt ? dt.toL
 const formatDate     = (d) => { const dt = parseLocalDate(d); return dt ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" }) : "—"; };
 const formatTime     = (t) => t ? t.substring(0, 5) : "—";
 
-const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
+const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = false, hideDelete = false }) => {
   const mapRef = useRef(null);
 
   const dateRange = generateDateRange(patrol?.start_date, patrol?.end_date);
@@ -64,10 +64,10 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete }) => {
   )];
 
   // Patrollers split by shift
-  const amPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
-  .filter((p) => p.shift === "AM" && toLocalDateStr(p.route_date) === activeDate);
+ const amPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
+  .filter((p) => p.shift === "AM" && (!p.route_date || toLocalDateStr(p.route_date) === activeDate));
 const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
-  .filter((p) => p.shift === "PM" && toLocalDateStr(p.route_date) === activeDate);
+  .filter((p) => p.shift === "PM" && (!p.route_date || toLocalDateStr(p.route_date) === activeDate));
   const currentPatrollers = activeShift === "AM" ? amPatrollers : pmPatrollers;
 
   const buildGeoJSON = useCallback(() => {
@@ -151,8 +151,12 @@ const pmPatrollers = (patrol?.patrollers_detail || patrol?.patrollers || [])
 >
   {isExporting ? "Exporting..." : "Export PDF"}
 </button>
-            <button className="bc-btn bc-btn-edit"   onClick={onEdit}>Edit</button>
-            <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+           {!hideEdit && (
+  <button className="bc-btn bc-btn-edit" onClick={onEdit}>Edit</button>
+)}
+           {!hideDelete && (
+  <button className="bc-btn bc-btn-delete" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+)}
             <button className="bc-btn bc-btn-close"  onClick={onClose}>✕</button>
           </div>
         </div>
