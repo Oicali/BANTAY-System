@@ -1391,6 +1391,80 @@ input:focus-visible {
   font-size: 14px;
 }
 
+/* ── Officer avatar marker (Life360 style) ─────────────────── */
+/* ── Officer avatar marker ─────────────────────────────────── */
+.crmap-officer-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.30));
+}
+
+.crmap-officer-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #1d4ed8;
+  background: #dbeafe;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.crmap-officer-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.crmap-officer-avatar-initials {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1d4ed8;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+/* Downward teardrop tail — sits flush below avatar */
+.crmap-officer-bubble-tail {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid #1d4ed8;
+  margin-top: -1px; /* overlap 1px so there's no gap */
+  position: relative;
+  z-index: 1;
+}
+
+/* Pulse ring — absolutely positioned behind avatar */
+.crmap-officer-pulse {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(29, 78, 216, 0.45);
+  animation: crmap-officer-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes crmap-officer-pulse {
+  0%   { transform: translateX(-50%) scale(1);   opacity: 0.7; }
+  70%  { transform: translateX(-50%) scale(1.5); opacity: 0;   }
+  100% { transform: translateX(-50%) scale(1.5); opacity: 0;   }
+}
+
 .crmap-multisel-trigger:hover {
   border-color: var(--navy-primary);
 }

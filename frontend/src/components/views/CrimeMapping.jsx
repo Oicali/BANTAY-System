@@ -184,6 +184,7 @@ function CrimeMapping() {
   const [showOfficers, setShowOfficers] = useState(true);
   const [hoveredOfficer, setHoveredOfficer] = useState(null);
   const officerPollRef = useRef(null);
+  const hoveredOfficerRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [selectedPin, setSelectedPin] = useState(null);
@@ -467,10 +468,34 @@ function CrimeMapping() {
 
   useEffect(() => {
     fetchOfficers();
-    officerPollRef.current = setInterval(fetchOfficers, 5000);
+
+    const startPoll = () => {
+      if (officerPollRef.current) clearInterval(officerPollRef.current);
+      officerPollRef.current = setInterval(fetchOfficers, 5000);
+    };
+
+    const stopPoll = () => {
+      if (officerPollRef.current) {
+        clearInterval(officerPollRef.current);
+        officerPollRef.current = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPoll(); // nobody watching → stop completely
+      } else {
+        fetchOfficers(); // tab back → immediate refresh
+        startPoll(); // restart polling
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    startPoll();
 
     return () => {
-      if (officerPollRef.current) clearInterval(officerPollRef.current);
+      stopPoll(); // component unmounts (navigates away) → stop
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [fetchOfficers]);
 
@@ -1078,6 +1103,7 @@ function CrimeMapping() {
               onClick={handleMapClick}
               doubleClickZoom={false}
               onMouseMove={(e) => {
+                if (hoveredOfficerRef.current) return; // ← reads ref, always current value
                 if (heatmapMode) {
                   setHoveredBarangay(null);
                   return;
@@ -1264,44 +1290,45 @@ function CrimeMapping() {
                     key={`officer-${officer.user_id}`}
                     longitude={parseFloat(officer.longitude)}
                     latitude={parseFloat(officer.latitude)}
-                    anchor="center"
+                    anchor="bottom"
                   >
                     <div
                       className="crmap-officer-marker"
                       onMouseEnter={(e) => {
+                        hoveredOfficerRef.current = true; // ← sync, immediate
                         const el = e.currentTarget;
                         const rect = el.getBoundingClientRect();
                         const mapRect = mapRef.current
                           ?.getContainer()
                           ?.getBoundingClientRect();
                         if (!mapRect) return;
-
                         setHoveredOfficer({
                           officer,
                           x: rect.left - mapRect.left + rect.width / 2,
                           y: rect.top - mapRect.top,
                         });
+                        setHoveredBarangay(null);
                       }}
-                      onMouseLeave={() => setHoveredOfficer(null)}
+                      onMouseLeave={() => {
+                        hoveredOfficerRef.current = false; // ← sync, immediate
+                        setHoveredOfficer(null);
+                      }}
                     >
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="#1d4ed8"
-                        stroke="#ffffff"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 2L4 5v6c0 4.97 3.4 9.13 8 10 4.6-.87 8-5.03 8-10V5l-8-3z" />
-                        <path
-                          d="M9 12l2 2 4-4"
-                          stroke="#ffffff"
-                          strokeWidth="1.8"
-                          fill="none"
-                        />
-                      </svg>
+                      <div className="crmap-officer-avatar">
+                        {officer.profile_picture ? (
+                          <img
+                            src={officer.profile_picture}
+                            alt={officer.full_name}
+                            className="crmap-officer-avatar-img"
+                          />
+                        ) : (
+                          <span className="crmap-officer-avatar-initials">
+                            {officer.initials || "??"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="crmap-officer-pulse" />
+                      <div className="crmap-officer-bubble-tail" />
                     </div>
                   </Marker>
                 ))}
@@ -1365,7 +1392,7 @@ function CrimeMapping() {
               >
                 <div className="crmap-officer-tooltip-name">
                   👮{" "}
-                  {`${hoveredOfficer.officer.abbreviation ?? ""} ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
+                  {`${hoveredOfficer.officer.abbreviation ?? ""}. ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
                     hoveredOfficer.officer.username ||
                     "Officer"}
                 </div>
@@ -2155,26 +2182,46 @@ function CrimeMapping() {
                             });
                           }}
                         >
-                          {/* Shield icon */}
-                          <svg
-                            width="28"
-                            height="28"
-                            viewBox="0 0 24 24"
-                            fill="#1d4ed8"
-                            stroke="#ffffff"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ flexShrink: 0 }}
+                          {/* Avatar */}
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: "50%",
+                              border: "2px solid #1d4ed8",
+                              background: "#dbeafe",
+                              overflow: "hidden",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
                           >
-                            <path d="M12 2L4 5v6c0 4.97 3.4 9.13 8 10 4.6-.87 8-5.03 8-10V5l-8-3z" />
-                            <path
-                              d="M9 12l2 2 4-4"
-                              stroke="#ffffff"
-                              strokeWidth="1.8"
-                              fill="none"
-                            />
-                          </svg>
+                            {officer.profile_picture ? (
+                              <img
+                                src={officer.profile_picture}
+                                alt={officer.full_name}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  borderRadius: "50%",
+                                }}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: "#1d4ed8",
+                                  userSelect: "none",
+                                  letterSpacing: "0.3px",
+                                }}
+                              >
+                                {officer.initials || "??"}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Info */}
                           <div style={{ flex: 1, minWidth: 0 }}>

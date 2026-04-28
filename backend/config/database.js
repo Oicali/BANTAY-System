@@ -57,7 +57,7 @@ pool.on("connect", async (client) => {
   try {
     await client.query("SET TIMEZONE = 'Asia/Manila'");
     await client.query("SET statement_timeout = '30s'");
-    console.log("🗄️ PostgreSQL connected");
+    // console.log("🗄️ PostgreSQL connected");
   } catch (err) {
     console.error("⚠️ Failed to configure DB client:", err.message);
   }
