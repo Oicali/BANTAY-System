@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import "./AfterPatrol.css";
 import TimePicker from "../modals/TimePicker";
 import Notification from "../modals/Notification";
+import BeatCard from "../modals/BeatCard";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -16,6 +17,8 @@ const todayDate = () => {
   const t = new Date();
   return new Date(t.getFullYear(), t.getMonth(), t.getDate());
 };
+
+
 
 const getPatrolStatus = (patrol) => {
   const t     = todayDate();
@@ -660,6 +663,7 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
   const [loading,    setLoading]    = useState(true);
   const [activeDate, setActiveDate] = useState(null);
   const [deleting,   setDeleting]   = useState(null);
+  
 
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
 
@@ -1100,6 +1104,8 @@ const AfterPatrol = () => {
   const [filters,         setFilters]         = useState({ search: "", status: "", date_from: "", date_to: "" });
   const [currentPage,     setCurrentPage]     = useState(1);
   const ITEMS_PER_PAGE = 15;
+  const [selectedBeat, setSelectedBeat] = useState(null);
+  const [geoJSONData, setGeoJSONData] = useState(null);
 
   const showToast = (message, type = "success") => {
     setNotif({ message, type });
@@ -1127,6 +1133,12 @@ const AfterPatrol = () => {
 };
 
   useEffect(() => { fetchMyPatrols(); }, []);
+  useEffect(() => {
+  fetch("/bacoor_barangays.geojson")
+    .then((r) => r.json())
+    .then((data) => setGeoJSONData(data))
+    .catch((err) => console.error("GeoJSON load error:", err));
+}, []);
 
   const handleSubmitReport = async (patrolId, formData, shift) => {
     try {
@@ -1223,7 +1235,7 @@ const AfterPatrol = () => {
   };
 
   return (
-    <div className="pd-content-area">
+     <div className="ap-wrap pd-content-area">
 
       <div className="pd-page-header">
         <div className="pd-page-header-left">
@@ -1295,84 +1307,64 @@ const AfterPatrol = () => {
         ))}
       </div>
 
-      <div className="pd-filter-bar">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
-            stroke="var(--navy-primary)" strokeWidth="2.5" viewBox="0 0 24 24">
-            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-          </svg>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-primary)", textTransform: "uppercase", letterSpacing: 1 }}>
-            Filter Records
-          </span>
-        </div>
-        <div className="pd-filter-row">
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Search</label>
-            <input type="text" className="pd-filter-input" placeholder="Search by patrol name or unit"
-              name="search" value={filters.search} onChange={handleFilterChange} />
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Status</label>
-            <select className="pd-filter-input" name="status" value={filters.status} onChange={handleFilterChange}>
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Date From</label>
-            <input type="date" className="pd-filter-input" name="date_from"
-              value={filters.date_from} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
-          </div>
-          <div className="pd-filter-group">
-            <label className="pd-filter-label">Date To</label>
-            <input type="date" className="pd-filter-input" name="date_to"
-              value={filters.date_to} onChange={handleFilterChange} onKeyDown={(e) => e.preventDefault()} />
-          </div>
-          <div className="pd-filter-group" style={{ justifyContent: "flex-end" }}>
-            <label className="pd-filter-label">&nbsp;</label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="pd-btn pd-btn-primary" style={{ height: 40, padding: "0 16px", fontSize: 13 }}
-                onClick={() => setCurrentPage(1)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none"
-                  stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-                Apply
-              </button>
-              <button onClick={clearFilters} title="Clear filters" style={{
-                background: "var(--white)", color: "var(--gray-700)",
-                border: "1px solid var(--gray-300)", borderRadius: 6,
-                height: 40, width: 40, fontSize: 18, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>↻</button>
-            </div>
-          </div>
-        </div>
-      </div>
+     <div className="pd-filter-bar">
+  <div className="pd-filter-icon">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+    </svg>
+  </div>
+  <input
+    className="pd-filter-search"
+    type="text"
+    placeholder="Search by patrol name or unit..."
+    name="search"
+    value={filters.search}
+    onChange={handleFilterChange}
+    onKeyDown={(e) => e.key === "Enter" && setCurrentPage(1)}
+  />
+  <select
+    className="pd-filter-select"
+    name="status"
+    value={filters.status}
+    onChange={handleFilterChange}
+  >
+    <option value="">All Statuses</option>
+    <option value="active">Active</option>
+    <option value="upcoming">Upcoming</option>
+    <option value="completed">Completed</option>
+  </select>
+  <div className="pd-filter-date-group">
+    <input type="date" className="pd-filter-date" name="date_from"
+      value={filters.date_from} onChange={handleFilterChange} />
+    <span className="pd-filter-arrow">→</span>
+    <input type="date" className="pd-filter-date" name="date_to"
+      value={filters.date_to} onChange={handleFilterChange} />
+  </div>
+  <button className="pd-filter-apply" onClick={() => setCurrentPage(1)}>Apply</button>
+  {(filters.search || filters.status || filters.date_from || filters.date_to) && (
+    <button className="pd-filter-reset" onClick={clearFilters} title="Reset filters">↺</button>
+  )}
+</div>
 
       <div className="pd-table-card">
         <div className="pd-table-container">
           <table className="pd-data-table">
-            <thead>
-              <tr>
-                <th>Patrol Name</th>
-                <th>Status</th>
-                <th>Mobile Unit</th>
-                <th>Duration</th>
-                <th>My Shift</th>
-                <th>Patrollers</th>
-                <th>Area of Responsibility</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+           <thead>
+  <tr>
+    <th>Patrol Name</th>
+    <th>Status</th>
+    <th>Duration</th>
+    {getMyRole() === "Administrator" ? <th>Patrollers</th> : <th>My Shift</th>}
+    <th>Actions</th>
+  </tr>
+</thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>Loading...</td></tr>
               ) : paginated.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No patrol assignments found.</td></tr>
               ) : paginated.map((patrol) => {
+                  const isAdmin    = getMyRole() === "Administrator";  // ← add this
                 const status     = getPatrolStatus(patrol);
                 const myShift    = getMyShift(patrol);
                 const patrollers = patrol.patrollers || [];
@@ -1384,89 +1376,52 @@ const AfterPatrol = () => {
                     .map((r) => r.barangay)
                 )];
                 return (
-                  <tr key={patrol.patrol_id}>
-                    <td>
-                      <span style={{
-                        fontFamily: "monospace", fontWeight: 700, color: "var(--navy-primary)",
-                        fontSize: 13, background: "rgba(30,58,95,0.07)",
-                        padding: "4px 10px", borderRadius: 6, display: "inline-block",
-                      }}>
-                        {patrol.patrol_name}
-                      </span>
-                    </td>
-                    <td><StatusBadge status={status} /></td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: "var(--navy-primary)", fontSize: 14 }}>
-                        {patrol.mobile_unit_name || "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--navy-primary)", whiteSpace: "nowrap" }}>
-                        {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
-                      </span>
-                    </td>
-                    <td>
-                      {myShift
-                        ? <ShiftBadge shift={myShift} />
-                        : <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>
-                      }
-                    </td>
-                    <td>
-                      {patrollers.length > 0 ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                          {amCount > 0 && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 700, color: "#92400e",
-                              background: "#fef3c7", padding: "1px 7px",
-                              borderRadius: 20, border: "1px solid #fcd34d",
-                              display: "inline-flex", alignItems: "center", gap: 3,
-                            }}>
-                              AM · {amCount} officer{amCount !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {pmCount > 0 && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 700, color: "#1e3a5f",
-                              background: "#e0e7f0", padding: "1px 7px",
-                              borderRadius: 20, border: "1px solid #93afc9",
-                              display: "inline-flex", alignItems: "center", gap: 3,
-                            }}>
-                              PM · {pmCount} officer{pmCount !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {patrollers.length - amCount - pmCount > 0 && (
-                            <span className="pd-count-pill pd-count-patroller">
-                              {patrollers.length - amCount - pmCount} other
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      {barangays.length > 0
-                        ? <span className="pd-count-pill pd-count-barangay">{barangays.length} Barangay{barangays.length !== 1 ? "s" : ""}</span>
-                        : <span style={{ fontSize: 13, color: "#adb5bd", fontStyle: "italic" }}>—</span>}
-                    </td>
-                    <td>
-                      <div className="pd-action-links">
-                        <button className="pd-action-btn pd-action-btn-view"
-                          onClick={() => setSelectedView(patrol)}>
-                          <ViewIcon /> View
-                        </button>
-                        <button className="pd-action-btn pd-action-btn-history"
-                          onClick={() => setSelectedHistory(patrol)}>
-                          <HistoryIcon /> History
-                        </button>
-                        {/* CHANGED: uses handleOpenAfterReport instead of directly opening modal */}
-                        <button className="pd-action-btn pd-action-btn-report"
-                          onClick={() => handleOpenAfterReport(patrol, myShift)}>
-                          <ReportIcon /> After Report
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                 <tr key={patrol.patrol_id}>
+  <td>
+    <span className="ap-patrol-name-badge">
+      {patrol.patrol_name}
+    </span>
+  </td>
+  <td><StatusBadge status={status} /></td>
+  <td>
+    <span className="ap-duration">
+      {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
+    </span>
+  </td>
+  {isAdmin ? (
+    <td>
+      {patrollers.length > 0 ? (
+        <div className="ap-patroller-counts">
+          {amCount > 0 && <span className="ap-shift-pill ap-shift-am">AM · {amCount} officer{amCount !== 1 ? "s" : ""}</span>}
+          {pmCount > 0 && <span className="ap-shift-pill ap-shift-pm">PM · {pmCount} officer{pmCount !== 1 ? "s" : ""}</span>}
+          {patrollers.length - amCount - pmCount > 0 && (
+            <span className="pd-count-pill pd-count-patroller">{patrollers.length - amCount - pmCount} other</span>
+          )}
+        </div>
+      ) : <span className="ap-empty">—</span>}
+    </td>
+  ) : (
+    <td>
+      {myShift ? <ShiftBadge shift={myShift} /> : <span className="ap-empty">—</span>}
+    </td>
+  )}
+  <td>
+    <div className="ap-wrap pd-action-links">
+      <button className="pd-action-btn pd-action-btn-view"
+        onClick={() => setSelectedBeat(patrol)}>
+        <ViewIcon /> View
+      </button>
+      <button className="pd-action-btn pd-action-btn-history"
+        onClick={() => setSelectedHistory(patrol)}>
+        <HistoryIcon /> History
+      </button>
+      <button className="pd-action-btn pd-action-btn-report"
+        onClick={() => handleOpenAfterReport(patrol, myShift)}>
+        <ReportIcon /> After Report
+      </button>
+    </div>
+  </td>
+</tr> 
                 );
               })}
             </tbody>
@@ -1520,6 +1475,17 @@ const AfterPatrol = () => {
           duration={3500}
         />
       )}
+    {selectedBeat && geoJSONData && (
+  <BeatCard
+    patrol={selectedBeat}
+    geoJSONData={geoJSONData}
+    onClose={() => setSelectedBeat(null)}
+    onEdit={() => {}}
+    onDelete={() => {}}
+    hideEdit={true}
+    hideDelete={true}
+  />
+)}
     </div>
   );
 };

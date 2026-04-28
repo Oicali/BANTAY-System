@@ -408,34 +408,50 @@ const PatrollerDashboard = () => {
               />
               <div className="table-container">
                 <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Officer</th>
-                      <th>Mobile Unit Assigned</th>
-                      <th>Last Login</th>
-                    </tr>
-                  </thead>
+                 <thead>
+  <tr>
+    <th>Officer</th>
+    <th>Status</th>
+    <th>Location</th>
+    <th>Last Update</th>
+  </tr>
+</thead>
                   <tbody>
-                    {paginatedPatrollers.length === 0 ? (
-                      <tr><td colSpan={3} className="empty-row">No patrollers found.</td></tr>
-                    ) : paginatedPatrollers.map((officer, index) => (
-                      <tr key={officer.officer_id || index}>
-                        <td>
-                          <div className="officer-info">
-                            <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
-                            <div className="officer-name">{officer.officer_name || "Unknown"}</div>
-                          </div>
-                        </td>
-                        <td>
-                          {officer.mobile_unit_assigned
-                            ? <span className="unit-badge">{officer.mobile_unit_assigned}</span>
-                            : <span className="unassigned-badge">Unassigned</span>}
-                        </td>
-                        <td>
-                          <span className="time-badge">{formatTime(officer.last_login)}</span>
-                        </td>
-                      </tr>
-                    ))}
+                   {paginatedPatrollers.map((officer, index) => {
+  const lastSeen   = officer.last_location_at ? new Date(officer.last_location_at) : null;
+  const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const isOnline   = lastSeen && lastSeen > fiveMinsAgo;
+
+  return (
+    <tr key={officer.officer_id || index}>
+      <td>
+        <div className="officer-info">
+          <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
+          <div className="officer-name">{officer.officer_name || "Unknown"}</div>
+        </div>
+      </td>
+      <td>
+        <span className={`online-badge ${isOnline ? "online-badge-on" : "online-badge-off"}`}>
+          <span className={`online-dot ${isOnline ? "online-dot-on" : "online-dot-off"}`} />
+          {isOnline ? "Online" : "Offline"}
+        </span>
+      </td>
+      <td>
+        <span className="location-text">
+          {officer.last_location_name
+            ? (isOnline ? officer.last_location_name : `Last seen: ${officer.last_location_name}`)
+            : <span className="unassigned-badge">No data</span>
+          }
+        </span>
+      </td>
+      <td>
+        <span className="time-badge">
+          {lastSeen ? lastSeen.toLocaleString() : "Never"}
+        </span>
+      </td>
+    </tr>
+  );
+})}
                   </tbody>
                 </table>
               </div>
