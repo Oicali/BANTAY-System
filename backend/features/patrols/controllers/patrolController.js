@@ -77,7 +77,7 @@ const getActivePatrollers = async (req, res) => {
       LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
       LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
       LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
-      LEFT JOIN officer_locations ol ON ap.officer_id = ol.officer_id
+      LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
       ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
     `);
     res.json({ success: true, data: result.rows });
@@ -1029,14 +1029,14 @@ const updateOfficerLocation = async (req, res) => {
 
   try {
     await pool.query(
-      `INSERT INTO officer_locations (officer_id, latitude, longitude, location_name, updated_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       ON CONFLICT (officer_id)
-       DO UPDATE SET
-         latitude      = EXCLUDED.latitude,
-         longitude     = EXCLUDED.longitude,
-         location_name = EXCLUDED.location_name,
-         updated_at    = NOW()`,
+     `INSERT INTO officer_locations (user_id, latitude, longitude, location_name, updated_at)
+ VALUES ($1, $2, $3, $4, NOW())
+ ON CONFLICT (user_id)
+ DO UPDATE SET
+   latitude      = EXCLUDED.latitude,
+   longitude     = EXCLUDED.longitude,
+   location_name = EXCLUDED.location_name,
+   updated_at    = NOW()`,
       [userId, latitude, longitude, location_name || null]
     );
     res.json({ success: true });
