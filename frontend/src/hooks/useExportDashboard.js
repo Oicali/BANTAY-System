@@ -1,19 +1,12 @@
-// frontend/src/hooks/useExportDashboard.js
 import { useState } from "react";
 import html2canvas from "html2canvas";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const getToken = () => localStorage.getItem("token");
 
-/**
- * Captures a DOM element as a base64 PNG string.
- * Waits 800ms first to let Recharts animations finish.
- * Returns null if the element is missing or capture fails.
- */
 async function captureElement(ref) {
   if (!ref?.current) return null;
   try {
-    // Wait for chart animations to complete before screenshotting
     await new Promise((resolve) => setTimeout(resolve, 800));
     const canvas = await html2canvas(ref.current, {
       backgroundColor: "#ffffff",
@@ -28,12 +21,6 @@ async function captureElement(ref) {
   }
 }
 
-/**
- * @param {object} dashData        – live dashboard data
- * @param {object} appliedFilters  – currently applied filter state
- * @param {object} chartRefs       – { caseStatus, trends, clock, byDay, modus, place, barangay }
- * @param {function} setIsExportLoading – setter from CrimeDashboard to show loading modal
- */
 export function useExportDashboard(
   dashData,
   appliedFilters,
@@ -43,6 +30,12 @@ export function useExportDashboard(
   analysisData = null,
 ) {
   const [isExporting, setIsExporting] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);   // ← add this
+
+  const closePreview = () => {
+    pdfPreview?.revoke();
+    setPdfPreview(null);
+  };
 
   const exportDoc = async () => {
     if (isExporting) return;
@@ -50,39 +43,36 @@ export function useExportDashboard(
     setIsExportLoading?.(true);
 
     try {
-      // ── Capture all charts sequentially so the 800ms delay per chart
-      //    doesn't overlap and cause partial renders ───────────────────
-      const imgTrends = await captureElement(chartRefs.trends);
-      const imgClock = await captureElement(chartRefs.clock);
-      const imgByDay = await captureElement(chartRefs.byDay);
-      const imgModus = await captureElement(chartRefs.modus);
-      const imgPlace = await captureElement(chartRefs.place);
+      const imgTrends  = await captureElement(chartRefs.trends);
+      const imgClock   = await captureElement(chartRefs.clock);
+      const imgByDay   = await captureElement(chartRefs.byDay);
+      const imgModus   = await captureElement(chartRefs.modus);
+      const imgPlace   = await captureElement(chartRefs.place);
       const imgBarangay = await captureElement(chartRefs.barangay);
 
       const payload = {
-        summary: dashData.summary ?? [],
-        trends: dashData.trends ?? [],
-        hourly: dashData.hourly ?? [],
-        byDay: dashData.byDay ?? [],
-        place: dashData.place ?? [],
-        barangay: dashData.barangay ?? [],
-        modus: dashData.modus ?? [],
+        summary:      dashData.summary      ?? [],
+        trends:       dashData.trends       ?? [],
+        hourly:       dashData.hourly       ?? [],
+        byDay:        dashData.byDay        ?? [],
+        place:        dashData.place        ?? [],
+        barangay:     dashData.barangay     ?? [],
+        modus:        dashData.modus        ?? [],
         completeData: dashData.completeData ?? [],
-        assessment: assessment ?? null,
+        assessment:   assessment   ?? null,
         analysisData: analysisData ?? null,
         meta: {
-          dateFrom: appliedFilters.dateFrom ?? null,
-          dateTo: appliedFilters.dateTo ?? null,
+          dateFrom:   appliedFilters.dateFrom   ?? null,
+          dateTo:     appliedFilters.dateTo     ?? null,
           crimeTypes: appliedFilters.crimeTypes ?? [],
-          barangays: appliedFilters.barangays ?? [],
+          barangays:  appliedFilters.barangays  ?? [],
         },
         images: {
-          // caseStatus removed
-          trends: imgTrends,
-          clock: imgClock,
-          byDay: imgByDay,
-          modus: imgModus,
-          place: imgPlace,
+          trends:   imgTrends,
+          clock:    imgClock,
+          byDay:    imgByDay,
+          modus:    imgModus,
+          place:    imgPlace,
           barangay: imgBarangay,
         },
       };
@@ -97,26 +87,32 @@ export function useExportDashboard(
       });
 
       if (!response.ok) {
-        const err = await response
-          .json()
-          .catch(() => ({ message: "Export failed" }));
+        const err = await response.json().catch(() => ({ message: "Export failed" }));
         throw new Error(err.message || "Export failed");
       }
 
-      const blob = await response.blob();
-      const dateStr =
-        appliedFilters.dateFrom && appliedFilters.dateTo
-          ? `${appliedFilters.dateFrom}_to_${appliedFilters.dateTo}`
-          : new Date().toISOString().slice(0, 10);
+      const dateStr = appliedFilters.dateFrom && appliedFilters.dateTo
+        ? `${appliedFilters.dateFrom}_to_${appliedFilters.dateTo}`
+        : new Date().toISOString().slice(0, 10);
+      const filename = `crime_dashboard_${dateStr}.pdf`;
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `crime_dashboard_${dateStr}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(file);
+
+      setPdfPreview({
+        blobUrl,
+        download: () => {
+          const link = document.createElement("a");
+          link.href     = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        },
+        revoke: () => URL.revokeObjectURL(blobUrl),
+      });
+
     } catch (err) {
       console.error("[useExportDashboard] error:", err);
       alert(err.message || "Failed to export dashboard");
@@ -126,5 +122,5 @@ export function useExportDashboard(
     }
   };
 
-  return { exportDoc, isExporting };
+  return { exportDoc, isExporting, pdfPreview, closePreview };
 }

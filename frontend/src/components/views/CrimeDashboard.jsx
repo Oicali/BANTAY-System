@@ -29,6 +29,7 @@ import {
 import LoadingModal from "../modals/LoadingModal";
 import { useExportDashboard } from "../../hooks/useExportDashboard";
 import ShortRangeWarningModal from "../modals/ShortRangeWarningModal";
+import PdfPreviewModal from "../modals/PdfPreviewModal";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
@@ -2157,7 +2158,7 @@ const CrimeDashboard = () => {
   const [showAiErrorModal, setShowAiErrorModal] = useState(false);
   const [aiErrorMessage, setAiErrorMessage] = useState("");
   const [showShortRangeModal, setShowShortRangeModal] = useState(false);
-const [pendingDayCount, setPendingDayCount] = useState(0);
+  const [pendingDayCount, setPendingDayCount] = useState(0);
 
   const fetchIdRef = useRef(0);
 
@@ -2180,14 +2181,15 @@ const [pendingDayCount, setPendingDayCount] = useState(0);
   };
 
   const [isExportLoading, setIsExportLoading] = useState(false);
-  const { exportDoc, isExporting } = useExportDashboard(
-    dashData,
-    appliedFilters,
-    chartRefs,
-    setIsExportLoading,
-    assessment,
-    analysisData,
-  );
+  const { exportDoc, isExporting, pdfPreview, closePreview } =
+    useExportDashboard(
+      dashData,
+      appliedFilters,
+      chartRefs,
+      setIsExportLoading,
+      assessment,
+      analysisData,
+    );
 
   const fetchOverview = (filters, force = false) => {
     if (!force && isCacheValid(filters)) {
@@ -2292,95 +2294,107 @@ const [pendingDayCount, setPendingDayCount] = useState(0);
   // ];
 
   const runAssessment = async () => {
-  const crimes =
-    appliedFilters.crimeTypes.length > 0
-      ? appliedFilters.crimeTypes
-      : INDEX_CRIMES;
+    const crimes =
+      appliedFilters.crimeTypes.length > 0
+        ? appliedFilters.crimeTypes
+        : INDEX_CRIMES;
 
-  const phases = [
-    "Querying blotter records...",
-    "Running spatial clustering...",
-    "Computing forecasts...",
-    ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
-    "Finalizing assessment...",
-  ];
+    const phases = [
+      "Querying blotter records...",
+      "Running spatial clustering...",
+      "Computing forecasts...",
+      ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
+      "Finalizing assessment...",
+    ];
 
-  let phaseIndex = 0;
-  setAssessmentPhase(phases[0]);
-  const phaseInterval = setInterval(() => {
-    phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
-    setAssessmentPhase(phases[phaseIndex]);
-  }, 3200);
+    let phaseIndex = 0;
+    setAssessmentPhase(phases[0]);
+    const phaseInterval = setInterval(() => {
+      phaseIndex = Math.min(phaseIndex + 1, phases.length - 1);
+      setAssessmentPhase(phases[phaseIndex]);
+    }, 3200);
 
-  try {
-    setIsGeneratingAssessment(true);
+    try {
+      setIsGeneratingAssessment(true);
 
-    const payload = {
-      barangays: appliedFilters.barangays || [],
-      crime_types: appliedFilters.crimeTypes || [],
-      date_from: appliedFilters.dateFrom,
-      date_to: appliedFilters.dateTo,
-      mode: getAssessmentMode(appliedFilters.dateTo),
-    };
+      const payload = {
+        barangays: appliedFilters.barangays || [],
+        crime_types: appliedFilters.crimeTypes || [],
+        date_from: appliedFilters.dateFrom,
+        date_to: appliedFilters.dateTo,
+        mode: getAssessmentMode(appliedFilters.dateTo),
+      };
 
-    const response = await fetch(`${AI_API}/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
-      body: JSON.stringify(payload),
-    });
+      const response = await fetch(`${AI_API}/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-    const json = await response.json();
+      const json = await response.json();
 
-    if (!response.ok || !json.success) {
-      throw new Error(json.message || "Failed to generate assessment");
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Failed to generate assessment");
+      }
+
+      setAssessment(json.assessment);
+      setAnalysisData(json.analysis);
+      console.log("AI assessment response:", json);
+    } catch (err) {
+      console.error("Generate assessment error:", err);
+      const msg = err.message || "";
+      const isRateLimit =
+        msg.includes("429") ||
+        msg.includes("rate limit") ||
+        msg.includes("quota") ||
+        msg.includes("limit");
+      setAiErrorMessage(
+        isRateLimit
+          ? "The AI service has reached its daily request limit. Please try again tomorrow (resets at 8:00 AM Philippine Time)."
+          : "Something went wrong while generating the assessment. Please try again in a few moments.",
+      );
+      setShowAiErrorModal(true);
+    } finally {
+      clearInterval(phaseInterval);
+      setAssessmentPhase("");
+      setIsGeneratingAssessment(false);
+    }
+  };
+
+  const handleGenerateAssessment = () => {
+    if (isLoading || !dashData.summary.length) return;
+
+    const dayCount = Math.round(
+      (new Date(appliedFilters.dateTo) - new Date(appliedFilters.dateFrom)) /
+        86400000,
+    );
+
+    if (dayCount < 180) {
+      setPendingDayCount(dayCount);
+      setShowShortRangeModal(true);
+      return;
     }
 
-    setAssessment(json.assessment);
-    setAnalysisData(json.analysis);
-    console.log("AI assessment response:", json);
-  } catch (err) {
-    console.error("Generate assessment error:", err);
-    const msg = err.message || "";
-    const isRateLimit =
-      msg.includes("429") ||
-      msg.includes("rate limit") ||
-      msg.includes("quota") ||
-      msg.includes("limit");
-    setAiErrorMessage(
-      isRateLimit
-        ? "The AI service has reached its daily request limit. Please try again tomorrow (resets at 8:00 AM Philippine Time)."
-        : "Something went wrong while generating the assessment. Please try again in a few moments.",
-    );
-    setShowAiErrorModal(true);
-  } finally {
-    clearInterval(phaseInterval);
-    setAssessmentPhase("");
-    setIsGeneratingAssessment(false);
-  }
-};
-
-const handleGenerateAssessment = () => {
-  if (isLoading || !dashData.summary.length) return;
-
-  const dayCount = Math.round(
-    (new Date(appliedFilters.dateTo) - new Date(appliedFilters.dateFrom)) /
-      86400000,
-  );
-
-  if (dayCount < 180) {
-    setPendingDayCount(dayCount);
-    setShowShortRangeModal(true);
-    return;
-  }
-
-  runAssessment();
-};
+    runAssessment();
+  };
 
   return (
     <div className="content-area">
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <PdfPreviewModal
+          blobUrl={pdfPreview.blobUrl}
+          onDownload={() => {
+            pdfPreview.download();
+            closePreview();
+          }}
+          onClose={closePreview}
+        />
+      )}
+
       <LoadingModal isOpen={isLoading} message="Loading crime data..." />
       <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
 
@@ -2401,18 +2415,43 @@ const handleGenerateAssessment = () => {
             onClick={exportDoc}
             disabled={isExporting || isLoading}
           >
-            
             {isExporting ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                  Exporting…
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Export PDF
-                </>
-              )}
+              <>
+                {/* <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="psch-btn-icon psch-spin"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg> */}
+                Exporting…
+              </>
+            ) : (
+              <>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="psch-btn-icon"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export PDF
+              </>
+            )}
           </button>
         )}
       </div>
@@ -2662,15 +2701,15 @@ const handleGenerateAssessment = () => {
       )}
 
       {showShortRangeModal && (
-  <ShortRangeWarningModal
-    dayCount={pendingDayCount}
-    onCancel={() => setShowShortRangeModal(false)}
-    onConfirm={() => {
-      setShowShortRangeModal(false);
-      runAssessment();
-    }}
-  />
-)}
+        <ShortRangeWarningModal
+          dayCount={pendingDayCount}
+          onCancel={() => setShowShortRangeModal(false)}
+          onConfirm={() => {
+            setShowShortRangeModal(false);
+            runAssessment();
+          }}
+        />
+      )}
 
       {errorMessage && (
         <div className="cd-toast cd-toast-error">
