@@ -23,6 +23,7 @@ deleteAfterPatrolReport,
   updateRouteTask,
   addRouteTask,
   removeRouteTask,
+  updateOfficerLocation,
 } = require("../controllers/patrolController");
 
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
@@ -68,4 +69,7 @@ router.post("/export/detail", authenticate, exportPatrolDetail);
 router.get( "/patrols/:id/after-reports", authenticate, getAfterPatrolReports);
 router.get( "/patrols/:id/after-reports/mine", authenticate, getMyAfterPatrolReports);
 router.delete("/after-reports/:reportId", authenticate, deleteAfterPatrolReport)
+
+//
+router.post("/location", authenticate, updateOfficerLocation);
 module.exports = router;

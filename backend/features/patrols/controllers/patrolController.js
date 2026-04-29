@@ -67,12 +67,17 @@ const getActivePatrollers = async (req, res) => {
         ap.officer_id,
         u.last_login,
         TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-        mu.mobile_unit_name AS mobile_unit_assigned
+        mu.mobile_unit_name AS mobile_unit_assigned,
+        ol.latitude,
+        ol.longitude,
+        ol.location_name  AS last_location_name,
+        ol.updated_at     AS last_location_at
       FROM active_patroller ap
       JOIN users u ON ap.officer_id = u.user_id
       LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
       LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
       LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+      LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
       ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
     `);
     res.json({ success: true, data: result.rows });
@@ -1012,6 +1017,35 @@ const deleteAfterPatrolReport = async (req, res) => {
   }
 };
 
+const updateOfficerLocation = async (req, res) => {
+  const userId = req.user?.user_id;
+  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  const { latitude, longitude, location_name } = req.body;
+
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ success: false, message: "latitude and longitude are required." });
+  }
+
+  try {
+    await pool.query(
+     `INSERT INTO officer_locations (user_id, latitude, longitude, location_name, updated_at)
+ VALUES ($1, $2, $3, $4, NOW())
+ ON CONFLICT (user_id)
+ DO UPDATE SET
+   latitude      = EXCLUDED.latitude,
+   longitude     = EXCLUDED.longitude,
+   location_name = EXCLUDED.location_name,
+   updated_at    = NOW()`,
+      [userId, latitude, longitude, location_name || null]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error("updateOfficerLocation error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 module.exports = {
   getMyPatrols,
   getAfterPatrolReports,
@@ -1034,4 +1068,5 @@ module.exports = {
   updateRouteTask,
   addRouteTask,
   removeRouteTask,
+  updateOfficerLocation,
 };
