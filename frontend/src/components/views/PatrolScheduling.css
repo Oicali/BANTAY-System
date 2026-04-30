@@ -11,6 +11,8 @@
   --gray-600:     #6c757d;
   --gray-700:     #495057;
   --gray-900:     #212529;
+  --red-primary:  #c1272d;
+  --red-dark:     #8b1a1f;
 }
 
 body {
@@ -38,7 +40,7 @@ body {
 }
 .psch-page-header-left p { color: var(--gray-600); font-size: 15px; }
 
-/* ── HEADER ACTIONS (grouped buttons) ────────────────────────── */
+/* ── HEADER ACTIONS ──────────────────────────────────────────── */
 .psch-header-actions {
   display: flex;
   align-items: center;
@@ -60,12 +62,14 @@ body {
   white-space: nowrap;
 }
 .psch-btn-icon { flex-shrink: 0; }
+
+/* Add Patrol → red-primary */
 .psch-btn-primary {
-  background: var(--navy-primary);
+  background: var(--red-primary);
   color: var(--white);
-  border: 1px solid var(--navy-primary);
+  border: 1px solid var(--red-primary);
 }
-.psch-btn-primary:hover { background: var(--navy-dark); border-color: var(--navy-dark); }
+.psch-btn-primary:hover { background: var(--red-dark); border-color: var(--red-dark); }
 
 .psch-btn-outline {
   background: var(--white);
@@ -86,60 +90,65 @@ body {
 }
 .psch-spin { animation: psch-spin 0.8s linear infinite; }
 
-/* ── STAT ROW ────────────────────────────────────────────────── */
+/* ── STAT ROW — CaseManagement card style ────────────────────── */
 .psch-stat-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
 }
 
 .psch-stat-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 14px 10px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: border-color 0.18s, box-shadow 0.18s, transform 0.12s;
+  padding: 24px;
+  border-left: 4px solid var(--gray-300);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: default;
   user-select: none;
-  gap: 2px;
 }
-.psch-stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.psch-stat-card.psch-stat-selected { border-color: currentColor; box-shadow: 0 0 0 3px rgba(30,58,95,0.12); }
+.psch-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.psch-stat-navy  { border-left-color: #3b82f6; }
+.psch-stat-green { border-left-color: #22c55e; }
+.psch-stat-amber { border-left-color: #f59e0b; }
+.psch-stat-gray  { border-left-color: #6b7280; }
 
 .psch-stat-num {
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1;
+  display: block;
   font-family: "Inter", sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  line-height: 1;
+  margin-bottom: 8px;
 }
 .psch-stat-label {
+  display: block;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--gray-600);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.75;
+  letter-spacing: 0.8px;
 }
 
-.psch-stat-navy    { background: #e8edf4; color: #1e3a5f; }
-.psch-stat-green   { background: #dcfce7; color: #166534; }
-.psch-stat-amber   { background: #fef9c3; color: #854d0e; }
-.psch-stat-gray    { background: #f1f5f9; color: #475569; }
-
-/* ── FILTER BAR ──────────────────────────────────────────────── */
+/* ── FILTER BAR — CrimeMapping style ────────────────────────── */
 .psch-filter-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 16px 20px;
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  border-left: 4px solid var(--navy-primary);
 }
 
 .psch-filter-icon {
@@ -207,9 +216,10 @@ body {
 }
 .psch-filter-arrow { font-size: 13px; color: var(--gray-400); flex-shrink: 0; }
 
+/* Apply → red-primary */
 .psch-filter-apply {
-  padding: 8px 18px;
-  background: var(--navy-primary);
+  padding: 8px 20px;
+  background: var(--red-primary);
   color: var(--white);
   border: none;
   border-radius: 6px;
@@ -221,7 +231,7 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.psch-filter-apply:hover { background: var(--navy-dark); }
+.psch-filter-apply:hover { background: var(--red-dark); }
 
 .psch-filter-reset {
   padding: 8px 12px;
@@ -237,100 +247,6 @@ body {
   line-height: 1;
 }
 .psch-filter-reset:hover { background: var(--gray-50); color: var(--navy-primary); border-color: var(--navy-primary); }
-
-/* ── SORT DROPDOWN ───────────────────────────────────────────── */
-.psch-sort-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.psch-sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 10px;
-  background: var(--gray-50);
-  border: 1px solid var(--gray-300);
-  border-radius: 6px;
-  color: var(--gray-700);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  transition: all 0.18s;
-  white-space: nowrap;
-}
-.psch-sort-btn:hover,
-.psch-sort-btn-open {
-  background: var(--white);
-  border-color: var(--navy-primary);
-  color: var(--navy-primary);
-}
-
-.psch-sort-chevron {
-  transition: transform 0.2s;
-  opacity: 0.6;
-}
-.psch-sort-chevron-open {
-  transform: rotate(180deg);
-}
-
-.psch-sort-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 500;
-  background: var(--white);
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-  min-width: 220px;
-  overflow: hidden;
-  animation: psch-dropdown-in 0.12s ease;
-}
-
-@keyframes psch-dropdown-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.psch-sort-dropdown-title {
-  padding: 8px 14px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--gray-400);
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.psch-sort-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 14px;
-  background: none;
-  border: none;
-  text-align: left;
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--gray-700);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.psch-sort-option:hover {
-  background: var(--gray-50);
-  color: var(--navy-primary);
-}
-.psch-sort-option-active {
-  color: var(--navy-primary);
-  font-weight: 700;
-  background: #f0f4f9;
-}
-.psch-sort-option svg {
-  flex-shrink: 0;
-  color: var(--navy-primary);
-}
 
 /* ── TABLE ───────────────────────────────────────────────────── */
 .psch-table-card {
@@ -369,13 +285,13 @@ body {
   font-size: 14px;
 }
 
-/* ── TABLE FOOTER ────────────────────────────────────────────── */
+/* ── TABLE FOOTER — CaseManagement pagination style ──────────── */
 .psch-table-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
-  font-size: 12px;
+  padding: 16px 20px;
+  font-size: 13px;
   color: var(--gray-600);
   border-top: 1px solid var(--gray-200);
   background: var(--gray-50);
@@ -384,54 +300,40 @@ body {
 }
 .psch-filtered-label { color: var(--navy-primary); font-weight: 600; }
 
-/* ── PAGINATION ──────────────────────────────────────────────── */
+/* ── PAGINATION — CaseManagement style ───────────────────────── */
 .psch-pagination {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .psch-page-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--gray-300);
   border-radius: 6px;
-  border: 1px solid var(--gray-200);
   background: var(--white);
-  color: var(--gray-700);
   font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
+  font-weight: 500;
+  color: var(--gray-700);
   cursor: pointer;
   transition: all 0.15s;
-  user-select: none;
+  font-family: inherit;
 }
-.psch-page-btn:hover:not(:disabled):not(.psch-page-btn-active) {
+.psch-page-btn:hover:not(:disabled) {
   background: var(--gray-50);
-  border-color: var(--navy-primary);
-  color: var(--navy-primary);
 }
 .psch-page-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
-.psch-page-btn-active {
-  background: var(--navy-primary);
-  border-color: var(--navy-primary);
-  color: var(--white);
-  cursor: default;
-}
-.psch-page-nav {
-  color: var(--gray-600);
-}
-.psch-page-dots {
-  font-size: 13px;
-  color: var(--gray-400);
-  padding: 0 4px;
-  user-select: none;
+
+.psch-page-current {
+  padding: 6px 16px;
+  color: var(--navy-primary);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
 }
 
 /* ── STATUS BADGE ────────────────────────────────────────────── */
@@ -576,28 +478,33 @@ body {
 .psch-duration-text { font-size: 13px; font-weight: 600; color: var(--navy-primary); white-space: nowrap; }
 .psch-none-text     { font-size: 13px; color: var(--gray-400); font-style: italic; }
 
+/* ── VIEW BUTTON — CaseManagement action style ───────────────── */
 .psch-view-btn {
-  padding: 6px 16px;
-  background: var(--navy-primary);
-  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(30,58,95,0.07);
+  color: var(--navy-primary);
   border: none;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.18s ease;
   font-family: inherit;
   white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
 }
-.psch-view-btn:hover { background: var(--navy-dark); }
+.psch-view-btn:hover { background: rgba(30,58,95,0.15); }
 
 /* ── RESPONSIVE ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .psch-content-area { padding: 20px; }
   .psch-page-header  { flex-direction: column; align-items: flex-start; gap: 12px; }
   .psch-header-actions { width: 100%; }
-  .psch-stat-row     { flex-wrap: wrap; }
-  .psch-stat-card    { min-width: calc(50% - 6px); }
+  .psch-stat-row     { grid-template-columns: 1fr 1fr; }
   .psch-filter-bar   { flex-wrap: wrap; }
   .psch-filter-date-group { flex-wrap: wrap; }
   .psch-table-footer { flex-direction: column; align-items: flex-start; }

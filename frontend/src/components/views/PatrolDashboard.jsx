@@ -257,11 +257,11 @@ const PatrollerDashboard = () => {
     unitPage * PAGE_SIZE
   );
 
-  // ── Pagination component ───────────────────────────────
+  // ── Pagination component — CaseManagement style ────────
   const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
     <div className="pd-table-footer">
       <span className="pd-footer-count">
-        Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered)} – {Math.min(page * PAGE_SIZE, filtered)} of {filtered}
+        Showing {filtered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered)} of {filtered} records
         {filtered !== total && <span className="pd-filtered-label"> (filtered)</span>}
       </span>
       <div className="pd-pagination">
@@ -269,19 +269,17 @@ const PatrollerDashboard = () => {
           className="pd-page-btn"
           onClick={() => onPage(page - 1)}
           disabled={page === 1}
-        >‹</button>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-          <button
-            key={p}
-            className={`pd-page-btn ${p === page ? "pd-page-active" : ""}`}
-            onClick={() => onPage(p)}
-          >{p}</button>
-        ))}
+        >
+          Previous
+        </button>
+        <span className="pd-page-current">Page {page} of {totalPages || 1}</span>
         <button
           className="pd-page-btn"
           onClick={() => onPage(page + 1)}
           disabled={page === totalPages}
-        >›</button>
+        >
+          Next
+        </button>
       </div>
     </div>
   );
@@ -408,50 +406,62 @@ const PatrollerDashboard = () => {
               />
               <div className="table-container">
                 <table className="data-table">
-                 <thead>
-  <tr>
-    <th>Officer</th>
-    <th>Status</th>
-    <th>Location</th>
-    <th>Last Update</th>
-  </tr>
-</thead>
+                  <thead>
+                    <tr>
+                      <th>Officer</th>
+                      <th>Status</th>
+                      <th>Location</th>
+                      <th>Last Update</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                   {paginatedPatrollers.map((officer, index) => {
-  const lastSeen   = officer.last_location_at ? new Date(officer.last_location_at) : null;
-  const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-  const isOnline   = lastSeen && lastSeen > fiveMinsAgo;
+                    {paginatedPatrollers.length === 0 ? (
+                      <tr><td colSpan={4} className="empty-row">No patrollers found.</td></tr>
+                    ) : paginatedPatrollers.map((officer, index) => {
+                      const lastSeen    = officer.last_location_at ? new Date(officer.last_location_at) : null;
+                      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+                      const isOnline    = lastSeen && lastSeen > fiveMinsAgo;
 
-  return (
-    <tr key={officer.officer_id || index}>
-      <td>
-        <div className="officer-info">
-          <div className="officer-avatar">{getInitials(officer.officer_name)}</div>
-          <div className="officer-name">{officer.officer_name || "Unknown"}</div>
-        </div>
-      </td>
-      <td>
-        <span className={`online-badge ${isOnline ? "online-badge-on" : "online-badge-off"}`}>
-          <span className={`online-dot ${isOnline ? "online-dot-on" : "online-dot-off"}`} />
-          {isOnline ? "Online" : "Offline"}
-        </span>
-      </td>
-      <td>
-        <span className="location-text">
-          {officer.last_location_name
-            ? (isOnline ? officer.last_location_name : `Last seen: ${officer.last_location_name}`)
-            : <span className="unassigned-badge">No data</span>
-          }
-        </span>
-      </td>
-      <td>
-        <span className="time-badge">
-          {lastSeen ? lastSeen.toLocaleString() : "Never"}
-        </span>
-      </td>
-    </tr>
-  );
-})}
+                      return (
+                        <tr key={officer.officer_id || index}>
+                          <td>
+                            <div className="officer-info">
+                              <div className="officer-avatar" style={{ overflow: "hidden", padding: 0 }}>
+                                {officer.profile_picture ? (
+                                  <img
+                                    src={officer.profile_picture}
+                                    alt={officer.officer_name}
+                                    style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+                                  />
+                                ) : (
+                                  getInitials(officer.officer_name)
+                                )}
+                              </div>
+                              <div className="officer-name">{officer.officer_name || "Unknown"}</div>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`online-badge ${isOnline ? "online-badge-on" : "online-badge-off"}`}>
+                              <span className={`online-dot ${isOnline ? "online-dot-on" : "online-dot-off"}`} />
+                              {isOnline ? "Online" : "Offline"}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="location-text">
+                              {officer.last_location_name
+                                ? (isOnline ? officer.last_location_name : `Last seen: ${officer.last_location_name}`)
+                                : <span className="unassigned-badge">No data</span>
+                              }
+                            </span>
+                          </td>
+                          <td>
+                            <span className="time-badge">
+                              {lastSeen ? lastSeen.toLocaleString() : "Never"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -511,7 +521,7 @@ const PatrollerDashboard = () => {
                         <td><span className="time-badge">{formatDateTime(unit.created_at)}</span></td>
                         <td>
                           <div className="action-btns">
-                            <button className="edit-btn"   onClick={() => openEditModal(unit)}>Edit</button>
+                            <button className="edit-btn" onClick={() => openEditModal(unit)}>Edit</button>
                             <button className="delete-btn" onClick={() => handleDelete(unit.mobile_unit_id)}>Delete</button>
                           </div>
                         </td>

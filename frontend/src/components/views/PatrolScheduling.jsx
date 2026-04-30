@@ -11,20 +11,16 @@ import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
-const PATROLS_PER_PAGE = 5;
+const PATROLS_PER_PAGE = 15;
 
-const getMyRole = () => {
-  const raw = localStorage.getItem("token");
-  if (!raw) return null;
-  try {
-    const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(atob(b64));
-    return json.role ?? json.user_role ?? json.roles ?? null;
-  } catch {
-    return null;
-  }
-};
-const isAdmin = getMyRole() === "admin";
+
+const ViewIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
 
 const parseLocalDate = (d) => {
   if (!d) return null;
@@ -64,186 +60,33 @@ const HoverPopup = ({ anchor, children }) => {
   if (!anchor) return null;
 
   return (
-    <div
-      ref={popupRef}
-      className="psch-hover-popup"
-      style={{ top: pos.top, left: pos.left }}
-    >
+    <div ref={popupRef} className="psch-hover-popup" style={{ top: pos.top, left: pos.left }}>
       {children}
     </div>
   );
 };
 
-// ── Sort dropdown component ───────────────────────────────────────
-const SortDropdown = ({ sortOption, onSortChange }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  const options = [
-    { value: "date_asc", label: "Sort by Date (Earliest First)" },
-    { value: "date_desc", label: "Sort by Date (Latest First)" },
-    { value: "name_asc", label: "Sort A → Z" },
-    { value: "name_desc", label: "Sort Z → A" },
-  ];
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const currentLabel =
-    options.find((o) => o.value === sortOption)?.label || "Sort";
-
-  return (
-    <div className="psch-sort-wrapper" ref={ref}>
-      <button
-        className={`psch-sort-btn ${open ? "psch-sort-btn-open" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        title={currentLabel}
-      >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="4" y1="12" x2="14" y2="12" />
-          <line x1="4" y1="18" x2="9" y2="18" />
-        </svg>
-        <svg
-          className={`psch-sort-chevron ${open ? "psch-sort-chevron-open" : ""}`}
-          width="11"
-          height="11"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="psch-sort-dropdown">
-          <div className="psch-sort-dropdown-title">Sort Options</div>
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              className={`psch-sort-option ${sortOption === opt.value ? "psch-sort-option-active" : ""}`}
-              onClick={() => {
-                onSortChange(opt.value);
-                setOpen(false);
-              }}
-            >
-              {sortOption === opt.value && (
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Pagination component ──────────────────────────────────────────
+// ── Pagination component — CaseManagement style ───────────────────
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null;
-
-  const getPages = () => {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push("...");
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (currentPage < totalPages - 2) pages.push("...");
-      pages.push(totalPages);
-    }
-    return pages;
-  };
-
+  if (totalPages <= 0) return null;
   return (
     <div className="psch-pagination">
       <button
-        className="psch-page-btn psch-page-nav"
+        className="psch-page-btn"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        title="Previous page"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="15 18 9 12 15 6" />
-        </svg>
+        Previous
       </button>
-
-      {getPages().map((page, i) =>
-        page === "..." ? (
-          <span key={`dots-${i}`} className="psch-page-dots">
-            …
-          </span>
-        ) : (
-          <button
-            key={page}
-            className={`psch-page-btn ${currentPage === page ? "psch-page-btn-active" : ""}`}
-            onClick={() => onPageChange(page)}
-          >
-            {page}
-          </button>
-        ),
-      )}
-
+      <span className="psch-page-current">
+        Page {currentPage} of {totalPages}
+      </span>
       <button
-        className="psch-page-btn psch-page-nav"
+        className="psch-page-btn"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        title="Next page"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
+        Next
       </button>
     </div>
   );
@@ -251,6 +94,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 
 const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
+ const [isAdmin] = useState(() => localStorage.getItem("role") === "Administrator");
 
   const [patrols, setPatrols] = useState([]);
   const [mobileUnits, setMobileUnits] = useState([]);
@@ -264,20 +108,17 @@ const PatrolScheduling = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filtersApplied, setFiltersApplied] = useState(false);
-
-  // Sort — default: earliest date first
-  const [sortOption, setSortOption] = useState("date_asc");
+const [barangayFilters, setBarangayFilters] = useState([]); 
+const [barangaySearch, setBrgySearch] = useState("");
+const [showBrgyDropdown, setShowBrgyDropdown] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
   // Applied filter values (only change on Apply click)
-  const [appliedFilters, setAppliedFilters] = useState({
-    search: "",
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-  });
+const [appliedFilters, setAppliedFilters] = useState({
+  search: "", status: "all", dateFrom: "", dateTo: "", barangays: [], 
+});
 
   // Hover popups
   const [patrollerAnchor, setPatrollerAnchor] = useState(null);
@@ -292,12 +133,11 @@ const PatrolScheduling = () => {
   const [editingPatrol, setEditingPatrol] = useState(null);
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
 
-  // PDF list preview state — { blobUrl, download, revoke }
+  // PDF list preview state
   const [listPdfPreview, setListPdfPreview] = useState(null);
 
   const { exportPatrolList, isExporting } = useExportPatrolList(patrols);
 
-  // Close + revoke helper
   const closeListPreview = () => {
     listPdfPreview?.revoke();
     setListPdfPreview(null);
@@ -365,10 +205,7 @@ const PatrolScheduling = () => {
         setNotif({ message: "Patrol created successfully!", type: "success" });
       } else {
         onError?.();
-        setNotif({
-          message: data.message || "Something went wrong.",
-          type: "error",
-        });
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
       }
     } catch (err) {
       onError?.();
@@ -378,17 +215,14 @@ const PatrolScheduling = () => {
 
   const handleEditSave = async (formData) => {
     try {
-      const res = await fetch(
-        `${API_BASE}/patrol/patrols/${editingPatrol.patrol_id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token()}`,
-          },
-          body: JSON.stringify(formData),
+      const res = await fetch(`${API_BASE}/patrol/patrols/${editingPatrol.patrol_id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token()}`,
         },
-      );
+        body: JSON.stringify(formData),
+      });
       const data = await res.json();
       if (data.success) {
         setShowEditModal(false);
@@ -396,10 +230,7 @@ const PatrolScheduling = () => {
         fetchPatrols();
         setNotif({ message: "Patrol updated successfully!", type: "success" });
       } else {
-        setNotif({
-          message: data.message || "Something went wrong.",
-          type: "error",
-        });
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
       }
     } catch (err) {
       setNotif({ message: "Server error.", type: "error" });
@@ -419,10 +250,7 @@ const PatrolScheduling = () => {
         fetchPatrols();
         setNotif({ message: "Patrol deleted.", type: "success" });
       } else {
-        setNotif({
-          message: data.message || "Something went wrong.",
-          type: "error",
-        });
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
       }
     } catch (err) {
       console.error("Delete error:", err);
@@ -432,11 +260,7 @@ const PatrolScheduling = () => {
   const formatDate = (d) => {
     const dt = parseLocalDate(d);
     return dt
-      ? dt.toLocaleDateString("en-PH", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
+      ? dt.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
       : "—";
   };
 
@@ -449,36 +273,26 @@ const PatrolScheduling = () => {
     ),
   ];
 
-  const handleApply = () => {
-    setAppliedFilters({ search, status: statusFilter, dateFrom, dateTo });
-    setFiltersApplied(
-      search !== "" ||
-        statusFilter !== "all" ||
-        dateFrom !== "" ||
-        dateTo !== "",
-    );
-    setCurrentPage(1);
-  };
+ const handleApply = () => {
+  setAppliedFilters({ search, status: statusFilter, dateFrom, dateTo, barangays: barangayFilters });
+  setFiltersApplied(
+    search !== "" || statusFilter !== "all" || dateFrom !== "" || dateTo !== "" || barangayFilters.length > 0
+  );
+  setCurrentPage(1);
+};
 
-  const handleReset = () => {
-    setSearch("");
-    setStatus("all");
-    setDateFrom("");
-    setDateTo("");
-    setAppliedFilters({ search: "", status: "all", dateFrom: "", dateTo: "" });
-    setFiltersApplied(false);
-    setCurrentPage(1);
-  };
+const handleReset = () => {
+  setSearch("");
+  setStatus("all");
+  setDateFrom("");
+  setDateTo("");
+  setBarangayFilters([]);
+  setBrgySearch("");
+  setAppliedFilters({ search: "", status: "all", dateFrom: "", dateTo: "", barangays: [] });
+  setFiltersApplied(false);
+  setCurrentPage(1);
+};
 
-  const handleSortChange = (val) => {
-    setSortOption(val);
-    setCurrentPage(1);
-  };
-
-  /**
-   * Fetch the patrol list PDF and open the preview modal instead of
-   * downloading immediately. Falls back to direct download on failure.
-   */
   const handleExportListClick = async () => {
     if (isExporting) return;
     try {
@@ -517,7 +331,21 @@ const PatrolScheduling = () => {
     }
   };
 
+
+  
   // Filter
+const allBarangays = [...new Set(
+  patrols.flatMap((p) =>
+    (p.routes || [])
+      .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+      .map((r) => r.barangay)
+  )
+)].sort();
+
+const filteredBrgyOptions = allBarangays.filter((b) =>
+  b.toLowerCase().includes(barangaySearch.toLowerCase())
+);
+
   const filteredPatrols = patrols.filter((p) => {
     const { search: s, status: st, dateFrom: df, dateTo: dt } = appliedFilters;
 
@@ -540,28 +368,38 @@ const PatrolScheduling = () => {
       const end = parseLocalDate(p.end_date);
       if (end && end > parseLocalDate(dt)) return false;
     }
-
+    if (appliedFilters.barangays.length > 0) {
+  const hasMatch = appliedFilters.barangays.every((selected) =>
+    (p.routes || []).some(
+      (r) => (r.stop_order || 0) <= 0 && r.barangay === selected
+    )
+  );
+  if (!hasMatch) return false;
+}
     return true;
   });
 
-  // Sort
-  const sortedPatrols = [...filteredPatrols].sort((a, b) => {
-    if (sortOption === "name_asc") {
-      return (a.patrol_name || "").localeCompare(b.patrol_name || "");
-    }
-    if (sortOption === "name_desc") {
-      return (b.patrol_name || "").localeCompare(a.patrol_name || "");
-    }
-    const dateA = parseLocalDate(a.start_date)?.getTime() ?? 0;
-    const dateB = parseLocalDate(b.start_date)?.getTime() ?? 0;
-    return sortOption === "date_asc" ? dateA - dateB : dateB - dateA;
-  });
+  // Sort — default date ascending only (no sort dropdown)
+ const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
 
-  // Pagination
-  const totalPages = Math.max(
-    1,
-    Math.ceil(sortedPatrols.length / PATROLS_PER_PAGE),
-  );
+const sortedPatrols = [...filteredPatrols].sort((a, b) => {
+  const statusA = STATUS_ORDER[getPatrolStatus(a)] ?? 3;
+  const statusB = STATUS_ORDER[getPatrolStatus(b)] ?? 3;
+  if (statusA !== statusB) return statusA - statusB;
+
+  // Primary: sort by start_date ascending
+  const startA = parseLocalDate(a.start_date)?.getTime() ?? 0;
+  const startB = parseLocalDate(b.start_date)?.getTime() ?? 0;
+  if (startA !== startB) return startA - startB;
+
+  // Secondary: if same start_date, sort by end_date ascending
+  const endA = parseLocalDate(a.end_date)?.getTime() ?? 0;
+  const endB = parseLocalDate(b.end_date)?.getTime() ?? 0;
+  return endA - endB;
+});
+
+  // Pagination — 15 items per page
+  const totalPages = Math.max(1, Math.ceil(sortedPatrols.length / PATROLS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
   const pagedPatrols = sortedPatrols.slice(
     (safePage - 1) * PATROLS_PER_PAGE,
@@ -569,21 +407,22 @@ const PatrolScheduling = () => {
   );
 
   const counts = {
-    all: patrols.length,
-    active: patrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming: patrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
+    all:       patrols.length,
+    active:    patrols.filter((p) => getPatrolStatus(p) === "active").length,
+    upcoming:  patrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
     completed: patrols.filter((p) => getPatrolStatus(p) === "completed").length,
   };
 
   const statusConfig = {
-    active: { label: "Active", className: "psch-status-active" },
-    upcoming: { label: "Upcoming", className: "psch-status-upcoming" },
+    active:    { label: "Active",    className: "psch-status-active" },
+    upcoming:  { label: "Upcoming",  className: "psch-status-upcoming" },
     completed: { label: "Completed", className: "psch-status-completed" },
   };
 
   return (
     <div className="dash">
       <div className="psch-content-area">
+
         {/* HEADER */}
         <div className="psch-page-header">
           <div className="psch-page-header-left">
@@ -598,34 +437,14 @@ const PatrolScheduling = () => {
             >
               {isExporting ? (
                 <>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="psch-btn-icon psch-spin"
-                  >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon psch-spin">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
                   Exporting…
                 </>
               ) : (
                 <>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="psch-btn-icon"
-                  >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -635,21 +454,8 @@ const PatrolScheduling = () => {
               )}
             </button>
             {isAdmin && (
-              <button
-                className="psch-btn psch-btn-primary"
-                onClick={openAddModal}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="psch-btn-icon"
-                >
+              <button className="psch-btn psch-btn-primary" onClick={openAddModal}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="psch-btn-icon">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
@@ -659,51 +465,28 @@ const PatrolScheduling = () => {
           </div>
         </div>
 
-        {/* STAT BADGES */}
+        {/* STAT CARDS — CaseManagement style, no click handler */}
         <div className="psch-stat-row">
           {[
-            { key: "all", label: "Total", color: "navy" },
-            { key: "active", label: "Active", color: "green" },
-            { key: "upcoming", label: "Upcoming", color: "amber" },
-            { key: "completed", label: "Completed", color: "gray" },
+            { key: "all",       label: "Total",     color: "navy"  },
+            { key: "active",    label: "Active",    color: "green" },
+            { key: "upcoming",  label: "Upcoming",  color: "amber" },
+            { key: "completed", label: "Completed", color: "gray"  },
           ].map(({ key, label, color }) => (
-            <div
-              key={key}
-              className={`psch-stat-card psch-stat-${color} ${appliedFilters.status === key ? "psch-stat-selected" : ""}`}
-              onClick={() => {
-                setStatus(key);
-                setAppliedFilters((prev) => ({ ...prev, status: key }));
-                setFiltersApplied(key !== "all");
-                setCurrentPage(1);
-              }}
-            >
+            <div key={key} className={`psch-stat-card psch-stat-${color}`}>
               <span className="psch-stat-num">{counts[key]}</span>
               <span className="psch-stat-label">{label}</span>
             </div>
           ))}
         </div>
 
-        {/* FILTER BAR */}
+        {/* FILTER BAR — CrimeMapping style, no sort dropdown */}
         <div className="psch-filter-bar">
           <div className="psch-filter-icon">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
           </div>
-
-          <SortDropdown
-            sortOption={sortOption}
-            onSortChange={handleSortChange}
-          />
 
           <input
             className="psch-filter-search"
@@ -744,16 +527,69 @@ const PatrolScheduling = () => {
             />
           </div>
 
+<div className="psch-brgy-dropdown-wrap" style={{ position: "relative" }}>
+
+ 
+
+  {/* Search input */}
+ <input
+  className="psch-filter-select"
+  type="text"
+  placeholder="Filter by barangay..."
+  value={
+    barangayFilters.length > 0
+      ? barangayFilters.join(", ") + (barangaySearch ? ", " + barangaySearch : "")
+      : barangaySearch
+  }
+  onChange={(e) => {
+    // Only update the search portion (after the last comma)
+    const parts = e.target.value.split(",");
+    setBrgySearch(parts[parts.length - 1].trim());
+    setShowBrgyDropdown(true);
+  }}
+  onFocus={() => setShowBrgyDropdown(true)}
+  onBlur={() => setTimeout(() => setShowBrgyDropdown(false), 150)}
+  onKeyDown={(e) => {
+    // Backspace on empty search removes last selected barangay
+    if (e.key === "Backspace" && barangaySearch === "") {
+      setBarangayFilters((prev) => prev.slice(0, -1));
+    }
+  }}
+/>
+
+  {/* Dropdown options */}
+  {showBrgyDropdown && filteredBrgyOptions.length > 0 && (
+    <div style={{
+      position: "absolute", top: "100%", left: 0, zIndex: 999,
+      background: "#fff", border: "1px solid #dde3f0", borderRadius: 8,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.10)", maxHeight: 200,
+      overflowY: "auto", minWidth: 200, width: "100%",
+    }}>
+      {filteredBrgyOptions
+        .filter((b) => !barangayFilters.includes(b)) // hide already selected
+        .map((b) => (
+          <div
+            key={b}
+            style={{ padding: "8px 14px", cursor: "pointer", fontSize: 13 }}
+            onMouseDown={() => {
+              setBarangayFilters((prev) => [...prev, b]);
+              setBrgySearch("");
+              setShowBrgyDropdown(false);
+            }}
+          >
+            {b}
+          </div>
+        ))}
+    </div>
+  )}
+</div>
+
           <button className="psch-filter-apply" onClick={handleApply}>
             Apply Filters
           </button>
 
           {filtersApplied && (
-            <button
-              className="psch-filter-reset"
-              onClick={handleReset}
-              title="Reset filters"
-            >
+            <button className="psch-filter-reset" onClick={handleReset} title="Reset filters">
               ↺
             </button>
           )}
@@ -777,51 +613,38 @@ const PatrolScheduling = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="psch-empty-row">
-                      Loading...
-                    </td>
+                    <td colSpan={7} className="psch-empty-row">Loading...</td>
                   </tr>
                 ) : pagedPatrols.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="psch-empty-row">
-                      No patrols found.
-                    </td>
+                    <td colSpan={7} className="psch-empty-row">No patrols found.</td>
                   </tr>
                 ) : (
                   pagedPatrols.map((patrol) => {
                     const uniquePatrollers = patrol.patrollers || [];
                     const barangays = getUniqueBarangays(patrol.routes);
                     const status = getPatrolStatus(patrol);
-                    const statusCfg = statusConfig[status] || {
-                      label: "—",
-                      className: "",
-                    };
+                    const statusCfg = statusConfig[status] || { label: "—", className: "" };
 
                     return (
                       <tr key={patrol.patrol_id}>
                         <td>
-                          <span className="psch-patrol-name">
-                            {patrol.patrol_name}
-                          </span>
+                          <span className="psch-patrol-name">{patrol.patrol_name}</span>
                         </td>
 
                         <td>
-                          <span
-                            className={`psch-status-badge ${statusCfg.className}`}
-                          >
+                          <span className={`psch-status-badge ${statusCfg.className}`}>
                             {statusCfg.label}
                           </span>
                         </td>
 
                         <td>
-                          <span className="psch-unit-text">
-                            {patrol.mobile_unit_name || "—"}
-                          </span>
+                          <span className="psch-unit-text">{patrol.mobile_unit_name || "—"}</span>
                         </td>
+
                         <td>
                           <span className="psch-duration-text">
-                            {formatDate(patrol.start_date)} —{" "}
-                            {formatDate(patrol.end_date)}
+                            {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
                           </span>
                         </td>
 
@@ -838,28 +661,16 @@ const PatrolScheduling = () => {
                                 setPatrollerData([]);
                               }}
                             >
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                 <circle cx="9" cy="7" r="4" />
                                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                               </svg>
-                              {uniquePatrollers.length} Patroller
-                              {uniquePatrollers.length !== 1 ? "s" : ""}
+                              {uniquePatrollers.length} Patroller{uniquePatrollers.length !== 1 ? "s" : ""}
                             </span>
                           ) : (
-                            <span className="psch-none-text">
-                              No patrollers
-                            </span>
+                            <span className="psch-none-text">No patrollers</span>
                           )}
                         </td>
 
@@ -876,21 +687,11 @@ const PatrolScheduling = () => {
                                 setBarangayData([]);
                               }}
                             >
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                                 <circle cx="12" cy="10" r="3" />
                               </svg>
-                              {barangays.length} Barangay
-                              {barangays.length !== 1 ? "s" : ""}
+                              {barangays.length} Barangay{barangays.length !== 1 ? "s" : ""}
                             </span>
                           ) : (
                             <span className="psch-none-text">No area set</span>
@@ -898,15 +699,16 @@ const PatrolScheduling = () => {
                         </td>
 
                         <td>
-                          <button
-                            className="psch-view-btn"
-                            onClick={() => {
-                              setBeatCardPatrol(patrol);
-                              setShowBeatCard(true);
-                            }}
-                          >
-                            View
-                          </button>
+                          {/* View button — CaseManagement action style */}
+                       <button
+  className="psch-view-btn"
+  onClick={() => {
+    setBeatCardPatrol(patrol);
+    setShowBeatCard(true);
+  }}
+>
+  <ViewIcon /> View
+</button>
                         </td>
                       </tr>
                     );
@@ -916,29 +718,23 @@ const PatrolScheduling = () => {
             </table>
           </div>
 
-          {/* TABLE FOOTER: count + pagination */}
-          {!loading && (
-            <div className="psch-table-footer">
-              <span>
-                Showing{" "}
-                {sortedPatrols.length === 0
-                  ? 0
-                  : (safePage - 1) * PATROLS_PER_PAGE + 1}
-                –{Math.min(safePage * PATROLS_PER_PAGE, sortedPatrols.length)}{" "}
-                of {sortedPatrols.length} patrol
-                {sortedPatrols.length !== 1 ? "s" : ""}
-                {filtersApplied && (
-                  <span className="psch-filtered-label"> (filtered)</span>
-                )}{" "}
-                · {patrols.length} total
-              </span>
-              <Pagination
-                currentPage={safePage}
-                totalPages={totalPages}
-                onPageChange={(p) => setCurrentPage(p)}
-              />
-            </div>
-          )}
+          {/* TABLE FOOTER — CaseManagement pagination style */}
+          {!loading && sortedPatrols.length > 0 && (
+  <div className="psch-table-footer">
+    <span>
+      Showing{" "}
+      {sortedPatrols.length === 0 ? 0 : (safePage - 1) * PATROLS_PER_PAGE + 1}–
+      {Math.min(safePage * PATROLS_PER_PAGE, sortedPatrols.length)} of{" "}
+      {sortedPatrols.length} record{sortedPatrols.length !== 1 ? "s" : ""}
+      {filtersApplied && <span className="psch-filtered-label"> (filtered)</span>}
+    </span>
+    <Pagination
+      currentPage={safePage}
+      totalPages={totalPages}
+      onPageChange={(p) => setCurrentPage(p)}
+    />
+  </div>
+)}
         </div>
       </div>
 
@@ -947,20 +743,26 @@ const PatrolScheduling = () => {
       <HoverPopup anchor={patrollerAnchor}>
         <div className="psch-popup-title">Assigned Patrollers</div>
         {patrollerData.map((p, i) => (
-          <div
-            key={`${p.active_patroller_id}-${p.shift}-${i}`}
-            className="psch-popup-row"
-          >
-            <div className="psch-popup-avatar">
-              {p.officer_name
-                ? p.officer_name.substring(0, 2).toUpperCase()
-                : "NA"}
-            </div>
-            <span className="psch-popup-name">{p.officer_name}</span>
-            <span className="psch-shift-badge" data-shift={p.shift}>
-              {p.shift}
-            </span>
-          </div>
+         <div key={`${p.active_patroller_id}-${p.shift}-${i}`} className="psch-popup-row">
+  <div className="psch-popup-avatar" style={{ overflow: "hidden", padding: 0 }}>
+    {p.profile_picture ? (
+      <img
+        src={p.profile_picture}
+        alt={p.officer_name}
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "50%",
+          objectFit: "cover",
+        }}
+      />
+    ) : (
+      p.officer_name ? p.officer_name.substring(0, 2).toUpperCase() : "NA"
+    )}
+  </div>
+  <span className="psch-popup-name">{p.officer_name}</span>
+  <span className="psch-shift-badge" data-shift={p.shift}>{p.shift}</span>
+</div>
         ))}
       </HoverPopup>
 
@@ -968,16 +770,7 @@ const PatrolScheduling = () => {
         <div className="psch-popup-title">Area of Responsibility</div>
         {barangayData.map((b) => (
           <div key={b} className="psch-popup-brgy-row">
-            <svg
-              width="11"
-              height="11"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#1e3a5f"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
@@ -1035,7 +828,6 @@ const PatrolScheduling = () => {
         />
       )}
 
-      {/* Patrol List PDF Preview */}
       {listPdfPreview && (
         <PdfPreviewModal
           blobUrl={listPdfPreview.blobUrl}

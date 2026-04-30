@@ -437,15 +437,22 @@ const PatrollerHoverCard = ({ patroller, anchorEl }) => {
       }}
     >
       <div
-        style={{
-          width: "52px", height: "52px", borderRadius: "50%",
-          background: "#1e3a5f", color: "#fff",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "18px", fontWeight: 700,
-        }}
-      >
-        {initials}
-      </div>
+  style={{
+    width: "52px", height: "52px", borderRadius: "50%",
+    background: "#1e3a5f", color: "#fff",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "18px", fontWeight: 700,
+    overflow: "hidden", padding: 0,
+  }}
+>
+  {patroller.profile_picture ? (
+    <img
+      src={patroller.profile_picture}
+      alt={patroller.officer_name}
+      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+    />
+  ) : initials}
+</div>
       <div style={{ fontWeight: 700, fontSize: "14px", color: "#0a1628", textAlign: "center" }}>
         {patroller.rank ? `${patroller.rank} ${patroller.officer_name}` : patroller.officer_name}
       </div>
