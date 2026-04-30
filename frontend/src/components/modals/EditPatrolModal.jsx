@@ -744,7 +744,15 @@ const patrollerResults = await Promise.all(
                           className={`epm-check-item ${isSelected ? "epm-checked" : ""} ${isOtherShift ? "epm-other-shift" : ""}`}
                           onClick={() => togglePatroller(p.active_patroller_id)}
                           title={isOtherShift ? `Already in ${activeShift === "AM" ? "PM" : "AM"} shift on this date` : ""}>
-                          <div className="epm-avatar">{getInitials(p.officer_name)}</div>
+                       <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+  {p.profile_picture ? (
+    <img
+      src={p.profile_picture}
+      alt={p.officer_name}
+      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+    />
+  ) : getInitials(p.officer_name)}
+</div>
                           <div className="epm-officer-info">
                             <span className="epm-officer-name">{p.officer_name}</span>
                             {isOtherShift && (

@@ -1,5 +1,5 @@
 const pool = require("../../../config/database");
-
+const cloudinary = require("../../../config/cloudinary");
 // ── Helper: generate date range ────────────────────────────
 
 const formatDateOnly = (d) => {
@@ -67,7 +67,8 @@ const getActivePatrollers = async (req, res) => {
         ap.officer_id,
         u.last_login,
         TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-        mu.mobile_unit_name AS mobile_unit_assigned,
+u.profile_picture,
+mu.mobile_unit_name AS mobile_unit_assigned,
         ol.latitude,
         ol.longitude,
         ol.location_name  AS last_location_name,
@@ -99,7 +100,8 @@ const getAvailablePatrollers = async (req, res) => {
         result = await pool.query(`
           SELECT ap.active_patroller_id, ap.officer_id,
             TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-            u.phone AS contact_number
+            u.phone AS contact_number,
+            u.profile_picture
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
           WHERE ap.active_patroller_id NOT IN (
@@ -116,7 +118,7 @@ const getAvailablePatrollers = async (req, res) => {
         result = await pool.query(`
           SELECT ap.active_patroller_id, ap.officer_id,
             TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-            u.phone AS contact_number
+            u.phone AS contact_number,u.profile_picture
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
           WHERE ap.active_patroller_id NOT IN (
@@ -133,7 +135,7 @@ const getAvailablePatrollers = async (req, res) => {
       result = await pool.query(`
         SELECT ap.active_patroller_id, ap.officer_id,
           TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-          u.phone AS contact_number
+          u.phone AS contact_number,u.profile_picture
         FROM active_patroller ap
         JOIN users u ON ap.officer_id = u.user_id
         ORDER BY officer_name ASC
@@ -241,16 +243,19 @@ const getPatrols = async (req, res) => {
         pa.mobile_unit_id,
         mu.mobile_unit_name,
         mu.plate_number,
+        
 
         (
+         
           SELECT COALESCE(JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'active_patroller_id', sub.active_patroller_id,
-              'officer_id',          sub.officer_id,
-              'officer_name',        sub.officer_name,
-              'contact_number',      sub.contact_number,
-              'shift',               sub.shift
-            )
+           JSON_BUILD_OBJECT(
+  'active_patroller_id', sub.active_patroller_id,
+  'officer_id',          sub.officer_id,
+  'officer_name',        sub.officer_name,
+  'contact_number',      sub.contact_number,
+  'shift',               sub.shift,
+  'profile_picture',     sub.profile_picture
+)
           ), '[]')
           FROM (
             SELECT DISTINCT ON (pap.active_patroller_id, pap.shift)
@@ -258,7 +263,8 @@ const getPatrols = async (req, res) => {
               ap.officer_id,
               pap.shift,
               TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-              u.phone AS contact_number
+              u.phone AS contact_number,
+              u.profile_picture
             FROM patrol_assignment_patroller pap
             JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
             JOIN users u ON ap.officer_id = u.user_id
@@ -268,16 +274,19 @@ const getPatrols = async (req, res) => {
         ) AS patrollers,
 
         (
-          SELECT COALESCE(JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'active_patroller_id', ap.active_patroller_id,
-              'officer_id',          ap.officer_id,
-              'officer_name', TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)),
-              'contact_number', u.phone,
-              'shift', pap.shift,
-              'route_date', pap.route_date
-            ) ORDER BY pap.route_date, pap.shift, u.last_name
-          ), '[]')
+          SELECT COALESCE(
+            JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'active_patroller_id', ap.active_patroller_id,
+                'officer_id',          ap.officer_id,
+                'officer_name', TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)),
+                'contact_number', u.phone,
+                'profile_picture', u.profile_picture,
+                'shift', pap.shift,
+                'route_date', pap.route_date
+              ) ORDER BY pap.route_date, pap.shift, u.last_name
+            ), '[]'
+          )
           FROM patrol_assignment_patroller pap
           JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
           JOIN users u ON ap.officer_id = u.user_id
@@ -648,13 +657,14 @@ const getMyPatrols = async (req, res) => {
 
         (
           SELECT COALESCE(JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'active_patroller_id', sub.active_patroller_id,
-              'officer_id',          sub.officer_id,
-              'officer_name',        sub.officer_name,
-              'contact_number',      sub.contact_number,
-              'shift',               sub.shift
-            )
+           JSON_BUILD_OBJECT(
+  'active_patroller_id', sub.active_patroller_id,
+  'officer_id',          sub.officer_id,
+  'officer_name',        sub.officer_name,
+  'contact_number',      sub.contact_number,
+  'shift',               sub.shift,
+  'profile_picture',     sub.profile_picture
+)
           ), '[]')
           FROM (
             SELECT DISTINCT ON (pap.active_patroller_id, pap.shift)
@@ -662,7 +672,8 @@ const getMyPatrols = async (req, res) => {
               ap.officer_id,
               pap.shift,
               TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-              u.phone AS contact_number
+              u.phone AS contact_number,
+              u.profile_picture
             FROM patrol_assignment_patroller pap
             JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
             JOIN users u ON ap.officer_id = u.user_id
@@ -670,6 +681,26 @@ const getMyPatrols = async (req, res) => {
             ORDER BY pap.active_patroller_id, pap.shift
           ) sub
         ) AS patrollers,
+
+        (
+          SELECT COALESCE(
+            JSON_AGG(
+              JSON_BUILD_OBJECT(
+                'active_patroller_id', ap.active_patroller_id,
+                'officer_id',          ap.officer_id,
+                'officer_name', TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)),
+                'contact_number', u.phone,
+                'profile_picture', u.profile_picture,
+                'shift', pap.shift,
+                'route_date', pap.route_date
+              ) ORDER BY pap.route_date, pap.shift, u.last_name
+            ), '[]'
+          )
+          FROM patrol_assignment_patroller pap
+          JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
+          JOIN users u ON ap.officer_id = u.user_id
+          WHERE pap.patrol_id = pa.patrol_id
+        ) AS patrollers_detail,
 
         (
           SELECT COALESCE(JSON_AGG(
@@ -731,84 +762,100 @@ res.json({ success: true, data });
 // ─────────────────────────────────────────────
 const submitAfterPatrolReport = async (req, res) => {
   const { id: patrol_id } = req.params;
-  const userId = req.user?.user_id;
+  const userId   = req.user?.user_id;
+  const userRole = req.user?.role;
   if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const {
-    date,
-    shift,          // 'AM' | 'PM' — sent by frontend, validated below
-    timeFrom,
-    timeTo,
-    preDeployment,
-    action1,
-    incidents,
-    action2,
-    safetyConcerns,
-    action3,
-    otherServices,
-    visitedAreas,
-    personsVisited,
-    numOfficials,
-    numGovt,
-    sector,
-    mustDos,
-    creditHours,
-    remarks,
-    sigOfficer1,
-    sigOfficer2,
-    sigSupervisor,
+    date, timeFrom, timeTo,
+    preDeployment, action1, incidents, action2,
+    safetyConcerns, action3, otherServices, visitedAreas,
+    personsVisited, numOfficials, numGovt,
+    sector, mustDos, creditHours, remarks,
+    sigOfficer1, sigOfficer2, sigSupervisor,
   } = req.body;
+
+  // shift is resolved below — may come from DB for admins
+  let shift = req.body.shift ?? null;
 
   if (!date) {
     return res.status(400).json({ success: false, message: "Patrol date is required." });
   }
 
   try {
-    // Resolve active_patroller_id from logged-in user
-    const patrollerResult = await pool.query(
-      `SELECT active_patroller_id FROM active_patroller WHERE officer_id = $1 LIMIT 1`,
-      [userId]
-    );
-    if (patrollerResult.rows.length === 0) {
-      return res.status(403).json({ success: false, message: "You are not registered as an active patroller." });
-    }
-    const active_patroller_id = patrollerResult.rows[0].active_patroller_id;
+    let active_patroller_id;
 
-    // Verify the patroller belongs to this patrol
-    const assignmentCheck = await pool.query(
-      `SELECT 1 FROM patrol_assignment_patroller
-       WHERE patrol_id = $1 AND active_patroller_id = $2 LIMIT 1`,
-      [patrol_id, active_patroller_id]
-    );
-    if (assignmentCheck.rows.length === 0) {
-      return res.status(403).json({ success: false, message: "You are not assigned to this patrol." });
-    }
+    if (userRole === "Administrator") {
+      // Admins edit only — find the existing report by patrol + date
+      // If a shift was sent use it, otherwise find any report for that date
+      let existingQuery, existingParams;
+      if (shift) {
+        existingQuery  = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
+                          WHERE patrol_id = $1 AND patrol_date = $2 AND shift = $3 LIMIT 1`;
+        existingParams = [patrol_id, date, shift];
+      } else {
+        existingQuery  = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
+                          WHERE patrol_id = $1 AND patrol_date = $2 LIMIT 1`;
+        existingParams = [patrol_id, date];
+      }
 
-    // Validate that the patroller actually belongs to the claimed shift
-    // (prevents an AM officer submitting under PM and vice-versa)
-    if (shift && shift !== "AM & PM") {
-      const shiftCheck = await pool.query(
-        `SELECT 1 FROM patrol_assignment_patroller
-         WHERE patrol_id = $1 AND active_patroller_id = $2 AND shift = $3 LIMIT 1`,
-        [patrol_id, active_patroller_id, shift]
-      );
-      if (shiftCheck.rows.length === 0) {
+      const existingReport = await pool.query(existingQuery, existingParams);
+
+      if (existingReport.rows.length === 0) {
         return res.status(403).json({
           success: false,
-          message: `You are not assigned to the ${shift} shift for this patrol.`,
+          message: "Administrators can only edit existing reports, not create new ones.",
         });
+      }
+
+      // Always derive shift and submitter from the stored record
+      active_patroller_id = existingReport.rows[0].submitted_by;
+      shift               = existingReport.rows[0].shift; // use DB value, not frontend value
+
+    } else {
+      // ── Normal patroller flow ──────────────────────────────────
+      const patrollerResult = await pool.query(
+        `SELECT active_patroller_id FROM active_patroller WHERE officer_id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (patrollerResult.rows.length === 0) {
+        return res.status(403).json({ success: false, message: "You are not registered as an active patroller." });
+      }
+      active_patroller_id = patrollerResult.rows[0].active_patroller_id;
+
+      const assignmentCheck = await pool.query(
+        `SELECT 1 FROM patrol_assignment_patroller
+         WHERE patrol_id = $1 AND active_patroller_id = $2 LIMIT 1`,
+        [patrol_id, active_patroller_id]
+      );
+      if (assignmentCheck.rows.length === 0) {
+        return res.status(403).json({ success: false, message: "You are not assigned to this patrol." });
+      }
+
+      if (shift && shift !== "AM & PM") {
+        const shiftCheck = await pool.query(
+          `SELECT 1 FROM patrol_assignment_patroller
+           WHERE patrol_id = $1 AND active_patroller_id = $2 AND shift = $3 LIMIT 1`,
+          [patrol_id, active_patroller_id, shift]
+        );
+        if (shiftCheck.rows.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: `You are not assigned to the ${shift} shift for this patrol.`,
+          });
+        }
       }
     }
 
-    // Validate date within patrol duration
+    // ── Validate date within patrol duration ───────────────────
     const patrolDates = await pool.query(
       `SELECT start_date, end_date FROM patrol_assignment WHERE patrol_id = $1`,
       [patrol_id]
     );
     if (patrolDates.rows.length > 0) {
       const start_date = formatDateOnly(patrolDates.rows[0].start_date);
-const end_date   = formatDateOnly(patrolDates.rows[0].end_date);
-if (date < start_date || date > end_date) {
+      const end_date   = formatDateOnly(patrolDates.rows[0].end_date);
+      if (date < start_date || date > end_date) {
         return res.status(400).json({
           success: false,
           message: `Report date must be within the patrol duration (${start_date} – ${end_date}).`,
@@ -816,8 +863,7 @@ if (date < start_date || date > end_date) {
       }
     }
 
-    // Upsert: one report per (patrol_id, patrol_date, shift)
-    // submitted_by records whoever last saved it
+    // ── Upsert ─────────────────────────────────────────────────
     const result = await pool.query(
       `INSERT INTO after_patrol_reports (
         patrol_id, submitted_by, shift,
@@ -875,8 +921,8 @@ if (date < start_date || date > end_date) {
         safetyConcerns || null, action3 || null,
         otherServices  || null, visitedAreas   || null,
         personsVisited || null,
-        numOfficials   != null ? parseInt(numOfficials)  : null,
-        numGovt        != null ? parseInt(numGovt)       : null,
+        numOfficials != null ? parseInt(numOfficials) : null,
+        numGovt      != null ? parseInt(numGovt)      : null,
         sector         || null, mustDos  || null, creditHours || null,
         remarks        || null,
         sigOfficer1    || null, sigOfficer2 || null, sigSupervisor || null,
@@ -979,29 +1025,38 @@ res.json({ success: true, data });
 const deleteAfterPatrolReport = async (req, res) => {
   const { reportId } = req.params;
   const userId = req.user?.user_id;
+  const userRole = req.user?.role; // make sure your auth middleware attaches this
 
   try {
-    // Confirm the user is in the same shift as the report
-    const result = await pool.query(
-      `DELETE FROM after_patrol_reports apr
-       WHERE apr.report_id = $1
-         AND (
-           -- User is in the same shift
-           apr.shift IN (
-             SELECT DISTINCT pap.shift
-             FROM patrol_assignment_patroller pap
-             JOIN active_patroller ap2 ON pap.active_patroller_id = ap2.active_patroller_id
-             WHERE pap.patrol_id = apr.patrol_id
-               AND ap2.officer_id = $2
-           )
-           OR
-           -- Or they were the original submitter (fallback)
-           apr.submitted_by IN (
-             SELECT active_patroller_id FROM active_patroller WHERE officer_id = $2
-           )
-         )`,
-      [reportId, userId]
-    );
+    let result;
+
+    if (userRole === "Administrator") {
+      // Admins can delete any report
+      result = await pool.query(
+        `DELETE FROM after_patrol_reports WHERE report_id = $1`,
+        [reportId]
+      );
+    } else {
+      // Patrollers can only delete reports belonging to their shift
+      result = await pool.query(
+        `DELETE FROM after_patrol_reports apr
+         WHERE apr.report_id = $1
+           AND (
+             apr.shift IN (
+               SELECT DISTINCT pap.shift
+               FROM patrol_assignment_patroller pap
+               JOIN active_patroller ap2 ON pap.active_patroller_id = ap2.active_patroller_id
+               WHERE pap.patrol_id = apr.patrol_id
+                 AND ap2.officer_id = $2
+             )
+             OR
+             apr.submitted_by IN (
+               SELECT active_patroller_id FROM active_patroller WHERE officer_id = $2
+             )
+           )`,
+        [reportId, userId]
+      );
+    }
 
     if (result.rowCount === 0) {
       return res.status(404).json({
@@ -1046,6 +1101,100 @@ const updateOfficerLocation = async (req, res) => {
   }
 };
 
+const uploadAfterPatrolPhotos = async (req, res) => {
+  const { reportId } = req.params;
+  const userId = req.user?.user_id;
+  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ success: false, message: "No images provided." });
+  }
+
+  try {
+    // Upload each file to Cloudinary under folder "patrol_reports"
+    const uploadPromises = req.files.map((file) =>
+      new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            folder: "patrol_reports",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result.secure_url);
+          }
+        ).end(file.buffer);
+      })
+    );
+
+    const uploadedUrls = await Promise.all(uploadPromises);
+
+    // Get existing photos and merge (max 10 total)
+    const existing = await pool.query(
+      `SELECT photo_urls FROM after_patrol_reports WHERE report_id = $1`,
+      [reportId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Report not found." });
+    }
+
+    const existingUrls = existing.rows[0].photo_urls || [];
+    const merged = [...existingUrls, ...uploadedUrls].slice(0, 10);
+
+    await pool.query(
+      `UPDATE after_patrol_reports SET photo_urls = $1 WHERE report_id = $2`,
+      [merged, reportId]
+    );
+
+    res.json({ success: true, message: "Photos uploaded successfully.", photo_urls: merged });
+  } catch (error) {
+    console.error("uploadAfterPatrolPhotos error:", error);
+    res.status(500).json({ success: false, message: "Server error: " + error.message });
+  }
+};
+
+// ─────────────────────────────────────────────
+// DELETE /patrol/after-reports/:reportId/photos
+// Delete a specific photo by URL from a report
+// ─────────────────────────────────────────────
+const deleteAfterPatrolPhoto = async (req, res) => {
+  const { reportId } = req.params;
+  const { photo_url } = req.body;
+  const userId = req.user?.user_id;
+  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!photo_url) return res.status(400).json({ success: false, message: "photo_url is required." });
+
+  try {
+    const existing = await pool.query(
+      `SELECT photo_urls FROM after_patrol_reports WHERE report_id = $1`,
+      [reportId]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Report not found." });
+    }
+
+    const updated = (existing.rows[0].photo_urls || []).filter((u) => u !== photo_url);
+
+    // Delete from Cloudinary too
+    // Extract public_id from URL: "patrol_reports/filename"
+    const urlParts  = photo_url.split("/");
+    const filename  = urlParts[urlParts.length - 1].split(".")[0];
+    const publicId  = `patrol_reports/${filename}`;
+    await cloudinary.uploader.destroy(publicId);
+
+    await pool.query(
+      `UPDATE after_patrol_reports SET photo_urls = $1 WHERE report_id = $2`,
+      [updated, reportId]
+    );
+
+    res.json({ success: true, message: "Photo deleted.", photo_urls: updated });
+  } catch (error) {
+    console.error("deleteAfterPatrolPhoto error:", error);
+    res.status(500).json({ success: false, message: "Server error: " + error.message });
+  }
+};
+
 module.exports = {
   getMyPatrols,
   getAfterPatrolReports,
@@ -1069,4 +1218,6 @@ module.exports = {
   addRouteTask,
   removeRouteTask,
   updateOfficerLocation,
+  uploadAfterPatrolPhotos,
+  deleteAfterPatrolPhoto,
 };

@@ -1,4 +1,7 @@
 
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
+
 const express = require("express");
 const router  = express.Router();
 const {
@@ -24,6 +27,8 @@ deleteAfterPatrolReport,
   addRouteTask,
   removeRouteTask,
   updateOfficerLocation,
+   uploadAfterPatrolPhotos,
+  deleteAfterPatrolPhoto,
 } = require("../controllers/patrolController");
 
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
@@ -73,3 +78,16 @@ router.delete("/after-reports/:reportId", authenticate, deleteAfterPatrolReport)
 //
 router.post("/location", authenticate, updateOfficerLocation);
 module.exports = router;
+
+//picture
+router.post(
+  "/after-reports/:reportId/photos",
+  authenticate,
+  upload.array("photos", 10),
+  uploadAfterPatrolPhotos
+);
+router.delete(
+  "/after-reports/:reportId/photos",
+  authenticate,
+  deleteAfterPatrolPhoto
+);

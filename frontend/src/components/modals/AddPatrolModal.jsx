@@ -414,7 +414,15 @@ const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
                               className={`apm-check-item ${isSelected ? "apm-checked" : ""} ${isOtherShift ? "apm-other-shift" : ""}`}
                               onClick={() => togglePatroller(p.active_patroller_id)}
                               title={isOtherShift ? `Already assigned to ${activeShift === "AM" ? "PM" : "AM"} shift` : ""}>
-                              <div className="apm-avatar">{getInitials(p.officer_name)}</div>
+                            <div className="apm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+  {p.profile_picture ? (
+    <img
+      src={p.profile_picture}
+      alt={p.officer_name}
+      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+    />
+  ) : getInitials(p.officer_name)}
+</div>
                               <div className="apm-officer-info">
                                 <span className="apm-officer-name">{p.officer_name}</span>
                                 {isOtherShift && (
