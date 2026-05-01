@@ -308,7 +308,7 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
     <div className="cd-brgy-ms-wrap" ref={ref}>
       <div className="cd-brgy-ms-trigger" onClick={() => setOpen((v) => !v)}>
         {isAll ? (
-          <span className="cd-brgy-ms-placeholder">All Crimes</span>
+          <span className="cd-brgy-ms-placeholder">All Crimes Types</span>
         ) : (
           <div className="cd-brgy-ms-pills">
             {selected.slice(0, 2).map((c) => (
@@ -321,7 +321,7 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
             ))}
             {selected.length > 2 && (
               <span className="cd-brgy-pill cd-pill-more">
-                +{selected.length - 2} more
+                +{selected.length - 2}
               </span>
             )}
           </div>
@@ -368,79 +368,113 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setSearch("");
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const filtered = CURRENT_BARANGAYS.filter((b) =>
-    b.toLowerCase().includes(search.toLowerCase()),
+    b.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredLegacy = LEGACY_BARANGAY_OPTIONS.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase())
   );
 
   const allSelected = selected.length === CURRENT_BARANGAYS.length;
+  const isAll = selected.length === 0;
 
-  const toggle = (b) =>
+  const toggle = (b) => {
     onChange(
-      selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
+      selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b]
     );
+    setSearch("");
+    inputRef.current?.focus();
+  };
 
   const removeOne = (b, e) => {
     e.stopPropagation();
     onChange(selected.filter((x) => x !== b));
   };
 
-  const toggleAll = () => onChange(allSelected ? [] : [...CURRENT_BARANGAYS]);
-  const isAll = selected.length === 0;
-
   return (
     <div className="cd-brgy-ms-wrap" ref={ref}>
-      <div className="cd-brgy-ms-trigger" onClick={() => setOpen((v) => !v)}>
-        {isAll ? (
-          <span className="cd-brgy-ms-placeholder">All Barangays</span>
-        ) : (
-          <div className="cd-brgy-ms-pills">
-            {selected.slice(0, 3).map((b) => (
-              <span key={b} className="cd-brgy-pill">
-                {formatBarangayLabel(b)}
-                <span className="cd-pill-x" onClick={(e) => removeOne(b, e)}>
-                  ×
-                </span>
-              </span>
-            ))}
-            {selected.length > 3 && (
-              <span className="cd-brgy-pill cd-pill-more">
-                +{selected.length - 3} more
-              </span>
-            )}
-          </div>
+
+      {/* ── TRIGGER: pills + inline search input ── */}
+      <div
+        className="cd-brgy-ms-trigger"
+        style={{ cursor: "text" }}
+        onClick={() => {
+          setOpen(true);
+          inputRef.current?.focus();
+        }}
+      >
+        {/* Selected pills */}
+        {selected.slice(0, 2).map((b) => (
+          <span key={b} className="cd-brgy-pill">
+            {formatBarangayLabel(b)}
+            <span
+              className="cd-pill-x"
+              onMouseDown={(e) => { e.stopPropagation(); removeOne(b, e); }}
+            >×</span>
+          </span>
+        ))}
+        {selected.length > 2 && (
+          <span className="cd-brgy-pill cd-pill-more">
+            +{selected.length - 2}
+          </span>
         )}
+
+        {/* Inline search input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={search}
+          placeholder={isAll ? "All Barangays" : ""}
+          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            flex: 1,
+            minWidth: 80,
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            fontSize: 13,
+            fontFamily: "DM Sans, sans-serif",
+            color: "#212529",
+            padding: 0,
+          }}
+        />
+
+        {/* Arrow */}
         <span className="cd-brgy-ms-arrow">{open ? "▲" : "▼"}</span>
       </div>
 
+      {/* ── DROPDOWN ── */}
       {open && (
         <div className="cd-brgy-ms-dropdown">
-          <div className="cd-brgy-ms-search-row">
-            <input
-              className="cd-brgy-ms-search"
-              placeholder="Search barangay…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-
           <div className="cd-brgy-ms-actions">
-            <button onClick={toggleAll} className="cd-brgy-ms-action-btn">
+            <button
+              className="cd-brgy-ms-action-btn"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onChange(allSelected ? [] : [...CURRENT_BARANGAYS])}
+            >
               {allSelected ? "Clear all" : "Select all"}
             </button>
             {selected.length > 0 && (
               <button
-                onClick={() => onChange([])}
                 className="cd-brgy-ms-action-btn cd-brgy-ms-clear"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onChange([]); setSearch(""); }}
               >
                 Clear ({selected.length})
               </button>
@@ -449,7 +483,11 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
 
           <div className="cd-brgy-ms-list">
             {filtered.map((b) => (
-              <label key={b} className="cd-brgy-ms-item">
+              <label
+                key={b}
+                className="cd-brgy-ms-item"
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 <input
                   type="checkbox"
                   checked={selected.includes(b)}
@@ -459,20 +497,22 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
               </label>
             ))}
 
-            {filtered.length === 0 && (
-              <div className="cd-brgy-ms-empty">No results</div>
+            {filtered.length === 0 && filteredLegacy.length === 0 && (
+              <div className="cd-brgy-ms-empty">
+                No results for "{search}"
+              </div>
             )}
 
-            <div className="cd-brgy-ms-group-label">
-              ── Pre-2023 Names (Auto-resolved) ──
-            </div>
-
-            {LEGACY_BARANGAY_OPTIONS.filter((o) =>
-              o.label.toLowerCase().includes(search.toLowerCase()),
-            ).map((o, idx) => (
+            {filteredLegacy.length > 0 && (
+              <div className="cd-brgy-ms-group-label">
+                ── Pre-2023 Names (Auto-resolved) ──
+              </div>
+            )}
+            {filteredLegacy.map((o, idx) => (
               <label
                 key={`legacy-${idx}`}
-                className="cd-brgy-ms-item cd-brgy-ms-item-legacy"
+                className="cd-brgy-ms-item"
+                onMouseDown={(e) => e.preventDefault()}
               >
                 <input
                   type="checkbox"

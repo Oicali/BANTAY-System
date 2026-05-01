@@ -245,9 +245,11 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
             style={{
               display: "flex",
               gap: 4,
-              flexWrap: "wrap",
-              flex: 1,
+              flexWrap: "nowrap",
+              flex: "0 0 auto", // ← fixed, no stretch
               minWidth: 0,
+              overflow: "hidden",
+              alignItems: "center",
             }}
           >
             {selected.slice(0, 2).map((c) => (
@@ -307,6 +309,131 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
   );
 };
 
+const BarangaySelect = ({ selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const formatBarangayLabel = (name) => {
+    const ROMAN = new Set([
+      "I",
+      "II",
+      "III",
+      "IV",
+      "V",
+      "VI",
+      "VII",
+      "VIII",
+      "IX",
+      "X",
+      "XI",
+      "XII",
+    ]);
+    return name.toLowerCase().replace(/\b\w+/g, (word) => {
+      const upper = word.toUpperCase();
+      if (ROMAN.has(upper)) return upper;
+      if (upper === "P" || upper === "F") return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    });
+  };
+
+  const handleSelect = (val) => {
+    onChange(val);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger */}
+      <div
+        className="crmap-multisel-trigger"
+        style={{ cursor: "pointer" }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span
+          style={{
+            flex: 1,
+            fontSize: 14,
+            color: selected ? "#212529" : "#6b7280",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {selected ? formatBarangayLabel(selected) : "All Barangays"}
+        </span>
+        <span style={{ fontSize: 10, color: "#6b7280", flexShrink: 0 }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="crmap-multisel-dropdown">
+          <div style={{ maxHeight: 228, overflowY: "auto" }}>
+            {/* "All Barangays" as the first item, same style as the rest */}
+            <div
+              className="crmap-multisel-item"
+              style={{
+                background: !selected ? "rgba(30,58,95,0.08)" : undefined,
+                fontStyle: "italic",
+              }}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSelect("")}
+            >
+              <span>All Barangays</span>
+            </div>
+
+            {CURRENT_BARANGAYS.map((b) => (
+              <div
+                key={b}
+                className="crmap-multisel-item"
+                style={{
+                  background:
+                    selected === b ? "rgba(30,58,95,0.08)" : undefined,
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(b)}
+              >
+                <span>{formatBarangayLabel(b)}</span>
+              </div>
+            ))}
+
+            {LEGACY_BARANGAY_OPTIONS.length > 0 && (
+              <div className="crmap-multisel-group-label">
+                ── Pre-2023 Names (Auto-resolved) ──
+              </div>
+            )}
+            {LEGACY_BARANGAY_OPTIONS.map((o, idx) => (
+              <div
+                key={`legacy-${idx}`}
+                className="crmap-multisel-item"
+                style={{
+                  background:
+                    selected === o.value ? "rgba(30,58,95,0.08)" : undefined,
+                }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(o.value)}
+              >
+                <span>{o.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function CrimeMapping() {
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
@@ -360,6 +487,13 @@ function CrimeMapping() {
 
   // Single state
   const [filters, setFilters] = useState({
+    incident_types: [],
+    date_from: defaultDateFrom,
+    date_to: defaultDateTo,
+    barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+  });
+
+  const [appliedFilters, setAppliedFilters] = useState({
     incident_types: [],
     date_from: defaultDateFrom,
     date_to: defaultDateTo,
@@ -511,15 +645,16 @@ function CrimeMapping() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
       const params = new URLSearchParams();
-      if (filters.incident_types?.length)
-        params.append("incident_type", filters.incident_types.join(","));
-      if (filters.date_from) params.append("date_from", filters.date_from);
-      if (filters.date_to) params.append("date_to", filters.date_to);
-      if (filters.barangays?.length)
-        params.append("barangay", filters.barangays[0]);
+      if (appliedFilters.incident_types?.length)
+        params.append("incident_type", appliedFilters.incident_types.join(","));
+      if (appliedFilters.date_from)
+        params.append("date_from", appliedFilters.date_from);
+      if (appliedFilters.date_to)
+        params.append("date_to", appliedFilters.date_to);
+      if (appliedFilters.barangays?.length)
+        params.append("barangay", appliedFilters.barangays[0]);
 
       const q = params.toString() ? `?${params}` : "";
       const headers = { Authorization: `Bearer ${getToken()}` };
@@ -547,21 +682,22 @@ function CrimeMapping() {
     } finally {
       setLoading(false);
     }
-  }, [filters]); // ← depends on filters directly
+  }, [appliedFilters]); // ← depends on appliedFilters directly
 
   // REPLACE the entire fetchHeatmap useCallback:
   const fetchHeatmap = useCallback(async () => {
     setHeatLoading(true);
     setError(null);
-
     try {
       const params = new URLSearchParams();
-      if (filters.incident_types?.length)
-        params.append("incident_type", filters.incident_types.join(","));
-      if (filters.date_from) params.append("date_from", filters.date_from);
-      if (filters.date_to) params.append("date_to", filters.date_to);
-      if (filters.barangays?.length)
-        params.append("barangay", filters.barangays[0]);
+      if (appliedFilters.incident_types?.length)
+        params.append("incident_type", appliedFilters.incident_types.join(","));
+      if (appliedFilters.date_from)
+        params.append("date_from", appliedFilters.date_from);
+      if (appliedFilters.date_to)
+        params.append("date_to", appliedFilters.date_to);
+      if (appliedFilters.barangays?.length)
+        params.append("barangay", appliedFilters.barangays[0]);
 
       const q = params.toString() ? `?${params}` : "";
 
@@ -580,7 +716,7 @@ function CrimeMapping() {
     } finally {
       setHeatLoading(false);
     }
-  }, [filters]); // ← depends on filters directly
+  }, [appliedFilters]); // ← depends on appliedFilters directly
 
   const fetchOfficers = useCallback(async () => {
     if (isBarangayUser) return;
@@ -648,6 +784,8 @@ function CrimeMapping() {
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData) return null;
 
+    const selectedBarangay = appliedFilters.barangays?.[0];
+
     if (isBarangayUser && userBarangay) {
       const ownFeature = geoJSONData.features.find(
         (f) => f.properties.name_db === userBarangay,
@@ -679,14 +817,19 @@ function CrimeMapping() {
     if (heatmapMode) {
       return {
         ...geoJSONData,
-        features: geoJSONData.features.map((f) => ({
-          ...f,
-          properties: {
-            ...f.properties,
-            fillColor: "rgba(255,255,255,0.0)",
-            isLocked: false,
-          },
-        })),
+        features: geoJSONData.features.map((f) => {
+          const isSelected =
+            !selectedBarangay || f.properties.name_db === selectedBarangay;
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              fillColor: "rgba(255,255,255,0.0)",
+              isSelected,
+              isLocked: false,
+            },
+          };
+        }),
       };
     }
 
@@ -699,16 +842,30 @@ function CrimeMapping() {
 
     return {
       ...geoJSONData,
-      features: geoJSONData.features.map((f) => ({
-        ...f,
-        properties: {
-          ...f.properties,
-          fillColor: colorLookup[f.properties.name_kml] || "#adb5bd",
-          isLocked: false,
-        },
-      })),
+      features: geoJSONData.features.map((f) => {
+        const isSelected =
+          !selectedBarangay || f.properties.name_db === selectedBarangay;
+        return {
+          ...f,
+          properties: {
+            ...f.properties,
+            fillColor: isSelected
+              ? colorLookup[f.properties.name_kml] || "#adb5bd"
+              : "#adb5bd",
+            isSelected,
+            isLocked: false,
+          },
+        };
+      }),
     };
-  }, [boundaries, geoJSONData, heatmapMode, isBarangayUser, userBarangay]);
+  }, [
+    boundaries,
+    geoJSONData,
+    heatmapMode,
+    isBarangayUser,
+    userBarangay,
+    appliedFilters,
+  ]);
 
   const handleMapDblClick = useCallback(
     (e) => {
@@ -860,7 +1017,7 @@ function CrimeMapping() {
       "fill-color": ["get", "fillColor"],
       "fill-opacity": heatmapMode
         ? ["case", ["==", ["get", "isLocked"], true], 0.35, 0]
-        : 0.4,
+        : ["case", ["==", ["get", "isSelected"], false], 0.08, 0.4],
     },
   };
 
@@ -869,8 +1026,13 @@ function CrimeMapping() {
     type: "line",
     paint: {
       "line-color": heatmapMode ? "#96c8ff" : "#1e3a5f",
-      "line-width": 1.2,
-      "line-opacity": heatmapMode ? 0.6 : 0.8,
+      "line-width": ["case", ["==", ["get", "isSelected"], false], 0.4, 1.2],
+      "line-opacity": [
+        "case",
+        ["==", ["get", "isSelected"], false],
+        0.18,
+        heatmapMode ? 0.6 : 0.8,
+      ],
     },
   };
 
@@ -930,16 +1092,29 @@ function CrimeMapping() {
             !isBarangayUser
               ? heatmapMode
                 ? { val: clusterCount, lbl: "Clusters Found" }
-                : {
-                    val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
-                    lbl: "Brgy. Affected",
-                  }
+                : appliedFilters.barangays?.[0]
+                  ? {
+                      val:
+                        boundaries.find(
+                          (b) =>
+                            b.name_db.toUpperCase() ===
+                            appliedFilters.barangays[0].toUpperCase(),
+                        )?.crime_count > 0
+                          ? "1/1"
+                          : "0/1",
+                      lbl: "Brgy. Affected",
+                    }
+                  : {
+                      val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
+                      lbl: "Brgy. Affected",
+                    }
               : null,
             {
               val: (() => {
                 const days =
                   Math.round(
-                    (new Date(filters.date_to) - new Date(filters.date_from)) /
+                    (new Date(appliedFilters.date_to) -
+                      new Date(appliedFilters.date_from)) /
                       86400000,
                   ) + 1;
                 return `${days}`;
@@ -985,61 +1160,12 @@ function CrimeMapping() {
               <span className="crmap-locked-icon"></span>
             </div>
           ) : (
-            <select
-              className="crmap-fsel"
-              value={filters.barangays?.[0] || ""}
-              onChange={(e) => {
-                const selected = e.target.value;
-                setFilters((f) => ({
-                  ...f,
-                  barangays: selected ? [selected] : [],
-                }));
-
-                if (selected && geoJSONData) {
-                  const feature = geoJSONData.features.find(
-                    (f) => f.properties.name_db === selected,
-                  );
-
-                  if (feature && mapRef.current) {
-                    const coords =
-                      feature.geometry.type === "Polygon"
-                        ? feature.geometry.coordinates[0]
-                        : feature.geometry.coordinates[0][0];
-                    const lngs = coords.map((c) => c[0]);
-                    const lats = coords.map((c) => c[1]);
-
-                    mapRef.current.flyTo({
-                      center: [
-                        (Math.min(...lngs) + Math.max(...lngs)) / 2,
-                        (Math.min(...lats) + Math.max(...lats)) / 2,
-                      ],
-                      zoom: 15,
-                      duration: 1200,
-                    });
-                  }
-                } else if (!selected && mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: [120.964, 14.4341],
-                    zoom: 12,
-                    duration: 1200,
-                  });
-                }
-              }}
-            >
-              <option value="">All Barangays</option>
-              {CURRENT_BARANGAYS.map((b) => (
-                <option key={b} value={b}>
-                  {formatBarangayLabel(b)}
-                </option>
-              ))}
-              <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
-                {LEGACY_BARANGAY_OPTIONS.map((b, idx) => (
-                  <option key={`legacy-${idx}`} value={b.value}>
-                    {b.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+            <BarangaySelect
+              selected={filters.barangays?.[0] || ""}
+              onChange={(val) =>
+                setFilters((f) => ({ ...f, barangays: val ? [val] : [] }))
+              }
+            />
           )}
 
           <div className="crmap-date-range">
@@ -1082,7 +1208,39 @@ function CrimeMapping() {
 
           <button
             className="crmap-apply-btn"
-            onClick={() => setFetchTrigger((t) => t + 1)}
+            onClick={() => {
+              setAppliedFilters({ ...filters });
+              setFetchTrigger((t) => t + 1);
+
+              const selectedBarangay = filters.barangays?.[0];
+              if (selectedBarangay && geoJSONData) {
+                const feature = geoJSONData.features.find(
+                  (f) => f.properties.name_db === selectedBarangay,
+                );
+                if (feature && mapRef.current) {
+                  const coords =
+                    feature.geometry.type === "Polygon"
+                      ? feature.geometry.coordinates[0]
+                      : feature.geometry.coordinates[0][0];
+                  const lngs = coords.map((c) => c[0]);
+                  const lats = coords.map((c) => c[1]);
+                  mapRef.current.flyTo({
+                    center: [
+                      (Math.min(...lngs) + Math.max(...lngs)) / 2,
+                      (Math.min(...lats) + Math.max(...lats)) / 2,
+                    ],
+                    zoom: 15,
+                    duration: 1200,
+                  });
+                }
+              } else if (!selectedBarangay && mapRef.current) {
+                mapRef.current.flyTo({
+                  center: [120.964, 14.4341],
+                  zoom: 12,
+                  duration: 1200,
+                });
+              }
+            }}
           >
             Apply Filters
           </button>
@@ -1093,15 +1251,14 @@ function CrimeMapping() {
             onClick={() => {
               const clearTo = getPHTToday();
               const clearFrom = getPHTOneYearAgo();
-
-              setFilters({
+              const cleared = {
                 incident_types: [],
                 date_from: clearFrom,
                 date_to: clearTo,
                 barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
-              });
-
-              // Reset map view
+              };
+              setFilters(cleared);
+              setAppliedFilters(cleared); // ← add this
               if (!isBarangayUser) {
                 mapRef.current?.flyTo({
                   center: [120.964, 14.4341],
@@ -1109,7 +1266,6 @@ function CrimeMapping() {
                   duration: 800,
                 });
               }
-
               setFetchTrigger((t) => t + 1);
             }}
           >
@@ -1147,15 +1303,12 @@ function CrimeMapping() {
             </div>
           )}
 
-          {!loading &&
+          {/* {!loading &&
             !heatLoading &&
             !error &&
             pins.length === 0 &&
             boundaries.every((b) => b.crime_count === 0) &&
-            (filters.incident_types?.length > 0 ||
-              filters.date_from ||
-              filters.date_to ||
-              filters.barangays?.length > 0) && (
+            fetchTrigger > 0 && (
               <div className="crmap-empty-state">
                 <svg
                   width="32"
@@ -1174,7 +1327,7 @@ function CrimeMapping() {
                   Try adjusting your filters or clearing them to see all data.
                 </div>
               </div>
-            )}
+            )} */}
 
           <div
             className="crmap-map-inner"
@@ -1917,9 +2070,10 @@ function CrimeMapping() {
                       </div>
 
                       {(() => {
+                        // In the legend section:
                         const t = getIncidenceThresholds(
-                          filters.date_from,
-                          filters.date_to,
+                          appliedFilters.date_from,
+                          appliedFilters.date_to,
                         );
 
                         const levels = [

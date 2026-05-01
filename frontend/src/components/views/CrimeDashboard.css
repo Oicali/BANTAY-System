@@ -605,7 +605,7 @@ body {
   font-size: 13px;
   font-family: inherit;
   color: var(--gray-900);
-  background: var(--gray-50);
+  background: var(--white);
   outline: none;
   transition: border-color 0.15s;
   box-sizing: border-box;
@@ -633,7 +633,7 @@ body {
   padding: 0 10px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
-  background: var(--gray-50);
+  background: var(--white);  /* ← was var(--gray-50) */
   cursor: pointer;
   transition: border-color 0.15s;
   width: 100%;
