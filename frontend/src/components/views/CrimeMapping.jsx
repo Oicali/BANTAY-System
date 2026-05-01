@@ -438,6 +438,9 @@ function CrimeMapping() {
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
+  const isInvestigator =
+    currentUser?.role_name === "Investigator" ||
+    currentUser?.role === "Investigator";
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
   const [boundaries, setBoundaries] = useState([]);
@@ -719,7 +722,7 @@ function CrimeMapping() {
   }, [appliedFilters]); // ← depends on appliedFilters directly
 
   const fetchOfficers = useCallback(async () => {
-    if (isBarangayUser) return;
+    if (isBarangayUser || isInvestigator) return;
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/gps/officers`, {
@@ -1064,7 +1067,9 @@ function CrimeMapping() {
     ...(!isBarangayUser
       ? [{ key: "at_risk", label: heatmapMode ? "Clusters" : "Incidence" }]
       : []),
-    { key: "officers", label: "Patrol" },
+    ...(!isBarangayUser && !isInvestigator
+      ? [{ key: "officers", label: "Patrol" }]
+      : []),
   ];
 
   // AND add this effect to auto-reset active tab if user lands on a hidden tab:
@@ -1072,7 +1077,10 @@ function CrimeMapping() {
     if (isBarangayUser && activeTab === "at_risk") {
       setActiveTab("legend");
     }
-  }, [isBarangayUser, activeTab]);
+    if ((isBarangayUser || isInvestigator) && activeTab === "officers") {
+      setActiveTab("legend");
+    }
+  }, [isBarangayUser, isInvestigator, activeTab]);
 
   return (
     <div className="crmap-wrapper">
@@ -1526,18 +1534,20 @@ function CrimeMapping() {
                         {showMorePopup ? "▲ View Less" : "▼ View More"}
                       </button>
 
-                      <button
-                        className="crmap-popup-view-btn"
-                        onClick={() => {
-                          sessionStorage.setItem(
-                            "openBlotterId",
-                            selectedPin.blotter_id,
-                          );
-                          window.location.href = "/e-blotter";
-                        }}
-                      >
-                        View Full Case
-                      </button>
+                      {!isBarangayUser && (
+                        <button
+                          className="crmap-popup-view-btn"
+                          onClick={() => {
+                            sessionStorage.setItem(
+                              "openBlotterId",
+                              selectedPin.blotter_id,
+                            );
+                            window.location.href = "/e-blotter";
+                          }}
+                        >
+                          View Full Case
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Popup>
@@ -1576,13 +1586,23 @@ function CrimeMapping() {
                       <div className="crmap-officer-avatar">
                         {officer.profile_picture ? (
                           <img
-                            src={officer.profile_picture}
+                            src={
+                              officer.profile_picture.startsWith("http")
+                                ? officer.profile_picture
+                                : `${import.meta.env.VITE_API_URL}${officer.profile_picture}`
+                            }
                             alt={officer.full_name}
                             className="crmap-officer-avatar-img"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : (
                           <span className="crmap-officer-avatar-initials">
-                            {officer.initials || "??"}
+                            {(
+                              (officer.first_name?.[0] || "") +
+                              (officer.last_name?.[0] || "")
+                            ).toUpperCase() || "?"}
                           </span>
                         )}
                       </div>
@@ -1831,7 +1851,7 @@ function CrimeMapping() {
                 <div className="crmap-options-popover">
                   <div className="crmap-options-title">Map Options</div>
 
-                  {!isBarangayUser && (
+                  {!isBarangayUser && !isInvestigator && (
                     <div className="crmap-map-option">
                       <span className="crmap-map-option-lbl">
                         Officer Locations
