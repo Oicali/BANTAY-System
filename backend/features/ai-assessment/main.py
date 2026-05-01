@@ -214,8 +214,13 @@ def get_incidents(
             UPPER(TRIM(place_barangay))                           AS place_barangay
         FROM blotter_analytics_view
         WHERE date_time_commission >= %s
-          AND date_time_commission < (%s::date + interval '1 day')
-    """
+        AND date_time_commission < (%s::date + interval '1 day')
+        AND LOWER(TRIM(status)) IN (
+            'cleared','cce','solved','cse',
+            'under investigation','ui',
+            'for investigation','active','ongoing'
+        )
+"""
     params: list[Any] = [date_from, date_to]
 
     if expanded_barangays:
