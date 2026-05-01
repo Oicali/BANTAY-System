@@ -14,7 +14,12 @@ const updateLocation = async (req, res) => {
     const user_id = req.user.user_id; // from existing JWT middleware
 
     if (!latitude || !longitude) {
-      return res.status(400).json({ success: false, message: "latitude and longitude are required" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "latitude and longitude are required",
+        });
     }
 
     await pool.query(
@@ -29,13 +34,22 @@ const updateLocation = async (req, res) => {
          speed      = EXCLUDED.speed,
          is_on_duty = true,
          updated_at = NOW()`,
-      [user_id, latitude, longitude, accuracy ?? null, heading ?? 0, speed ?? 0]
+      [
+        user_id,
+        latitude,
+        longitude,
+        accuracy ?? null,
+        heading ?? 0,
+        speed ?? 0,
+      ],
     );
 
     res.json({ success: true });
   } catch (err) {
     console.error("GPS updateLocation error:", err);
-    res.status(500).json({ success: false, message: "Failed to update location" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update location" });
   }
 };
 
@@ -46,32 +60,32 @@ const updateLocation = async (req, res) => {
 // ============================================================
 const getActiveOfficers = async (req, res) => {
   try {
+    const { role } = req.user;
+
+    // Only Administrator sees officers
+    if (role !== "Administrator") {
+      return res.json({ success: true, data: [] });
+    }
+
     const result = await pool.query(
-      `SELECT
-         ol.user_id,
-         u.first_name,
-         u.last_name,
-         TRIM(u.first_name || ' ' || u.last_name) AS full_name,
-         u.username,
-         r.role_name,
-         pr.abbreviation,
-         pr.rank_name,
-         ol.latitude,
-         ol.longitude,
-         ol.heading,
-         ol.speed,
-         ol.updated_at,
-         EXTRACT(EPOCH FROM (NOW() - ol.updated_at))::int AS seconds_ago
-       FROM officer_locations ol
-       JOIN users u ON u.user_id = ol.user_id
-       JOIN roles r ON r.role_id = u.role_id
-       LEFT JOIN pnp_ranks pr ON pr.rank_id = u.rank_id
-       WHERE ol.is_on_duty = true
-         AND ol.updated_at > NOW() - INTERVAL '30 seconds'
-       ORDER BY ol.updated_at DESC`
+      `SELECT ol.user_id, u.first_name, u.last_name,
+          TRIM(u.first_name || ' ' || u.last_name) AS full_name,
+          u.username, r.role_name, pr.abbreviation, pr.rank_name,
+          u.profile_picture,
+          UPPER(LEFT(u.first_name, 1) || LEFT(u.last_name, 1)) AS initials,
+          ol.latitude, ol.longitude, ol.heading, ol.speed,
+          ol.updated_at,
+          EXTRACT(EPOCH FROM (NOW() - ol.updated_at))::int AS seconds_ago
+   FROM officer_locations ol
+   JOIN users u ON u.user_id = ol.user_id
+   JOIN roles r ON r.role_id = u.role_id
+   LEFT JOIN pnp_ranks pr ON pr.rank_id = u.rank_id
+   WHERE ol.is_on_duty = true
+     AND ol.updated_at > NOW() - INTERVAL '30 seconds'
+   ORDER BY ol.updated_at DESC`,
     );
 
-    res.json({ success: true, data: result.rows });
+    return res.json({ success: true, data: result.rows });
   } catch (err) {
     console.error("GPS getActiveOfficers error:", err);
     res.status(500).json({ success: false, data: [] });
@@ -86,7 +100,7 @@ const setOffDuty = async (req, res) => {
   try {
     await pool.query(
       `UPDATE officer_locations SET is_on_duty = false WHERE user_id = $1`,
-      [req.user.user_id]
+      [req.user.user_id],
     );
     res.json({ success: true });
   } catch (err) {

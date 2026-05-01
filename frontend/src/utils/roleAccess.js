@@ -28,6 +28,7 @@ export const roleAccess = {
     "crime-analytics",
     "e-blotter",
     "case-management",
+    "modus-management",
     "crime-mapping",
     "profile-settings",
   ],
@@ -35,6 +36,7 @@ export const roleAccess = {
   Patrol: [
     "dashboard",
     "crime-mapping",
+    "e-blotter",
     "patrol-dashboard",
     "patrol-scheduling",
     "profile-settings",
