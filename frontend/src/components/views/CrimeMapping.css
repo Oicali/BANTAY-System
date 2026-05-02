@@ -1384,7 +1384,7 @@ input:focus-visible {
   background: #ffffff;
   cursor: pointer;
   user-select: none;
-  width: 220px;
+  width: 265px;
   color-scheme: light;
   transition: border-color 0.15s;
   font-family: "DM Sans", sans-serif;

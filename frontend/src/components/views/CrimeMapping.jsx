@@ -264,7 +264,10 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
               </span>
             ))}
             {selected.length > 2 && (
-              <span className="crmap-multisel-pill">
+              <span
+                className="crmap-multisel-pill"
+                style={{ background: "#adb5bd" }}
+              >
                 +{selected.length - 2}
               </span>
             )}

@@ -82,6 +82,16 @@ const RestoreIcon = () => (
 );
 
 // =====================================================
+// DEFAULT FILTER STATE
+// =====================================================
+const DEFAULT_FILTERS = {
+  searchTerm: "",
+  roleFilter: "all",
+  statusFilter: "Default",
+  barangayFilter: "all",
+};
+
+// =====================================================
 // MAIN COMPONENT
 // =====================================================
 const UserManagement = () => {
@@ -110,12 +120,18 @@ const UserManagement = () => {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("Default");
-  const [barangayFilter, setBarangayFilter] = useState("all");
+  // ── Draft filters (what the user is editing in the UI) ──
+  const [draft, setDraft] = useState({ ...DEFAULT_FILTERS });
+
+  // ── Applied filters (what was last submitted — drives fetchUsers) ──
+  const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
+
   const [activeTab, setActiveTab] = useState("police");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Derived: is draft different from applied?
+  const isDirty =
+    JSON.stringify(draft) !== JSON.stringify(appliedFilters);
 
   // ===================================================
   // HELPER: resolve barangay name from map
@@ -185,7 +201,7 @@ const UserManagement = () => {
   }, []);
 
   // ===================================================
-  // FETCH USERS
+  // FETCH USERS — driven only by appliedFilters & activeTab
   // ===================================================
   const fetchUsers = useCallback(
     async (page = 1) => {
@@ -198,16 +214,20 @@ const UserManagement = () => {
         params.set("page", page);
         params.set("limit", ITEMS_PER_PAGE);
 
-        const statusParam = STATUS_PARAM_MAP[statusFilter];
+        const statusParam = STATUS_PARAM_MAP[appliedFilters.statusFilter];
         if (statusParam) params.set("status", statusParam);
 
-        if (searchTerm.trim()) params.set("search", searchTerm.trim());
+        if (appliedFilters.searchTerm.trim())
+          params.set("search", appliedFilters.searchTerm.trim());
 
-        if (activeTab === "police" && roleFilter !== "all") {
-          params.set("role", roleFilter);
+        if (activeTab === "police" && appliedFilters.roleFilter !== "all") {
+          params.set("role", appliedFilters.roleFilter);
         }
-        if (activeTab === "barangay" && barangayFilter !== "all") {
-          params.set("barangayCode", barangayFilter);
+        if (
+          activeTab === "barangay" &&
+          appliedFilters.barangayFilter !== "all"
+        ) {
+          params.set("barangayCode", appliedFilters.barangayFilter);
         }
 
         const res = await fetch(
@@ -242,11 +262,17 @@ const UserManagement = () => {
         setLoading(false);
       }
     },
-    [activeTab, statusFilter, searchTerm, roleFilter, barangayFilter],
+    [activeTab, appliedFilters],
   );
 
+  // Re-fetch whenever appliedFilters or activeTab changes
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchUsers(1);
+  }, [appliedFilters, activeTab]);
+
   // ===================================================
-  // TAB SWITCH
+  // TAB SWITCH — reset both draft and applied
   // ===================================================
   const handleTabSwitch = (tab) => {
     if (tab === activeTab) return;
@@ -255,26 +281,31 @@ const UserManagement = () => {
     setError("");
     setPagination({ total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1 });
     setCurrentPage(1);
-    setSearchTerm("");
-    setRoleFilter("all");
-    setBarangayFilter("all");
-    setStatusFilter("Default");
+    setDraft({ ...DEFAULT_FILTERS });
+    setAppliedFilters({ ...DEFAULT_FILTERS });
     setActiveTab(tab);
   };
 
-  useEffect(() => {
+  // ===================================================
+  // APPLY FILTERS
+  // ===================================================
+  const handleApplyFilters = () => {
     setCurrentPage(1);
-    fetchUsers(1);
-  }, [activeTab, statusFilter, roleFilter, barangayFilter]);
+    setAppliedFilters({ ...draft });
+  };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCurrentPage(1);
-      fetchUsers(1);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+  // ===================================================
+  // RESET FILTERS
+  // ===================================================
+  const handleResetFilters = () => {
+    setDraft({ ...DEFAULT_FILTERS });
+    setAppliedFilters({ ...DEFAULT_FILTERS });
+    setCurrentPage(1);
+  };
 
+  // ===================================================
+  // TOAST TIMERS
+  // ===================================================
   useEffect(() => {
     if (successMessage) {
       const t = setTimeout(() => setSuccessMessage(""), 5000);
@@ -385,7 +416,9 @@ const UserManagement = () => {
       const fullName = parts.join(" ");
       const display = rankPrefix + fullName;
       if (display.length > 30) {
-        return rankPrefix + fullName.substring(0, 27 - rankPrefix.length) + "...";
+        return (
+          rankPrefix + fullName.substring(0, 27 - rankPrefix.length) + "..."
+        );
       }
       return display;
     }
@@ -404,20 +437,29 @@ const UserManagement = () => {
 
   const getStatusText = (userData) => {
     switch (userData.status) {
-      case "deactivated": return "Deactivated";
-      case "locked":      return "Locked";
-      case "unverified":  return "Unverified";
-      case "verified":    return "Verified";
-      default:            return "Verified";
+      case "deactivated":
+        return "Deactivated";
+      case "locked":
+        return "Locked";
+      case "unverified":
+        return "Unverified";
+      case "verified":
+        return "Verified";
+      default:
+        return "Verified";
     }
   };
 
   const getStatusBadgeClass = (userData) => {
     switch (userData.status) {
-      case "deactivated": return "um-status-inactive";
-      case "locked":      return "um-status-locked";
-      case "unverified":  return "um-status-unverified";
-      default:            return "um-status-active";
+      case "deactivated":
+        return "um-status-inactive";
+      case "locked":
+        return "um-status-locked";
+      case "unverified":
+        return "um-status-unverified";
+      default:
+        return "um-status-active";
     }
   };
 
@@ -474,83 +516,113 @@ const UserManagement = () => {
 
       {/* Filter Bar */}
       <div className="um-filter-bar">
-        {/* Search */}
-        <div className="um-filter-group">
-          <label className="um-filter-label">Search</label>
-          <input
-            type="text"
-            className="um-filter-input"
-            placeholder="Name, username, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Role filter — police tab only */}
-        {activeTab === "police" && (
+        <div className="um-filter-fields">
+          {/* Search */}
           <div className="um-filter-group">
-            <label className="um-filter-label">Role</label>
-            <select
+            <label className="um-filter-label">Search</label>
+            <input
+              type="text"
               className="um-filter-input"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-            >
-              <option value="all">All Roles</option>
-              {policeRoles.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              placeholder="Name, username, or email..."
+              value={draft.searchTerm}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, searchTerm: e.target.value }))
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleApplyFilters();
+              }}
+            />
           </div>
-        )}
 
-        {/* Barangay filter */}
-        {activeTab === "barangay" && (
-          <div className="um-filter-group">
-            <label className="um-filter-label">Barangay</label>
-            <select
-              className="um-filter-input"
-              value={barangayFilter}
-              onChange={(e) => setBarangayFilter(e.target.value)}
-              disabled={barangaysLoading}
-            >
-              <option value="all">
-                {barangaysLoading ? "Loading barangays..." : "All Barangays"}
-              </option>
-              {CURRENT_BARANGAYS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-              <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
-                {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
-                  <option key={i} value={b.value}>
-                    {b.label}
+          {/* Role filter — police tab only */}
+          {activeTab === "police" && (
+            <div className="um-filter-group">
+              <label className="um-filter-label">Role</label>
+              <select
+                className="um-filter-input"
+                value={draft.roleFilter}
+                onChange={(e) =>
+                  setDraft((f) => ({ ...f, roleFilter: e.target.value }))
+                }
+              >
+                <option value="all">All Roles</option>
+                {policeRoles.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
                   </option>
                 ))}
-              </optgroup>
+              </select>
+            </div>
+          )}
+
+          {/* Barangay filter */}
+          {activeTab === "barangay" && (
+            <div className="um-filter-group">
+              <label className="um-filter-label">Barangay</label>
+              <select
+                className="um-filter-input"
+                value={draft.barangayFilter}
+                onChange={(e) =>
+                  setDraft((f) => ({ ...f, barangayFilter: e.target.value }))
+                }
+                disabled={barangaysLoading}
+              >
+                <option value="all">
+                  {barangaysLoading ? "Loading barangays..." : "All Barangays"}
+                </option>
+                {CURRENT_BARANGAYS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+                <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+                  {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+                    <option key={i} value={b.value}>
+                      {b.label}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
+
+          {/* Status filter */}
+          <div className="um-filter-group">
+            <label className="um-filter-label">Status</label>
+            <select
+              className={`um-filter-input${draft.statusFilter === "Default" ? " um-status-placeholder" : ""}`}
+              value={draft.statusFilter}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, statusFilter: e.target.value }))
+              }
+              style={draft.statusFilter === "Default" ? { color: "#adb5bd" } : {}}
+            >
+              <option value="Default" style={{ color: "#adb5bd" }}>
+                Select Status
+              </option>
+              <option value="Verified">Verified</option>
+              <option value="Unverified">Unverified</option>
+              <option value="Locked">Locked</option>
+              <option value="Deactivated">Deactivated</option>
             </select>
           </div>
-        )}
+        </div>
 
-        {/* Status filter */}
-        <div className="um-filter-group">
-          <label className="um-filter-label">Status</label>
-          <select
-            className={`um-filter-input${statusFilter === "Default" ? " um-status-placeholder" : ""}`}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={statusFilter === "Default" ? { color: "#adb5bd" } : {}}
+        {/* Action buttons */}
+        <div className="um-filter-actions">
+          <button
+            className={`um-apply-btn${isDirty ? " um-apply-btn-dirty" : ""}`}
+            onClick={handleApplyFilters}
           >
-            <option value="Default" style={{ color: "#adb5bd" }}>
-              Select Status
-            </option>
-            <option value="Verified">Verified</option>
-            <option value="Unverified">Unverified</option>
-            <option value="Locked">Locked</option>
-            <option value="Deactivated">Deactivated</option>
-          </select>
+            Apply Filters
+          </button>
+          <button
+            className="um-reset-btn"
+            onClick={handleResetFilters}
+            title="Reset to defaults"
+          >
+            ↺
+          </button>
         </div>
       </div>
 

@@ -149,8 +149,15 @@ const getPins = async (req, res) => {
       params.push(date_to);
     }
     if (incident_type) {
-      query += ` AND UPPER(incident_type) = UPPER($${p++})`;
-      params.push(incident_type);
+      const types = (
+        Array.isArray(incident_type) ? incident_type : incident_type.split(",")
+      )
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      if (types.length > 0) {
+        query += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
+        params.push(types);
+      }
     }
     if (barangay) {
       query += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
@@ -277,8 +284,15 @@ const getStatistics = async (req, res) => {
       params.push(date_to);
     }
     if (incident_type) {
-      baseWhere += ` AND UPPER(incident_type) = UPPER($${p++})`;
-      params.push(incident_type);
+      const types = (
+        Array.isArray(incident_type) ? incident_type : incident_type.split(",")
+      )
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      if (types.length > 0) {
+        baseWhere += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
+        params.push(types);
+      }
     }
     if (barangay) {
       baseWhere += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
@@ -402,8 +416,15 @@ const getHeatmap = async (req, res) => {
       params.push(date_to);
     }
     if (incident_type) {
-      baseWhere += ` AND UPPER(TRIM(incident_type)) = UPPER($${p++})`;
-      params.push(incident_type);
+      const types = (
+        Array.isArray(incident_type) ? incident_type : incident_type.split(",")
+      )
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      if (types.length > 0) {
+        baseWhere += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
+        params.push(types);
+      }
     }
     if (barangay) {
       baseWhere += ` AND UPPER(TRIM(place_barangay)) = UPPER($${p++})`;
