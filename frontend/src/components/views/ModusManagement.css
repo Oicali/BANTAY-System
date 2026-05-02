@@ -325,6 +325,41 @@
   align-items: center;
 }
 
+.mm-apply-btn {
+  height: 38px;
+  padding: 0 20px;
+  background: var(--red-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.mm-apply-btn:hover { background: var(--red-dark); }
+.mm-apply-btn-dirty { box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.22); }
+
+.mm-reset-btn {
+  height: 38px;
+  width: 38px;
+  padding: 0;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mm-reset-btn:hover { background: var(--gray-50); border-color: var(--navy-primary); color: var(--navy-primary); }
+
 /* ===================== RESPONSIVE ===================== */
 
 /* Hide Description at ≤1100px */

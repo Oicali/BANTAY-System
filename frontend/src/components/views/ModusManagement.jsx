@@ -79,9 +79,22 @@ function ModusManagement() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+
+  // ── Applied filters (drive fetch + table filtering) ──
   const [filterCrime, setFilterCrime] = useState("");
   const [filterStatus, setFilterStatus] = useState("active");
   const [sortBy, setSortBy] = useState("");
+
+  // ── Draft filters (what the user is editing in the UI) ──
+  const [draftCrime, setDraftCrime] = useState("");
+  const [draftStatus, setDraftStatus] = useState("active");
+  const [draftSort, setDraftSort] = useState("");
+
+  const isDirty =
+    draftCrime !== filterCrime ||
+    draftStatus !== filterStatus ||
+    draftSort !== sortBy;
+
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState({
     show: false,
@@ -226,6 +239,25 @@ function ModusManagement() {
     }
   };
 
+  // ── Apply filters ──
+  const handleApplyFilters = () => {
+    setFilterCrime(draftCrime);
+    setFilterStatus(draftStatus);
+    setSortBy(draftSort);
+    setCurrentPage(1);
+  };
+
+  // ── Reset filters ──
+  const handleResetFilters = () => {
+    setDraftCrime("");
+    setDraftStatus("active");
+    setDraftSort("");
+    setFilterCrime("");
+    setFilterStatus("active");
+    setSortBy("");
+    setCurrentPage(1);
+  };
+
   const filtered = modusList.filter((m) => {
     const crimeMatch = filterCrime ? m.crime_type === filterCrime : true;
     const statusMatch =
@@ -243,11 +275,6 @@ function ModusManagement() {
     (safePage - 1) * ITEMS_PER_PAGE,
     safePage * ITEMS_PER_PAGE,
   );
-
-  const handleFilterChange = (setter) => (e) => {
-    setter(e.target.value);
-    setCurrentPage(1);
-  };
 
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
@@ -297,6 +324,7 @@ function ModusManagement() {
         </button>
       </div>
 
+      {/* Filter Bar */}
       <div className="mm-filter-bar">
         <div
           style={{
@@ -330,10 +358,11 @@ function ModusManagement() {
             Filter
           </span>
         </div>
+
         <select
           className="mm-filter-select"
-          value={filterCrime}
-          onChange={handleFilterChange(setFilterCrime)}
+          value={draftCrime}
+          onChange={(e) => setDraftCrime(e.target.value)}
         >
           <option value="">All Crime Types</option>
           {CRIME_TYPES.map((c) => (
@@ -345,8 +374,8 @@ function ModusManagement() {
 
         <select
           className="mm-filter-select"
-          value={sortBy}
-          onChange={handleFilterChange(setSortBy)}
+          value={draftSort}
+          onChange={(e) => setDraftSort(e.target.value)}
         >
           <option value="">Sort: Default</option>
           <option value="created_at">Sort: Newest First</option>
@@ -355,13 +384,27 @@ function ModusManagement() {
 
         <select
           className="mm-filter-select"
-          value={filterStatus}
-          onChange={handleFilterChange(setFilterStatus)}
+          value={draftStatus}
+          onChange={(e) => setDraftStatus(e.target.value)}
         >
           <option value="active">Status: Active</option>
           <option value="removed">Status: Removed</option>
           <option value="all">Status: All</option>
         </select>
+
+        <button
+          className={`mm-apply-btn${isDirty ? " mm-apply-btn-dirty" : ""}`}
+          onClick={handleApplyFilters}
+        >
+          Apply Filters
+        </button>
+        <button
+          className="mm-reset-btn"
+          title="Reset to defaults"
+          onClick={handleResetFilters}
+        >
+          ↺
+        </button>
       </div>
 
       <div className="mm-table-card">

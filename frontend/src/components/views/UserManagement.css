@@ -122,7 +122,6 @@ body {
   background: var(--gray-200);
 }
 
-/* REPLACE WITH: */
 .um-tab-active {
   background: var(--white);
   color: var(--navy-dark);
@@ -143,10 +142,19 @@ body {
   padding: 20px 24px;
   margin-bottom: 24px;
   display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* The fields section grows to fill available space */
+.um-filter-fields {
+  display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  align-items: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  align-items: flex-end;
+  flex: 1;
+  min-width: 0;
 }
 
 .um-filter-group {
@@ -174,6 +182,8 @@ body {
   background: var(--white);
   color: var(--gray-900);
   transition: all 0.2s ease;
+  height: 42px;
+  box-sizing: border-box;
 }
 
 .um-filter-input:focus {
@@ -184,6 +194,67 @@ body {
 /* === GRAY PLACEHOLDER FOR STATUS SELECT === */
 .um-status-placeholder {
   color: var(--gray-400) !important;
+}
+
+/* === FILTER ACTION BUTTONS === */
+.um-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  /* Align to the bottom of the filter bar (same height as inputs) */
+  padding-bottom: 0;
+}
+
+.um-apply-btn {
+  height: 42px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--red-primary);
+  color: var(--white);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.um-apply-btn:hover {
+  background: var(--red-dark);
+}
+
+/* Pulse ring when draft differs from applied */
+.um-apply-btn-dirty {
+  box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.22);
+}
+
+.um-reset-btn {
+  height: 42px;
+  width: 42px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--white);
+  color: var(--gray-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.um-reset-btn:hover {
+  background: var(--gray-50);
+  border-color: var(--navy-primary);
+  color: var(--navy-primary);
 }
 
 /* === USER TABLE === */
@@ -278,7 +349,7 @@ body {
   display: inline-block;
   width: 120px;
   padding: 3px 10px;
-  border-radius: 4px; /* professional rectangle */
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.4px;
@@ -299,7 +370,7 @@ body {
 
 .um-role-patrol {
   color: #1f2937;
-  border-color: #475569; /* steel/slate tone */
+  border-color: #475569;
 }
 
 .um-role-chairman {
@@ -635,8 +706,6 @@ body {
     padding: 24px;
   }
 
-  
-
   .um-table-barangay .um-col-status {
     display: none;
   }
@@ -668,6 +737,31 @@ body {
   }
 }
 
+/* Filter bar stacks at narrow widths */
+@media (max-width: 900px) {
+  .um-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .um-filter-fields {
+    flex-direction: column;
+  }
+
+  .um-filter-group {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .um-filter-actions {
+    width: 100%;
+  }
+
+  .um-apply-btn {
+    flex: 1;
+  }
+}
+
 /* At ≤860px: shrink name text and action buttons */
 @media (max-width: 860px) {
   .um-data-table {
@@ -678,12 +772,12 @@ body {
   .um-table-container {
     overflow-x: hidden;
   }
-  
+
   .um-role-badge {
     width: auto;
     min-width: unset;
   }
-  
+
   .um-user-cell-name {
     font-size: 12px;
   }
