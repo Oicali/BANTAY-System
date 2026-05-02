@@ -29,6 +29,9 @@ const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
   const [notif, setNotif]             = useState(null);
   const [activeShift, setActiveShift] = useState("AM");
   const [hoveredBrgy, setHoveredBrgy] = useState(null);
+const [showPatrollers, setShowPatrollers] = useState(false);
+const [patrollerPage, setPatrollerPage]   = useState(1);
+
 
   const [form, setForm] = useState({
     patrol_name:    "",
@@ -367,81 +370,127 @@ const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
             <div className="apm-shift-tabs-top">
               <button
                 className={`apm-shift-tab-top ${activeShift === "AM" ? "apm-shift-active" : ""}`}
-                onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); }}
+               onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 AM Shift
                 {selectedAMIds.length > 0 && <span className="apm-shift-badge">{selectedAMIds.length}</span>}
               </button>
               <button
                 className={`apm-shift-tab-top ${activeShift === "PM" ? "apm-shift-active" : ""}`}
-                onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); }}
+                onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 PM Shift
                 {selectedPMIds.length > 0 && <span className="apm-shift-badge">{selectedPMIds.length}</span>}
               </button>
             </div>
 
-            {/* Patrollers */}
-            <div className="apm-section">
-              <div className="apm-section-title">
-                {activeShift} Shift Patrollers
-                {currentSelectedIds.length > 0 && <span className="apm-count"> ({currentSelectedIds.length})</span>}
-              </div>
+{/* Patrollers */}
+<div className="apm-section">
+  <div className="apm-section-title-row">
+    <div className="apm-section-title">
+      {activeShift} Shift Patrollers
+      {currentSelectedIds.length > 0 && (
+        <span className="apm-shift-badge" style={{ marginLeft: 6 }}>{currentSelectedIds.length}</span>
+      )}
+    </div>
+    {availableForDates !== null && !loadingPatrollers && (
+      showPatrollers ? (
+        <button className="apm-toggle-btn apm-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
+          Hide
+        </button>
+      ) : (
+        <button className="apm-toggle-btn apm-toggle-show" onClick={() => setShowPatrollers(true)}>
+          Show Patrollers
+        </button>
+      )
+    )}
+  </div>
 
-              {availableForDates === null ? (
-                <p className="apm-empty" style={{ fontStyle: "normal", color: "#6c757d" }}>
-                  Please select a start and end date to see available patrollers.
-                </p>
-              ) : loadingPatrollers ? (
-                <p className="apm-empty">Loading patrollers...</p>
-              ) : (
-                <>
-                  <input className="apm-search" type="text" placeholder="Search patroller..."
-                    value={patrollerSearch} onChange={(e) => setPatrollerSearch(e.target.value)} />
-                  <div className="apm-checklist">
-                    {availableForDates.filter((p) =>
-                      (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase())
-                    ).length === 0 ? (
-                      <div className="apm-empty">No available patrollers for this period.</div>
-                    ) : (
-                      availableForDates
-                        .filter((p) => (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase()))
-                        .map((p) => {
-                          const isSelected   = currentSelectedIds.includes(p.active_patroller_id);
-                          const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
-                          return (
-                            <div key={p.active_patroller_id}
-                              className={`apm-check-item ${isSelected ? "apm-checked" : ""} ${isOtherShift ? "apm-other-shift" : ""}`}
-                              onClick={() => togglePatroller(p.active_patroller_id)}
-                              title={isOtherShift ? `Already assigned to ${activeShift === "AM" ? "PM" : "AM"} shift` : ""}>
-                            <div className="apm-avatar" style={{ overflow: "hidden", padding: 0 }}>
-  {p.profile_picture ? (
-    <img
-      src={p.profile_picture}
-      alt={p.officer_name}
-      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-    />
-  ) : getInitials(p.officer_name)}
-</div>
-                              <div className="apm-officer-info">
-                                <span className="apm-officer-name">{p.officer_name}</span>
-                                {isOtherShift && (
-                                  <span className="apm-other-shift-label">
-                                    {activeShift === "AM" ? "PM" : "AM"} shift
-                                  </span>
-                                )}
-                              </div>
-                              <div className={`apm-checkbox ${isSelected ? "apm-checkbox-on" : ""}`}>
-                                {isSelected ? "✓" : ""}
-                              </div>
-                            </div>
-                          );
-                        })
-                    )}
-                  </div>
-                </>
-              )}
+  {availableForDates === null ? (
+    <p className="apm-empty" style={{ fontStyle: "normal", color: "#6c757d" }}>
+      Please select a start and end date to see available patrollers.
+    </p>
+  ) : loadingPatrollers ? (
+    <p className="apm-empty">Loading patrollers...</p>
+  ) : (
+    <>
+      {!showPatrollers && (
+        <p className="apm-patroller-hidden-hint">
+          {currentSelectedIds.length > 0
+            ? `${currentSelectedIds.length} selected — click Show Patrollers to manage`
+            : `${availableForDates.length} available — click Show Patrollers to assign`}
+        </p>
+      )}
+
+      {showPatrollers && (() => {
+        const PER_PAGE    = 5;
+        const filtered    = availableForDates.filter((p) =>
+          (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase())
+        );
+        const totalPP     = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+        const safePP      = Math.min(patrollerPage, totalPP);
+        const paged       = filtered.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
+        return (
+  <>
+    <input className="apm-search" type="text" placeholder="Search patroller..."
+      value={patrollerSearch}
+      onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
+   <div className="apm-checklist">
+  {filtered.length === 0 ? (
+    <div className="apm-empty">No available patrollers for this period.</div>
+  ) : (
+    paged.map((p) => {
+      const isSelected   = currentSelectedIds.includes(p.active_patroller_id);
+      const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
+      return (
+        <div key={p.active_patroller_id}
+          className={`apm-check-item ${isSelected ? "apm-checked" : ""} ${isOtherShift ? "apm-other-shift" : ""}`}
+          onClick={() => togglePatroller(p.active_patroller_id)}
+          title={isOtherShift ? `Already assigned to ${activeShift === "AM" ? "PM" : "AM"} shift` : ""}>
+          <div className="apm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+            {p.profile_picture ? (
+              <img src={p.profile_picture} alt={p.officer_name}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+            ) : getInitials(p.officer_name)}
+          </div>
+          <div className="apm-officer-info">
+            <span className="apm-officer-name">{p.officer_name}</span>
+            {isOtherShift && (
+              <span className="apm-other-shift-label">
+                {activeShift === "AM" ? "PM" : "AM"} shift
+              </span>
+            )}
+          </div>
+          <div className="apm-checkbox-col">
+            <div className={`apm-checkbox ${isSelected ? "apm-checkbox-on" : ""}`}>
+              {isSelected ? "✓" : ""}
             </div>
+          </div>
+        </div>
+      );
+    })
+  )}
+  {filtered.length > 0 && Array.from({ length: Math.max(0, PER_PAGE - paged.length) }).map((_, i) => (
+    <div key={`ghost-${i}`} className="apm-checklist-ghost" />
+  ))}
+</div>
+    {totalPP > 1 && (
+  <div className="apm-pg-inline">
+    <button className="apm-pg-arrow"
+      onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
+      disabled={safePP === 1}>‹</button>
+    <span className="apm-pg-label">{safePP} / {totalPP}</span>
+    <button className="apm-pg-arrow"
+      onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
+      disabled={safePP === totalPP}>›</button>
+  </div>
+)}
+  </>
+);
+      })()}
+    </>
+  )}
+</div>
 
             {/* Timetable */}
             <div className="apm-section apm-section-grow">
