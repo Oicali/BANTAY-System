@@ -830,7 +830,7 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
             </div>
 </div>
 
-<h3 className="pd-section-title">9. Photo Evidence</h3>
+<h3 className="pd-section-title">9. Photo Documentation</h3>
 <div style={{ marginBottom: 24 }}>
 
   {/* Existing photos (edit mode) */}
