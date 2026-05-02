@@ -313,7 +313,8 @@
 .epm-add-task-btn:hover { background: var(--pm-navy-dark); }
 
 /* Remove (×) inside timetable row */
-.apm-remove {
+.apm-remove,
+.epm-remove {
   background: none;
   border: none;
   color: var(--pm-text-faint);
@@ -323,7 +324,8 @@
   line-height: 1;
   transition: color var(--pm-transition);
 }
-.apm-remove:hover { color: var(--pm-red); }
+.apm-remove:hover,
+.epm-remove:hover { color: var(--pm-red); }
 
 /* ══════════════════════════════════════════════════════════════════
    BODY LAYOUT
@@ -332,7 +334,7 @@
 .epm-body,
 .bc-body {
   display: grid;
-  grid-template-columns: 50% 50%;
+  grid-template-columns: 42% 58%;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -418,7 +420,11 @@
   overflow: hidden;
   background: var(--pm-bg);
 }
-
+/* Patroller section — can flex when expanded */
+.epm-section.epm-patroller-section {
+  flex-shrink: 1;
+  min-height: 0;
+}
 /* Section base */
 .apm-section,
 .epm-section,
@@ -482,9 +488,11 @@
 .epm-checklist {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  max-height: 155px;
-  overflow-y: auto;
+  gap: 0;
+  overflow-y: hidden;
+  height: 220px;
+  min-height: 220px;
+  max-height: 220px;
 }
 .apm-check-item,
 .epm-check-item {
@@ -538,6 +546,60 @@
 .apm-checkbox-on,
 .epm-checkbox-on { background: var(--pm-navy); border-color: var(--pm-navy); }
 
+/* ── Checkbox column — stacks checkbox on top, pagination below ── */
+.apm-checkbox-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ── Inline pagination — sits in the checkbox column area ── */
+.apm-pg-inline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 10px 2px;
+}
+
+.apm-pg-arrow {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dee2e6;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3a5f;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+.apm-pg-arrow:hover:not(:disabled) {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.apm-pg-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.apm-pg-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6c757d;
+  white-space: nowrap;
+  min-width: 28px;
+  text-align: center;
+}
 /* ══════════════════════════════════════════════════════════════════
    DATE TABS
    ══════════════════════════════════════════════════════════════════ */
@@ -1196,6 +1258,229 @@
 .pm-map-ctrl-btn:hover svg { stroke: #c1272d; }
 .pm-map-ctrl-btn svg { display: block; flex-shrink: 0; stroke: #1e3a5f; fill: none; }
 .pm-map-ctrl-divider { height: 1px; background: #e9ecef; }
+
+/* ── ADD / EDIT PATROL — Collapsible patroller section ── */
+.apm-section-title-row,
+.epm-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apm-toggle-btn,
+.epm-toggle-btn,
+.bc-toggle-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+  transition: all 0.15s ease !important;
+  border: 1.5px solid transparent !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  line-height: 1.4 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: unset !important;
+  background-clip: padding-box !important;
+}
+
+.apm-toggle-show,
+.epm-toggle-show {
+  background: rgba(30, 58, 95, 0.07) !important;
+  border-color: rgba(30, 58, 95, 0.18) !important;
+  color: #1e3a5f !important;
+}
+.apm-toggle-show:hover,
+.epm-toggle-show:hover {
+  background: #1e3a5f !important;
+  color: #fff !important;
+  border-color: #1e3a5f !important;
+}
+
+.apm-toggle-hide,
+.epm-toggle-hide {
+  background: transparent !important;
+  border-color: #ced4da !important;
+  color: #6c757d !important;
+}
+.apm-toggle-hide:hover,
+.epm-toggle-hide:hover {
+  background: #f8f9fa !important;
+  border-color: #adb5bd !important;
+  color: #212529 !important;
+}
+
+.apm-patroller-hidden-hint,
+.epm-patroller-hidden-hint {
+  font-size: 12px;
+  color: #adb5bd;
+  font-style: italic;
+  margin: 2px 0 0;
+}
+
+/* ── ADD / EDIT PATROL — Patroller pagination ── */
+.apm-patroller-pagination,
+.epm-patroller-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+
+.apm-pg-btn,
+.epm-pg-btn {
+  padding: 4px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a5f;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+.apm-pg-btn:hover:not(:disabled),
+.epm-pg-btn:hover:not(:disabled) {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.apm-pg-btn:disabled,
+.epm-pg-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.apm-pg-label,
+.epm-pg-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+/* ── BEATCARD — Collapsible patroller section ── */
+.bc-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bc-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bc-toggle-show {
+  background: rgba(30, 58, 95, 0.07);
+  border-color: rgba(30, 58, 95, 0.18);
+  color: #1e3a5f;
+}
+.bc-toggle-show:hover {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+
+.bc-toggle-hide {
+  background: transparent;
+  border-color: #ced4da;
+  color: #6c757d;
+}
+.bc-toggle-hide:hover {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+  color: #212529;
+}
+
+.bc-patroller-hidden-hint {
+  font-size: 12px;
+  color: #adb5bd;
+  font-style: italic;
+  margin: 2px 0 0;
+}
+
+/* ── BEATCARD — Patroller pagination ── */
+.bc-patroller-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+
+.bc-pg-btn {
+  padding: 4px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a5f;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+.bc-pg-btn:hover:not(:disabled) {
+  background: #1e3a5f;
+  color: #fff;
+  border-color: #1e3a5f;
+}
+.bc-pg-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.bc-pg-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+/* ── Checklist ghost rows — fill empty slots to keep height fixed ── */
+.apm-checklist-ghost,
+.epm-checklist-ghost {
+  height: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--pm-radius-sm);
+  background: transparent;
+}
+
+/* ── Inline pagination row — fixed height, flush right ── */
+.apm-pg-inline {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    RESPONSIVE

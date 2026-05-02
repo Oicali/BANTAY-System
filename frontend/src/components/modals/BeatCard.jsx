@@ -47,6 +47,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = f
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [hoveredPatroller, setHoveredPatroller]   = useState(null);
   const [hoverAnchor, setHoverAnchor]             = useState(null);
+  const [showPatrollers, setShowPatrollers]   = useState(false);
+const [patrollerPage, setPatrollerPage]     = useState(1);
 
   // PDF preview state
   const [pdfPreview, setPdfPreview] = useState(null); // { blobUrl, download, revoke }
@@ -250,7 +252,8 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = f
                 {dateRange.map((date) => (
                   <button key={date}
                     className={`bc-date-tab ${activeDate === date ? "bc-date-tab-active" : ""}`}
-                    onClick={() => setActiveDate(date)}>
+                    onClick={() => { setActiveDate(date); setShowPatrollers(false); setPatrollerPage(1); }}
+                    >
                     {formatTabDate(date)}
                   </button>
                 ))}
@@ -261,51 +264,103 @@ const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = f
             <div className="bc-shift-tabs-top">
               <button
                 className={`bc-shift-tab-top ${activeShift === "AM" ? "bc-shift-active" : ""}`}
-                onClick={() => setActiveShift("AM")}
+                onClick={() => { setActiveShift("AM"); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 AM Shift
                 {amPatrollers.length > 0 && <span className="bc-shift-badge">{amPatrollers.length}</span>}
               </button>
               <button
                 className={`bc-shift-tab-top ${activeShift === "PM" ? "bc-shift-active" : ""}`}
-                onClick={() => setActiveShift("PM")}
+               onClick={() => { setActiveShift("PM"); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 PM Shift
                 {pmPatrollers.length > 0 && <span className="bc-shift-badge">{pmPatrollers.length}</span>}
               </button>
             </div>
 
-            {/* Patrollers */}
-            <div className="bc-section">
-              <div className="bc-section-title">{activeShift} Shift Patrollers</div>
-              {currentPatrollers.length > 0 ? (
-                <div className="bc-patroller-table-wrap">
-                  <table className="bc-patroller-table">
-                    <thead>
-                      <tr>
-                        <th>Rank &amp; Name</th>
-                        <th>Contact Number</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentPatrollers.map((p) => (
-                        <tr key={p.active_patroller_id}>
-                          <td
-                            className="bc-pt-name"
-                            onMouseEnter={(e) => { setHoveredPatroller(p); setHoverAnchor(e.currentTarget); }}
-                            onMouseLeave={() => { setHoveredPatroller(null); setHoverAnchor(null); }}
-                            style={{ cursor: "default" }}
-                          >
-                            {p.rank ? `${p.rank} ${p.officer_name}` : p.officer_name}
-                          </td>
-                          <td className="bc-pt-contact">{p.contact_number || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : <p className="bc-empty">No patrollers assigned to {activeShift} shift.</p>}
-            </div>
+           {/* Patrollers */}
+<div className="bc-section">
+  <div className="bc-section-title-row">
+    <div className="bc-section-title">
+      {activeShift} Shift Patrollers
+      {currentPatrollers.length > 0 && (
+        <span className="bc-shift-badge" style={{ marginLeft: 6 }}>{currentPatrollers.length}</span>
+      )}
+    </div>
+    {currentPatrollers.length > 0 && (
+      showPatrollers ? (
+        <button className="bc-toggle-btn bc-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
+          Hide
+        </button>
+      ) : (
+        <button className="bc-toggle-btn bc-toggle-show" onClick={() => setShowPatrollers(true)}>
+          Show Patrollers
+        </button>
+      )
+    )}
+  </div>
+
+  {!showPatrollers && currentPatrollers.length > 0 && (
+    <p className="bc-patroller-hidden-hint">
+      {currentPatrollers.length} patroller{currentPatrollers.length !== 1 ? "s" : ""} assigned — click <strong>Show Patrollers</strong> to view
+    </p>
+  )}
+
+  {showPatrollers && currentPatrollers.length > 0 && (() => {
+    const PER_PAGE = 5;
+    const totalPP  = Math.max(1, Math.ceil(currentPatrollers.length / PER_PAGE));
+    const safePP   = Math.min(patrollerPage, totalPP);
+    const paged    = currentPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
+    return (
+      <>
+        <div className="bc-patroller-table-wrap">
+          <table className="bc-patroller-table">
+            <thead>
+              <tr>
+                <th>Rank &amp; Name</th>
+                <th>Contact Number</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map((p) => (
+                <tr key={p.active_patroller_id}>
+                  <td
+                    className="bc-pt-name"
+                    onMouseEnter={(e) => { setHoveredPatroller(p); setHoverAnchor(e.currentTarget); }}
+                    onMouseLeave={() => { setHoveredPatroller(null); setHoverAnchor(null); }}
+                    style={{ cursor: "default" }}
+                  >
+                    {p.rank ? `${p.rank} ${p.officer_name}` : p.officer_name}
+                  </td>
+                  <td className="bc-pt-contact">{p.contact_number || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {totalPP > 1 && (
+          <div className="bc-patroller-pagination">
+            <button
+              className="bc-pg-btn"
+              onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
+              disabled={safePP === 1}
+            >‹ Prev</button>
+            <span className="bc-pg-label">Page {safePP} of {totalPP}</span>
+            <button
+              className="bc-pg-btn"
+              onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
+              disabled={safePP === totalPP}
+            >Next ›</button>
+          </div>
+        )}
+      </>
+    );
+  })()}
+
+  {currentPatrollers.length === 0 && (
+    <p className="bc-empty">No patrollers assigned to {activeShift} shift.</p>
+  )}
+</div>
 
             {/* Timetable */}
             <div className="bc-section bc-section-grow">

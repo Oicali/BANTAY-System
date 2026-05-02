@@ -117,7 +117,9 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
   const [activeShift, setActiveShift]         = useState("AM");
   const [hoveredBrgy, setHoveredBrgy]         = useState(null);
   const [showApplyDialog, setShowApplyDialog] = useState(false);
-  const [patrollerSearch, setPatrollerSearch] = useState("");
+const [patrollerSearch, setPatrollerSearch] = useState("");
+const [showPatrollers, setShowPatrollers]   = useState(false);
+const [patrollerPage, setPatrollerPage]     = useState(1);
 
   // The full list shown in the checklist (available + already assigned to this patrol)
   const [patrollerList, setPatrollerList]         = useState([]);
@@ -690,7 +692,7 @@ const patrollerResults = await Promise.all(
                 {dateRange.map((date) => (
                   <button key={date}
                     className={`epm-date-tab ${activeDate === date ? "epm-date-tab-active" : ""}`}
-                    onClick={() => { setActiveDate(date); setPatrollerSearch(""); }}>
+                    onClick={() => { setActiveDate(date); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}>
                     {formatTabDate(date)}
                     {dirtyDates.has(date) && <span className="epm-date-dirty">●</span>}
                   </button>
@@ -702,7 +704,7 @@ const patrollerResults = await Promise.all(
             <div className="epm-shift-tabs-top">
               <button
                 className={`epm-shift-tab-top ${activeShift === "AM" ? "epm-shift-active" : ""}`}
-                onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); }}
+             onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 AM Shift
                 {activeDatePatrollers.am.length > 0 && (
@@ -711,7 +713,7 @@ const patrollerResults = await Promise.all(
               </button>
               <button
                 className={`epm-shift-tab-top ${activeShift === "PM" ? "epm-shift-active" : ""}`}
-                onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); }}
+               onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 PM Shift
                 {activeDatePatrollers.pm.length > 0 && (
@@ -720,55 +722,104 @@ const patrollerResults = await Promise.all(
               </button>
             </div>
 
-            {/* ── Patrollers for this date + shift ── */}
-            <div className="epm-section">
-              <div className="epm-section-title">
-                {activeShift} Patrollers — {formatTabDate(activeDate)}
-                {currentPatrollerIds.length > 0 && <span className="epm-count"> ({currentPatrollerIds.length})</span>}
-              </div>
+          {/* ── Patrollers for this date + shift ── */}
+<div className="epm-section epm-patroller-section">
+  <div className="epm-section-title-row">
+    <span className="epm-section-title">
+      {activeShift} Patrollers — {formatTabDate(activeDate)}
+      {currentPatrollerIds.length > 0 && (
+        <span className="epm-shift-badge" style={{ marginLeft: 6 }}>{currentPatrollerIds.length}</span>
+      )}
+    </span>
+    {!loadingPatrollers && (
+      showPatrollers ? (
+        <button className="epm-toggle-btn epm-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
+          Hide
+        </button>
+      ) : (
+        <button className="epm-toggle-btn epm-toggle-show" onClick={() => setShowPatrollers(true)}>
+          Show Patrollers
+        </button>
+      )
+    )}
+  </div>
 
-              {loadingPatrollers ? (
-                <div className="epm-empty">Loading patrollers...</div>
-              ) : (
-                <>
-                  <input className="epm-search" type="text" placeholder="Search patroller..."
-                    value={patrollerSearch} onChange={(e) => setPatrollerSearch(e.target.value)} />
-                  <div className="epm-checklist">
-                    {filteredPatrollers.length === 0 ? (
-                      <div className="epm-empty">No patrollers available.</div>
-                    ) : filteredPatrollers.map((p) => {
-                      const isSelected   = currentPatrollerIds.includes(p.active_patroller_id);
-                      const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
-                      return (
-                        <div key={p.active_patroller_id}
-                          className={`epm-check-item ${isSelected ? "epm-checked" : ""} ${isOtherShift ? "epm-other-shift" : ""}`}
-                          onClick={() => togglePatroller(p.active_patroller_id)}
-                          title={isOtherShift ? `Already in ${activeShift === "AM" ? "PM" : "AM"} shift on this date` : ""}>
-                       <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
-  {p.profile_picture ? (
-    <img
-      src={p.profile_picture}
-      alt={p.officer_name}
-      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-    />
-  ) : getInitials(p.officer_name)}
-</div>
-                          <div className="epm-officer-info">
-                            <span className="epm-officer-name">{p.officer_name}</span>
-                            {isOtherShift && (
-                              <span className="epm-other-shift-label">{activeShift === "AM" ? "PM" : "AM"} shift</span>
-                            )}
-                          </div>
-                          <div className={`epm-checkbox ${isSelected ? "epm-checkbox-on" : ""}`}>
-                            {isSelected ? "✓" : ""}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+  {loadingPatrollers ? (
+    <div className="epm-empty">Loading patrollers...</div>
+  ) : (
+    <>
+      {!showPatrollers && (
+        <p className="epm-patroller-hidden-hint">
+          {currentPatrollerIds.length > 0
+            ? `${currentPatrollerIds.length} selected — click Show Patrollers to manage`
+            : `${patrollerList.length} available — click Show Patrollers to assign`}
+        </p>
+      )}
+
+      {showPatrollers && (() => {
+        const PER_PAGE = 5;
+        const totalPP  = Math.max(1, Math.ceil(filteredPatrollers.length / PER_PAGE));
+        const safePP   = Math.min(patrollerPage, totalPP);
+        const paged    = filteredPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
+        return (
+          <>
+            <input className="epm-search" type="text" placeholder="Search patroller..."
+              value={patrollerSearch}
+              onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
+           <div className="epm-checklist">
+  {filteredPatrollers.length === 0 ? (
+    <div className="epm-empty">No patrollers available.</div>
+  ) : (
+    paged.map((p) => {
+      const isSelected   = currentPatrollerIds.includes(p.active_patroller_id);
+      const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
+      return (
+        <div key={p.active_patroller_id}
+          className={`epm-check-item ${isSelected ? "epm-checked" : ""} ${isOtherShift ? "epm-other-shift" : ""}`}
+          onClick={() => togglePatroller(p.active_patroller_id)}
+          title={isOtherShift ? `Already in ${activeShift === "AM" ? "PM" : "AM"} shift on this date` : ""}>
+          <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+            {p.profile_picture ? (
+              <img src={p.profile_picture} alt={p.officer_name}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+            ) : getInitials(p.officer_name)}
+          </div>
+          <div className="epm-officer-info">
+            <span className="epm-officer-name">{p.officer_name}</span>
+            {isOtherShift && (
+              <span className="epm-other-shift-label">{activeShift === "AM" ? "PM" : "AM"} shift</span>
+            )}
+          </div>
+          <div className="apm-checkbox-col">
+            <div className={`epm-checkbox ${isSelected ? "epm-checkbox-on" : ""}`}>
+              {isSelected ? "✓" : ""}
             </div>
+          </div>
+        </div>
+      );
+    })
+  )}
+  {filteredPatrollers.length > 0 && Array.from({ length: Math.max(0, PER_PAGE - paged.length) }).map((_, i) => (
+    <div key={`ghost-${i}`} className="epm-checklist-ghost" />
+  ))}
+</div>
+            {totalPP > 1 && (
+              <div className="apm-pg-inline">
+                <button className="apm-pg-arrow"
+                  onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
+                  disabled={safePP === 1}>‹</button>
+                <span className="apm-pg-label">{safePP} / {totalPP}</span>
+                <button className="apm-pg-arrow"
+                  onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
+                  disabled={safePP === totalPP}>›</button>
+              </div>
+            )}
+          </>
+        );
+      })()}
+    </>
+  )}
+</div>
 
             {/* ── Timetable for this date + shift ── */}
             <div className="epm-section epm-section-grow">

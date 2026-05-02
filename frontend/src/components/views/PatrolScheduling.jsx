@@ -583,16 +583,13 @@ const sortedPatrols = [...filteredPatrols].sort((a, b) => {
     </div>
   )}
 </div>
+<button className="psch-filter-apply" onClick={handleApply}>
+  Apply Filters
+</button>
 
-          <button className="psch-filter-apply" onClick={handleApply}>
-            Apply Filters
-          </button>
-
-          {filtersApplied && (
-            <button className="psch-filter-reset" onClick={handleReset} title="Reset filters">
-              ↺
-            </button>
-          )}
+<button className="psch-filter-reset" onClick={handleReset} title="Reset filters">
+  ↺
+</button>
         </div>
 
         {/* TABLE */}
