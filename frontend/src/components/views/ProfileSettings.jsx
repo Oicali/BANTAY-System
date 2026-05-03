@@ -390,8 +390,12 @@ export default function ProfileSettings() {
           fetchAllBarangays();
         } else if (ud.region_code) {
           await fetchRegions();
-          await fetchProvinces(ud.region_code);
-          if (ud.province_code) await fetchMunicipalities(ud.province_code);
+          if (ud.region_code === "130000000") {
+            await fetchMunicipalitiesByRegion(ud.region_code);
+          } else {
+            await fetchProvinces(ud.region_code);
+            if (ud.province_code) await fetchMunicipalities(ud.province_code);
+          }
           if (ud.municipality_code) await fetchBarangays(ud.municipality_code);
         } else {
           fetchRegions();
@@ -443,8 +447,12 @@ export default function ProfileSettings() {
         );
         if (munChanged || bgyChanged) {
           await fetchRegions();
-          await fetchProvinces(ud.region_code);
-          if (ud.province_code) await fetchMunicipalities(ud.province_code);
+          if (ud.region_code === "130000000") {
+            await fetchMunicipalitiesByRegion(ud.region_code);
+          } else {
+            await fetchProvinces(ud.region_code);
+            if (ud.province_code) await fetchMunicipalities(ud.province_code);
+          }
           if (ud.municipality_code) await fetchBarangays(ud.municipality_code);
         }
       }
@@ -526,10 +534,14 @@ export default function ProfileSettings() {
     setErrorMessage("");
     if (isPoliceRole()) {
       await fetchRegions();
-      if (originalFormData.region_code)
-        await fetchProvinces(originalFormData.region_code);
-      if (originalFormData.province_code)
-        await fetchMunicipalities(originalFormData.province_code);
+      if (originalFormData.region_code === "130000000") {
+        await fetchMunicipalitiesByRegion(originalFormData.region_code);
+      } else {
+        if (originalFormData.region_code)
+          await fetchProvinces(originalFormData.region_code);
+        if (originalFormData.province_code)
+          await fetchMunicipalities(originalFormData.province_code);
+      }
       if (originalFormData.municipality_code)
         await fetchBarangays(originalFormData.municipality_code);
     } else if (isBarangayRole()) {
@@ -629,7 +641,25 @@ export default function ProfileSettings() {
     if (suffix) name += " " + suffix;
     return name.trim();
   };
-
+  const fetchMunicipalitiesByRegion = useCallback(async (regionCode) => {
+    setPsgcLoading((p) => ({ ...p, municipalities: true }));
+    try {
+      const d = await (
+        await fetch(`${PSGC}/regions/${regionCode}/cities-municipalities/`)
+      ).json();
+      const arr = Array.isArray(d)
+        ? d.sort((a, b) => a.name.localeCompare(b.name))
+        : [];
+      municipalitiesRef.current = arr;
+      setMunicipalities(arr);
+      return arr;
+    } catch {
+      setMunicipalities([]);
+      return [];
+    } finally {
+      setPsgcLoading((p) => ({ ...p, municipalities: false }));
+    }
+  }, []);
   const getRegionName = (code) =>
     regionsRef.current.find((o) => o.code === code)?.name ||
     regions.find((o) => o.code === code)?.name ||
@@ -755,7 +785,7 @@ export default function ProfileSettings() {
       errors.address_line = "Address line must not exceed 255 characters";
     if (isPoliceRole()) {
       if (!formData.region_code) errors.region_code = "Region is required";
-      if (!formData.province_code)
+      if (!formData.province_code && formData.region_code !== "130000000")
         errors.province_code = "Province is required";
       if (!formData.municipality_code)
         errors.municipality_code = "City / Municipality is required";
@@ -825,7 +855,18 @@ export default function ProfileSettings() {
     provincesRef.current = [];
     municipalitiesRef.current = [];
     barangaysRef.current = [];
-    fetchProvinces(code);
+    setValidationErrors((prev) => ({
+      ...prev,
+      region_code: "",
+      province_code: "",
+      municipality_code: "",
+      barangay_code: "",
+    }));
+    if (code === "130000000") {
+      fetchMunicipalitiesByRegion(code);
+    } else {
+      fetchProvinces(code);
+    }
   };
   const handleProvinceChange = (e) => {
     const code = e.target.value;
@@ -839,6 +880,12 @@ export default function ProfileSettings() {
     setBarangays([]);
     municipalitiesRef.current = [];
     barangaysRef.current = [];
+    setValidationErrors((prev) => ({
+      ...prev,
+      province_code: "",
+      municipality_code: "",
+      barangay_code: "",
+    }));
     fetchMunicipalities(code);
   };
   const handleMunicipalityChange = (e) => {
@@ -846,10 +893,17 @@ export default function ProfileSettings() {
     setFormData((p) => ({ ...p, municipality_code: code, barangay_code: "" }));
     setBarangays([]);
     barangaysRef.current = [];
+    setValidationErrors((prev) => ({
+      ...prev,
+      municipality_code: "",
+      barangay_code: "",
+    }));
     fetchBarangays(code);
   };
-  const handleBarangayChange = (e) =>
+  const handleBarangayChange = (e) => {
     setFormData((p) => ({ ...p, barangay_code: e.target.value }));
+    setValidationErrors((prev) => ({ ...prev, barangay_code: "" }));
+  };
 
   // ── Email OTP timer helpers ────────────────────────────────────────────────
   // resendsLeftRef: ref that mirrors the resend count for THIS otp flow (old or new)
@@ -1428,7 +1482,6 @@ export default function ProfileSettings() {
         "phone",
         "alternate_phone",
         "region_code",
-        "province_code",
         "municipality_code",
         "barangay_code",
         "address_line",
@@ -1440,6 +1493,12 @@ export default function ProfileSettings() {
         )
           fd.append(k, fmt[k]);
       });
+
+      // NCR has no province — send empty string so backend clears it
+      fd.append(
+        "province_code",
+        fmt.region_code === "130000000" ? "130000000" : fmt.province_code || "",
+      );
       const res = await fetch(
         `${API_URL}/users/profile/${profileData.user_id}`,
         {
@@ -2120,8 +2179,15 @@ export default function ProfileSettings() {
                             onChange={handleProvinceChange}
                             options={provinces}
                             isLoading={psgcLoading.provinces}
-                            disabled={!formData.region_code}
-                            placeholder="— Province —"
+                            disabled={
+                              !formData.region_code ||
+                              formData.region_code === "130000000"
+                            }
+                            placeholder={
+                              formData.region_code === "130000000"
+                                ? "N/A (NCR)"
+                                : "— Province —"
+                            }
                           />
                           <PsgcSelect
                             label="City / Municipality"
@@ -2130,7 +2196,11 @@ export default function ProfileSettings() {
                             onChange={handleMunicipalityChange}
                             options={municipalities}
                             isLoading={psgcLoading.municipalities}
-                            disabled={!formData.province_code}
+                            disabled={
+                              (!formData.province_code &&
+                                formData.region_code !== "130000000") ||
+                              psgcLoading.municipalities
+                            }
                             placeholder="— City / Mun. —"
                           />
                           <PsgcSelect

@@ -1,4 +1,4 @@
-const LoadingModal = ({ isOpen, message = "Loading..." }) => {
+const LoadingModal = ({ isOpen, message = "Loading...", zIndex = 9999 }) => {
   if (!isOpen) return null;
 
   return (
@@ -7,7 +7,7 @@ const LoadingModal = ({ isOpen, message = "Loading..." }) => {
         position: "fixed",
         inset: 0,
         backgroundColor: "rgba(0,0,0,0.45)",
-        zIndex: 9999,
+        zIndex,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

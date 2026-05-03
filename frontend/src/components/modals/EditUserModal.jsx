@@ -12,7 +12,13 @@ const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
 const API_URL = import.meta.env.VITE_API_URL;
 
-const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }) => {
+const EditUserModal = ({
+  isOpen,
+  onClose,
+  user,
+  onUserUpdated,
+  onResendSuccess,
+}) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -202,8 +208,23 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
 
     if (user.user_type === "police") {
       fetchRegions();
-      if (user.region_code) fetchProvinces(user.region_code);
-      if (user.province_code) fetchMunicipalities(user.province_code);
+      if (user.region_code === "130000000") {
+        setLoadingMunicipalities(true);
+        fetch(
+          `https://psgc.gitlab.io/api/regions/130000000/cities-municipalities/`,
+        )
+          .then((r) => r.json())
+          .then((data) =>
+            setMunicipalities(
+              data.sort((a, b) => a.name.localeCompare(b.name)),
+            ),
+          )
+          .catch(() => setMunicipalities([]))
+          .finally(() => setLoadingMunicipalities(false));
+      } else {
+        if (user.region_code) fetchProvinces(user.region_code);
+        if (user.province_code) fetchMunicipalities(user.province_code);
+      }
       if (user.municipality_code) fetchAddressBarangays(user.municipality_code);
     }
   }, [user, isOpen]);
@@ -473,7 +494,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
 
     if (isPNP) {
       if (!formData.region_code) e.region_code = "Region is required";
-      if (!formData.province_code) e.province_code = "Province is required";
+      if (!formData.province_code && formData.region_code !== "130000000")
+        e.province_code = "Province is required";
       if (!formData.municipality_code)
         e.municipality_code = "City/Municipality is required";
       if (!formData.barangay_code) e.barangay_code = "Barangay is required";
@@ -554,7 +576,22 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
       setProvinces([]);
       setMunicipalities([]);
       setAddressBarangays([]);
-      if (value) fetchProvinces(value);
+      if (value) {
+        if (value === "130000000") {
+          setLoadingMunicipalities(true);
+          fetch(`${PSGC_BASE}/regions/${value}/cities-municipalities/`)
+            .then((r) => r.json())
+            .then((data) =>
+              setMunicipalities(
+                data.sort((a, b) => a.name.localeCompare(b.name)),
+              ),
+            )
+            .catch(() => setMunicipalities([]))
+            .finally(() => setLoadingMunicipalities(false));
+        } else {
+          fetchProvinces(value);
+        }
+      }
       clearError("region_code");
       return;
     }
@@ -706,7 +743,12 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
 
       if (isPNP) {
         fd.append("region_code", formData.region_code);
-        fd.append("province_code", formData.province_code);
+        fd.append(
+          "province_code",
+          formData.region_code === "130000000"
+            ? "130000000"
+            : formData.province_code,
+        );
         fd.append("municipality_code", formData.municipality_code);
         fd.append("barangay_code", formData.barangay_code);
         fd.append("rank_id", formData.rank_id || "");
@@ -1263,12 +1305,17 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                       disabled={
                         isSubmitting ||
                         !formData.region_code ||
-                        loadingProvinces
+                        loadingProvinces ||
+                        formData.region_code === "130000000"
                       }
                       className={`eum-form-input ${errors.province_code ? "eum-error" : ""}`}
                     >
                       <option value="">
-                        {loadingProvinces ? "Loading..." : "Select Province"}
+                        {loadingProvinces
+                          ? "Loading..."
+                          : formData.region_code === "130000000"
+                            ? "N/A (NCR)"
+                            : "Select Province"}
                       </option>
                       {provinces.map((p) => (
                         <option key={p.code} value={p.code}>
@@ -1295,7 +1342,8 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                       onChange={handleChange}
                       disabled={
                         isSubmitting ||
-                        !formData.province_code ||
+                        (!formData.province_code &&
+                          formData.region_code !== "130000000") ||
                         loadingMunicipalities
                       }
                       className={`eum-form-input ${errors.municipality_code ? "eum-error" : ""}`}
@@ -1557,7 +1605,6 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
 
             {/* ── Actions ── */}
             <div className="eum-modal-actions">
-
               {/* Resend verification — only for unverified accounts */}
               {isUnverified && (
                 <button
@@ -1624,7 +1671,14 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                         viewBox="0 0 24 24"
                         style={{ marginRight: "6px" }}
                       >
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <rect
+                          x="3"
+                          y="11"
+                          width="18"
+                          height="11"
+                          rx="2"
+                          ry="2"
+                        />
                         <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                       </svg>
                       Unlock Account
@@ -1643,7 +1697,14 @@ const EditUserModal = ({ isOpen, onClose, user, onUserUpdated, onResendSuccess }
                         viewBox="0 0 24 24"
                         style={{ marginRight: "6px" }}
                       >
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <rect
+                          x="3"
+                          y="11"
+                          width="18"
+                          height="11"
+                          rx="2"
+                          ry="2"
+                        />
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                       Lock Account

@@ -3,7 +3,13 @@ import { NavLink } from "react-router-dom";
 import { navItems } from "../../utils/navItems";
 import { roleAccess } from "../../utils/roleAccess";
 
-export default function Sidebar({ openSections, toggleSection, handleLogout, sidebarOpen, onClose }) {
+export default function Sidebar({
+  openSections,
+  toggleSection,
+  handleLogout,
+  sidebarOpen,
+  onClose,
+}) {
   const role = localStorage.getItem("role");
   const allowedTabs = roleAccess[role] || [];
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -35,7 +41,7 @@ export default function Sidebar({ openSections, toggleSection, handleLogout, sid
         <nav className="sidebar-nav">
           {navItems.map((group) => {
             const visibleItems = group.items.filter((item) =>
-              allowedTabs.includes(item.key)
+              allowedTabs.includes(item.key),
             );
 
             if (visibleItems.length === 0) return null;
@@ -112,7 +118,12 @@ export default function Sidebar({ openSections, toggleSection, handleLogout, sid
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              style={{ width: "14px", height: "14px", flexShrink: 0, opacity: 0.7 }}
+              style={{
+                width: "14px",
+                height: "14px",
+                flexShrink: 0,
+                opacity: 0.7,
+              }}
             >
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
               <polyline points="16,17 21,12 16,7" />
@@ -136,30 +147,93 @@ export default function Sidebar({ openSections, toggleSection, handleLogout, sid
         >
           <div
             className="eb-modal-content"
-            style={{ maxWidth: "400px", padding: "0" }}
+            style={{ maxWidth: "420px", padding: 0 }}
           >
-            <div style={{ padding: "24px", borderBottom: "1px solid #e5e7eb" }}>
-              <h3
+            <div
+              style={{
+                padding: "20px 24px",
+                background: "linear-gradient(135deg, #0B2447 0%, #19376D 100%)",
+                borderBottom: "3px solid #dc2626",
+                borderRadius: "8px 8px 0 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+              <div
                 style={{
-                  margin: 0,
-                  fontSize: "18px",
-                  fontWeight: 600,
-                  color: "#111827",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  background: "rgba(255,255,255,0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                Confirm Logout
-              </h3>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16,17 21,12 16,7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    color: "white",
+                  }}
+                >
+                  Confirm Logout
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.6)",
+                    marginTop: "2px",
+                  }}
+                >
+                  You will be signed out of the system
+                </p>
+              </div>
+              <span
+                onClick={() => setShowLogoutModal(false)}
+                style={{
+                  marginLeft: "auto",
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </span>
             </div>
             <div style={{ padding: "24px" }}>
               <p
                 style={{
                   margin: 0,
                   fontSize: "14px",
-                  color: "#6b7280",
-                  lineHeight: "1.5",
+                  color: "#374151",
+                  lineHeight: "1.6",
                 }}
               >
-                Are you sure you want to logout?
+                Are you sure you want to logout? You will be redirected to the
+                login page.
               </p>
             </div>
             <div
@@ -169,6 +243,8 @@ export default function Sidebar({ openSections, toggleSection, handleLogout, sid
                 display: "flex",
                 gap: "12px",
                 justifyContent: "flex-end",
+                background: "#f9fafb",
+                borderRadius: "0 0 8px 8px",
               }}
             >
               <button

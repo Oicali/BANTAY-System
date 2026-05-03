@@ -407,7 +407,12 @@ function ModusManagement() {
                     </td>
                     <td>
                       {m.created_at
-                        ? new Date(m.created_at).toLocaleDateString()
+                        ? new Date(m.created_at).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            timeZone: "Asia/Manila",
+                          })
                         : "—"}
                     </td>
                     <td>

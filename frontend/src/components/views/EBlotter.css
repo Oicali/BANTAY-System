@@ -1266,7 +1266,10 @@ select.eb-modal-input {
 .eb-pagination-btn:focus {
   outline: none !important;
 }
-
+@keyframes eb-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 .eb-pagination-current {
   padding: 8px 16px;
   color: var(--navy-primary);

@@ -162,8 +162,8 @@ if (role === "Investigator") {
     CONCAT(b.place_city_municipality, ', ', b.place_district_province) AS location
  FROM cases c
    LEFT JOIN users u ON c.assigned_io_id = u.user_id
-   LEFT JOIN blotter_entries b ON c.blotter_id = b.blotter_id
-   ${where}
+   INNER JOIN blotter_entries b ON c.blotter_id = b.blotter_id AND b.deleted_at IS NULL
+${where}
    ORDER BY 
   CASE 
     WHEN c.priority = 'High' AND c.status = 'Under Investigation' THEN 1
@@ -192,16 +192,17 @@ if (role === "Investigator") {
 const getStatistics = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT
-        COUNT(*) AS total_cases,
-        COUNT(*) FILTER (WHERE status = 'Under Investigation') AS active_cases,
-        COUNT(*) FILTER (WHERE status = 'Solved') AS solved_cases,
-        COUNT(*) FILTER (WHERE status = 'Cleared') AS cleared_cases,
-        COUNT(*) FILTER (WHERE status = 'Referred') AS referred_cases,
-        COUNT(*) FILTER (WHERE assigned_io_id IS NULL) AS unassigned_cases,
-        COUNT(*) FILTER (WHERE priority = 'High') AS high_priority_cases
-       FROM cases`
-    );
+  `SELECT
+    COUNT(*) AS total_cases,
+    COUNT(*) FILTER (WHERE c.status = 'Under Investigation') AS active_cases,
+    COUNT(*) FILTER (WHERE c.status = 'Solved') AS solved_cases,
+    COUNT(*) FILTER (WHERE c.status = 'Cleared') AS cleared_cases,
+    COUNT(*) FILTER (WHERE c.status = 'Referred') AS referred_cases,
+    COUNT(*) FILTER (WHERE c.assigned_io_id IS NULL) AS unassigned_cases,
+    COUNT(*) FILTER (WHERE c.priority = 'High') AS high_priority_cases
+   FROM cases c
+   INNER JOIN blotter_entries b ON c.blotter_id = b.blotter_id AND b.deleted_at IS NULL`
+);
 
     const row = result.rows[0];
     return res.status(200).json({
@@ -256,14 +257,17 @@ const getCaseById = async (req, res) => {
     }
 
     // Get notes
-    const notes = await pool.query(
-      `SELECT cn.id, cn.note, cn.created_at,
-              CONCAT(u.first_name, ' ', u.last_name) AS added_by_name
-       FROM case_notes cn
-       JOIN users u ON cn.added_by_id = u.user_id
-       WHERE cn.case_id = $1 ORDER BY cn.created_at DESC`,
-      [id]
-    );
+    const isAdmin = req.user.role === "Administrator";
+const notes = await pool.query(
+  `SELECT cn.id, cn.note, cn.note_date, cn.created_at, cn.edited_at, cn.deleted_at,
+          cn.added_by_id,
+          CONCAT(u.first_name, ' ', u.last_name) AS added_by_name
+   FROM case_notes cn
+   JOIN users u ON cn.added_by_id = u.user_id
+   WHERE cn.case_id = $1 ${isAdmin ? "" : "AND cn.deleted_at IS NULL"}
+   ORDER BY cn.created_at DESC`,
+  [id]
+);
 
     return res.status(200).json({ success: true, data: { ...theCase, notes: notes.rows } });
   } catch (error) {
@@ -276,22 +280,21 @@ const getCaseById = async (req, res) => {
 const addNote = async (req, res) => {
   try {
     const { id } = req.params;
-    const { note } = req.body;
-
-    if (!note || note.trim().length < 3) return res.status(400).json({ success: false, message: "Note must be at least 3 characters" });
+    const { note, note_date } = req.body;
+    if (!note || note.trim().length < 3)
+      return res.status(400).json({ success: false, message: "Note must be at least 3 characters" });
 
     const caseResult = await pool.query("SELECT * FROM cases WHERE id = $1", [id]);
-    if (caseResult.rows.length === 0) return res.status(404).json({ success: false, message: "Case not found" });
+    if (caseResult.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Case not found" });
 
-    if (req.user.role === "Investigator" && caseResult.rows[0].assigned_io_id !== req.user.user_id) {
+    if (req.user.role === "Investigator" && caseResult.rows[0].assigned_io_id !== req.user.user_id)
       return res.status(403).json({ success: false, message: "You are not assigned to this case" });
-    }
 
     const result = await pool.query(
-      `INSERT INTO case_notes (case_id, note, added_by_id)
-       VALUES ($1, $2, $3)
-       RETURNING id, case_id, note, created_at`,
-      [id, note.trim(), req.user.user_id]
+      `INSERT INTO case_notes (case_id, note, added_by_id, note_date)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, note.trim(), req.user.user_id, note_date || new Date()]
     );
 
     const user = await pool.query(
@@ -300,12 +303,11 @@ const addNote = async (req, res) => {
     );
 
     return res.status(201).json({
-      success: true,
-      message: "Note added successfully",
+      success: true, message: "Note added",
       data: { ...result.rows[0], added_by_name: user.rows[0].name },
     });
   } catch (error) {
-    console.error("Add note error:", error);
+    console.error(error);
     res.status(500).json({ success: false, message: "Error adding note" });
   }
 };
@@ -314,18 +316,80 @@ const updatePriority = async (req, res) => {
   try {
     const { id } = req.params;
     const { priority } = req.body;
-    if (!['Low', 'Medium', 'High'].includes(priority)) {
+    if (!['Low', 'Medium', 'High'].includes(priority))
       return res.status(400).json({ success: false, message: 'Invalid priority' });
-    }
+
+    // ADD THIS:
+    const caseResult = await pool.query("SELECT * FROM cases WHERE id = $1", [id]);
+    if (caseResult.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    if (req.user.role === "Investigator" && caseResult.rows[0].assigned_io_id !== req.user.user_id)
+      return res.status(403).json({ success: false, message: "You are not assigned to this case" });
+
     const result = await pool.query(
       'UPDATE cases SET priority = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [priority, id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Case not found' });
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-module.exports = { createCase, assignInvestigator, updateStatus, updatePriority, getCases, getCaseById, addNote, getStatistics };
+const editNote = async (req, res) => {
+  try {
+    const { noteId } = req.params;
+    const { note, note_date } = req.body;
+    if (!note || note.trim().length < 3)
+      return res.status(400).json({ success: false, message: "Note too short" });
+
+    const existing = await pool.query("SELECT * FROM case_notes WHERE id = $1 AND deleted_at IS NULL", [noteId]);
+    if (existing.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Note not found" });
+
+    if (req.user.role === "Investigator" && existing.rows[0].added_by_id !== req.user.user_id)
+      return res.status(403).json({ success: false, message: "Cannot edit others' notes" });
+
+    const result = await pool.query(
+  `UPDATE case_notes SET note = $1, edited_at = NOW()
+   WHERE id = $2 RETURNING *`,
+  [note.trim(), noteId]
+);
+res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const deleteNote = async (req, res) => {
+  try {
+    const { noteId } = req.params;
+    const existing = await pool.query("SELECT * FROM case_notes WHERE id = $1 AND deleted_at IS NULL", [noteId]);
+    if (existing.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Note not found" });
+
+    if (req.user.role === "Investigator" && existing.rows[0].added_by_id !== req.user.user_id)
+      return res.status(403).json({ success: false, message: "Cannot delete others' notes" });
+
+    await pool.query("UPDATE case_notes SET deleted_at = NOW() WHERE id = $1", [noteId]);
+    res.json({ success: true, message: "Note deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const restoreNote = async (req, res) => {
+  try {
+    const { noteId } = req.params;
+    const existing = await pool.query("SELECT * FROM case_notes WHERE id = $1 AND deleted_at IS NOT NULL", [noteId]);
+    if (existing.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Note not found or not deleted" });
+
+    await pool.query("UPDATE case_notes SET deleted_at = NULL WHERE id = $1", [noteId]);
+    res.json({ success: true, message: "Note restored" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { createCase, assignInvestigator, updateStatus, updatePriority, getCases, getCaseById, addNote, editNote, deleteNote, restoreNote, getStatistics };
