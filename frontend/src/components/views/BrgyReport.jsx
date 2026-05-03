@@ -26,6 +26,14 @@ function BrgyReport() {
   const [victims, setVictims] = useState([
     { first_name: "", last_name: "", gender: "Male", contact: "" },
   ]);
+  const [form, setForm] = useState({
+    incident_type: "",
+    date_time_commission: "",
+    date_time_reported: "",
+    place_barangay: "",
+    place_street: "",
+    narrative: "",
+  });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [reports, setReports] = useState([]);
