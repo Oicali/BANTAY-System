@@ -1133,20 +1133,23 @@ const acceptReferral = async (req, res) => {
 const createBrgyReport = async (req, res) => {
   try {
     const { incident_type, date_time_commission, date_time_reported,
-            place_barangay, place_street, narrative,
-            victim_first_name, victim_last_name, victim_gender, victim_contact } = req.body;
+        place_barangay, place_street, narrative, victims } = req.body;
 
-    // Simple validation
-    const errors = [];
-    if (!incident_type) errors.push("Incident type is required");
-    if (!date_time_commission) errors.push("Date & time of commission is required");
-    if (!date_time_reported) errors.push("Date & time reported is required");
-    if (!place_barangay) errors.push("Barangay is required");
-    if (!place_street) errors.push("Street is required");
-    if (!narrative || narrative.trim().length < 20) errors.push("Narrative must be at least 20 characters");
+const errors = [];
+if (!incident_type) errors.push("Incident type is required");
+if (!date_time_commission) errors.push("Date & time of commission is required");
+if (!date_time_reported) errors.push("Date & time reported is required");
+if (!place_barangay) errors.push("Barangay is required");
+if (!place_street) errors.push("Street is required");
+if (!narrative || narrative.trim().length < 20) errors.push("Narrative must be at least 20 characters");
 if (!place_street || place_street.trim().length < 2) errors.push("Street must be at least 2 characters");
-    if (!victim_first_name) errors.push("Victim first name is required");
-    if (!victim_last_name) errors.push("Victim last name is required");
+if (!victims || victims.length === 0) errors.push("At least one victim is required");
+else {
+  victims.forEach((v, i) => {
+    if (!v.first_name) errors.push(`Victim #${i + 1} first name is required`);
+    if (!v.last_name) errors.push(`Victim #${i + 1} last name is required`);
+  });
+}
 
     if (errors.length > 0) {
       return res.status(400).json({ success: false, errors });
@@ -1188,18 +1191,20 @@ if (!place_street || place_street.trim().length < 2) errors.push("Street must be
 
       const blotterId = blotterResult.rows[0].blotter_id;
 
-      await client.query(
-        `INSERT INTO complainants (
-          blotter_id, first_name, last_name, gender, nationality,
-          house_street, info_obtained
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [
-          blotterId,
-          victim_first_name, victim_last_name,
-          victim_gender || "Male", "FILIPINO",
-          "N/A", "Walk-in"
-        ]
-      );
+      for (const v of victims) {
+  await client.query(
+    `INSERT INTO complainants (
+      blotter_id, first_name, last_name, gender, nationality,
+      house_street, info_obtained
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [
+      blotterId,
+      v.first_name, v.last_name,
+      v.gender || "Male", "FILIPINO",
+      "N/A", "Walk-in"
+    ]
+  );
+}
 
       // Insert offense so it shows correctly in EBlotter
       await client.query(
