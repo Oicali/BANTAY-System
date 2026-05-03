@@ -23,18 +23,9 @@ const getStatusClass = (status) => {
 };
 
 function BrgyReport() {
-  const [form, setForm] = useState({
-    incident_type: "",
-    date_time_commission: "",
-    date_time_reported: "",
-    place_barangay: "",
-    place_street: "",
-    narrative: "",
-    victim_first_name: "",
-    victim_last_name: "",
-    victim_gender: "Male",
-    victim_contact: "",
-  });
+  const [victims, setVictims] = useState([
+    { first_name: "", last_name: "", gender: "Male", contact: "" },
+  ]);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [reports, setReports] = useState([]);
@@ -101,7 +92,18 @@ function BrgyReport() {
         return e;
       });
   };
-
+  const updateVictim = (i, field, value) => {
+    setVictims((prev) =>
+      prev.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
+    );
+  };
+  const addVictim = () =>
+    setVictims((prev) => [
+      ...prev,
+      { first_name: "", last_name: "", gender: "Male", contact: "" },
+    ]);
+  const removeVictim = (i) =>
+    setVictims((prev) => prev.filter((_, idx) => idx !== i));
   const validate = () => {
     const e = {};
     if (!form.incident_type) e.incident_type = "Required";
@@ -137,8 +139,10 @@ function BrgyReport() {
     }
     if (!form.narrative || form.narrative.trim().length < 20)
       e.narrative = "At least 20 characters";
-    if (!form.victim_first_name) e.victim_first_name = "Required";
-    if (!form.victim_last_name) e.victim_last_name = "Required";
+    victims.forEach((v, i) => {
+      if (!v.first_name) e[`victim_${i}_first_name`] = "Required";
+      if (!v.last_name) e[`victim_${i}_last_name`] = "Required";
+    });
     return e;
   };
 
@@ -164,7 +168,7 @@ function BrgyReport() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, victims }),
       });
       const data = await res.json();
       if (data.success) {
@@ -178,11 +182,10 @@ function BrgyReport() {
           place_barangay: form.place_barangay,
           place_street: "",
           narrative: "",
-          victim_first_name: "",
-          victim_last_name: "",
-          victim_gender: "Male",
-          victim_contact: "",
         });
+        setVictims([
+          { first_name: "", last_name: "", gender: "Male", contact: "" },
+        ]);
         fetchMyReports();
         document
           .querySelector(".content-wrapper")
@@ -451,107 +454,180 @@ function BrgyReport() {
             <h2 className="br-card-title">Victim Information</h2>
           </div>
           <div className="br-card-body">
-            <div className="br-form-grid">
-              <div className="br-form-group">
-                <label className="br-label">
-                  First Name <span>*</span>
-                </label>
-                <input
-                  type="text"
-                  className={`br-input ${errors.victim_first_name ? "error" : ""}`}
-                  value={form.victim_first_name}
-                  placeholder="First Name"
-                  maxLength={50}
-                  onChange={(e) =>
-                    update(
-                      "victim_first_name",
-                      e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
-                    )
-                  }
-                />
-                {errors.victim_first_name && (
-                  <span className="br-error">{errors.victim_first_name}</span>
-                )}
-              </div>
-
-              <div className="br-form-group">
-                <label className="br-label">
-                  Last Name <span>*</span>
-                </label>
-                <input
-                  type="text"
-                  className={`br-input ${errors.victim_last_name ? "error" : ""}`}
-                  value={form.victim_last_name}
-                  placeholder="Last Name"
-                  maxLength={50}
-                  onChange={(e) =>
-                    update(
-                      "victim_last_name",
-                      e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
-                    )
-                  }
-                />
-                {errors.victim_last_name && (
-                  <span className="br-error">{errors.victim_last_name}</span>
-                )}
-              </div>
-
-              <div className="br-form-group">
-                <label className="br-label">Gender</label>
-                <div className="br-gender-row">
-                  {["Male", "Female"].map((g) => (
+            {victims.map((v, i) => (
+              <div
+                key={i}
+                style={{
+                  marginBottom: i < victims.length - 1 ? "20px" : 0,
+                  paddingBottom: i < victims.length - 1 ? "20px" : 0,
+                  borderBottom:
+                    i < victims.length - 1 ? "1px solid #e5e7eb" : "none",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "#1e3a5f",
+                    }}
+                  >
+                    Victim #{i + 1}
+                  </span>
+                  {victims.length > 1 && (
                     <button
-                      key={g}
                       type="button"
-                      className={`br-gender-btn ${form.victim_gender === g ? "active" : ""}`}
-                      onClick={() => update("victim_gender", g)}
+                      onClick={() => removeVictim(i)}
+                      style={{
+                        fontSize: "12px",
+                        color: "#ef4444",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
                     >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        {g === "Male" ? (
-                          <>
-                            <circle cx="10" cy="7" r="4" />
-                            <path d="M21 2l-5.5 5.5" />
-                            <path d="M15 2h6v6" />
-                            <path d="M10 11v10" />
-                            <path d="M7 19h6" />
-                          </>
-                        ) : (
-                          <>
-                            <circle cx="12" cy="7" r="4" />
-                            <path d="M12 11v10" />
-                            <path d="M9 18h6" />
-                          </>
-                        )}
-                      </svg>
-                      {g}
+                      Remove
                     </button>
-                  ))}
+                  )}
+                </div>
+                <div className="br-form-grid">
+                  <div className="br-form-group">
+                    <label className="br-label">
+                      First Name <span>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={`br-input ${errors[`victim_${i}_first_name`] ? "error" : ""}`}
+                      value={v.first_name}
+                      placeholder="First Name"
+                      maxLength={50}
+                      onChange={(e) =>
+                        updateVictim(
+                          i,
+                          "first_name",
+                          e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
+                        )
+                      }
+                    />
+                    {errors[`victim_${i}_first_name`] && (
+                      <span className="br-error">
+                        {errors[`victim_${i}_first_name`]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="br-form-group">
+                    <label className="br-label">
+                      Last Name <span>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={`br-input ${errors[`victim_${i}_last_name`] ? "error" : ""}`}
+                      value={v.last_name}
+                      placeholder="Last Name"
+                      maxLength={50}
+                      onChange={(e) =>
+                        updateVictim(
+                          i,
+                          "last_name",
+                          e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
+                        )
+                      }
+                    />
+                    {errors[`victim_${i}_last_name`] && (
+                      <span className="br-error">
+                        {errors[`victim_${i}_last_name`]}
+                      </span>
+                    )}
+                  </div>
+                  <div className="br-form-group">
+                    <label className="br-label">Gender</label>
+                    <div className="br-gender-row">
+                      {["Male", "Female"].map((g) => (
+                        <button
+                          key={g}
+                          type="button"
+                          className={`br-gender-btn ${v.gender === g ? "active" : ""}`}
+                          onClick={() => updateVictim(i, "gender", g)}
+                        >
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            {g === "Male" ? (
+                              <>
+                                <circle cx="10" cy="7" r="4" />
+                                <path d="M21 2l-5.5 5.5" />
+                                <path d="M15 2h6v6" />
+                                <path d="M10 11v10" />
+                                <path d="M7 19h6" />
+                              </>
+                            ) : (
+                              <>
+                                <circle cx="12" cy="7" r="4" />
+                                <path d="M12 11v10" />
+                                <path d="M9 18h6" />
+                              </>
+                            )}
+                          </svg>
+                          {g}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="br-form-group">
+                    <label className="br-label">Contact Number</label>
+                    <input
+                      type="text"
+                      className="br-input"
+                      value={v.contact}
+                      placeholder="09XXXXXXXXX"
+                      maxLength={11}
+                      onChange={(e) =>
+                        updateVictim(
+                          i,
+                          "contact",
+                          e.target.value.replace(/\D/g, ""),
+                        )
+                      }
+                    />
+                  </div>
                 </div>
               </div>
+            ))}
 
-              <div className="br-form-group">
-                <label className="br-label">Contact Number</label>
-                <input
-                  type="text"
-                  className="br-input"
-                  value={form.victim_contact}
-                  placeholder="09XXXXXXXXX"
-                  maxLength={11}
-                  onChange={(e) =>
-                    update("victim_contact", e.target.value.replace(/\D/g, ""))
-                  }
-                />
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={addVictim}
+              style={{
+                marginTop: "12px",
+                marginBottom: "12px",
+                padding: "8px 16px",
+                background: "#f0f4f8",
+                border: "1px dashed #1e3a5f",
+                borderRadius: "7px",
+                color: "#1e3a5f",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              + Add Another Victim
+            </button>
 
             <button
               type="submit"

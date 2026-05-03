@@ -582,7 +582,7 @@ function EBlotter() {
         }
       }
     }
-  }, [currentStep]);
+  }, [currentStep, caseDetail.incident_type]);
 
   const handleEdit = async (blotterId) => {
     setFetchingEdit(true);
@@ -932,8 +932,6 @@ function EBlotter() {
       const data = await response.json();
 
       if (data.success) {
-        setComplainants(data.data.complainants);
-        setSuspects(data.data.suspects);
         setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
 
         const OFFENSE_NORMALIZE = {
@@ -1014,6 +1012,86 @@ function EBlotter() {
           );
           setSelectedBrgyFeature(feature || null);
         }
+
+        const newCProvinces = {},
+          newCCities = {},
+          newCBarangays = {};
+        const updatedComplainants = data.data.complainants.map((c) => ({
+          ...c,
+          region_code: c.region_code || "",
+          province_code: c.province_code || "",
+          municipality_code: c.municipality_code || "",
+          barangay_code: c.barangay_code || "",
+        }));
+        try {
+          await Promise.all(
+            updatedComplainants.map(async (c, i) => {
+              let provs = [],
+                cities = [],
+                brgys = [];
+              [provs, cities, brgys] = await Promise.all([
+                c.region_code && c.region_code !== "130000000"
+                  ? fetchProvinces(c.region_code)
+                  : Promise.resolve([]),
+                c.province_code
+                  ? fetchCities(c.province_code)
+                  : c.region_code === "130000000"
+                    ? fetchCitiesByRegion(c.region_code)
+                    : Promise.resolve([]),
+                c.municipality_code
+                  ? fetchBarangays(c.municipality_code)
+                  : Promise.resolve([]),
+              ]);
+              newCProvinces[i] = provs;
+              newCCities[i] = cities;
+              newCBarangays[i] = brgys;
+            }),
+          );
+        } catch (e) {}
+        setComplainants(updatedComplainants);
+        setCProvinces(newCProvinces);
+        setCCities(newCCities);
+        setCBarangays(newCBarangays);
+
+        const newSProvinces = {},
+          newSCities = {},
+          newSBarangays = {};
+        const updatedSuspects = data.data.suspects.map((s) => ({
+          ...s,
+          region_code: s.region_code || "",
+          province_code: s.province_code || "",
+          municipality_code: s.municipality_code || "",
+          barangay_code: s.barangay_code || "",
+        }));
+        try {
+          await Promise.all(
+            updatedSuspects.map(async (s, i) => {
+              let provs = [],
+                cities = [],
+                brgys = [];
+              [provs, cities, brgys] = await Promise.all([
+                s.region_code && s.region_code !== "130000000"
+                  ? fetchProvinces(s.region_code)
+                  : Promise.resolve([]),
+                s.province_code
+                  ? fetchCities(s.province_code)
+                  : s.region_code === "130000000"
+                    ? fetchCitiesByRegion(s.region_code)
+                    : Promise.resolve([]),
+                s.municipality_code
+                  ? fetchBarangays(s.municipality_code)
+                  : Promise.resolve([]),
+              ]);
+              newSProvinces[i] = provs;
+              newSCities[i] = cities;
+              newSBarangays[i] = brgys;
+            }),
+          );
+        } catch (e) {}
+        setSuspects(updatedSuspects);
+        setSProvinces(newSProvinces);
+        setSCities(newSCities);
+        setSBarangays(newSBarangays);
 
         setAcceptMode(true);
         setEditMode(false);
@@ -4590,12 +4668,12 @@ function EBlotter() {
                       {/* ── ROW 2: CASE ADMIN ── */}
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
-                          COP (Officer on Case)
+                          COP (Chief of Police)
                         </label>
                         <input
                           type="text"
                           className={`eb-modal-input ${fieldErrors.cop ? "error" : ""}`}
-                          placeholder="Officer Name"
+                          placeholder="Chief Name"
                           value={caseDetail.cop}
                           maxLength="100"
                           onChange={(e) => {
