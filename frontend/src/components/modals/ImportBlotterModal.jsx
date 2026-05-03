@@ -37,6 +37,22 @@ function ImportBlotterModal({ onClose, onSuccess }) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
       totalRows = rows.length;
+
+      if (rows.length > 0) {
+        const firstRow = rows[0];
+        const hasRequiredColumns =
+          "BLOTTER_ENTRY_NUMBER" in firstRow &&
+          "DATE_COMMITTED" in firstRow &&
+          "PLACE_BARANGAY" in firstRow &&
+          "INCIDENT_TYPE" in firstRow;
+
+        if (!hasRequiredColumns) {
+          alert(
+            "Invalid file format. Please use the official Bantay System import template.",
+          );
+          return;
+        }
+      }
     } catch (_) {
       totalRows = 0;
     }

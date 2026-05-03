@@ -409,6 +409,7 @@ function EBlotter() {
       fetchControllerRef.current = controller;
       setLoading(true);
       setBlotters([]);
+      await new Promise((resolve) => setTimeout(resolve, 700));
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("search", filters.search);
       if (filters.status) queryParams.append("status", filters.status);
@@ -563,8 +564,8 @@ function EBlotter() {
 
   useEffect(() => {
     if (currentStep === 3) {
-      // Sync offense_name with incident_type if empty — do it in one atomic update
-      if (!offenses[0]?.offense_name && caseDetail.incident_type) {
+      if (caseDetail.incident_type) {
+        // Always sync offense_name
         setOffenses((prev) => {
           const updated = [...prev];
           if (!updated[0]) return prev;
@@ -572,16 +573,13 @@ function EBlotter() {
             ...updated[0],
             offense_name: caseDetail.incident_type,
             index_type: "Index",
-            // Preserve stage_of_felony — do NOT overwrite it
           };
           return updated;
         });
-      }
-      if (
-        caseDetail.incident_type &&
-        (!offenseModus[0] || offenseModus[0].length === 0)
-      ) {
-        fetchModusForIncidentType(caseDetail.incident_type, true);
+        // Always fetch modus if not already loaded for this crime type
+        if (!offenseModus[0] || offenseModus[0].length === 0) {
+          fetchModusForIncidentType(caseDetail.incident_type, true);
+        }
       }
     }
   }, [currentStep]);
@@ -730,13 +728,18 @@ function EBlotter() {
         try {
           await Promise.all(
             updatedComplainants.map(async (c, i) => {
-              const [provs, cities, brgys] = await Promise.all([
-                c.region_code
+              let provs = [],
+                cities = [],
+                brgys = [];
+              [provs, cities, brgys] = await Promise.all([
+                c.region_code && c.region_code !== "130000000"
                   ? fetchProvinces(c.region_code)
                   : Promise.resolve([]),
                 c.province_code
                   ? fetchCities(c.province_code)
-                  : Promise.resolve([]),
+                  : c.region_code === "130000000"
+                    ? fetchCitiesByRegion(c.region_code)
+                    : Promise.resolve([]),
                 c.municipality_code
                   ? fetchBarangays(c.municipality_code)
                   : Promise.resolve([]),
@@ -771,13 +774,18 @@ function EBlotter() {
         try {
           await Promise.all(
             updatedSuspects.map(async (s, i) => {
-              const [provs, cities, brgys] = await Promise.all([
-                s.region_code
+              let provs = [],
+                cities = [],
+                brgys = [];
+              [provs, cities, brgys] = await Promise.all([
+                s.region_code && s.region_code !== "130000000"
                   ? fetchProvinces(s.region_code)
                   : Promise.resolve([]),
                 s.province_code
                   ? fetchCities(s.province_code)
-                  : Promise.resolve([]),
+                  : s.region_code === "130000000"
+                    ? fetchCitiesByRegion(s.region_code)
+                    : Promise.resolve([]),
                 s.municipality_code
                   ? fetchBarangays(s.municipality_code)
                   : Promise.resolve([]),
@@ -2133,12 +2141,10 @@ function EBlotter() {
   );
   return (
     <div className="eb-content-area">
-      <LoadingModal
-        isOpen={loading && blotters.length === 0}
-        message="Loading records..."
-      />
+      <LoadingModal isOpen={loading} message="Loading records..." />
       <LoadingModal isOpen={fetchingEdit} message="Loading blotter data..." />
       <LoadingModal isOpen={fetchingView} message="Loading blotter data..." />
+
       <LoadingModal
         isOpen={isSubmitting}
         message={
@@ -6261,8 +6267,10 @@ function EBlotter() {
         <button
           className={`eb-report-tab ${activeReportTab === "reports" ? "active" : ""}`}
           onClick={() => {
-            setActiveReportTab("reports");
+            if (activeReportTab === "reports") return;
+            setBlotters([]);
             setCurrentPage(1);
+            setActiveReportTab("reports");
           }}
         >
           Reports
@@ -6270,8 +6278,10 @@ function EBlotter() {
         <button
           className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
           onClick={() => {
-            setActiveReportTab("referred");
+            if (activeReportTab === "referred") return;
+            setBlotters([]);
             setCurrentPage(1);
+            setActiveReportTab("referred");
           }}
         >
           <span
@@ -6324,7 +6334,7 @@ function EBlotter() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading ? null : blotters.length === 0 ? (
                 <tr>
                   <td
                     colSpan="6"
@@ -6334,12 +6344,6 @@ function EBlotter() {
                       color: "#9ca3af",
                     }}
                   >
-                    Loading...
-                  </td>
-                </tr>
-              ) : blotters.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: "center" }}>
                     No records found
                   </td>
                 </tr>

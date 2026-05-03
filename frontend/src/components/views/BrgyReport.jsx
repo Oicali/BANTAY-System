@@ -17,7 +17,8 @@ const formatDate = (d) => {
 const getStatusClass = (status) => {
   if (status === "Pending") return "br-status-pending";
   if (status === "Under Investigation") return "br-status-investigating";
-  if (status === "Solved" || status === "Cleared") return "br-status-solved";
+  if (status === "Solved") return "br-status-solved";
+  if (status === "Cleared") return "br-status-cleared";
   return "br-status-pending";
 };
 

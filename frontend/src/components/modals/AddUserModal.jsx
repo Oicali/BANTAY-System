@@ -299,7 +299,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     }
 
     if (!formData.region_code) newErrors.region_code = "Region is required";
-    if (!formData.province_code)
+    if (!formData.province_code && formData.region_code !== "130000000")
       newErrors.province_code = "Province is required";
     if (!formData.municipality_code)
       newErrors.municipality_code = "City/Municipality is required";
@@ -434,7 +434,23 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       setProvinces([]);
       setMunicipalities([]);
       setBarangays([]);
-      if (value) fetchProvinces(value);
+      if (value) {
+        if (value === "130000000") {
+          // NCR — skip provinces, go straight to municipalities
+          setLoadingMunicipalities(true);
+          fetch(`${PSGC_BASE}/regions/${value}/cities-municipalities/`)
+            .then((r) => r.json())
+            .then((data) => {
+              setMunicipalities(
+                data.sort((a, b) => a.name.localeCompare(b.name)),
+              );
+            })
+            .catch(() => setMunicipalities([]))
+            .finally(() => setLoadingMunicipalities(false));
+        } else {
+          fetchProvinces(value);
+        }
+      }
       if (errors.region_code)
         setErrors((prev) => ({ ...prev, region_code: "" }));
       return;
@@ -978,10 +994,18 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             value={formData.province_code}
             onChange={handleChange}
             className={`aum-form-input ${errors.province_code ? "aum-error" : ""}`}
-            disabled={!formData.region_code || loadingProvinces}
+            disabled={
+              !formData.region_code ||
+              loadingProvinces ||
+              formData.region_code === "130000000"
+            }
           >
             <option value="">
-              {loadingProvinces ? "Loading..." : "Select Province"}
+              {loadingProvinces
+                ? "Loading..."
+                : formData.region_code === "130000000"
+                  ? "N/A (NCR)"
+                  : "Select Province"}
             </option>
             {provinces.map((p) => (
               <option key={p.code} value={p.code}>
@@ -1003,10 +1027,16 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
             value={formData.municipality_code}
             onChange={handleChange}
             className={`aum-form-input ${errors.municipality_code ? "aum-error" : ""}`}
-            disabled={!formData.province_code || loadingMunicipalities}
+            disabled={
+              (!formData.province_code &&
+                formData.region_code !== "130000000") ||
+              loadingMunicipalities
+            }
           >
             <option value="">
-              {loadingMunicipalities ? "Loading..." : "Select City/Municipality"}
+              {loadingMunicipalities
+                ? "Loading..."
+                : "Select City/Municipality"}
             </option>
             {municipalities.map((m) => (
               <option key={m.code} value={m.code}>
@@ -1272,7 +1302,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                         className="aum-form-input"
                       >
                         <option value="">
-                          {loadingRanks ? "Loading ranks..." : "No rank assigned"}
+                          {loadingRanks
+                            ? "Loading ranks..."
+                            : "No rank assigned"}
                         </option>
                         {ranks.map((r) => (
                           <option key={r.rank_id} value={r.rank_id}>

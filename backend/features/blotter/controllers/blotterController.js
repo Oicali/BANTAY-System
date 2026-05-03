@@ -724,7 +724,7 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
         rowNum,
         // ── blotter fields ──
         blotterNo,
-        incidentType,
+        incidentType: incidentType?.toUpperCase(),
         barangay,
         dateCommitted,
         dateReported: dateReported || dateCommitted,
@@ -815,7 +815,7 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
         // ── offense fields ──
         offense: {
-          offense_name: str(row["O_OFFENSE_NAME"]) || incidentType,
+          offense_name: (str(row["O_OFFENSE_NAME"]) || incidentType)?.toUpperCase(),
           stage_of_felony: str(row["O_STAGE_OF_FELONY"]) || str(row["STAGE_OF_FELONY"]) || "COMPLETED",
           index_type: str(row["O_INDEX_TYPE"]) || "Index",
           is_principal_offense: true,

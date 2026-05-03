@@ -26,20 +26,28 @@ function CaseManagement() {
   });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
-  const [filters, setFilters] = useState({ status: "", priority: "" });
+  const [filters, setFilters] = useState({
+    status: "",
+    priority: "",
+    sort_updated: "",
+  });
 
   // Modals
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
-
+  const [editingNote, setEditingNote] = useState(null); // { id, note, note_date }
+  const [showDeletedNotes, setShowDeletedNotes] = useState(false);
   // Data
   const [investigators, setInvestigators] = useState([]);
   const [selectedCase, setSelectedCase] = useState(null);
   const [selectedInvestigatorId, setSelectedInvestigatorId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [noteText, setNoteText] = useState("");
+  const [noteForm, setNoteForm] = useState({
+    note: "",
+    note_date: new Date().toISOString().split("T")[0],
+  });
   const [modalLoading, setModalLoading] = useState(false);
   const [toast, setToast] = useState({
     show: false,
@@ -123,6 +131,16 @@ function CaseManagement() {
           });
         }
 
+        if (f.sort_updated === "newest") {
+          result = [...result].sort(
+            (a, b) => new Date(b.updated_at) - new Date(a.updated_at),
+          );
+        } else if (f.sort_updated === "oldest") {
+          result = [...result].sort(
+            (a, b) => new Date(a.updated_at) - new Date(b.updated_at),
+          );
+        }
+
         setCases(result);
         setCurrentPage(1);
       }
@@ -147,21 +165,21 @@ function CaseManagement() {
   };
 
   const fetchInvestigators = async () => {
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/user-management/users?userType=police&role=Investigator&limit=100`,
-      {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      },
-    );
-    const data = await res.json();
-    if (data.users) {
-      setInvestigators(data.users.filter((u) => u.status === "verified")); // ← changed from "active" to "verified"
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/user-management/users?userType=police&role=Investigator&limit=100`,
+        {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const data = await res.json();
+      if (data.users) {
+        setInvestigators(data.users || []); // ← changed from "active" to "verified"
+      }
+    } catch (err) {
+      console.error(err);
     }
-  } catch (err) {
-    console.error(err);
-  }
-};
+  };
 
   const fetchCaseDetail = async (caseId) => {
     try {
@@ -273,8 +291,8 @@ function CaseManagement() {
   };
 
   const handleAddNote = async () => {
-    if (!noteText.trim() || noteText.trim().length < 3)
-      return showError("Note must be at least 3 characters long.");
+    if (!noteForm.note.trim() || noteForm.note.trim().length < 3)
+      return showError("Note must be at least 3 characters.");
     try {
       setModalLoading(true);
       const res = await fetch(`${API_URL}/${selectedCase.id}/notes`, {
@@ -283,19 +301,97 @@ function CaseManagement() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ note: noteText.trim() }),
+        body: JSON.stringify({
+          note: noteForm.note.trim(),
+          note_date: noteForm.note_date,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Note added successfully!");
-        setNoteText("");
+        showToast("Note added!");
+        setNoteForm({
+          note: "",
+          note_date: new Date().toISOString().split("T")[0],
+        });
         setShowNoteModal(false);
         if (showDetailModal) fetchCaseDetail(selectedCase.id);
-      } else {
-        showError(data.message);
-      }
-    } catch (err) {
-      showError("Failed to add note. Please try again.");
+      } else showError(data.message);
+    } catch {
+      showError("Failed to add note.");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+  const handleEditNote = async () => {
+    if (!editingNote?.note?.trim() || editingNote.note.trim().length < 3)
+      return showError("Note must be at least 3 characters.");
+    try {
+      setModalLoading(true);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/cases/notes/${editingNote.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({
+            note: editingNote.note.trim(),
+          }),
+        },
+      );
+      const data = await res.json();
+      if (data.success) {
+        showToast("Note updated!");
+        setEditingNote(null);
+        fetchCaseDetail(selectedCase.id);
+      } else showError(data.message);
+    } catch {
+      showError("Failed to edit note.");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    try {
+      setModalLoading(true);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/cases/notes/${noteId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const data = await res.json();
+      if (data.success) {
+        showToast("Note deleted!");
+        fetchCaseDetail(selectedCase.id);
+      } else showError(data.message);
+    } catch {
+      showError("Failed to delete note.");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleRestoreNote = async (noteId) => {
+    try {
+      setModalLoading(true);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/cases/notes/${noteId}/restore`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const data = await res.json();
+      if (data.success) {
+        showToast("Note restored!");
+        fetchCaseDetail(selectedCase.id);
+      } else showError(data.message);
+    } catch {
+      showError("Failed to restore note.");
     } finally {
       setModalLoading(false);
     }
@@ -335,7 +431,10 @@ function CaseManagement() {
 
   const openNoteModal = (c) => {
     setSelectedCase(c);
-    setNoteText("");
+    setNoteForm({
+      note: "",
+      note_date: new Date().toISOString().split("T")[0],
+    });
     setShowNoteModal(true);
   };
 
@@ -497,6 +596,16 @@ function CaseManagement() {
           <option>Medium</option>
           <option>Low</option>
         </select>
+        <select
+          className="cm-filter-input"
+          name="sort_updated"
+          value={filters.sort_updated || ""}
+          onChange={handleFilterChange}
+        >
+          <option value="">Last Updated: Default</option>
+          <option value="newest">Last Updated: Newest</option>
+          <option value="oldest">Last Updated: Oldest</option>
+        </select>
       </div>
 
       {/* TABS */}
@@ -562,15 +671,19 @@ function CaseManagement() {
               <div className="cm-case-meta">
                 <div className="cm-case-meta-item">
                   <span className="cm-case-meta-label">Assigned To:</span>
-                  <span>{c.assigned_io_name || "Unassigned"}</span>
+                  <span>{c.assigned_io_name?.trim() || "N/A"}</span>
                 </div>
                 <div className="cm-case-meta-item">
                   <span className="cm-case-meta-label">Location:</span>
                   <span>{c.location || c.barangay}</span>
                 </div>
                 <div className="cm-case-meta-item">
-                  <span className="cm-case-meta-label">Date Opened:</span>
+                  <span className="cm-case-meta-label">Date Created:</span>
                   <span>{formatDate(c.created_at)}</span>
+                </div>
+                <div className="cm-case-meta-item">
+                  <span className="cm-case-meta-label">Last Updated:</span>
+                  <span>{formatDate(c.updated_at)}</span>
                 </div>
               </div>
               <div className="cm-case-footer">
@@ -585,6 +698,14 @@ function CaseManagement() {
                     View Details
                   </button>
                   {isAdmin && (
+                    <button
+                      className="cm-action-btn cm-action-btn-edit"
+                      onClick={() => openAssignModal(c)}
+                    >
+                      Assign IO
+                    </button>
+                  )}
+                  {(isAdmin || isInvestigator) && (
                     <>
                       {c.status === "Under Investigation" && (
                         <button
@@ -594,12 +715,6 @@ function CaseManagement() {
                           Set Priority
                         </button>
                       )}
-                      <button
-                        className="cm-action-btn cm-action-btn-edit"
-                        onClick={() => openAssignModal(c)}
-                      >
-                        Assign IO
-                      </button>
                       <button
                         className="cm-action-btn cm-action-btn-edit"
                         onClick={() => openStatusModal(c)}
@@ -1133,7 +1248,6 @@ function CaseManagement() {
                     selectedCase?.case_number}
                 </span>
               </div>
-
               <div
                 style={{
                   background: "rgba(30,58,95,0.03)",
@@ -1168,18 +1282,43 @@ function CaseManagement() {
                       month: "short",
                       day: "numeric",
                     })}{" "}
+                    {new Date().toLocaleTimeString("en-PH", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}{" "}
                     · {user.username || "Officer"}
                   </strong>
                 </span>
               </div>
-
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginBottom: "12px",
+                  padding: "8px 12px",
+                  background: "#f3f4f6",
+                  borderRadius: "6px",
+                }}
+              >
+                Note Date:{" "}
+                <strong style={{ color: "#374151" }}>
+                  {new Date().toLocaleDateString("en-PH", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </strong>
+              </div>
               <label className="cm-modal-label">Investigation Note *</label>
               <textarea
                 className="cm-modal-input"
                 rows="6"
                 placeholder="Write your investigation note here (minimum 3 characters)..."
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
+                value={noteForm.note}
+                onChange={(e) =>
+                  setNoteForm((p) => ({ ...p, note: e.target.value }))
+                }
                 maxLength={2000}
                 style={{ resize: "vertical", marginBottom: "8px" }}
               />
@@ -1193,13 +1332,13 @@ function CaseManagement() {
               >
                 <small
                   style={{
-                    color: noteText.length > 1800 ? "#dc2626" : "#9ca3af",
+                    color: noteForm.note.length > 1800 ? "#dc2626" : "#9ca3af",
                     fontSize: "12px",
                   }}
                 >
-                  {noteText.length}/2000 characters
+                  {noteForm.note.length}/2000 characters
                 </small>
-                {noteText.length >= 3 && (
+                {noteForm.note.length >= 3 && (
                   <small
                     style={{
                       color: "#16a34a",
@@ -1222,11 +1361,11 @@ function CaseManagement() {
                 <div
                   style={{
                     height: "100%",
-                    width: `${(noteText.length / 2000) * 100}%`,
+                    width: `${(noteForm.note.length / 2000) * 100}%`,
                     background:
-                      noteText.length > 1800
+                      noteForm.note.length > 1800
                         ? "#dc2626"
-                        : noteText.length >= 3
+                        : noteForm.note.length >= 3
                           ? "#16a34a"
                           : "var(--navy-primary)",
                     borderRadius: "4px",
@@ -1392,7 +1531,7 @@ function CaseManagement() {
                     borderRight: "1px solid #f3f4f6",
                   }}
                 >
-                  <span className="cm-detail-label">Date Opened</span>
+                  <span className="cm-detail-label">Date Created</span>
                   <span>{formatDate(selectedCase.created_at)}</span>
                 </div>
                 <div
@@ -1450,35 +1589,363 @@ function CaseManagement() {
                   }}
                 >
                   <h4 style={{ color: "#1e3a5f", fontWeight: 700 }}>
-                    Investigation Notes ({selectedCase.notes?.length || 0})
+                    Investigation Notes (
+                    {selectedCase.notes?.filter((n) => !n.deleted_at).length ||
+                      0}
+                    )
                   </h4>
-                  {(isAdmin || isInvestigator) && (
-                    <button
-                      className="cm-btn cm-btn-primary"
-                      style={{ padding: "8px 16px", fontSize: "13px" }}
-                      onClick={() => {
-                        setShowDetailModal(false);
-                        openNoteModal(selectedCase);
-                      }}
-                    >
-                      + Add Note
-                    </button>
-                  )}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {isAdmin && (
+                      <div
+                        style={{
+                          display: "flex",
+                          background: "#f3f4f6",
+                          borderRadius: "8px",
+                          padding: "3px",
+                          gap: "2px",
+                        }}
+                      >
+                        <button
+                          style={{
+                            padding: "5px 12px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            background: !showDeletedNotes
+                              ? "white"
+                              : "transparent",
+                            color: !showDeletedNotes ? "#1e3a5f" : "#6b7280",
+                            boxShadow: !showDeletedNotes
+                              ? "0 1px 3px rgba(0,0,0,0.1)"
+                              : "none",
+                            transition: "all 0.15s",
+                          }}
+                          onClick={() => setShowDeletedNotes(false)}
+                        >
+                          Active
+                        </button>
+                        <button
+                          style={{
+                            padding: "5px 12px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            background: showDeletedNotes
+                              ? "white"
+                              : "transparent",
+                            color: showDeletedNotes ? "#dc2626" : "#6b7280",
+                            boxShadow: showDeletedNotes
+                              ? "0 1px 3px rgba(0,0,0,0.1)"
+                              : "none",
+                            transition: "all 0.15s",
+                          }}
+                          onClick={() => setShowDeletedNotes(true)}
+                        >
+                          Deleted
+                        </button>
+                      </div>
+                    )}
+                    {(isAdmin || isInvestigator) && (
+                      <button
+                        className="cm-btn cm-btn-primary"
+                        style={{ padding: "8px 16px", fontSize: "13px" }}
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          openNoteModal(selectedCase);
+                        }}
+                      >
+                        + Add Note
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {selectedCase.notes?.length === 0 ? (
+
+                {selectedCase.notes?.filter((n) =>
+                  showDeletedNotes ? n.deleted_at : !n.deleted_at,
+                ).length === 0 ? (
                   <p style={{ color: "#9ca3af", fontSize: "14px" }}>
                     No notes yet.
                   </p>
                 ) : (
-                  selectedCase.notes?.map((n) => (
-                    <div key={n.id} className="cm-note-card">
-                      <div className="cm-note-header">
-                        <strong>{n.added_by_name}</strong>
-                        <span>{formatDate(n.created_at)}</span>
+                  selectedCase.notes
+                    ?.filter((n) =>
+                      showDeletedNotes ? n.deleted_at : !n.deleted_at,
+                    )
+                    .map((n) => (
+                      <div
+                        key={n.id}
+                        className="cm-note-card"
+                        style={{
+                          opacity: n.deleted_at ? 0.6 : 1,
+                          border: n.deleted_at
+                            ? "1px dashed #e5e7eb"
+                            : undefined,
+                        }}
+                      >
+                        {editingNote?.id === n.id ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#6b7280",
+                                padding: "6px 10px",
+                                background: "#f3f4f6",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              Editing as of:{" "}
+                              <strong style={{ color: "#374151" }}>
+                                {new Date().toLocaleDateString("en-PH", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                  timeZone: "Asia/Manila",
+                                })}{" "}
+                                {new Date().toLocaleTimeString("en-PH", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: true,
+                                  timeZone: "Asia/Manila",
+                                })}
+                              </strong>
+                            </div>
+                            <textarea
+                              className="cm-modal-input"
+                              rows="3"
+                              value={editingNote.note}
+                              onChange={(e) =>
+                                setEditingNote((p) => ({
+                                  ...p,
+                                  note: e.target.value,
+                                }))
+                              }
+                              maxLength={2000}
+                            />
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button
+                                className="cm-btn cm-btn-primary"
+                                style={{
+                                  padding: "6px 14px",
+                                  fontSize: "12px",
+                                }}
+                                onClick={handleEditNote}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="cm-btn cm-btn-secondary"
+                                style={{
+                                  padding: "6px 14px",
+                                  fontSize: "12px",
+                                }}
+                                onClick={() => setEditingNote(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="cm-note-header">
+                              <div>
+                                <strong>{n.added_by_name}</strong>
+                                {n.edited_at && (
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#9ca3af",
+                                      marginLeft: "8px",
+                                    }}
+                                  >
+                                    (edited)
+                                  </span>
+                                )}
+                                {n.deleted_at && (
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#dc2626",
+                                      marginLeft: "8px",
+                                    }}
+                                  >
+                                    (deleted)
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                <span
+                                  style={{ fontSize: "12px", color: "#6b7280" }}
+                                >
+                                  {n.edited_at
+                                    ? new Date(n.edited_at).toLocaleDateString(
+                                        "en-PH",
+                                        {
+                                          year: "numeric",
+                                          month: "short",
+                                          day: "numeric",
+                                          timeZone: "Asia/Manila",
+                                        },
+                                      )
+                                    : new Date(n.created_at).toLocaleDateString(
+                                        "en-PH",
+                                        {
+                                          year: "numeric",
+                                          month: "short",
+                                          day: "numeric",
+                                          timeZone: "Asia/Manila",
+                                        },
+                                      )}
+                                  {" · "}
+                                  {n.edited_at
+                                    ? new Date(n.edited_at).toLocaleTimeString(
+                                        "en-PH",
+                                        {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: true,
+                                          timeZone: "Asia/Manila",
+                                        },
+                                      )
+                                    : new Date(n.created_at).toLocaleTimeString(
+                                        "en-PH",
+                                        {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: true,
+                                          timeZone: "Asia/Manila",
+                                        },
+                                      )}
+                                </span>
+                                {!n.deleted_at &&
+                                  (isAdmin ||
+                                    n.added_by_id === user.user_id) && (
+                                    <button
+                                      onClick={() =>
+                                        setEditingNote({
+                                          id: n.id,
+                                          note: n.note,
+                                          note_date:
+                                            n.note_date ||
+                                            new Date()
+                                              .toISOString()
+                                              .split("T")[0],
+                                        })
+                                      }
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        color: "#6b7280",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="13"
+                                        height="13"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                {!n.deleted_at &&
+                                  (isAdmin ||
+                                    n.added_by_id === user.user_id) && (
+                                    <button
+                                      onClick={() => handleDeleteNote(n.id)}
+                                      style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        color: "#dc2626",
+                                        fontSize: "12px",
+                                      }}
+                                    >
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="13"
+                                        height="13"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                        <path d="M10 11v6M14 11v6" />
+                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                {n.deleted_at && isAdmin && (
+                                  <button
+                                    onClick={() => handleRestoreNote(n.id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      color: "#16a34a",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="13"
+                                      height="13"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2.2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                      <path d="M3 3v5h5" />
+                                    </svg>
+                                    Restore
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p
+                              style={{
+                                margin: "6px 0 0",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {n.note}
+                            </p>
+                          </>
+                        )}
                       </div>
-                      <p>{n.note}</p>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
             </div>

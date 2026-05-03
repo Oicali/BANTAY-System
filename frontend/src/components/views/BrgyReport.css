@@ -461,7 +461,7 @@
   .br-page-header { flex-wrap: wrap; }
   .br-brgy-pill { margin-left: 0; }
 }
-
+.br-status-cleared { background: #ede9fe; color: #5b21b6; }
 .br-wrapper input:-webkit-autofill,
 .br-wrapper input:-webkit-autofill:hover,
 .br-wrapper input:-webkit-autofill:focus,
