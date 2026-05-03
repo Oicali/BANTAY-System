@@ -337,7 +337,7 @@ const SignatureSelect = ({ label, value, onChange, patrollers, shift }) => {
 };
 
 // ── Toggle Field ── OUTSIDE AfterPatrolModal ───────────────────────
-const ToggleField = ({ fieldKey, label, children, shown, onShow, onHide }) => (
+const ToggleField = ({ fieldKey, label, children, shown, onShow, onHide, required }) => (
   <div className="pd-form-group pd-full" style={{ marginBottom: 8 }}>
     {!shown ? (
       <button type="button" onClick={() => onShow(fieldKey)}
@@ -354,7 +354,10 @@ const ToggleField = ({ fieldKey, label, children, shown, onShow, onHide }) => (
     ) : (
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <label className="pd-modal-label">{label}</label>
+          <label className="pd-modal-label">
+            {label}
+            {required && <span style={{ color: "#dc2626", marginLeft: 3 }}>*</span>}
+          </label>
           <button type="button" onClick={() => onHide(fieldKey)}
             style={{
               fontSize: 11, color: "#dc2626", background: "none",
@@ -724,7 +727,7 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
   </div>
 
   <ToggleField fieldKey="mustDos" label="Patrolled MUST DOs"
-    shown={shown.mustDos} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.mustDos} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={2} value={form.mustDos}
       onChange={set("mustDos")}
       placeholder="List MUST DOs patrolled..." />
@@ -735,13 +738,13 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
    <h3 className="pd-section-title">3. Pre-Deployment Instructions</h3>
 <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
   <ToggleField fieldKey="preDeployment" label="Specific instructions received"
-    shown={shown.preDeployment} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.preDeployment} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={3} value={form.preDeployment}
       onChange={set("preDeployment")}
       placeholder="Enter pre-deployment instructions..." />
   </ToggleField>
   <ToggleField fieldKey="action1" label="Action Taken"
-    shown={shown.action1} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.action1} onShow={toggleShow} onHide={toggleHide} required>
     <input type="text" className="pd-modal-input" placeholder="Action taken..."
       value={form.action1} onChange={set("action1")} />
   </ToggleField>
@@ -753,13 +756,13 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
 </div>
 <div className="pd-form-grid">
   <ToggleField fieldKey="incidents" label="Incidents / Unusual situations"
-    shown={shown.incidents} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.incidents} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={3} value={form.incidents}
       onChange={set("incidents")}
       placeholder="Describe incidents or unusual events..." />
   </ToggleField>
   <ToggleField fieldKey="action2" label="Action Taken"
-    shown={shown.action2} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.action2} onShow={toggleShow} onHide={toggleHide} required>
     <input type="text" className="pd-modal-input" placeholder="Action taken..."
       value={form.action2} onChange={set("action2")} />
   </ToggleField>
@@ -771,13 +774,13 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
 </div>
 <div className="pd-form-grid">
   <ToggleField fieldKey="safetyConcerns" label="Safety concerns observed"
-    shown={shown.safetyConcerns} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.safetyConcerns} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={3} value={form.safetyConcerns}
       onChange={set("safetyConcerns")}
       placeholder="Describe public safety concerns..." />
   </ToggleField>
   <ToggleField fieldKey="action3" label="Action Taken"
-    shown={shown.action3} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.action3} onShow={toggleShow} onHide={toggleHide} required>
     <input type="text" className="pd-modal-input" placeholder="Action taken..."
       value={form.action3} onChange={set("action3")} />
   </ToggleField>
@@ -786,13 +789,13 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
 <h3 className="pd-section-title">6. Other Services &amp; Visited Areas</h3>
 <div className="pd-form-grid">
   <ToggleField fieldKey="otherServices" label="Other public safety services rendered"
-    shown={shown.otherServices} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.otherServices} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={2} value={form.otherServices}
       onChange={set("otherServices")}
       placeholder="Area and route security, assistance to PWD, recovered property, etc." />
   </ToggleField>
   <ToggleField fieldKey="visitedAreas" label="Visited areas"
-    shown={shown.visitedAreas} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.visitedAreas} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={2} value={form.visitedAreas}
       onChange={set("visitedAreas")}
       placeholder="House, school, church, business, barangay, etc." />
@@ -802,32 +805,31 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
 <h3 className="pd-section-title">7. Persons Visited</h3>
 <div className="pd-form-grid">
   <ToggleField fieldKey="personsVisited" label="Name of persons visited / local officials"
-    shown={shown.personsVisited} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.personsVisited} onShow={toggleShow} onHide={toggleHide} required>
     <textarea className="pd-modal-input" rows={2} value={form.personsVisited}
       onChange={set("personsVisited")}
       placeholder="List persons visited..." />
   </ToggleField>
   <ToggleField fieldKey="numOfficials" label="No. of officials visited"
-    shown={shown.numOfficials} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.numOfficials} onShow={toggleShow} onHide={toggleHide} required>
     <input type="number" min={0} className="pd-modal-input" placeholder="0"
       value={form.numOfficials} onChange={set("numOfficials")} />
   </ToggleField>
   <ToggleField fieldKey="numGovt" label="Total gov't officials in area (incl. brgy.)"
-    shown={shown.numGovt} onShow={toggleShow} onHide={toggleHide}>
+    shown={shown.numGovt} onShow={toggleShow} onHide={toggleHide} required>
     <input type="number" min={0} className="pd-modal-input" placeholder="0"
       value={form.numGovt} onChange={set("numGovt")} />
   </ToggleField>
 </div>
 
-
-          <h3 className="pd-section-title">8. Remarks &amp; Recommendations</h3>
-          <div className="pd-form-grid">
-            <div className="pd-form-group pd-full">
-            <label className="pd-modal-label">Remarks / Recommendations <span style={{ color: "#dc2626" }}>*</span></label>
-              <textarea className="pd-modal-input" rows={3} value={form.remarks}
-                onChange={set("remarks")}
-                placeholder="Best practices, traffic assistance rendered, etc." />
-            </div>
+<h3 className="pd-section-title">8. Remarks &amp; Recommendations</h3>
+<div className="pd-form-grid">
+  <div className="pd-form-group pd-full">
+    <label className="pd-modal-label">Remarks / Recommendations <span style={{ color: "#dc2626" }}>*</span></label>
+    <textarea className="pd-modal-input" rows={3} value={form.remarks}
+      onChange={set("remarks")}
+      placeholder="Best practices, traffic assistance rendered, etc." />
+  </div>
 </div>
 
 <h3 className="pd-section-title">9. Photo Documentation</h3>

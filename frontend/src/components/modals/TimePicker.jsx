@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import "./TimePicker.css";
 
-/**
- * TimePicker
- * Props:
- *   value      — "HH:MM" 24h string (controlled)
- *   onChange   — (newValue: "HH:MM") => void
- *   baseHour   — optional number: which hour to start the list from (e.g. 8)
- */
-const TimePicker = ({ value, onChange, baseHour }) => {
+const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const ref = useRef(null);
 
-  // Parse incoming 24h value
   const parse = (v) => {
     if (!v) return { h: baseHour ?? 8, m: 0, period: "AM" };
     const [hh, mm] = v.split(":").map(Number);
@@ -23,7 +16,6 @@ const TimePicker = ({ value, onChange, baseHour }) => {
 
   const { h, m, period } = parse(value);
 
-  // Convert back to 24h "HH:MM"
   const to24 = (h12, min, p) => {
     let hh = h12 % 12;
     if (p === "PM") hh += 12;
@@ -32,14 +24,44 @@ const TimePicker = ({ value, onChange, baseHour }) => {
 
   const emit = (h12, min, p) => onChange(to24(h12, min, p));
 
-  // Close on outside click
+  // Close on outside click + trigger onBlur
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        if (open) {
+          setOpen(false);
+          onBlur?.();
+        }
+      }
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [open, onBlur]);
 
-  // Scroll selected item into center when dropdown opens
+  // Detect if dropdown should open upward
+  const handleOpen = () => {
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // dropdown is ~220px tall
+      setDropUp(spaceBelow < 230 && spaceAbove > spaceBelow);
+    }
+    setOpen((o) => !o);
+  };
+
+  // Close with onBlur when pressing Escape
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape" && open) {
+        setOpen(false);
+        onBlur?.();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onBlur]);
+
   const hourListRef   = useRef(null);
   const minuteListRef = useRef(null);
 
@@ -52,9 +74,7 @@ const TimePicker = ({ value, onChange, baseHour }) => {
     }, 0);
   }, [open]);
 
-  // Hours 1–12 (no loop)
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
-  // Minutes 0–59
+  const hours   = Array.from({ length: 12 }, (_, i) => i + 1);
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
   const displayH = String(h).padStart(2, "0");
@@ -62,11 +82,10 @@ const TimePicker = ({ value, onChange, baseHour }) => {
 
   return (
     <div className="tp-root" ref={ref}>
-      {/* Trigger */}
       <button
         type="button"
         className="tp-trigger"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleOpen}
       >
         <span className="tp-value">{displayH}:{displayM}</span>
         <span className="tp-period-badge">{period}</span>
@@ -76,28 +95,36 @@ const TimePicker = ({ value, onChange, baseHour }) => {
         </svg>
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="tp-dropdown">
-          {/* Hours column */}
+        <div className={`tp-dropdown ${dropUp ? "tp-dropdown-up" : ""}`}>
           <div className="tp-col">
             <div className="tp-col-label">HR</div>
             <div className="tp-list" ref={hourListRef}>
-              {hours.map((hv) => (
-                <div
-                  key={hv}
-                  className={`tp-item ${hv === h ? "tp-item-active" : ""}`}
-                  onClick={() => emit(hv, m, period)}
-                >
-                  {String(hv).padStart(2, "0")}
-                </div>
-              ))}
+              {hours.map((hv) => {
+  // Convert this option to 24h to check if it's in the allowed shift range
+  let hh24 = hv % 12;
+  if (period === "PM") hh24 += 12;
+  // AM shift: allowed 08:00–19:59 (8am to just before 8pm)
+  // PM shift: allowed 20:00–07:59 (8pm to just before 8am)
+  const outOfRange =
+    shift === "AM" ? (hh24 < 8 || hh24 >= 20)
+    : shift === "PM" ? (hh24 >= 8 && hh24 < 20)
+    : false;
+  return (
+    <div
+      key={hv}
+      className={`tp-item ${hv === h ? "tp-item-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
+      onClick={() => { if (!outOfRange) emit(hv, m, period); }}
+    >
+      {String(hv).padStart(2, "0")}
+    </div>
+  );
+})}
             </div>
           </div>
 
           <div className="tp-sep">:</div>
 
-          {/* Minutes column */}
           <div className="tp-col">
             <div className="tp-col-label">MIN</div>
             <div className="tp-list" ref={minuteListRef}>
@@ -113,19 +140,25 @@ const TimePicker = ({ value, onChange, baseHour }) => {
             </div>
           </div>
 
-          {/* AM / PM column */}
           <div className="tp-col tp-col-period">
             <div className="tp-col-label">‎</div>
             <div className="tp-period-list">
-              {["AM", "PM"].map((p) => (
-                <div
-                  key={p}
-                  className={`tp-period-item ${p === period ? "tp-period-active" : ""}`}
-                  onClick={() => emit(h, m, p)}
-                >
-                  {p}
-                </div>
-              ))}
+             {["AM", "PM"].map((p) => {
+  // AM shift: only AM hours (8–11) and PM hours (12–7) allowed — block PM after 8pm
+  // PM shift: only PM hours (8–11pm) and AM hours (12–7am) allowed — block AM after 8am
+  const isDisabled =
+    (shift === "AM" && p === "AM" && false) ? false  // AM period always ok in AM shift
+    : false; // we handle via hour disabling below
+  return (
+    <div
+      key={p}
+      className={`tp-period-item ${p === period ? "tp-period-active" : ""}`}
+      onClick={() => emit(h, m, p)}
+    >
+      {p}
+    </div>
+  );
+})}
             </div>
           </div>
         </div>

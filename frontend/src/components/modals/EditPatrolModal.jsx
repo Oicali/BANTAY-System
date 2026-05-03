@@ -115,15 +115,19 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
   const [loading, setLoading]                 = useState(false);
   const [notif, setNotif]                     = useState(null);
   const [activeShift, setActiveShift]         = useState("AM");
+  const activeShiftRef                        = useRef("AM");
   const [hoveredBrgy, setHoveredBrgy]         = useState(null);
   const [showApplyDialog, setShowApplyDialog] = useState(false);
-const [patrollerSearch, setPatrollerSearch] = useState("");
-const [showPatrollers, setShowPatrollers]   = useState(false);
-const [patrollerPage, setPatrollerPage]     = useState(1);
+  const [patrollerSearch, setPatrollerSearch] = useState("");
+  const [showPatrollers, setShowPatrollers]   = useState(false);
+  const [patrollerPage, setPatrollerPage]     = useState(1);
 
   // The full list shown in the checklist (available + already assigned to this patrol)
   const [patrollerList, setPatrollerList]         = useState([]);
   const [loadingPatrollers, setLoadingPatrollers] = useState(true);
+
+  // routes ref for stale closure fix (mirrors localRoutes)
+  const localRoutesRef = useRef([]);
 
   const [form, setForm] = useState({
     patrol_name:    patrol?.patrol_name    || "",
@@ -136,9 +140,11 @@ const [patrollerPage, setPatrollerPage]     = useState(1);
     [...new Set((patrol?.routes || []).filter((r) => (r.stop_order || 0) <= 0 && r.barangay).map((r) => r.barangay))]
   );
 
-  const [localRoutes, setLocalRoutes] = useState(
-    (patrol?.routes || []).filter((r) => (r.stop_order || 0) > 0)
-  );
+  const [localRoutes, setLocalRoutes] = useState(() => {
+    const routes = (patrol?.routes || []).filter((r) => (r.stop_order || 0) > 0);
+    localRoutesRef.current = routes;
+    return routes;
+  });
 
   const dateRange = generateDateRange(toDateStr(form.start_date), toDateStr(form.end_date));
 
@@ -148,14 +154,12 @@ const [patrollerPage, setPatrollerPage]     = useState(1);
   });
 
   // ── Per-date patroller state ────────────────────────────────────
-  // Shape: { "2025-05-02": { am: [id, ...], pm: [id, ...] }, ... }
   const [patrollersByDate, setPatrollersByDate] = useState(() => {
     const map    = {};
     const source = patrol?.patrollers_detail || patrol?.patrollers || [];
     for (const p of source) {
-  console.log("patroller row:", p.active_patroller_id, p.route_date, p.shift);
-  const d = toDateStr(p.route_date);
-  if (!d) continue;
+      const d = toDateStr(p.route_date);
+      if (!d) continue;
       if (!map[d]) map[d] = { am: [], pm: [] };
       if (p.shift === "AM") map[d].am.push(p.active_patroller_id);
       else                  map[d].pm.push(p.active_patroller_id);
@@ -163,17 +167,12 @@ const [patrollerPage, setPatrollerPage]     = useState(1);
     return map;
   });
 
-  // ── Dirty dates — useState so executeSave closure always sees latest ──
+  // ── Dirty dates ──────────────────────────────────────────────────
   const [dirtyDates, setDirtyDates] = useState(new Set());
   const markDirty  = (date) => setDirtyDates((prev) => { const n = new Set(prev); n.add(date); return n; });
   const clearDirty = ()     => setDirtyDates(new Set());
 
-  // ── Load patroller list on mount ────────────────────────────────
-  // Strategy:
-  //   1. Fetch available patrollers for this date range (excludes other patrols)
-  //   2. Also collect every patroller already assigned to THIS patrol from patrollers_detail
-  //   3. Merge both — this ensures currently-assigned patrollers always appear in the list
-  //      even if the available-patrollers endpoint would normally exclude them
+  // ── Load patroller list on mount ─────────────────────────────────
   useEffect(() => {
     if (!patrol?.patrol_id) return;
 
@@ -189,39 +188,30 @@ const [patrollerPage, setPatrollerPage]     = useState(1);
     )
       .then((r) => r.json())
       .then((data) => {
-        // Start with the available list (patrollers not in any other patrol)
         const available = data.success ? data.data : [];
-
-        // Build a map of all patrollers already assigned to THIS patrol
-        // from patrollers_detail (full per-date list) or patrollers (deduplicated)
         const assignedSource = patrol?.patrollers_detail || patrol?.patrollers || [];
         const merged = [...available];
-for (const p of assignedSource) {
-  if (!merged.find((m) => m.active_patroller_id === p.active_patroller_id)) {
-    merged.push({
-      active_patroller_id: p.active_patroller_id,
-      officer_name:        p.officer_name,
-      contact_number:      p.contact_number || null,
-    });
-  }
-}
-          
-console.log("final merged:", merged);
-        // Sort alphabetically
+        for (const p of assignedSource) {
+          if (!merged.find((m) => m.active_patroller_id === p.active_patroller_id)) {
+            merged.push({
+              active_patroller_id: p.active_patroller_id,
+              officer_name:        p.officer_name,
+              contact_number:      p.contact_number || null,
+            });
+          }
+        }
         merged.sort((a, b) => (a.officer_name || "").localeCompare(b.officer_name || ""));
         setPatrollerList(merged);
       })
       .catch((err) => {
-         console.error("Load patrollers error:", err); // already there
-  console.error("catch triggered — this is why list is empty");
-        // Fallback: show at least the already-assigned patrollers
+        console.error("Load patrollers error:", err);
         const assignedSource = patrol?.patrollers_detail || patrol?.patrollers || [];
         const seen   = new Set(assignedSource.map((p) => p.active_patroller_id));
-const unique = assignedSource.filter((p) => {
-  if (seen.has(p.active_patroller_id)) { seen.delete(p.active_patroller_id); return true; }
-  return false;
-});
-setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.officer_name || "")));
+        const unique = assignedSource.filter((p) => {
+          if (seen.has(p.active_patroller_id)) { seen.delete(p.active_patroller_id); return true; }
+          return false;
+        });
+        setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.officer_name || "")));
       })
       .finally(() => setLoadingPatrollers(false));
   }, [patrol?.patrol_id]);
@@ -239,7 +229,6 @@ setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.of
       });
       return;
     }
-    // Only mark THIS date dirty — other dates are untouched
     markDirty(activeDate);
     setPatrollersByDate((prev) => {
       const existing = prev[activeDate] || { am: [], pm: [] };
@@ -256,53 +245,121 @@ setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.of
   };
 
   // ── Routes / tasks ──────────────────────────────────────────────
+  // PM-aware normalizer (same as AddPatrolModal)
+  const toPmMin = (t) => {
+    if (!t) return 0;
+    const [h, m] = t.split(":").map(Number);
+    const raw = h * 60 + m;
+    return raw < 12 * 60 ? raw + 24 * 60 : raw;
+  };
+
+  const toMin = (t) => {
+    if (!t) return 0;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  // Sort routes for display — PM-aware
   const routesForDateShift = localRoutes
     .filter((r) => toDateStr(r.route_date) === activeDate && r.shift === activeShift)
-    .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
+    .slice()
+    .sort((a, b) => {
+      if (activeShift === "PM") return toPmMin(a.time_start) - toPmMin(b.time_start);
+      return toMin(a.time_start) - toMin(b.time_start);
+    });
 
   const handleTaskChange = (routeId, field, value) => {
     tasksDirty.current = true;
-    setLocalRoutes((prev) =>
-      prev.map((r) => r.route_id === routeId ? { ...r, [field]: value } : r)
-    );
+    setLocalRoutes((prev) => {
+      const next = prev.map((r) => r.route_id === routeId ? { ...r, [field]: value } : r);
+      localRoutesRef.current = next;
+      return next;
+    });
   };
 
+  // ── Add task (mirrors AddPatrolModal logic) ──────────────────────
   const addTask = async () => {
-    const existingForDateShift = localRoutes
+    const existing = localRoutes
       .filter((r) => toDateStr(r.route_date) === activeDate && r.shift === activeShift)
-      .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
+      .slice()
+      .sort((a, b) =>
+        activeShift === "PM"
+          ? toPmMin(a.time_start) - toPmMin(b.time_start)
+          : toMin(a.time_start)  - toMin(b.time_start)
+      );
 
+    // Limit check
+    const AM_END   = 20 * 60;
+    const AM_START = 8 * 60;
+
+    if (existing.length > 0) {
+      const last = existing[existing.length - 1];
+      if (last.time_end) {
+        if (activeShift === "AM" && toMin(last.time_end) >= AM_END) {
+          setNotif({ message: "AM shift tasks cannot go past 8:00 PM.", type: "warning" });
+          return;
+        }
+        if (activeShift === "PM") {
+          const pmMinutes = toPmMin(last.time_end) - 20 * 60;
+          if (pmMinutes >= 12 * 60) {
+            setNotif({ message: "PM shift tasks cannot go past 8:00 AM.", type: "warning" });
+            return;
+          }
+        }
+      }
+    }
+
+    // Default start
     let defaultStart;
-    if (existingForDateShift.length === 0) {
+    if (existing.length === 0) {
       defaultStart = activeShift === "AM" ? "08:00" : "20:00";
     } else {
-      const last = existingForDateShift[existingForDateShift.length - 1];
+      const last = existing[existing.length - 1];
       if (last.time_end) {
-        const [h, m] = last.time_end.split(":").map(Number);
-        const total  = h * 60 + m + 1;
+        const total = toMin(last.time_end) + 1;
         defaultStart = `${String(Math.floor(total / 60) % 24).padStart(2,"0")}:${String(total % 60).padStart(2,"0")}`;
       } else {
         defaultStart = last.time_start || (activeShift === "AM" ? "08:00" : "20:00");
       }
     }
 
-    const newStopOrder = existingForDateShift.length + 1;
+    // Default end = start + 60 min (first task) or + 59 min (subsequent)
+    const [dh, dm]   = defaultStart.split(":").map(Number);
+    const isFirst    = existing.length === 0;
+    const endTotal   = dh * 60 + dm + (isFirst ? 60 : 59);
+    const defaultEnd = `${String(Math.floor(endTotal / 60) % 24).padStart(2, "0")}:${String(endTotal % 60).padStart(2, "0")}`;
+
+    const newStopOrder = existing.length + 1;
     try {
       const res  = await fetch(`${API_BASE}/patrol/routes/add`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
         body:    JSON.stringify({
-          patrol_id: patrol.patrol_id, route_date: activeDate, shift: activeShift,
-          time_start: defaultStart, time_end: null, notes: null, stop_order: newStopOrder,
+          patrol_id:  patrol.patrol_id,
+          route_date: activeDate,
+          shift:      activeShift,
+          time_start: defaultStart,
+          time_end:   defaultEnd,
+          notes:      null,
+          stop_order: newStopOrder,
         }),
       });
       const data = await res.json();
       if (data.success) {
         tasksDirty.current = true;
-        setLocalRoutes((prev) => [...prev, {
-          route_id:   data.route_id, route_date: activeDate, shift: activeShift,
-          time_start: defaultStart,  time_end: "", notes: "", stop_order: newStopOrder,
-        }]);
+        setLocalRoutes((prev) => {
+          const next = [...prev, {
+            route_id:   data.route_id,
+            route_date: activeDate,
+            shift:      activeShift,
+            time_start: defaultStart,
+            time_end:   defaultEnd,
+            notes:      "",
+            stop_order: newStopOrder,
+          }];
+          localRoutesRef.current = next;
+          return next;
+        });
       }
     } catch (err) { console.error("Add task error:", err); }
   };
@@ -310,41 +367,56 @@ setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.of
   const removeTask = (routeId) => {
     tasksDirty.current = true;
     deletedRouteIds.current.add(routeId);
-    setLocalRoutes((prev) => prev.filter((r) => r.route_id !== routeId));
+    setLocalRoutes((prev) => {
+      const next = prev.filter((r) => r.route_id !== routeId);
+      localRoutesRef.current = next;
+      return next;
+    });
   };
 
-  // ── Validation ──────────────────────────────────────────────────
+  // ── Validation ───────────────────────────────────────────────────
   const handleSave = () => {
     if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
       setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
     }
 
     const taskRoutes = localRoutes.filter((r) => (r.stop_order || 0) > 0);
+
+    // Per-task validation — PM-aware
     for (const r of taskRoutes) {
       if (!r.time_start || !r.time_end) {
         setNotif({ message: "All tasks must have both a start and end time.", type: "warning" }); return;
       }
-      const [sh, sm] = r.time_start.split(":").map(Number);
-      const [eh, em] = r.time_end.split(":").map(Number);
-      if (eh * 60 + em <= sh * 60 + sm) {
+      const effectiveStart = r.shift === "PM" ? toPmMin(r.time_start) : toMin(r.time_start);
+      const effectiveEnd   = r.shift === "PM" ? toPmMin(r.time_end)   : toMin(r.time_end);
+      if (effectiveEnd <= effectiveStart) {
         setNotif({ message: "A task's end time must be after its start time.", type: "warning" }); return;
       }
     }
 
+    // Overlap check — PM-aware
     const groupKeys = [...new Set(taskRoutes.map((r) => `${toDateStr(r.route_date)}__${r.shift}`))];
     for (const key of groupKeys) {
       const [date, shift] = key.split("__");
       const group = taskRoutes
         .filter((r) => toDateStr(r.route_date) === date && r.shift === shift)
+        .slice()
         .sort((a, b) => {
-          const [ah, am] = a.time_start.split(":").map(Number);
-          const [bh, bm] = b.time_start.split(":").map(Number);
-          return (ah * 60 + am) - (bh * 60 + bm);
+          const norm = (t) => {
+            const [h, m] = t.split(":").map(Number);
+            const raw = h * 60 + m;
+            return shift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+          };
+          return norm(a.time_start) - norm(b.time_start);
         });
+
       for (let i = 0; i < group.length - 1; i++) {
-        const [eh, em] = group[i].time_end.split(":").map(Number);
-        const [sh, sm] = group[i + 1].time_start.split(":").map(Number);
-        if ((eh * 60 + em) > (sh * 60 + sm)) {
+        const norm = (t) => {
+          const [h, m] = t.split(":").map(Number);
+          const raw = h * 60 + m;
+          return shift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+        };
+        if (norm(group[i].time_end) > norm(group[i + 1].time_start)) {
           const fmt = (t) => {
             const [h, m] = t.split(":").map(Number);
             const h12 = h % 12 === 0 ? 12 : h % 12;
@@ -446,31 +518,26 @@ setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.of
       }
       await Promise.all(patchRequests);
 
-      // 3. Save patrollers for all selected dates using active date's state
-//    If patrollers were changed (dirtyDates has activeDate), apply to ALL selectedDates
-//    If patrollers were NOT changed, only save the individually dirty dates
-const patrollerDatestoSave = dirtyDates.has(activeDate)
-  ? [...new Set([...selectedDates, ...dirtyDates])]  // selectedDates + any other dirty dates
-  : [...dirtyDates];                                  // only individually toggled dates
+      // 3. Save patrollers
+      const patrollerDatestoSave = dirtyDates.has(activeDate)
+        ? [...new Set([...selectedDates, ...dirtyDates])]
+        : [...dirtyDates];
 
-const activeDatePatrollerState = patrollersByDate[activeDate] || { am: [], pm: [] };
+      const activeDatePatrollerState = patrollersByDate[activeDate] || { am: [], pm: [] };
 
-const patrollerResults = await Promise.all(
-  patrollerDatestoSave.map((date) => {
-    // For dates in selectedDates, use active date's patroller state (apply-all behavior)
-    // For other dirty dates, use that date's own patroller state
-    const dp = selectedDates.includes(date)
-      ? activeDatePatrollerState
-      : (patrollersByDate[date] || { am: [], pm: [] });
-    return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-      body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
-    }).then((r) => r.json());
-  })
-);
+      const patrollerResults = await Promise.all(
+        patrollerDatestoSave.map((date) => {
+          const dp = selectedDates.includes(date)
+            ? activeDatePatrollerState
+            : (patrollersByDate[date] || { am: [], pm: [] });
+          return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
+            method:  "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+            body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
+          }).then((r) => r.json());
+        })
+      );
 
-      // If any conflict was returned, show it and stop
       const conflict = patrollerResults.find((r) => !r.success);
       if (conflict) {
         setLoading(false);
@@ -588,7 +655,6 @@ const patrollerResults = await Promise.all(
               <div className="epm-map-tooltip">
                 <strong>{hoveredBrgy}</strong>
                 {barangays.includes(hoveredBrgy) ? " — Click to remove" : " — Click to add"}
-                
               </div>
             )}
             <Map
@@ -630,63 +696,63 @@ const patrollerResults = await Promise.all(
               </div>
             )}
             <div className="pm-map-controls">
-  <button className="pm-map-ctrl-btn" title="Zoom in"
-    onClick={() => mapRef.current?.getMap?.().zoomIn({ duration: 300 })}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Zoom out"
-    onClick={() => mapRef.current?.getMap?.().zoomOut({ duration: 300 })}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Fit to barangays"
-    onClick={() => {
-      const map = mapRef.current?.getMap?.();
-      if (!map || barangays.length === 0 || !geoJSONData) return;
-      const coords = [];
-      for (const f of geoJSONData.features) {
-        if (barangays.includes(f.properties.name_db)) {
-          const rings = f.geometry.type === "Polygon"
-            ? [f.geometry.coordinates[0]]
-            : f.geometry.coordinates.map((p) => p[0]);
-          for (const ring of rings) coords.push(...ring);
-        }
-      }
-      if (coords.length === 0) return;
-      const lngs = coords.map((c) => c[0]);
-      const lats = coords.map((c) => c[1]);
-      map.fitBounds(
-        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: 60, duration: 800 }
-      );
-    }}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-    </svg>
-  </button>
-  <div className="pm-map-ctrl-divider"/>
-  <button className="pm-map-ctrl-btn" title="Fullscreen"
-    onClick={() => {
-      const el = document.querySelector(".bc-map-panel");
-      if (!document.fullscreenElement) el?.requestFullscreen();
-      else document.exitFullscreen();
-    }}>
-    <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-    </svg>
-  </button>
-</div>
+              <button className="pm-map-ctrl-btn" title="Zoom in"
+                onClick={() => mapRef.current?.getMap?.().zoomIn({ duration: 300 })}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Zoom out"
+                onClick={() => mapRef.current?.getMap?.().zoomOut({ duration: 300 })}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Fit to barangays"
+                onClick={() => {
+                  const map = mapRef.current?.getMap?.();
+                  if (!map || barangays.length === 0 || !geoJSONData) return;
+                  const coords = [];
+                  for (const f of geoJSONData.features) {
+                    if (barangays.includes(f.properties.name_db)) {
+                      const rings = f.geometry.type === "Polygon"
+                        ? [f.geometry.coordinates[0]]
+                        : f.geometry.coordinates.map((p) => p[0]);
+                      for (const ring of rings) coords.push(...ring);
+                    }
+                  }
+                  if (coords.length === 0) return;
+                  const lngs = coords.map((c) => c[0]);
+                  const lats = coords.map((c) => c[1]);
+                  map.fitBounds(
+                    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                    { padding: 60, duration: 800 }
+                  );
+                }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                </svg>
+              </button>
+              <div className="pm-map-ctrl-divider"/>
+              <button className="pm-map-ctrl-btn" title="Fullscreen"
+                onClick={() => {
+                  const el = document.querySelector(".epm-map-panel");
+                  if (!document.fullscreenElement) el?.requestFullscreen();
+                  else document.exitFullscreen();
+                }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* RIGHT panel */}
           <div className="epm-info-panel">
 
-            {/* ── Date tabs — very top ── */}
+            {/* ── Date tabs ── */}
             {dateRange.length > 0 && (
               <div className="epm-date-tabs">
                 {dateRange.map((date) => (
@@ -704,7 +770,7 @@ const patrollerResults = await Promise.all(
             <div className="epm-shift-tabs-top">
               <button
                 className={`epm-shift-tab-top ${activeShift === "AM" ? "epm-shift-active" : ""}`}
-             onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
+                onClick={() => { setActiveShift("AM"); activeShiftRef.current = "AM"; setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 AM Shift
                 {activeDatePatrollers.am.length > 0 && (
@@ -713,7 +779,7 @@ const patrollerResults = await Promise.all(
               </button>
               <button
                 className={`epm-shift-tab-top ${activeShift === "PM" ? "epm-shift-active" : ""}`}
-               onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
+                onClick={() => { setActiveShift("PM"); activeShiftRef.current = "PM"; setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
               >
                 PM Shift
                 {activeDatePatrollers.pm.length > 0 && (
@@ -722,106 +788,106 @@ const patrollerResults = await Promise.all(
               </button>
             </div>
 
-          {/* ── Patrollers for this date + shift ── */}
-<div className="epm-section epm-patroller-section">
-  <div className="epm-section-title-row">
-    <span className="epm-section-title">
-      {activeShift} Patrollers — {formatTabDate(activeDate)}
-      {currentPatrollerIds.length > 0 && (
-        <span className="epm-shift-badge" style={{ marginLeft: 6 }}>{currentPatrollerIds.length}</span>
-      )}
-    </span>
-    {!loadingPatrollers && (
-      showPatrollers ? (
-        <button className="epm-toggle-btn epm-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
-          Hide
-        </button>
-      ) : (
-        <button className="epm-toggle-btn epm-toggle-show" onClick={() => setShowPatrollers(true)}>
-          Show Patrollers
-        </button>
-      )
-    )}
-  </div>
-
-  {loadingPatrollers ? (
-    <div className="epm-empty">Loading patrollers...</div>
-  ) : (
-    <>
-      {!showPatrollers && (
-        <p className="epm-patroller-hidden-hint">
-          {currentPatrollerIds.length > 0
-            ? `${currentPatrollerIds.length} selected — click Show Patrollers to manage`
-            : `${patrollerList.length} available — click Show Patrollers to assign`}
-        </p>
-      )}
-
-      {showPatrollers && (() => {
-        const PER_PAGE = 5;
-        const totalPP  = Math.max(1, Math.ceil(filteredPatrollers.length / PER_PAGE));
-        const safePP   = Math.min(patrollerPage, totalPP);
-        const paged    = filteredPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
-        return (
-          <>
-            <input className="epm-search" type="text" placeholder="Search patroller..."
-              value={patrollerSearch}
-              onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
-           <div className="epm-checklist">
-  {filteredPatrollers.length === 0 ? (
-    <div className="epm-empty">No patrollers available.</div>
-  ) : (
-    paged.map((p) => {
-      const isSelected   = currentPatrollerIds.includes(p.active_patroller_id);
-      const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
-      return (
-        <div key={p.active_patroller_id}
-          className={`epm-check-item ${isSelected ? "epm-checked" : ""} ${isOtherShift ? "epm-other-shift" : ""}`}
-          onClick={() => togglePatroller(p.active_patroller_id)}
-          title={isOtherShift ? `Already in ${activeShift === "AM" ? "PM" : "AM"} shift on this date` : ""}>
-          <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
-            {p.profile_picture ? (
-              <img src={p.profile_picture} alt={p.officer_name}
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
-            ) : getInitials(p.officer_name)}
-          </div>
-          <div className="epm-officer-info">
-            <span className="epm-officer-name">{p.officer_name}</span>
-            {isOtherShift && (
-              <span className="epm-other-shift-label">{activeShift === "AM" ? "PM" : "AM"} shift</span>
-            )}
-          </div>
-          <div className="apm-checkbox-col">
-            <div className={`epm-checkbox ${isSelected ? "epm-checkbox-on" : ""}`}>
-              {isSelected ? "✓" : ""}
-            </div>
-          </div>
-        </div>
-      );
-    })
-  )}
-  {filteredPatrollers.length > 0 && Array.from({ length: Math.max(0, PER_PAGE - paged.length) }).map((_, i) => (
-    <div key={`ghost-${i}`} className="epm-checklist-ghost" />
-  ))}
-</div>
-            {totalPP > 1 && (
-              <div className="apm-pg-inline">
-                <button className="apm-pg-arrow"
-                  onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
-                  disabled={safePP === 1}>‹</button>
-                <span className="apm-pg-label">{safePP} / {totalPP}</span>
-                <button className="apm-pg-arrow"
-                  onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
-                  disabled={safePP === totalPP}>›</button>
+            {/* ── Patrollers ── */}
+            <div className="epm-section epm-patroller-section">
+              <div className="epm-section-title-row">
+                <span className="epm-section-title">
+                  {activeShift} Patrollers — {formatTabDate(activeDate)}
+                  {currentPatrollerIds.length > 0 && (
+                    <span className="epm-shift-badge" style={{ marginLeft: 6 }}>{currentPatrollerIds.length}</span>
+                  )}
+                </span>
+                {!loadingPatrollers && (
+                  showPatrollers ? (
+                    <button className="epm-toggle-btn epm-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
+                      Hide
+                    </button>
+                  ) : (
+                    <button className="epm-toggle-btn epm-toggle-show" onClick={() => setShowPatrollers(true)}>
+                      Show Patrollers
+                    </button>
+                  )
+                )}
               </div>
-            )}
-          </>
-        );
-      })()}
-    </>
-  )}
-</div>
 
-            {/* ── Timetable for this date + shift ── */}
+              {loadingPatrollers ? (
+                <div className="epm-empty">Loading patrollers...</div>
+              ) : (
+                <>
+                  {!showPatrollers && (
+                    <p className="epm-patroller-hidden-hint">
+                      {currentPatrollerIds.length > 0
+                        ? `${currentPatrollerIds.length} selected — click Show Patrollers to manage`
+                        : `${patrollerList.length} available — click Show Patrollers to assign`}
+                    </p>
+                  )}
+
+                  {showPatrollers && (() => {
+                    const PER_PAGE = 5;
+                    const totalPP  = Math.max(1, Math.ceil(filteredPatrollers.length / PER_PAGE));
+                    const safePP   = Math.min(patrollerPage, totalPP);
+                    const paged    = filteredPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
+                    return (
+                      <>
+                        <input className="epm-search" type="text" placeholder="Search patroller..."
+                          value={patrollerSearch}
+                          onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
+                        <div className="epm-checklist">
+                          {filteredPatrollers.length === 0 ? (
+                            <div className="epm-empty">No patrollers available.</div>
+                          ) : (
+                            paged.map((p) => {
+                              const isSelected   = currentPatrollerIds.includes(p.active_patroller_id);
+                              const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
+                              return (
+                                <div key={p.active_patroller_id}
+                                  className={`epm-check-item ${isSelected ? "epm-checked" : ""} ${isOtherShift ? "epm-other-shift" : ""}`}
+                                  onClick={() => togglePatroller(p.active_patroller_id)}
+                                  title={isOtherShift ? `Already in ${activeShift === "AM" ? "PM" : "AM"} shift on this date` : ""}>
+                                  <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+                                    {p.profile_picture ? (
+                                      <img src={p.profile_picture} alt={p.officer_name}
+                                        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                                    ) : getInitials(p.officer_name)}
+                                  </div>
+                                  <div className="epm-officer-info">
+                                    <span className="epm-officer-name">{p.officer_name}</span>
+                                    {isOtherShift && (
+                                      <span className="epm-other-shift-label">{activeShift === "AM" ? "PM" : "AM"} shift</span>
+                                    )}
+                                  </div>
+                                  <div className="apm-checkbox-col">
+                                    <div className={`epm-checkbox ${isSelected ? "epm-checkbox-on" : ""}`}>
+                                      {isSelected ? "✓" : ""}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                          {filteredPatrollers.length > 0 && Array.from({ length: Math.max(0, PER_PAGE - paged.length) }).map((_, i) => (
+                            <div key={`ghost-${i}`} className="epm-checklist-ghost" />
+                          ))}
+                        </div>
+                        {totalPP > 1 && (
+                          <div className="apm-pg-inline">
+                            <button className="apm-pg-arrow"
+                              onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
+                              disabled={safePP === 1}>‹</button>
+                            <span className="apm-pg-label">{safePP} / {totalPP}</span>
+                            <button className="apm-pg-arrow"
+                              onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
+                              disabled={safePP === totalPP}>›</button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+
+            {/* ── Timetable ── */}
             <div className="epm-section epm-section-grow">
               <div className="epm-timetable-header">
                 <div className="epm-section-title">{activeShift} Time Table — {formatTabDate(activeDate)}</div>
@@ -836,35 +902,58 @@ const patrollerResults = await Promise.all(
                       <tr><th>Time</th><th>Task / Comment</th><th></th></tr>
                     </thead>
                     <tbody>
-                      {routesForDateShift.map((r) => (
-                        <tr key={r.route_id}>
-                          <td className="epm-tt-time">
-                            <div className="epm-time-inputs">
-                              <TimePicker
-                                value={r.time_start || ""}
-                                onChange={(v) => handleTaskChange(r.route_id, "time_start", v)}
-                              />
-                              <span>—</span>
-                              <TimePicker
-                                value={r.time_end || r.time_start || ""}
-                                onChange={(v) => handleTaskChange(r.route_id, "time_end", v)}
-                                baseHour={r.time_start ? parseInt(r.time_start.split(":")[0]) % 12 || 12 : 8}
-                              />
-                            </div>
-                          </td>
-                          <td className="epm-tt-notes">
-                            <textarea className="epm-notes" value={r.notes || ""} placeholder="Enter task..." rows={1}
-                              onChange={(e) => {
-                                handleTaskChange(r.route_id, "notes", e.target.value);
-                                e.target.style.height = "auto";
-                                e.target.style.height = e.target.scrollHeight + "px";
-                              }} />
-                          </td>
-                          <td>
-                            <button className="epm-remove" onClick={() => removeTask(r.route_id)}>×</button>
-                          </td>
-                        </tr>
-                      ))}
+                      {routesForDateShift.map((r, idx) => {
+                        // PM-aware highlight logic (mirrors AddPatrolModal)
+                        const toPmMinRow = (t) => {
+                          if (!t) return null;
+                          const [h, m] = t.split(":").map(Number);
+                          const raw = h * 60 + m;
+                          return activeShift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+                        };
+
+                        const prevRoute  = routesForDateShift[idx - 1];
+                        const startMin   = toPmMinRow(r.time_start);
+                        const endMin     = toPmMinRow(r.time_end);
+                        const badRange   = startMin !== null && endMin !== null && endMin <= startMin;
+                        const hasOverlap = prevRoute
+                          && startMin !== null
+                          && toPmMinRow(prevRoute.time_end) !== null
+                          && startMin < toPmMinRow(prevRoute.time_end);
+                        const rowError   = badRange || hasOverlap;
+
+                        return (
+                          <tr key={r.route_id} style={rowError ? { background: "#fffbeb", outline: "1px solid #f59e0b" } : {}}>
+                            <td className="epm-tt-time">
+                              <div className="epm-time-inputs">
+                                <TimePicker
+                                  value={r.time_start || ""}
+                                  onChange={(v) => handleTaskChange(r.route_id, "time_start", v)}
+                                  shift={activeShift}
+                                  baseHour={activeShift === "AM" ? 8 : 20}
+                                />
+                                <span>—</span>
+                                <TimePicker
+                                  value={r.time_end || r.time_start || ""}
+                                  onChange={(v) => handleTaskChange(r.route_id, "time_end", v)}
+                                  shift={activeShift}
+                                  baseHour={r.time_start ? parseInt(r.time_start.split(":")[0]) % 12 || 12 : 8}
+                                />
+                              </div>
+                            </td>
+                            <td className="epm-tt-notes">
+                              <textarea className="epm-notes" value={r.notes || ""} placeholder="Enter task..." rows={1}
+                                onChange={(e) => {
+                                  handleTaskChange(r.route_id, "notes", e.target.value);
+                                  e.target.style.height = "auto";
+                                  e.target.style.height = e.target.scrollHeight + "px";
+                                }} />
+                            </td>
+                            <td>
+                              <button className="epm-remove" onClick={() => removeTask(r.route_id)}>×</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

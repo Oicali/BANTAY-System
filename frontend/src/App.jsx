@@ -11,6 +11,7 @@ import EBlotter from "./components/views/EBlotter";
 import CaseManagement from "./components/views/CaseManagement";
 import CrimeMapping from "./components/views/CrimeMapping";
 import PatrolDashboard from "./components/views/PatrolDashboard";
+import PatrollerDashboardView from "./components/views/PatrollerDashboardView";
 import PatrolScheduling from "./components/views/PatrolScheduling";
 import UserManagement from "./components/views/UserManagement";
 import ProfileSettings from "./components/views/ProfileSettings";
@@ -19,6 +20,20 @@ import VerificationSuccess from "./components/views/VerificationSucess";
 import AfterPatrol from "./components/views/AfterPatrol";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
+
+const getRole = () => {
+  const raw = localStorage.getItem("token");
+  if (!raw) return null;
+  try {
+    const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64))?.role ?? null;
+  } catch { return null; }
+};
+
+const RoleBasedPatrolDashboard = () => {
+  const role = getRole();
+  return role === "Administrator" ? <PatrolDashboard /> : <PatrollerDashboardView />;
+};
 
 function App() {
   return (
@@ -40,7 +55,10 @@ function App() {
           <Route path="/e-blotter" element={<EBlotter />} />
           <Route path="/case-management" element={<CaseManagement />} />
           <Route path="/crime-mapping" element={<CrimeMapping />} />
-          <Route path="/patrol-dashboard" element={<PatrolDashboard />} />
+          <Route
+  path="/patrol-dashboard"
+  element={<RoleBasedPatrolDashboard />}
+/>
           <Route path="/patrol-scheduling" element={<PatrolScheduling />} />
           <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
