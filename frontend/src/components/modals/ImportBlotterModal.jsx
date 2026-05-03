@@ -9,7 +9,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const fileRef = useRef();
-
+  const [toast, setToast] = useState(false);
   const handleFile = (f) => {
     if (!f) return;
     if (!f.name.match(/\.(xlsx|csv)$/i)) {
@@ -47,9 +47,9 @@ function ImportBlotterModal({ onClose, onSuccess }) {
           "INCIDENT_TYPE" in firstRow;
 
         if (!hasRequiredColumns) {
-          alert(
-            "Invalid file format. Please use the official Bantay System import template.",
-          );
+          setLoading(false);
+          setToast(true);
+          setTimeout(() => setToast(false), 4000);
           return;
         }
       }
@@ -333,6 +333,28 @@ function ImportBlotterModal({ onClose, onSuccess }) {
           </>
         )}
       </div>
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "32px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#1e3a5f",
+            color: "white",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+            zIndex: 99999,
+            borderLeft: "4px solid #c1272d",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ⚠️ Invalid template. Please use the official CIRAS import file.
+        </div>
+      )}
     </div>,
     document.body,
   );
