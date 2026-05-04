@@ -524,7 +524,7 @@ const PatrollerDashboard = () => {
                     <tr>
                       <th>Officer</th>
                       <th>Status</th>
-                      <th>Location</th>
+                      <th>Last Location</th>
                       <th>Last Update</th>
                     </tr>
                   </thead>
@@ -583,39 +583,33 @@ const PatrollerDashboard = () => {
                             </td>
                             <td>
                               <span className="location-text">
-                                {officer.last_location_at ? (
+                                {officer.latitude && officer.longitude ? (
                                   (() => {
                                     const lastSeen = new Date(
-                                      officer.last_location_at,
+                                      officer.updated_at ||
+                                        officer.last_location_at,
                                     );
-                                    const thirtySecsAgo = new Date(
-                                      Date.now() - 30 * 1000,
-                                    );
-                                    const isOnline = lastSeen > thirtySecsAgo;
+                                    const now = new Date();
+                                    const secondsAgo = (now - lastSeen) / 1000;
+                                    const isOnline = secondsAgo <= 30;
 
-                                    if (isOnline) {
-                                      // Online: show current barangay
-                                      return officer.resolved_barangay ? (
-                                        `📍 ${officer.resolved_barangay}`
-                                      ) : (
+                                    if (isOnline && officer.current_barangay) {
+                                      return `📍 ${officer.current_barangay}`;
+                                    } else if (officer.current_barangay) {
+                                      return `⏱️ Last: ${officer.current_barangay}`;
+                                    } else if (officer.location_name) {
+                                      return `📍 ${officer.location_name}`;
+                                    } else {
+                                      return (
                                         <span className="unassigned-badge">
                                           No GPS data
-                                        </span>
-                                      );
-                                    } else {
-                                      // Offline: show last known barangay
-                                      return officer.resolved_barangay ? (
-                                        `Last seen: ${officer.resolved_barangay}`
-                                      ) : (
-                                        <span className="unassigned-badge">
-                                          No data
                                         </span>
                                       );
                                     }
                                   })()
                                 ) : (
                                   <span className="unassigned-badge">
-                                    Never logged in
+                                    No signal
                                   </span>
                                 )}
                               </span>
