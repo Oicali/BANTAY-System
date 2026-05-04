@@ -40,6 +40,16 @@ const getMyUserId = () => {
   } catch { return null; }
 };
 
+const getMyRole = () => {
+  const raw = localStorage.getItem("token");
+  if (!raw) return null;
+  try {
+    const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(b64));
+    return json.role ?? json.user_role ?? json.roles ?? null;
+  } catch { return null; }
+};
+
 const parseLocalDate = (d) => {
   if (!d) return null;
   const dt = new Date(d);
@@ -122,11 +132,17 @@ const ShiftBadge = ({ shift }) => {
   );
 };
 
-// ── Ongoing Shift Card ────────────────────────────────────
-const OngoingShiftCard = ({ patrol, geoJSONData, myShifts }) => {
+// ── Ongoing / Upcoming Shift Card ─────────────────────────
+const OngoingShiftCard = ({ patrol, geoJSONData, myShifts, isUpcoming }) => {
   const mapRef = useRef(null);
   const dateRange = generateDateRange(patrol?.start_date, patrol?.end_date);
-  const [activeDate, setActiveDate] = useState(todayStr() || dateRange[0] || null);
+
+  // For upcoming patrols, default to the first date; for active, default to today
+  const defaultDate = isUpcoming
+    ? (dateRange[0] || null)
+    : (dateRange.includes(todayStr()) ? todayStr() : dateRange[0] || null);
+
+  const [activeDate, setActiveDate] = useState(defaultDate);
   const [activeShift, setActiveShift] = useState(myShifts[0] || "AM");
 
   // Routes for this date + shift
@@ -194,10 +210,14 @@ const OngoingShiftCard = ({ patrol, geoJSONData, myShifts }) => {
             </div>
           </div>
         </div>
-        <div className="pdv-ongoing-live-pill">
-          <span className="pdv-live-dot" />
-          LIVE
-        </div>
+
+        {/* Status pill — UPCOMING or nothing (no LIVE pill) */}
+        {isUpcoming && (
+          <div className="pdv-upcoming-pill">
+            <span className="pdv-upcoming-dot" />
+            UPCOMING
+          </div>
+        )}
       </div>
 
       {/* Card body: map + schedule */}
@@ -317,6 +337,9 @@ const PatrollerDashboardView = () => {
   const [notif, setNotif]           = useState(null);
   const [selectedBeat, setSelectedBeat] = useState(null);
 
+  // Role detection
+  const isPatroller = getMyRole() !== "Administrator";
+
   // Filters
   const [search, setSearch]         = useState("");
   const [statusFilter, setStatus]   = useState("");
@@ -353,9 +376,24 @@ const PatrollerDashboardView = () => {
       .catch((err) => console.error("GeoJSON error:", err));
   }, []);
 
-  // Ongoing patrol = active today, patroller is assigned
+  // Active patrol first, then fallback to soonest upcoming
   const ongoingPatrol = patrols.find((p) => getPatrolStatus(p) === "active");
-  const myShifts = ongoingPatrol ? getMyShiftsForPatrol(ongoingPatrol) : [];
+  const upcomingPatrol = !ongoingPatrol
+    ? patrols
+        .filter((p) => getPatrolStatus(p) === "upcoming")
+        .sort((a, b) => parseLocalDate(a.start_date) - parseLocalDate(b.start_date))[0] || null
+    : null;
+
+  const featuredPatrol = ongoingPatrol || upcomingPatrol;
+  const isUpcoming = !ongoingPatrol && !!upcomingPatrol;
+  const myShifts = featuredPatrol ? getMyShiftsForPatrol(featuredPatrol) : [];
+
+  // ── Section label ─────────────────────────────────────
+  const sectionLabel = ongoingPatrol
+    ? "ONGOING SHIFT"
+    : upcomingPatrol
+    ? "UPCOMING SHIFT"
+    : "ONGOING SHIFT";
 
   // ── Filter logic ──────────────────────────────────────
   const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
@@ -410,19 +448,20 @@ const PatrollerDashboardView = () => {
         </div>
       </div>
 
-      {/* ── ONGOING SHIFT ── */}
+      {/* ── ONGOING / UPCOMING SHIFT ── */}
       <section className="pdv-section">
         <div className="pdv-section-heading">
-          <span className="pdv-section-label">ONGOING SHIFT</span>
+          <span className="pdv-section-label">{sectionLabel}</span>
         </div>
 
         {loading ? (
           <div className="pdv-loading-card">Loading patrol data…</div>
-        ) : ongoingPatrol ? (
+        ) : featuredPatrol ? (
           <OngoingShiftCard
-            patrol={ongoingPatrol}
+            patrol={featuredPatrol}
             geoJSONData={geoJSONData}
             myShifts={myShifts.length > 0 ? myShifts : ["AM"]}
+            isUpcoming={isUpcoming}
           />
         ) : (
           <div className="pdv-no-ongoing">
@@ -430,8 +469,8 @@ const PatrollerDashboardView = () => {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <div>
-              <div className="pdv-no-ongoing-title">No active patrol today</div>
-              <div className="pdv-no-ongoing-sub">You have no patrol assignment for today's date.</div>
+              <div className="pdv-no-ongoing-title">No active or upcoming patrol</div>
+              <div className="pdv-no-ongoing-sub">You have no patrol assignment scheduled.</div>
             </div>
           </div>
         )}
@@ -483,7 +522,7 @@ const PatrollerDashboardView = () => {
           )}
         </div>
 
-        {/* Table */}
+        {/* Table — AfterPatrol style */}
         <div className="pdv-table-card">
           <div className="pdv-table-container">
             <table className="pdv-table">
@@ -493,7 +532,11 @@ const PatrollerDashboardView = () => {
                   <th>STATUS</th>
                   <th>MOBILE UNIT</th>
                   <th>DURATION</th>
-                  <th>ASSIGNED PATROLLERS</th>
+                  {isPatroller ? (
+                    <th>MY SHIFT</th>
+                  ) : (
+                    <th>ASSIGNED PATROLLERS</th>
+                  )}
                   <th>AREA OF RESPONSIBILITY</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -508,6 +551,7 @@ const PatrollerDashboardView = () => {
                   const patrollers = patrol.patrollers || [];
                   const amCount    = patrollers.filter((p) => p.shift === "AM").length;
                   const pmCount    = patrollers.filter((p) => p.shift === "PM").length;
+                  const myShiftsForRow = getMyShiftsForPatrol(patrol);
                   const barangays  = [...new Set(
                     (patrol.routes || [])
                       .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
@@ -528,24 +572,39 @@ const PatrollerDashboardView = () => {
                           {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
                         </span>
                       </td>
-                      <td>
-                        {patrollers.length > 0 ? (
-                          <div className="pdv-patroller-pills">
-                            {amCount > 0 && (
-                              <span className="pdv-count-pill pdv-count-am">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                                {amCount} AM
-                              </span>
-                            )}
-                            {pmCount > 0 && (
-                              <span className="pdv-count-pill pdv-count-pm">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                                {pmCount} PM
-                              </span>
-                            )}
-                          </div>
-                        ) : <span className="pdv-empty-cell">—</span>}
-                      </td>
+
+                      {/* My Shift (patroller) OR Assigned Patrollers (admin) */}
+                      {isPatroller ? (
+                        <td>
+                          {myShiftsForRow.length > 0 ? (
+                            <div className="pdv-my-shifts-cell">
+                              {myShiftsForRow.map((s) => <ShiftBadge key={s} shift={s} />)}
+                            </div>
+                          ) : (
+                            <span className="pdv-empty-cell">—</span>
+                          )}
+                        </td>
+                      ) : (
+                        <td>
+                          {patrollers.length > 0 ? (
+                            <div className="pdv-patroller-pills">
+                              {amCount > 0 && (
+                                <span className="pdv-count-pill pdv-count-am">
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+                                  {amCount} AM
+                                </span>
+                              )}
+                              {pmCount > 0 && (
+                                <span className="pdv-count-pill pdv-count-pm">
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+                                  {pmCount} PM
+                                </span>
+                              )}
+                            </div>
+                          ) : <span className="pdv-empty-cell">—</span>}
+                        </td>
+                      )}
+
                       <td>
                         {barangays.length > 0 ? (
                           <div className="pdv-brgy-pills">
