@@ -20,6 +20,7 @@ import VerificationSuccess from "./components/views/VerificationSucess";
 import AfterPatrol from "./components/views/AfterPatrol";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
+import PatrollerDashboard from "./components/views/PatrolDashboard";
 
 const getRole = () => {
   const raw = localStorage.getItem("token");
@@ -32,7 +33,7 @@ const getRole = () => {
 
 const RoleBasedPatrolDashboard = () => {
   const role = getRole();
-  return role === "Administrator" ? <PatrolDashboard /> : <PatrollerDashboardView />;
+  return role === "Administrator" ? <PatrolScheduling /> : <PatrollerDashboardView />;
 };
 
 function App() {
@@ -55,11 +56,8 @@ function App() {
           <Route path="/e-blotter" element={<EBlotter />} />
           <Route path="/case-management" element={<CaseManagement />} />
           <Route path="/crime-mapping" element={<CrimeMapping />} />
-          <Route
-  path="/patrol-dashboard"
-  element={<RoleBasedPatrolDashboard />}
-/>
-          <Route path="/patrol-scheduling" element={<PatrolScheduling />} />
+          <Route path="/patrol-dashboard"element={<PatrollerDashboard />}/>
+         <Route path="/patrol-scheduling" element={<RoleBasedPatrolDashboard />}/>
           <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
           <Route path="/profile" element={<ProfileSettings />} />
