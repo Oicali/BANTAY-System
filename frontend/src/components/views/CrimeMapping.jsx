@@ -869,25 +869,20 @@ function CrimeMapping() {
   // Fetch data on trigger or mode change
   // Fetch data on trigger or mode change — but wait for patrol assignment first
   // Fetch data on trigger or mode change
-// Fetch data on trigger or mode change — wait for patrol assignment to load first
-useEffect(() => {
-  // For patrol users, wait for patrol status to be determined
-  if (isPatrol && patrolAssignmentLoading) {
-    return;
-  }
+  // Fetch data on trigger or mode change — wait for patrol assignment to load first
+  useEffect(() => {
+    // For patrol users, wait for patrol status to be determined
+    if (isPatrol && patrolAssignmentLoading) {
+      return;
+    }
 
-  if (heatmapMode) {
-    fetchHeatmap();
-    fetchAll();
-  } else {
-    fetchAll();
-  }
-}, [
-  fetchTrigger,
-  heatmapMode,
-  isPatrol,
-  patrolAssignmentLoading,
-]);
+    if (heatmapMode) {
+      fetchHeatmap();
+      fetchAll();
+    } else {
+      fetchAll();
+    }
+  }, [fetchTrigger, heatmapMode, isPatrol, patrolAssignmentLoading]);
 
   const handleModeToggle = useCallback(() => {
     setHeatmapMode((m) => !m);
@@ -1902,7 +1897,7 @@ useEffect(() => {
               >
                 <div className="crmap-officer-tooltip-name">
                   👮{" "}
-                  {`${hoveredOfficer.officer.abbreviation ?? ""}. ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
+                  {`${hoveredOfficer.officer.abbreviation ?? ""}. ${hoveredOfficer.officer.first_name ?? ""} ${hoveredOfficer.officer.last_name ?? ""}`.trim() ||
                     hoveredOfficer.officer.username ||
                     "Officer"}
                 </div>
@@ -2745,8 +2740,9 @@ useEffect(() => {
                               }}
                             >
                               {officer.abbreviation
-                                ? `${officer.abbreviation}. ${officer.full_name}`
-                                : officer.full_name || officer.username}
+                                ? `${officer.abbreviation}. ${officer.first_name || ""} ${officer.last_name || ""}`.trim()
+                                : `${officer.first_name || ""} ${officer.last_name || ""}`.trim() ||
+                                  officer.username}
                             </div>
                             <div
                               style={{
