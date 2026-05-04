@@ -28,9 +28,12 @@ const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
   const [loading, setLoading]         = useState(false);
   const [notif, setNotif]             = useState(null);
   const [activeShift, setActiveShift] = useState("AM");
+  const activeShiftRef = useRef("AM");
   const [hoveredBrgy, setHoveredBrgy] = useState(null);
 const [showPatrollers, setShowPatrollers] = useState(false);
 const [patrollerPage, setPatrollerPage]   = useState(1);
+
+
 
 
   const [form, setForm] = useState({
@@ -47,6 +50,8 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
   const [loadingPatrollers, setLoadingPatrollers] = useState(false);
   const [barangays, setBarangays]                 = useState([]);
   const [tasks, setTasks]                         = useState([]);
+  const [taskOrder, setTaskOrder] = useState([]); 
+  const tasksRef                  = useRef([]);
 
   // Fetch available patrollers when dates change
   useEffect(() => {
@@ -67,35 +72,134 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
 
   const amTasks      = tasks.filter((t) => t.shift === "AM");
   const pmTasks      = tasks.filter((t) => t.shift === "PM");
-  const currentTasks = activeShift === "AM" ? amTasks : pmTasks;
+const shiftTasks   = activeShift === "AM" ? amTasks : pmTasks;
+const currentTasks = taskOrder
+  .map((id) => shiftTasks.find((t) => t._id === id))
+  .filter(Boolean);
 
   const currentSelectedIds    = activeShift === "AM" ? selectedAMIds : selectedPMIds;
   const setCurrentSelectedIds = activeShift === "AM" ? setSelectedAMIds : setSelectedPMIds;
   const otherShiftIds         = activeShift === "AM" ? selectedPMIds : selectedAMIds;
 
-  const addTask = () => {
-    const existing = tasks.filter((t) => t.shift === activeShift);
-    let defaultStart;
-    if (existing.length === 0) {
-      defaultStart = activeShift === "AM" ? "08:00" : "20:00";
-    } else {
-      const last = existing[existing.length - 1];
-      if (last.time_end) {
-        const [h, m] = last.time_end.split(":").map(Number);
-        const total  = h * 60 + m + 1;
-        defaultStart = `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-      } else {
-        defaultStart = last.time_start || (activeShift === "AM" ? "08:00" : "20:00");
-      }
-    }
-    setTasks((prev) => [
-      ...prev,
-      { shift: activeShift, time_start: defaultStart, time_end: "", notes: "", stop_order: existing.length + 1, _id: Date.now() },
-    ]);
+const addTask = () => {
+  // Normalize times for PM shift so post-midnight sorts after 20:00+
+  const toPmMin = (t) => {
+    if (!t) return 0;
+    const [h, m] = t.split(":").map(Number);
+    const raw = h * 60 + m;
+    return raw < 12 * 60 ? raw + 24 * 60 : raw;
   };
 
-  const removeTask  = (id)           => setTasks((prev) => prev.filter((t) => t._id !== id));
-  const updateTask  = (id, field, v) => setTasks((prev) => prev.map((t) => t._id === id ? { ...t, [field]: v } : t));
+  const toMin = (t) => {
+    if (!t) return 0;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const existing = tasks
+    .filter((t) => t.shift === activeShift)
+    .slice()
+    .sort((a, b) =>
+      activeShift === "PM"
+        ? toPmMin(a.time_start) - toPmMin(b.time_start)
+        : toMin(a.time_start)  - toMin(b.time_start)
+    );
+
+  // Limit check
+  if (existing.length > 0) {
+    const last = existing[existing.length - 1];
+    if (last.time_end) {
+      if (activeShift === "AM" && toMin(last.time_end) >= 20 * 60) {
+        setNotif({ message: "AM shift tasks cannot go past 8:00 PM.", type: "warning" });
+        return;
+      }
+      if (activeShift === "PM") {
+        const pmMinutes = toPmMin(last.time_end) - 20 * 60;
+        if (pmMinutes >= 12 * 60) {
+          setNotif({ message: "PM shift tasks cannot go past 8:00 AM.", type: "warning" });
+          return;
+        }
+      }
+    }
+  }
+
+  // Default start
+  let defaultStart;
+  if (existing.length === 0) {
+    defaultStart = activeShift === "AM" ? "08:00" : "20:00";
+  } else {
+    const last = existing[existing.length - 1];
+    if (last.time_end) {
+      const total = toMin(last.time_end) + 1;
+      defaultStart = `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+    } else {
+      defaultStart = last.time_start || (activeShift === "AM" ? "08:00" : "20:00");
+    }
+  }
+
+  // Default end = start + 60 min (first task) or + 59 min (subsequent)
+  const [dh, dm]   = defaultStart.split(":").map(Number);
+  const isFirst    = existing.length === 0;
+  const endTotal   = dh * 60 + dm + (isFirst ? 60 : 59);
+  const defaultEnd = `${String(Math.floor(endTotal / 60) % 24).padStart(2, "0")}:${String(endTotal % 60).padStart(2, "0")}`;
+
+  const newId   = Date.now();
+  const newTask = {
+    shift:      activeShift,
+    time_start: defaultStart,
+    time_end:   defaultEnd,
+    notes:      "",
+    stop_order: existing.length + 1,
+    _id:        newId,
+  };
+
+  setTasks((prev) => {
+    const next = [...prev, newTask];
+    tasksRef.current = next;
+    return next;
+  });
+  setTaskOrder((prev) => [...prev, newId]);
+};
+
+const removeTask = (id) => {
+  setTasks((prev) => {
+    const next = prev.filter((t) => t._id !== id);
+    tasksRef.current = next;
+    return next;
+  });
+  setTaskOrder((prev) => prev.filter((x) => x !== id));
+};
+
+const sortCurrentShift = useCallback(() => {
+  const latest = tasksRef.current;
+  const shift  = activeShiftRef.current;
+  setTaskOrder((prev) => {
+    const shiftIds = latest.filter((t) => t.shift === shift).map((t) => t._id);
+    const otherIds = prev.filter((id) => !shiftIds.includes(id));
+    const sorted   = latest
+      .filter((t) => t.shift === shift)
+      .slice()
+      .sort((a, b) => {
+        const norm = (t) => {
+          if (!t) return Infinity;
+          const [h, m] = t.split(":").map(Number);
+          const raw = h * 60 + m;
+          return shift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+        };
+        return norm(a.time_start) - norm(b.time_start);
+      })
+      .map((t) => t._id);
+    return [...otherIds, ...sorted];
+  });
+}, []);
+
+const updateTask = (id, field, v) => setTasks((prev) => {
+  const next = prev.map((t) => t._id === id ? { ...t, [field]: v } : t);
+  tasksRef.current = next;
+  return next;
+});
+
+
 
   const buildGeoJSON = useCallback(() => {
     if (!geoJSONData) return null;
@@ -163,30 +267,49 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
     }
 
     // Validate tasks
-    for (const task of tasks) {
-      if (!task.time_start || !task.time_end) {
-        setNotif({ message: "All tasks must have both a start and end time.", type: "warning" }); return;
-      }
-      const [sh, sm] = task.time_start.split(":").map(Number);
-      const [eh, em] = task.time_end.split(":").map(Number);
-      if (eh * 60 + em <= sh * 60 + sm) {
-        setNotif({ message: "A task's end time must be after its start time.", type: "warning" }); return;
-      }
-    }
+const toPmMin = (t) => {
+  if (!t) return 0;
+  const [h, m] = t.split(":").map(Number);
+  const raw = h * 60 + m;
+  return raw < 12 * 60 ? raw + 24 * 60 : raw;
+};
+
+for (const task of tasks) {
+  if (!task.time_start || !task.time_end) {
+    setNotif({ message: "All tasks must have both a start and end time.", type: "warning" }); return;
+  }
+  const startMin = task.time_start.split(":").map(Number).reduce((h, m) => h * 60 + m);
+  const endMin   = task.time_end.split(":").map(Number).reduce((h, m) => h * 60 + m);
+
+  // For PM shift use midnight-aware comparison
+  const effectiveStart = task.shift === "PM" ? toPmMin(task.time_start) : startMin;
+  const effectiveEnd   = task.shift === "PM" ? toPmMin(task.time_end)   : endMin;
+
+  if (effectiveEnd <= effectiveStart) {
+    setNotif({ message: "A task's end time must be after its start time.", type: "warning" }); return;
+  }
+}
 
     // Overlap check
-    for (const shift of ["AM", "PM"]) {
-      const group = tasks
-        .filter((t) => t.shift === shift)
-        .sort((a, b) => {
-          const [ah, am] = a.time_start.split(":").map(Number);
-          const [bh, bm] = b.time_start.split(":").map(Number);
-          return (ah * 60 + am) - (bh * 60 + bm);
-        });
-      for (let i = 0; i < group.length - 1; i++) {
-        const [eh, em] = group[i].time_end.split(":").map(Number);
-        const [sh, sm] = group[i + 1].time_start.split(":").map(Number);
-        if ((eh * 60 + em) > (sh * 60 + sm)) {
+   for (const shift of ["AM", "PM"]) {
+  const group = tasks
+    .filter((t) => t.shift === shift)
+    .slice()
+    .sort((a, b) => {
+      const norm = (t) => {
+        const [h, m] = t.split(":").map(Number);
+        const raw = h * 60 + m;
+        return shift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+      };
+      return norm(a.time_start) - norm(b.time_start);
+    });
+  for (let i = 0; i < group.length - 1; i++) {
+    const norm = (t) => {
+      const [h, m] = t.split(":").map(Number);
+      const raw = h * 60 + m;
+      return shift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+    };
+    if (norm(group[i].time_end) > norm(group[i + 1].time_start)) {
           const fmt = (t) => {
             const [h, m] = t.split(":").map(Number);
             const h12 = h % 12 === 0 ? 12 : h % 12;
@@ -368,20 +491,20 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
 
             {/* Shift tabs */}
             <div className="apm-shift-tabs-top">
-              <button
-                className={`apm-shift-tab-top ${activeShift === "AM" ? "apm-shift-active" : ""}`}
-               onClick={() => { setActiveShift("AM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
-              >
-                AM Shift
-                {selectedAMIds.length > 0 && <span className="apm-shift-badge">{selectedAMIds.length}</span>}
-              </button>
-              <button
-                className={`apm-shift-tab-top ${activeShift === "PM" ? "apm-shift-active" : ""}`}
-                onClick={() => { setActiveShift("PM"); setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
-              >
-                PM Shift
-                {selectedPMIds.length > 0 && <span className="apm-shift-badge">{selectedPMIds.length}</span>}
-              </button>
+            <button
+  className={`apm-shift-tab-top ${activeShift === "AM" ? "apm-shift-active" : ""}`}
+  onClick={() => { setActiveShift("AM"); activeShiftRef.current = "AM"; setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
+>
+  AM Shift
+  {selectedAMIds.length > 0 && <span className="apm-shift-badge">{selectedAMIds.length}</span>}
+</button>
+<button
+  className={`apm-shift-tab-top ${activeShift === "PM" ? "apm-shift-active" : ""}`}
+  onClick={() => { setActiveShift("PM"); activeShiftRef.current = "PM"; setPatrollerSearch(""); setShowPatrollers(false); setPatrollerPage(1); }}
+>
+  PM Shift
+  {selectedPMIds.length > 0 && <span className="apm-shift-badge">{selectedPMIds.length}</span>}
+</button>
             </div>
 
 {/* Patrollers */}
@@ -507,21 +630,51 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
                       <tr><th>Time</th><th>Task / Comment</th><th></th></tr>
                     </thead>
                     <tbody>
-                      {currentTasks.map((task) => (
-                        <tr key={task._id}>
+                   {currentTasks.map((task, idx) => {
+  const toMin = (t) => { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const prevTask = currentTasks[idx - 1];
+
+const toPmMinRow = (t) => {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  const raw = h * 60 + m;
+  return activeShift === "PM" && raw < 12 * 60 ? raw + 24 * 60 : raw;
+};
+
+const startMin = toPmMinRow(task.time_start);
+const endMin   = toPmMinRow(task.time_end);
+const badRange = startMin !== null && endMin !== null && endMin <= startMin;
+
+const hasOverlap = prevTask
+  && startMin !== null
+  && toPmMinRow(prevTask.time_end) !== null
+  && startMin < toPmMinRow(prevTask.time_end);
+
+
+  const rowError = badRange || hasOverlap;
+  return (
+  <tr key={task._id} style={rowError ? { background: "#fffbeb", outline: "1px solid #f59e0b" } : {}}>
                           <td className="apm-tt-time">
                             <div className="apm-time-inputs">
-                              <TimePicker
-                                value={task.time_start}
-                                onChange={(v) => updateTask(task._id, "time_start", v)}
-                                baseHour={activeShift === "AM" ? 8 : 20}
-                              />
-                              <span>—</span>
-                              <TimePicker
-                                value={task.time_end || task.time_start}
-                                onChange={(v) => updateTask(task._id, "time_end", v)}
-                                baseHour={task.time_start ? parseInt(task.time_start.split(":")[0]) % 12 || 12 : 8}
-                              />
+ <TimePicker
+  value={task.time_start}
+  onChange={(v) => updateTask(task._id, "time_start", v)}
+  onBlur={sortCurrentShift}
+  baseHour={activeShift === "AM" ? 8 : 20}
+  allowedPeriods={activeShift === "AM" ? ["AM", "PM"] : ["PM", "AM"]}
+  maxPeriod={activeShift === "AM" ? "PM" : null}
+  shift={activeShift}
+/>
+<span>—</span>
+<TimePicker
+  value={task.time_end || task.time_start}
+  onChange={(v) => updateTask(task._id, "time_end", v)}
+  onBlur={sortCurrentShift}
+  baseHour={task.time_start ? parseInt(task.time_start.split(":")[0]) % 12 || 12 : 8}
+  allowedPeriods={activeShift === "AM" ? ["AM", "PM"] : ["PM", "AM"]}
+  maxPeriod={activeShift === "AM" ? "PM" : null}
+  shift={activeShift}
+/>
                             </div>
                           </td>
                           <td className="apm-tt-notes">
@@ -536,7 +689,8 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
                             <button className="apm-remove" onClick={() => removeTask(task._id)}>×</button>
                           </td>
                         </tr>
-                      ))}
+                     );
+                    })}
                     </tbody>
                   </table>
                 </div>

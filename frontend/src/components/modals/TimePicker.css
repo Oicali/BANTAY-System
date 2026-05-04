@@ -41,6 +41,8 @@
   flex-shrink: 0;
 }
 
+
+
 /* ── DROPDOWN ── */
 .tp-dropdown {
   position: absolute;
@@ -56,6 +58,12 @@
   gap: 0;
   overflow: hidden;
   min-width: 200px;
+}
+.tp-dropdown-up {
+  bottom: 100%;
+  top: auto;
+  margin-bottom: 4px;
+  margin-top: 0;
 }
 
 /* ── COLUMNS ── */
@@ -77,7 +85,14 @@
   border-bottom: 1px solid #dee2e6;
   flex-shrink: 0;
 }
-
+.tp-item-disabled {
+  color: #ced4da;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.tp-item-disabled:hover {
+  background: transparent;
+}
 /* ── SCROLLABLE LIST ── */
 .tp-list {
   height: 180px;
