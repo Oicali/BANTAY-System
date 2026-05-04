@@ -49,27 +49,31 @@ const HEATMAP_LAYER = {
       1,
       1,
     ],
+    // KEY CHANGE: much smaller radius at low zoom, grows as you zoom in
     "heatmap-radius": [
       "interpolate",
       ["linear"],
       ["zoom"],
       10,
-      18,
-      13,
-      32,
-      15,
+      8, // was 18 — very tight at city overview
+      12,
+      16, // was 32
+      14,
+      28, // was 48
+      16,
       48,
     ],
+    // Stronger intensity at low zoom to keep spots visible despite small radius
     "heatmap-intensity": [
       "interpolate",
       ["linear"],
       ["zoom"],
       10,
-      0.6,
+      1.5, // was 0.6 — compensate for smaller radius
       13,
-      1.2,
+      1.8, // was 1.2
       15,
-      2.0,
+      2.5, // was 2.0
     ],
     "heatmap-color": [
       "interpolate",
@@ -88,20 +92,22 @@ const HEATMAP_LAYER = {
       1.0,
       "rgba(69,10,10,0.97)",
     ],
+    // Fade out earlier as you zoom in close (pins take over)
     "heatmap-opacity": [
       "interpolate",
       ["linear"],
       ["zoom"],
-      12,
-      0.92,
+      11,
+      0.9,
+      14,
+      0.7,
       15,
-      0.55,
+      0.35,
       16,
       0,
     ],
   },
 };
-
 const CLUSTER_CIRCLE_LAYER = {
   id: "cluster-circles",
   type: "circle",
@@ -253,10 +259,21 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
             }}
           >
             {selected.slice(0, 2).map((c) => (
-              <span key={c} className="crmap-multisel-pill">
-                {CRIME_SHORT[c] || c}
+              <span
+                key={c}
+                className="crmap-multisel-pill"
+                title={CRIME_DISPLAY[c] || c}
+              >
+                <span className="crmap-multisel-pill-label">
+                  {CRIME_SHORT[c] || c}
+                </span>
                 <span
-                  style={{ marginLeft: 3, cursor: "pointer", opacity: 0.7 }}
+                  style={{
+                    marginLeft: 3,
+                    cursor: "pointer",
+                    opacity: 0.7,
+                    flexShrink: 0,
+                  }}
                   onClick={(e) => removeOne(c, e)}
                 >
                   ×
@@ -312,131 +329,216 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
   );
 };
 
-const BarangaySelect = ({ selected, onChange }) => {
+const formatBarangayLabel = (name) => {
+  const ROMAN = new Set([
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+  ]);
+
+  return name.toLowerCase().replace(/\b\w+/g, (word) => {
+    const upper = word.toUpperCase();
+    if (ROMAN.has(upper)) return upper;
+    if (upper === "P" || upper === "F") return upper;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+};
+
+const BarangayMultiSelect = ({ selected, onChange }) => {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
         setOpen(false);
+        setSearch("");
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const formatBarangayLabel = (name) => {
-    const ROMAN = new Set([
-      "I",
-      "II",
-      "III",
-      "IV",
-      "V",
-      "VI",
-      "VII",
-      "VIII",
-      "IX",
-      "X",
-      "XI",
-      "XII",
-    ]);
-    return name.toLowerCase().replace(/\b\w+/g, (word) => {
-      const upper = word.toUpperCase();
-      if (ROMAN.has(upper)) return upper;
-      if (upper === "P" || upper === "F") return upper;
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    });
+  const filtered = CURRENT_BARANGAYS.filter((b) =>
+    b.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const toggle = (b) => {
+    onChange(
+      selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
+    );
   };
 
-  const handleSelect = (val) => {
-    onChange(val);
-    setOpen(false);
+  const removeOne = (b, e) => {
+    e.stopPropagation();
+    onChange(selected.filter((x) => x !== b));
   };
+
+  const isAll = selected.length === 0;
+  const allSelected = selected.length === CURRENT_BARANGAYS.length;
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      {/* Trigger */}
+    <div
+      className="crmap-multisel-wrap"
+      ref={ref}
+      style={{ position: "relative" }}
+    >
       <div
         className="crmap-multisel-trigger"
-        style={{ cursor: "pointer" }}
-        onClick={() => setOpen((v) => !v)}
+        style={{ cursor: "text" }}
+        onClick={() => {
+          setOpen(true);
+          inputRef.current?.focus();
+        }}
       >
-        <span
+        {/* Pills + input in a flex row that can grow */}
+        <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
             flex: 1,
-            fontSize: 14,
-            color: selected ? "#212529" : "#6b7280",
+            minWidth: 0,
             overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
-          {selected ? formatBarangayLabel(selected) : "All Barangays"}
-        </span>
-        <span style={{ fontSize: 10, color: "#6b7280", flexShrink: 0 }}>
+          {selected.slice(0, 2).map((b) => (
+            <span
+              key={b}
+              className="crmap-multisel-pill"
+              title={formatBarangayLabel(b)}
+            >
+              <span className="crmap-multisel-pill-label">
+                {formatBarangayLabel(b)}
+              </span>
+              <span
+                style={{
+                  marginLeft: 3,
+                  cursor: "pointer",
+                  opacity: 0.7,
+                  flexShrink: 0,
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  removeOne(b, e);
+                }}
+              >
+                ×
+              </span>
+            </span>
+          ))}
+          {selected.length > 2 && (
+            <span
+              className="crmap-multisel-pill"
+              style={{ background: "#adb5bd", flexShrink: 0 }}
+            >
+              +{selected.length - 2}
+            </span>
+          )}
+          <input
+            ref={inputRef}
+            type="text"
+            value={search}
+            placeholder={selected.length === 0 ? "All Barangays" : ""}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              flex: 1,
+              minWidth: 40,
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              fontSize: 14,
+              fontFamily: "inherit",
+              color: "#212529",
+              padding: 0,
+            }}
+          />
+        </div>
+
+        {/* Arrow always pinned to the right, never moves */}
+        <span
+          style={{
+            fontSize: 10,
+            color: "#6b7280",
+            flexShrink: 0,
+            marginLeft: 6,
+          }}
+        >
           {open ? "▲" : "▼"}
         </span>
       </div>
 
-      {/* Dropdown */}
       {open && (
         <div className="crmap-multisel-dropdown">
-          <div style={{ maxHeight: 228, overflowY: "auto" }}>
-            {/* "All Barangays" as the first item, same style as the rest */}
-            <div
-              className="crmap-multisel-item"
-              style={{
-                background: !selected ? "rgba(30,58,95,0.08)" : undefined,
-                fontStyle: "italic",
-              }}
+          {/* FIX 2: Select All / Clear All — matches CrimeTypeMultiSelect */}
+          <div className="crmap-multisel-actions">
+            <button
+              className="crmap-multisel-action-btn"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleSelect("")}
+              onClick={() =>
+                onChange(allSelected ? [] : [...CURRENT_BARANGAYS])
+              }
             >
-              <span>All Barangays</span>
-            </div>
+              {allSelected ? "Clear all" : "Select all"}
+            </button>
+            {selected.length > 0 && (
+              <button
+                className="crmap-multisel-action-btn clear"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange([]);
+                  setSearch("");
+                }}
+              >
+                Clear ({selected.length})
+              </button>
+            )}
+          </div>
 
-            {CURRENT_BARANGAYS.map((b) => (
-              <div
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            {filtered.map((b) => (
+              <label
                 key={b}
                 className="crmap-multisel-item"
-                style={{
-                  background:
-                    selected === b ? "rgba(30,58,95,0.08)" : undefined,
-                }}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(b)}
               >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(b)}
+                  onChange={() => toggle(b)}
+                />
                 <span>{formatBarangayLabel(b)}</span>
-              </div>
+              </label>
             ))}
-
-            {LEGACY_BARANGAY_OPTIONS.length > 0 && (
-              <div className="crmap-multisel-group-label">
-                ── Pre-2023 Names (Auto-resolved) ──
+            {filtered.length === 0 && (
+              <div
+                style={{ padding: "8px 12px", fontSize: 12, color: "#9ca3af" }}
+              >
+                {search ? `No results for "${search}"` : "No barangays found"}
               </div>
             )}
-            {LEGACY_BARANGAY_OPTIONS.map((o, idx) => (
-              <div
-                key={`legacy-${idx}`}
-                className="crmap-multisel-item"
-                style={{
-                  background:
-                    selected === o.value ? "rgba(30,58,95,0.08)" : undefined,
-                }}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(o.value)}
-              >
-                <span>{o.label}</span>
-              </div>
-            ))}
           </div>
         </div>
       )}
     </div>
   );
 };
-
 function CrimeMapping() {
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
@@ -445,10 +547,12 @@ function CrimeMapping() {
     currentUser?.role_name === "Investigator" ||
     currentUser?.role === "Investigator";
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
+  const isPatrol =
+    currentUser?.role_name === "Patrol" || currentUser?.role === "Patrol";
 
   const [boundaries, setBoundaries] = useState([]);
   const [mapReady, setMapReady] = useState(false);
-  const [showClusters, setShowClusters] = useState(true);
+  const [showClusters, setShowClusters] = useState(false);
   const [pins, setPins] = useState([]);
   const [stats, setStats] = useState(null);
   const [geoJSONData, setGeoJSONData] = useState(null);
@@ -469,6 +573,10 @@ function CrimeMapping() {
   const [selectedPin, setSelectedPin] = useState(null);
   const [zoom, setZoom] = useState(12);
   const [error, setError] = useState(null);
+
+  // Add this state:
+  const [hasPatrolAssignment, setHasPatrolAssignment] = useState(false);
+  const [patrolAssignedBarangays, setPatrolAssignedBarangays] = useState([]);
 
   const getPHTDate = (offsetDays = 0) => {
     const now = new Date();
@@ -492,10 +600,12 @@ function CrimeMapping() {
   const defaultDateFrom = getPHTOneYearAgo();
 
   // Single state
+  // Single state
   const [filters, setFilters] = useState({
     incident_types: [],
     date_from: defaultDateFrom,
     date_to: defaultDateTo,
+    // Start with empty array for patrol - will be overridden after check
     barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
   });
 
@@ -523,6 +633,7 @@ function CrimeMapping() {
     left: 0,
     type: "choropleth",
   });
+  const [patrolAssignmentLoading, setPatrolAssignmentLoading] = useState(true);
 
   const mapRef = useRef(null);
   const incidenceTooltipTimerRef = useRef(null);
@@ -540,30 +651,6 @@ function CrimeMapping() {
   const totalBarangays = geoJSONData
     ? new Set(geoJSONData.features.map((f) => f.properties.name_db)).size
     : 47;
-
-  const formatBarangayLabel = (name) => {
-    const ROMAN = new Set([
-      "I",
-      "II",
-      "III",
-      "IV",
-      "V",
-      "VI",
-      "VII",
-      "VIII",
-      "IX",
-      "X",
-      "XI",
-      "XII",
-    ]);
-
-    return name.toLowerCase().replace(/\b\w+/g, (word) => {
-      const upper = word.toUpperCase();
-      if (ROMAN.has(upper)) return upper;
-      if (upper === "P" || upper === "F") return upper;
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    });
-  };
 
   const formatDate = (d) => {
     if (!d) return "N/A";
@@ -660,7 +747,10 @@ function CrimeMapping() {
       if (appliedFilters.date_to)
         params.append("date_to", appliedFilters.date_to);
       if (appliedFilters.barangays?.length)
-        params.append("barangay", appliedFilters.barangays[0]);
+        params.append(
+          "barangays",
+          appliedFilters.barangays.map((b) => b.toUpperCase()).join(","),
+        );
 
       const q = params.toString() ? `?${params}` : "";
       const headers = { Authorization: `Bearer ${getToken()}` };
@@ -703,7 +793,10 @@ function CrimeMapping() {
       if (appliedFilters.date_to)
         params.append("date_to", appliedFilters.date_to);
       if (appliedFilters.barangays?.length)
-        params.append("barangay", appliedFilters.barangays[0]);
+        params.append(
+          "barangays",
+          appliedFilters.barangays.map((b) => b.toUpperCase()).join(","),
+        );
 
       const q = params.toString() ? `?${params}` : "";
 
@@ -725,10 +818,11 @@ function CrimeMapping() {
   }, [appliedFilters]); // ← depends on appliedFilters directly
 
   const fetchOfficers = useCallback(async () => {
-    if (isBarangayUser || isInvestigator) return;
+    if (isBarangayUser || isInvestigator) return; // early exit still fine
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/gps/officers`, {
+        // no ?platform param — web always shows all visible officers
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
@@ -771,15 +865,29 @@ function CrimeMapping() {
     };
   }, [fetchOfficers]);
 
-  // REPLACE the fetch effect that currently has no deps listed:
-  useEffect(() => {
-    if (heatmapMode) {
-      fetchHeatmap();
-      fetchAll();
-    } else {
-      fetchAll();
-    }
-  }, [fetchTrigger, heatmapMode]);
+  // Fetch data on trigger or mode change — but wait for patrol assignment first
+  // Fetch data on trigger or mode change
+  // Fetch data on trigger or mode change — but wait for patrol assignment first
+  // Fetch data on trigger or mode change
+// Fetch data on trigger or mode change — wait for patrol assignment to load first
+useEffect(() => {
+  // For patrol users, wait for patrol status to be determined
+  if (isPatrol && patrolAssignmentLoading) {
+    return;
+  }
+
+  if (heatmapMode) {
+    fetchHeatmap();
+    fetchAll();
+  } else {
+    fetchAll();
+  }
+}, [
+  fetchTrigger,
+  heatmapMode,
+  isPatrol,
+  patrolAssignmentLoading,
+]);
 
   const handleModeToggle = useCallback(() => {
     setHeatmapMode((m) => !m);
@@ -791,6 +899,29 @@ function CrimeMapping() {
     if (!geoJSONData) return null;
 
     const selectedBarangay = appliedFilters.barangays?.[0];
+
+    // Patrol user with ongoing schedule → only show assigned barangays
+    if (isPatrol && hasPatrolAssignment && patrolAssignedBarangays.length > 0) {
+      return {
+        ...geoJSONData,
+        features: geoJSONData.features
+          .filter((f) => patrolAssignedBarangays.includes(f.properties.name_db))
+          .map((f) => {
+            const boundary = boundaries.find(
+              (b) => b.name_db === f.properties.name_db,
+            );
+            return {
+              ...f,
+              properties: {
+                ...f.properties,
+                fillColor: boundary?.color || "#adb5bd",
+                isSelected: true,
+                isLocked: false,
+              },
+            };
+          }),
+      };
+    }
 
     if (isBarangayUser && userBarangay) {
       const ownFeature = geoJSONData.features.find(
@@ -825,7 +956,8 @@ function CrimeMapping() {
         ...geoJSONData,
         features: geoJSONData.features.map((f) => {
           const isSelected =
-            !selectedBarangay || f.properties.name_db === selectedBarangay;
+            !appliedFilters.barangays?.length ||
+            appliedFilters.barangays.includes(f.properties.name_db);
           return {
             ...f,
             properties: {
@@ -850,14 +982,15 @@ function CrimeMapping() {
       ...geoJSONData,
       features: geoJSONData.features.map((f) => {
         const isSelected =
-          !selectedBarangay || f.properties.name_db === selectedBarangay;
+          !appliedFilters.barangays?.length ||
+          appliedFilters.barangays.includes(f.properties.name_db);
         return {
           ...f,
           properties: {
             ...f.properties,
             fillColor: isSelected
               ? colorLookup[f.properties.name_kml] || "#adb5bd"
-              : "#adb5bd",
+              : "rgba(0,0,0,0)", // ← transparent, not gray
             isSelected,
             isLocked: false,
           },
@@ -871,6 +1004,9 @@ function CrimeMapping() {
     isBarangayUser,
     userBarangay,
     appliedFilters,
+    isPatrol,
+    hasPatrolAssignment,
+    patrolAssignedBarangays,
   ]);
 
   const handleMapDblClick = useCallback(
@@ -1036,7 +1172,7 @@ function CrimeMapping() {
       "line-opacity": [
         "case",
         ["==", ["get", "isSelected"], false],
-        0.18,
+        0.08, // ← was 0.18, nearly invisible for unselected
         heatmapMode ? 0.6 : 0.8,
       ],
     },
@@ -1075,6 +1211,77 @@ function CrimeMapping() {
       : []),
   ];
 
+  // ADD this useEffect to check patrol assignment on mount:
+  // ADD this useEffect to check patrol assignment on mount:
+  useEffect(() => {
+    if (!isPatrol) {
+      setPatrolAssignmentLoading(false);
+      return;
+    }
+
+    const checkPatrolAssignment = async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const data = await res.json();
+
+        if (data.success) {
+          const today = new Date().toISOString().split("T")[0];
+          const ongoingPatrol = data.data.find(
+            (p) => p.start_date <= today && p.end_date >= today,
+          );
+
+          if (ongoingPatrol) {
+            // ✅ HAS schedule - extract barangays from routes
+            const assignedBarangays = [
+              ...new Set(
+                (ongoingPatrol.routes || [])
+                  .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+                  .map((r) => r.barangay),
+              ),
+            ];
+            setHasPatrolAssignment(true);
+            setPatrolAssignedBarangays(assignedBarangays);
+
+            // Auto-set barangay filter for patrol user
+            setFilters((prev) => ({ ...prev, barangays: assignedBarangays }));
+            setAppliedFilters((prev) => ({
+              ...prev,
+              barangays: assignedBarangays,
+            }));
+
+            // Trigger data fetch with new barangay filter
+            setFetchTrigger((t) => t + 1);
+          } else {
+            // ✅ NO schedule - show all data like admin
+            setHasPatrolAssignment(false);
+            setPatrolAssignedBarangays([]);
+
+            // Clear any barangay filters to show all data
+            setFilters((prev) => ({ ...prev, barangays: [] }));
+            setAppliedFilters((prev) => ({ ...prev, barangays: [] }));
+            setFetchTrigger((t) => t + 1);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to check patrol assignment:", err);
+        // On error, show all data with no restrictions
+        setHasPatrolAssignment(false);
+        setPatrolAssignedBarangays([]);
+        setFetchTrigger((t) => t + 1);
+      } finally {
+        setPatrolAssignmentLoading(false);
+      }
+    };
+
+    checkPatrolAssignment();
+  }, [isPatrol]);
+
   // AND add this effect to auto-reset active tab if user lands on a hidden tab:
   useEffect(() => {
     if (isBarangayUser && activeTab === "at_risk") {
@@ -1103,22 +1310,20 @@ function CrimeMapping() {
             !isBarangayUser
               ? heatmapMode
                 ? { val: clusterCount, lbl: "Clusters Found" }
-                : appliedFilters.barangays?.[0]
-                  ? {
-                      val:
-                        boundaries.find(
+                : {
+                    val: (() => {
+                      if (appliedFilters.barangays?.length > 0) {
+                        const affected = boundaries.filter(
                           (b) =>
-                            b.name_db.toUpperCase() ===
-                            appliedFilters.barangays[0].toUpperCase(),
-                        )?.crime_count > 0
-                          ? "1/1"
-                          : "0/1",
-                      lbl: "Brgy. Affected",
-                    }
-                  : {
-                      val: `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`,
-                      lbl: "Brgy. Affected",
-                    }
+                            appliedFilters.barangays.includes(b.name_db) &&
+                            b.crime_count > 0,
+                        ).length;
+                        return `${affected}/${appliedFilters.barangays.length}`;
+                      }
+                      return `${boundaries.filter((b) => b.crime_count > 0).length}/${totalBarangays}`;
+                    })(),
+                    lbl: "Brgy. Affected",
+                  }
               : null,
             {
               val: (() => {
@@ -1165,17 +1370,25 @@ function CrimeMapping() {
             }
           />
 
-          {isBarangayUser && userBarangay ? (
+          {isPatrol && hasPatrolAssignment ? (
+            <div className="crmap-fsel crmap-fsel-locked">
+              {patrolAssignedBarangays.length === 1
+                ? formatBarangayLabel(patrolAssignedBarangays[0])
+                : `${patrolAssignedBarangays.length} Assigned Barangays`}
+              <span
+                className="crmap-locked-icon"
+                title="Auto-filtered to your patrol assignment"
+              ></span>
+            </div>
+          ) : isBarangayUser && userBarangay ? (
             <div className="crmap-fsel crmap-fsel-locked">
               {formatBarangayLabel(userBarangay)}
               <span className="crmap-locked-icon"></span>
             </div>
           ) : (
-            <BarangaySelect
-              selected={filters.barangays?.[0] || ""}
-              onChange={(val) =>
-                setFilters((f) => ({ ...f, barangays: val ? [val] : [] }))
-              }
+            <BarangayMultiSelect
+              selected={filters.barangays}
+              onChange={(val) => setFilters((f) => ({ ...f, barangays: val }))}
             />
           )}
 
@@ -1220,31 +1433,41 @@ function CrimeMapping() {
           <button
             className="crmap-apply-btn"
             onClick={() => {
-              setAppliedFilters({ ...filters });
+              // For patrol users, always use assigned barangays
+              const filtersToApply =
+                isPatrol && hasPatrolAssignment
+                  ? { ...filters, barangays: patrolAssignedBarangays }
+                  : filters;
+
+              setAppliedFilters(filtersToApply);
               setFetchTrigger((t) => t + 1);
 
-              const selectedBarangay = filters.barangays?.[0];
-              if (selectedBarangay && geoJSONData) {
-                const feature = geoJSONData.features.find(
-                  (f) => f.properties.name_db === selectedBarangay,
-                );
-                if (feature && mapRef.current) {
+              const selectedBarangays = filtersToApply.barangays;
+              if (selectedBarangays?.length > 0 && geoJSONData) {
+                const allCoords = [];
+                for (const brgy of selectedBarangays) {
+                  const feature = geoJSONData.features.find(
+                    (f) => f.properties.name_db === brgy,
+                  );
+                  if (!feature) continue;
                   const coords =
                     feature.geometry.type === "Polygon"
                       ? feature.geometry.coordinates[0]
                       : feature.geometry.coordinates[0][0];
-                  const lngs = coords.map((c) => c[0]);
-                  const lats = coords.map((c) => c[1]);
-                  mapRef.current.flyTo({
-                    center: [
-                      (Math.min(...lngs) + Math.max(...lngs)) / 2,
-                      (Math.min(...lats) + Math.max(...lats)) / 2,
-                    ],
-                    zoom: 15,
-                    duration: 1200,
-                  });
+                  allCoords.push(...coords);
                 }
-              } else if (!selectedBarangay && mapRef.current) {
+                if (allCoords.length > 0 && mapRef.current) {
+                  const lngs = allCoords.map((c) => c[0]);
+                  const lats = allCoords.map((c) => c[1]);
+                  mapRef.current.fitBounds(
+                    [
+                      [Math.min(...lngs), Math.min(...lats)],
+                      [Math.max(...lngs), Math.max(...lats)],
+                    ],
+                    { padding: 60, duration: 1200 },
+                  );
+                }
+              } else if (!selectedBarangays?.length && mapRef.current) {
                 mapRef.current.flyTo({
                   center: [120.964, 14.4341],
                   zoom: 12,
@@ -1266,11 +1489,16 @@ function CrimeMapping() {
                 incident_types: [],
                 date_from: clearFrom,
                 date_to: clearTo,
-                barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+                barangays:
+                  isPatrol && hasPatrolAssignment
+                    ? patrolAssignedBarangays
+                    : isBarangayUser && userBarangay
+                      ? [userBarangay]
+                      : [],
               };
               setFilters(cleared);
-              setAppliedFilters(cleared); // ← add this
-              if (!isBarangayUser) {
+              setAppliedFilters(cleared);
+              if (!isBarangayUser && !(isPatrol && hasPatrolAssignment)) {
                 mapRef.current?.flyTo({
                   center: [120.964, 14.4341],
                   zoom: 12,

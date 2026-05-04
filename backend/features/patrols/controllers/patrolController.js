@@ -1,5 +1,8 @@
+// patrolController.js
+
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
+const { getBarangayFromCoordinates } = require("../../../shared/utils/geoUtils");
 // ── Helper: generate date range ────────────────────────────
 
 const formatDateOnly = (d) => {
@@ -59,6 +62,7 @@ const getPatrolStats = async (req, res) => {
 // ─────────────────────────────────────────────
 // GET /patrol/active
 // ─────────────────────────────────────────────
+// REPLACE the existing getActivePatrollers function
 const getActivePatrollers = async (req, res) => {
   try {
     const result = await pool.query(`
@@ -82,13 +86,31 @@ const getActivePatrollers = async (req, res) => {
       WHERE u.role_id = 3
       ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
     `);
-    res.json({ success: true, data: result.rows });
+    
+    // Resolve barangay names for each officer
+    const officersWithBarangay = result.rows.map(officer => {
+      let barangay = officer.last_location_name;
+      
+      // If no location_name but we have coordinates, resolve from GeoJSON
+      if (!barangay && officer.latitude && officer.longitude) {
+        barangay = getBarangayFromCoordinates(
+          parseFloat(officer.longitude),
+          parseFloat(officer.latitude)
+        );
+      }
+      
+      return {
+        ...officer,
+        resolved_barangay: barangay || null
+      };
+    });
+    
+    res.json({ success: true, data: officersWithBarangay });
   } catch (error) {
     console.error("Patroller fetch error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 // ─────────────────────────────────────────────
 // GET /patrol/available-patrollers
 // ─────────────────────────────────────────────

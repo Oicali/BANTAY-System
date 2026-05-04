@@ -1403,10 +1403,10 @@ input:focus-visible {
 }
 
 .crmap-officer-avatar {
-  width: 28px;
-  height: 28px;
+  width: 42px;        /* was 28px */
+  height: 42px;       /* was 28px */
   border-radius: 50%;
-  border: 2px solid #1d4ed8;
+  border: 2.5px solid #1d4ed8;
   background: #dbeafe;
   overflow: hidden;
   display: flex;
@@ -1425,7 +1425,7 @@ input:focus-visible {
 }
 
 .crmap-officer-avatar-initials {
-  font-size: 10px;
+  font-size: 14px;    /* was 10px */
   font-weight: 700;
   color: #1d4ed8;
   letter-spacing: 0.3px;
@@ -1447,17 +1447,19 @@ input:focus-visible {
 /* Pulse ring — absolutely positioned behind avatar */
 .crmap-officer-pulse {
   position: absolute;
-  top: -3px;
+  top: -4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 34px;
-  height: 34px;
+  width: 50px;        /* was 34px */
+  height: 50px;       /* was 34px */
   border-radius: 50%;
   border: 2px solid rgba(29, 78, 216, 0.45);
   animation: crmap-officer-pulse 2.2s ease-out infinite;
   pointer-events: none;
   z-index: 0;
 }
+
+
 
 @keyframes crmap-officer-pulse {
   0%   { transform: translateX(-50%) scale(1);   opacity: 0.7; }
@@ -1617,10 +1619,18 @@ input:focus-visible {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  flex-shrink: 0;        /* ← don't shrink */
-  max-width: 100px;
+  flex-shrink: 0;
+  max-width: 90px;          /* ← fixed cap */
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* NEW — truncate the text label inside the pill */
+.crmap-multisel-pill-label {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 @media (max-width: 1024px) {
