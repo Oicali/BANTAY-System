@@ -107,14 +107,16 @@ const getBoundaries = async (req, res) => {
       params.push(barangayList);
     }
 
-    // ADD: Patrol user barangay restriction
+    // Patrol user barangay restriction - ONLY apply if they have an ongoing schedule
     const { role_name, user_id } = req.user || {};
     if (role_name === "Patrol") {
       const assignedBarangays = await getPatrolUserBarangays(user_id);
+      // Only restrict if they have assigned barangays (ongoing schedule)
       if (assignedBarangays.length > 0) {
         crimeQuery += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
         params.push(assignedBarangays);
       }
+      // If no assignedBarangays, don't add any filter - they see all data like admin
     }
 
     crimeQuery += ` GROUP BY UPPER(TRIM(place_barangay))`;
@@ -253,11 +255,12 @@ const getPins = async (req, res) => {
 
       if (role_name === "Patrol") {
         const assignedBarangays = await getPatrolUserBarangays(user_id);
+        // Only restrict if they have assigned barangays (ongoing schedule)
         if (assignedBarangays.length > 0) {
           query += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
           params.push(assignedBarangays);
         }
-        // If no ongoing assignment, no filter = see all data
+        // If no assignedBarangays, don't add any filter - they see all data like admin
       }
 
       query += ` ORDER BY date_time_commission DESC`;
@@ -354,15 +357,16 @@ const getStatistics = async (req, res) => {
       params.push(barangayList);
     }
 
-    // ADD: Patrol user barangay restriction
+    // Patrol user barangay restriction - ONLY apply if they have an ongoing schedule
     const { role_name, user_id } = req.user || {};
     if (role_name === "Patrol") {
       const assignedBarangays = await getPatrolUserBarangays(user_id);
+      // Only restrict if they have assigned barangays (ongoing schedule)
       if (assignedBarangays.length > 0) {
         baseWhere += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
         params.push(assignedBarangays);
       }
-      // If no ongoing assignment, no filter = see all data
+      // If no assignedBarangays, don't add any filter - they see all data like admin
     }
 
     const incidenceMin = getIncidenceMinCount(
@@ -505,14 +509,16 @@ const getHeatmap = async (req, res) => {
       params.push(barangayList);
     }
 
-    // ADD: Patrol user barangay restriction (apply to baseWhere BEFORE building pointsSQL)
+    // Patrol user barangay restriction - ONLY apply if they have an ongoing schedule
     const { role_name, user_id } = req.user || {};
     if (role_name === "Patrol") {
       const assignedBarangays = await getPatrolUserBarangays(user_id);
+      // Only restrict if they have assigned barangays (ongoing schedule)
       if (assignedBarangays.length > 0) {
         baseWhere += ` AND UPPER(TRIM(place_barangay)) = ANY($${p++}::text[])`;
         params.push(assignedBarangays);
       }
+      // If no assignedBarangays, don't add any filter - they see all data like admin
     }
 
     const pointsSQL = `
@@ -531,7 +537,7 @@ const getHeatmap = async (req, res) => {
     const client = await pool.connect();
     let pointsResult;
     try {
-      // Barangay Official override (keep existing)
+      // Barangay Official override
       if (role_name === "Barangay Official") {
         const bdRes = await client.query(
           `SELECT barangay_code FROM barangay_details WHERE user_id = $1`,
@@ -548,7 +554,6 @@ const getHeatmap = async (req, res) => {
           pointsResult = await client.query(pointsSQL, params);
         }
       } else {
-        // Patrol filter already baked into baseWhere/params
         pointsResult = await client.query(pointsSQL, params);
       }
     } finally {

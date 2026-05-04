@@ -600,10 +600,12 @@ function CrimeMapping() {
   const defaultDateFrom = getPHTOneYearAgo();
 
   // Single state
+  // Single state
   const [filters, setFilters] = useState({
     incident_types: [],
     date_from: defaultDateFrom,
     date_to: defaultDateTo,
+    // Start with empty array for patrol - will be overridden after check
     barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
   });
 
@@ -631,6 +633,7 @@ function CrimeMapping() {
     left: 0,
     type: "choropleth",
   });
+  const [patrolAssignmentLoading, setPatrolAssignmentLoading] = useState(true);
 
   const mapRef = useRef(null);
   const incidenceTooltipTimerRef = useRef(null);
@@ -695,60 +698,6 @@ function CrimeMapping() {
       type,
     });
   }, []);
-
-  // ADD this useEffect to check patrol assignment on mount:
-  useEffect(() => {
-    if (!isPatrol) return;
-
-    const checkPatrolAssignment = async () => {
-      try {
-        const token = getToken();
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        const data = await res.json();
-
-        if (data.success) {
-          const today = new Date().toISOString().split("T")[0];
-          const ongoingPatrol = data.data.find(
-            (p) => p.start_date <= today && p.end_date >= today,
-          );
-
-          if (ongoingPatrol) {
-            const barangays = [
-              ...new Set(
-                (ongoingPatrol.routes || [])
-                  .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-                  .map((r) => r.barangay),
-              ),
-            ];
-            setHasPatrolAssignment(true);
-            setPatrolAssignedBarangays(barangays);
-            
-            // Auto-set barangay filter for patrol user
-            setFilters((prev) => ({ ...prev, barangays }));
-            setAppliedFilters((prev) => ({ ...prev, barangays }));
-            
-            // Trigger data fetch with new barangay filter
-            setFetchTrigger((t) => t + 1);
-          } else {
-            setHasPatrolAssignment(false);
-            setPatrolAssignedBarangays([]);
-            
-            // Trigger data fetch without barangay filter
-            setFetchTrigger((t) => t + 1);
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to check patrol assignment:", err);
-      }
-    };
-
-    checkPatrolAssignment();
-  }, [isPatrol]);
 
   useEffect(() => {
     fetch("/bacoor_barangays.geojson")
@@ -916,21 +865,29 @@ function CrimeMapping() {
     };
   }, [fetchOfficers]);
 
-    // Fetch data on trigger or mode change — but wait for patrol assignment first
-  useEffect(() => {
-    // Don't fetch until patrol status is resolved
-    if (isPatrol && patrolAssignedBarangays.length === 0 && hasPatrolAssignment === false) {
-      // Still loading patrol status — skip this fetch, the patrol useEffect will trigger re-fetch
-      return;
-    }
-    
-    if (heatmapMode) {
-      fetchHeatmap();
-      fetchAll();
-    } else {
-      fetchAll();
-    }
-  }, [fetchTrigger, heatmapMode, isPatrol, hasPatrolAssignment]);
+  // Fetch data on trigger or mode change — but wait for patrol assignment first
+  // Fetch data on trigger or mode change
+  // Fetch data on trigger or mode change — but wait for patrol assignment first
+  // Fetch data on trigger or mode change
+// Fetch data on trigger or mode change — wait for patrol assignment to load first
+useEffect(() => {
+  // For patrol users, wait for patrol status to be determined
+  if (isPatrol && patrolAssignmentLoading) {
+    return;
+  }
+
+  if (heatmapMode) {
+    fetchHeatmap();
+    fetchAll();
+  } else {
+    fetchAll();
+  }
+}, [
+  fetchTrigger,
+  heatmapMode,
+  isPatrol,
+  patrolAssignmentLoading,
+]);
 
   const handleModeToggle = useCallback(() => {
     setHeatmapMode((m) => !m);
@@ -1253,6 +1210,77 @@ function CrimeMapping() {
       ? [{ key: "officers", label: "Patrol" }]
       : []),
   ];
+
+  // ADD this useEffect to check patrol assignment on mount:
+  // ADD this useEffect to check patrol assignment on mount:
+  useEffect(() => {
+    if (!isPatrol) {
+      setPatrolAssignmentLoading(false);
+      return;
+    }
+
+    const checkPatrolAssignment = async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const data = await res.json();
+
+        if (data.success) {
+          const today = new Date().toISOString().split("T")[0];
+          const ongoingPatrol = data.data.find(
+            (p) => p.start_date <= today && p.end_date >= today,
+          );
+
+          if (ongoingPatrol) {
+            // ✅ HAS schedule - extract barangays from routes
+            const assignedBarangays = [
+              ...new Set(
+                (ongoingPatrol.routes || [])
+                  .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+                  .map((r) => r.barangay),
+              ),
+            ];
+            setHasPatrolAssignment(true);
+            setPatrolAssignedBarangays(assignedBarangays);
+
+            // Auto-set barangay filter for patrol user
+            setFilters((prev) => ({ ...prev, barangays: assignedBarangays }));
+            setAppliedFilters((prev) => ({
+              ...prev,
+              barangays: assignedBarangays,
+            }));
+
+            // Trigger data fetch with new barangay filter
+            setFetchTrigger((t) => t + 1);
+          } else {
+            // ✅ NO schedule - show all data like admin
+            setHasPatrolAssignment(false);
+            setPatrolAssignedBarangays([]);
+
+            // Clear any barangay filters to show all data
+            setFilters((prev) => ({ ...prev, barangays: [] }));
+            setAppliedFilters((prev) => ({ ...prev, barangays: [] }));
+            setFetchTrigger((t) => t + 1);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to check patrol assignment:", err);
+        // On error, show all data with no restrictions
+        setHasPatrolAssignment(false);
+        setPatrolAssignedBarangays([]);
+        setFetchTrigger((t) => t + 1);
+      } finally {
+        setPatrolAssignmentLoading(false);
+      }
+    };
+
+    checkPatrolAssignment();
+  }, [isPatrol]);
 
   // AND add this effect to auto-reset active tab if user lands on a hidden tab:
   useEffect(() => {

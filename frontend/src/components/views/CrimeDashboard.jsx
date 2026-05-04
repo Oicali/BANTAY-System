@@ -620,6 +620,11 @@ const FilterBar = ({
     if (isBarangayUser && userBarangay) {
       base.barangays = [userBarangay];
     }
+    // For patrol users with active assignment, restrict to their barangays
+    if (isPatrol && hasPatrolAssignment && patrolAssignedBarangays.length > 0) {
+      base.barangays = patrolAssignedBarangays;
+    }
+    // For patrol users without assignment, base.barangays stays empty (all barangays)
     onApply(base);
   };
 
@@ -758,10 +763,14 @@ const FilterBar = ({
                   ></span>
                 </div>
               ) : isBarangayUser && userBarangay ? (
-                <div className="cd-brgy-locked">
-                  <span className="cd-brgy-pill">
+                <div className="crmap-fsel crmap-fsel-locked">
+                  <span className="crmap-locked-value">
                     {formatBarangayLabel(userBarangay)}
                   </span>
+                  <span
+                    className="crmap-locked-icon"
+                    title="Auto-filtered to your assigned barangay"
+                  ></span>
                 </div>
               ) : (
                 <BarangayMultiSelect
@@ -2207,11 +2216,15 @@ const CrimeDashboard = () => {
 
   const BLANK_FILTERS_FOR_USER = () => {
     const base = BLANK_FILTERS();
-    if (isPatrol && hasPatrolAssignment) {
+    // Only apply automatic barangay restriction if:
+    // 1. It's a patrol user WITH an ongoing assignment, OR
+    // 2. It's a barangay user
+    if (isPatrol && hasPatrolAssignment && patrolAssignedBarangays.length > 0) {
       base.barangays = patrolAssignedBarangays;
     } else if (isBarangayUser && userBarangay) {
       base.barangays = [userBarangay];
     }
+    // For patrol users without assignment, keep barangays as empty array (all barangays)
     return base;
   };
 
@@ -2238,6 +2251,7 @@ const CrimeDashboard = () => {
 
   const fetchIdRef = useRef(0);
 
+  // Check patrol assignment on mount
   // Check patrol assignment on mount
   // Check patrol assignment on mount
   useEffect(() => {
@@ -2280,12 +2294,22 @@ const CrimeDashboard = () => {
             setAppliedFilters(updatedFilters);
             fetchOverview(updatedFilters, true);
           } else {
+            // NO ongoing patrol - use default filters (all barangays)
             setHasPatrolAssignment(false);
             setPatrolAssignedBarangays([]);
+
+            // Fetch with default filters (no barangay restriction)
+            const defaultFilters = BLANK_FILTERS();
+            setAppliedFilters(defaultFilters);
+            fetchOverview(defaultFilters, true);
           }
         }
       } catch (err) {
         console.warn("Failed to check patrol assignment:", err);
+        // On error, still fetch with default filters
+        const defaultFilters = BLANK_FILTERS();
+        setAppliedFilters(defaultFilters);
+        fetchOverview(defaultFilters, true);
       }
     };
 
@@ -2373,7 +2397,8 @@ const CrimeDashboard = () => {
   };
 
   useEffect(() => {
-    // Skip initial fetch for patrol users — the patrol check useEffect will handle it
+    // For patrol users, the patrol check useEffect handles the initial fetch
+    // For non-patrol users (Admin, Barangay, Investigator), fetch here
     if (isPatrol) return;
 
     const defaults = BLANK_FILTERS_FOR_USER();
@@ -2384,7 +2409,7 @@ const CrimeDashboard = () => {
     } else {
       fetchOverview(defaults);
     }
-  }, []);
+  }, [isPatrol]);
 
   useEffect(() => {
     if (errorMessage) {
@@ -2406,11 +2431,13 @@ const CrimeDashboard = () => {
   };
 
   const handleApply = (newFilters) => {
-    if (isPatrol && hasPatrolAssignment) {
+    // Only override barangays if patrol user HAS an active assignment
+    if (isPatrol && hasPatrolAssignment && patrolAssignedBarangays.length > 0) {
       newFilters.barangays = patrolAssignedBarangays;
     } else if (isBarangayUser && userBarangay) {
       newFilters.barangays = [userBarangay];
     }
+    // For patrol users without assignment, respect their manual selection
     setAssessment(null);
     setAppliedFilters(newFilters);
     fetchOverview(newFilters, true);

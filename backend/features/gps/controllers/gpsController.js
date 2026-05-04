@@ -7,11 +7,21 @@ const pool = require("../../../config/database");
 // ============================================================
 // POST /gps/location
 // Called by mobile every 5 seconds while officer is on duty
+// Only Patrol role can update location
 // ============================================================
 const updateLocation = async (req, res) => {
   try {
+    const { role, user_id } = req.user;
+    
+    // Only Patrol can update location
+    if (role !== "Patrol") {
+      return res.status(403).json({
+        success: false,
+        message: "Only Patrol officers can update location"
+      });
+    }
+    
     const { latitude, longitude, accuracy, heading, speed } = req.body;
-    const user_id = req.user.user_id; // from existing JWT middleware
 
     if (!latitude || !longitude) {
       return res
@@ -112,12 +122,23 @@ const getActiveOfficers = async (req, res) => {
 // ============================================================
 // POST /gps/off-duty
 // Called when officer logs out or manually ends patrol
+// Only Patrol role can set off-duty
 // ============================================================
 const setOffDuty = async (req, res) => {
   try {
+    const { role, user_id } = req.user;
+    
+    // Only Patrol can go off-duty
+    if (role !== "Patrol") {
+      return res.status(403).json({
+        success: false,
+        message: "Only Patrol officers can set off-duty"
+      });
+    }
+    
     await pool.query(
       `UPDATE officer_locations SET is_on_duty = false WHERE user_id = $1`,
-      [req.user.user_id],
+      [user_id],
     );
     res.json({ success: true });
   } catch (err) {
