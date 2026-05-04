@@ -419,8 +419,8 @@ const PatrollerDashboard = () => {
                       <tr><td colSpan={4} className="empty-row">No patrollers found.</td></tr>
                     ) : paginatedPatrollers.map((officer, index) => {
                       const lastSeen    = officer.last_location_at ? new Date(officer.last_location_at) : null;
-                      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-                      const isOnline    = lastSeen && lastSeen > fiveMinsAgo;
+                     const thirtySecsAgo = new Date(Date.now() - 30 * 1000);
+const isOnline       = lastSeen && lastSeen > thirtySecsAgo;
 
                       return (
                         <tr key={officer.officer_id || index}>

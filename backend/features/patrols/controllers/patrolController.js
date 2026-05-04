@@ -67,8 +67,8 @@ const getActivePatrollers = async (req, res) => {
         ap.officer_id,
         u.last_login,
         TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-u.profile_picture,
-mu.mobile_unit_name AS mobile_unit_assigned,
+        u.profile_picture,
+        mu.mobile_unit_name AS mobile_unit_assigned,
         ol.latitude,
         ol.longitude,
         ol.location_name  AS last_location_name,
@@ -79,6 +79,7 @@ mu.mobile_unit_name AS mobile_unit_assigned,
       LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
       LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
       LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
+      WHERE u.role_id = 3
       ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
     `);
     res.json({ success: true, data: result.rows });
@@ -104,30 +105,33 @@ const getAvailablePatrollers = async (req, res) => {
             u.profile_picture
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
-          WHERE ap.active_patroller_id NOT IN (
-            SELECT DISTINCT pap.active_patroller_id
-            FROM patrol_assignment_patroller pap
-            JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
-            WHERE pa.start_date <= $2
-              AND pa.end_date   >= $1
-              AND pa.patrol_id  != $3
-          )
+          WHERE u.role_id = 3
+            AND ap.active_patroller_id NOT IN (
+              SELECT DISTINCT pap.active_patroller_id
+              FROM patrol_assignment_patroller pap
+              JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+              WHERE pa.start_date <= $2
+                AND pa.end_date   >= $1
+                AND pa.patrol_id  != $3
+            )
           ORDER BY officer_name ASC
         `, [start, end, parseInt(exclude_patrol_id)]);
       } else {
         result = await pool.query(`
           SELECT ap.active_patroller_id, ap.officer_id,
             TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-            u.phone AS contact_number,u.profile_picture
+            u.phone AS contact_number,
+            u.profile_picture
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
-          WHERE ap.active_patroller_id NOT IN (
-            SELECT DISTINCT pap.active_patroller_id
-            FROM patrol_assignment_patroller pap
-            JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
-            WHERE pa.start_date <= $2
-              AND pa.end_date   >= $1
-          )
+          WHERE u.role_id = 3
+            AND ap.active_patroller_id NOT IN (
+              SELECT DISTINCT pap.active_patroller_id
+              FROM patrol_assignment_patroller pap
+              JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+              WHERE pa.start_date <= $2
+                AND pa.end_date   >= $1
+            )
           ORDER BY officer_name ASC
         `, [start, end]);
       }
@@ -135,9 +139,11 @@ const getAvailablePatrollers = async (req, res) => {
       result = await pool.query(`
         SELECT ap.active_patroller_id, ap.officer_id,
           TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-          u.phone AS contact_number,u.profile_picture
+          u.phone AS contact_number,
+          u.profile_picture
         FROM active_patroller ap
         JOIN users u ON ap.officer_id = u.user_id
+        WHERE u.role_id = 3
         ORDER BY officer_name ASC
       `);
     }
