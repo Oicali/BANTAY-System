@@ -546,7 +546,6 @@ def compute_clusters(df: pd.DataFrame, eps: float = 0.003) -> dict[str, Any]:
         "total_with_coords": total_with_coords,
     }
 
-
 # ─── MODULE 4 — CROSTON FORECASTING ───────────────────────────────────────────
 
 def compute_croston(weekly_df: pd.DataFrame) -> dict[str, Any]:
