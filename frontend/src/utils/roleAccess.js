@@ -46,10 +46,5 @@ export const roleAccess = {
   // BARANGAY ROLES
   // ============================================
   
-  Barangay: [
-  "dashboard",
-  "crime-mapping",
-  "brgy-report",
-  "profile-settings",
-],
+  Barangay: ["dashboard", "crime-mapping", "brgy-report", "resident-management", "profile-settings"],
 };

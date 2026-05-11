@@ -117,7 +117,20 @@ const validateComplainant = (complainant, index) => {
   if (!complainant.gender) errors.push(`${prefix} Gender is required`);
   if (!complainant.nationality) errors.push(`${prefix} Nationality is required`);
   if (!complainant.info_obtained) errors.push(`${prefix} Info obtained is required`);
-  
+  const validRoles = ['Victim', 'Complainant', 'Witness', 'Respondent'];
+if (complainant.role && !validRoles.includes(complainant.role)) {
+  errors.push(`${prefix} has an invalid role`);
+}
+
+// Witness statement max length
+if (complainant.witness_statement && complainant.witness_statement.length > 500) {
+  errors.push(`${prefix} witness statement must be under 500 characters`);
+}
+
+// relationship_to_victim max length  
+if (complainant.relationship_to_victim && complainant.relationship_to_victim.length > 100) {
+  errors.push(`${prefix} relationship to victim must be under 100 characters`);
+}
   if (complainant.house_street && complainant.house_street.trim().length > 0) {
   if (complainant.house_street.trim().length < 2 || complainant.house_street.trim().length > 200) {
     errors.push(`${prefix} House/Street must be 2-200 characters`);
@@ -1143,11 +1156,11 @@ if (!place_barangay) errors.push("Barangay is required");
 if (!place_street) errors.push("Street is required");
 if (!narrative || narrative.trim().length < 20) errors.push("Narrative must be at least 20 characters");
 if (!place_street || place_street.trim().length < 2) errors.push("Street must be at least 2 characters");
-if (!victims || victims.length === 0) errors.push("At least one victim is required");
+if (!victims || victims.length === 0) errors.push("At least one person involved is required");
 else {
   victims.forEach((v, i) => {
-    if (!v.first_name) errors.push(`Victim #${i + 1} first name is required`);
-    if (!v.last_name) errors.push(`Victim #${i + 1} last name is required`);
+    if (!v.first_name) errors.push(`Person #${i + 1} first name is required`);
+    if (!v.last_name) errors.push(`Person #${i + 1} last name is required`);
   });
 }
 
@@ -1194,14 +1207,23 @@ else {
       for (const v of victims) {
   await client.query(
     `INSERT INTO complainants (
-      blotter_id, first_name, last_name, gender, nationality,
-      house_street, info_obtained
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      blotter_id, first_name, middle_name, last_name, gender, nationality,
+      house_street, info_obtained, contact_number, role,
+      relationship_to_victim, witness_statement
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
     [
       blotterId,
-      v.first_name, v.last_name,
-      v.gender || "Male", "FILIPINO",
-      "N/A", "Walk-in"
+      v.first_name,
+      v.middle_name || null,
+      v.last_name,
+      v.gender || "Male",
+      "FILIPINO",
+      v.house_street || "N/A",
+      "Walk-in",
+      v.contact_number || null,
+      v.role || "Victim",
+      v.relationship_to_victim || null,
+      v.witness_statement || null,
     ]
   );
 }

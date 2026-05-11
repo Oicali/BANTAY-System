@@ -7,8 +7,6 @@ class Blotter {
       ? new Date(incidentDate).getFullYear()
       : new Date().getFullYear();
 
-    // Only count REAL manual entries
-    // Excludes: SEED-XXXX (dev data) and IMP-XXXX (excel imports)
     const result = await pool.query(
       `SELECT COUNT(*) as count FROM blotter_entries 
      WHERE EXTRACT(YEAR FROM created_at) = $1
@@ -99,8 +97,9 @@ class Blotter {
             blotter_id, first_name, middle_name, last_name, qualifier, alias,
             gender, nationality, contact_number, region, district_province,
             city_municipality, barangay, house_street, info_obtained, occupation,
-            region_code, province_code, municipality_code, barangay_code
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+            region_code, province_code, municipality_code, barangay_code,
+            role, relationship_to_victim, witness_statement
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,$21,$22,$23)`,
           [
             blotterId,
             complainant.first_name,
@@ -122,6 +121,9 @@ class Blotter {
             complainant.province_code || null,
             complainant.municipality_code || null,
             complainant.barangay_code || null,
+            complainant.role || 'Victim',
+complainant.relationship_to_victim || null,
+complainant.witness_statement || null,
           ],
         );
       }
@@ -460,12 +462,13 @@ FROM blotter_entries WHERE is_deleted = false`;
       // Re-insert complainants
       for (const c of complainants) {
         await client.query(
-          `INSERT INTO complainants (
-          blotter_id, first_name, middle_name, last_name, qualifier, alias,
-          gender, nationality, contact_number, region, district_province,
-          city_municipality, barangay, house_street, info_obtained, occupation,
-          region_code, province_code, municipality_code, barangay_code
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+`INSERT INTO complainants (
+  blotter_id, first_name, middle_name, last_name, qualifier, alias,
+  gender, nationality, contact_number, region, district_province,
+  city_municipality, barangay, house_street, info_obtained, occupation,
+  region_code, province_code, municipality_code, barangay_code,
+  role, relationship_to_victim, witness_statement
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
           [
             blotterId,
             c.first_name,
@@ -487,6 +490,9 @@ FROM blotter_entries WHERE is_deleted = false`;
             c.province_code || null,
             c.municipality_code || null,
             c.barangay_code || null,
+            c.role || 'Victim',
+c.relationship_to_victim || null,
+c.witness_statement || null,
           ],
         );
       }

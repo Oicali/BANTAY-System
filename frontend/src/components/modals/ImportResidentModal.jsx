@@ -1,0 +1,364 @@
+import React, { useState, useRef } from "react";
+import ReactDOM from "react-dom";
+
+function ImportResidentModal({ onClose, onSuccess }) {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [toast, setToast] = useState(false);
+  const fileRef = useRef();
+
+  const handleFile = (f) => {
+    if (!f) return;
+    if (!f.name.match(/\.(xlsx|csv)$/i)) {
+      alert("Only .xlsx or .csv files allowed");
+      return;
+    }
+    setFile(f);
+    setResult(null);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleFile(e.dataTransfer.files[0]);
+  };
+
+  const handleSubmit = async () => {
+    if (!file) return;
+
+    let totalRows = 0;
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      totalRows = rows.length;
+
+      if (rows.length > 0) {
+        const firstRow = rows[0];
+        // Validate resident template columns
+        const hasRequiredColumns =
+          "FIRST_NAME" in firstRow && "LAST_NAME" in firstRow;
+
+        if (!hasRequiredColumns) {
+          setLoading(false);
+          setToast(true);
+          setTimeout(() => setToast(false), 4000);
+          return;
+        }
+      }
+    } catch (_) {
+      totalRows = 0;
+    }
+
+    setProgress({ current: 0, total: totalRows });
+    setLoading(true);
+
+    let simCount = 0;
+    const cap = Math.floor(totalRows * 0.9);
+    const interval =
+      totalRows > 0
+        ? setInterval(
+            () => {
+              if (simCount < cap) {
+                simCount++;
+                setProgress({ current: simCount, total: totalRows });
+              }
+            },
+            Math.max(20, Math.floor(5000 / totalRows)),
+          )
+        : null;
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/residents/import`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          body: formData,
+        },
+      );
+      const data = await res.json();
+      if (interval) clearInterval(interval);
+
+      setProgress({ current: totalRows, total: totalRows });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      if (data.success) {
+        setResult(data.summary);
+        onSuccess && onSuccess();
+      } else {
+        alert(data.message || "Import failed");
+      }
+    } catch (err) {
+      if (interval) clearInterval(interval);
+      alert("Import failed: " + err.message);
+    }
+    setLoading(false);
+  };
+
+  const downloadTemplate = () => {
+    // Guide user to download the template
+    const link = document.createElement("a");
+    link.href = "/bantay_resident_template.xlsx";
+    link.download = "bantay_resident_template.xlsx";
+    link.click();
+  };
+
+  return ReactDOM.createPortal(
+    <div className="im-overlay">
+      <div className="im-modal">
+        {loading && (
+          <div className="im-progress-overlay">
+            <div className="im-progress-box">
+              <div className="im-progress-title">Importing Residents...</div>
+              <div className="im-progress-sub">
+                {progress.total > 0
+                  ? `${progress.current} / ${progress.total} records processed`
+                  : "Uploading and processing, please wait..."}
+              </div>
+              <div className="im-progress-bar-bg">
+                <div
+                  className="im-progress-bar-fill"
+                  style={{
+                    width:
+                      progress.total > 0
+                        ? `${Math.round((progress.current / progress.total) * 100)}%`
+                        : "10%",
+                  }}
+                />
+              </div>
+              <div className="im-progress-pct">
+                {progress.total > 0
+                  ? `${Math.round((progress.current / progress.total) * 100)}%`
+                  : ""}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && (
+          <>
+            <div className="im-header">
+              <div>
+                <h2 className="im-title">Import Residents</h2>
+                <p className="im-subtitle">
+                  Upload .xlsx or .csv using the Bantay Resident template
+                </p>
+              </div>
+              <span className="im-close" onClick={onClose}>
+                &times;
+              </span>
+            </div>
+
+            <div className="im-body">
+              {!result ? (
+                <>
+                  {/* Template download hint */}
+                  <div
+                    style={{
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      borderRadius: "8px",
+                      padding: "10px 14px",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      fontSize: "13px",
+                      color: "#1e40af",
+                    }}
+                  >
+                    <span>
+                      <strong>Required columns:</strong> FIRST_NAME, LAST_NAME
+                      (others optional)
+                    </span>
+                    <button
+                      onClick={downloadTemplate}
+                      style={{
+                        background: "#1e3a5f",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "5px 12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        marginLeft: "12px",
+                      }}
+                    >
+                      Download Template
+                    </button>
+                  </div>
+
+                  <div
+                    className={`im-dropzone ${dragOver ? "dragover" : ""} ${file ? "has-file" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileRef.current.click()}
+                  >
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".xlsx,.csv"
+                      style={{ display: "none" }}
+                      onChange={(e) => handleFile(e.target.files[0])}
+                    />
+                    {file ? (
+                      <>
+                        <div className="im-file-icon">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="36"
+                            height="36"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#16a34a"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="12" y1="18" x2="12" y2="12" />
+                            <line x1="9" y1="15" x2="15" y2="15" />
+                          </svg>
+                        </div>
+                        <p className="im-file-name">{file.name}</p>
+                        <p className="im-file-hint">Click to change file</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="im-file-icon">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="36"
+                            height="36"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6b7280"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                          </svg>
+                        </div>
+                        <p className="im-drop-text">
+                          Drag & drop your file here
+                        </p>
+                        <p className="im-file-hint">
+                          or click to browse — .xlsx, .csv only
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="im-results">
+                  <div className="im-result-row">
+                    <div className="im-result-card success">
+                      <span className="im-result-num">{result.inserted}</span>
+                      <span className="im-result-label">Imported</span>
+                    </div>
+                    <div className="im-result-card error">
+                      <span className="im-result-num">{result.skipped}</span>
+                      <span className="im-result-label">Skipped</span>
+                    </div>
+                  </div>
+
+                  {result.errors?.length > 0 && (
+                    <div className="im-error-table-wrap">
+                      <table className="im-error-table">
+                        <thead>
+                          <tr>
+                            <th>Row</th>
+                            <th>Issue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {result.errors.slice(0, 10).map((e, i) => (
+                            <tr key={i}>
+                              <td>{e.row}</td>
+                              <td>{e.message}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {result.errors.length > 10 && (
+                        <p className="im-more-errors">
+                          +{result.errors.length - 10} more errors
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="im-footer">
+              {!result ? (
+                <>
+                  <button className="im-btn-secondary" onClick={onClose}>
+                    Cancel
+                  </button>
+                  <button
+                    className="im-btn-primary"
+                    onClick={handleSubmit}
+                    disabled={!file || loading}
+                  >
+                    Upload & Import
+                  </button>
+                </>
+              ) : (
+                <button className="im-btn-primary" onClick={onClose}>
+                  Done
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "32px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "#1e3a5f",
+            color: "white",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            fontWeight: 600,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+            zIndex: 99999,
+            borderLeft: "4px solid #c1272d",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ⚠️ Invalid template. Columns FIRST_NAME and LAST_NAME are required.
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+export default ImportResidentModal;
