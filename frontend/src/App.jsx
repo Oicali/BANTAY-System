@@ -21,6 +21,7 @@ import AfterPatrol from "./components/views/AfterPatrol";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
 import PatrollerDashboard from "./components/views/PatrolDashboard";
+import ResidentManagement from "./components/views/ResidentManagement";
 
 const getRole = () => {
   const raw = localStorage.getItem("token");
@@ -28,12 +29,18 @@ const getRole = () => {
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     return JSON.parse(atob(b64))?.role ?? null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 const RoleBasedPatrolDashboard = () => {
   const role = getRole();
-  return role === "Administrator" ? <PatrolScheduling /> : <PatrollerDashboardView />;
+  return role === "Administrator" ? (
+    <PatrolScheduling />
+  ) : (
+    <PatrollerDashboardView />
+  );
 };
 
 function App() {
@@ -56,13 +63,17 @@ function App() {
           <Route path="/e-blotter" element={<EBlotter />} />
           <Route path="/case-management" element={<CaseManagement />} />
           <Route path="/crime-mapping" element={<CrimeMapping />} />
-          <Route path="/patrol-dashboard"element={<PatrollerDashboard />}/>
-         <Route path="/patrol-scheduling" element={<RoleBasedPatrolDashboard />}/>
+          <Route path="/patrol-dashboard" element={<PatrollerDashboard />} />
+          <Route
+            path="/patrol-scheduling"
+            element={<RoleBasedPatrolDashboard />}
+          />
           <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
           <Route path="/profile" element={<ProfileSettings />} />
           <Route path="/modus-management" element={<ModusManagement />} />
           <Route path="/brgy-report" element={<BrgyReport />} />
+          <Route path="/resident-management" element={<ResidentManagement />} />
         </Route>
 
         {/* Fallback */}

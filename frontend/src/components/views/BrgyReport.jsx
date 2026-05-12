@@ -24,7 +24,16 @@ const getStatusClass = (status) => {
 
 function BrgyReport() {
   const [victims, setVictims] = useState([
-    { first_name: "", last_name: "", gender: "Male", contact: "" },
+    {
+      first_name: "",
+      middle_name: "",
+      last_name: "",
+      gender: "Male",
+      contact_number: "",
+      role: "Victim",
+      relationship_to_victim: "",
+      witness_statement: "",
+    },
   ]);
   const [form, setForm] = useState({
     incident_type: "",
@@ -42,6 +51,11 @@ function BrgyReport() {
   const [barangayName, setBarangayName] = useState("Loading...");
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [toast, setToast] = useState({ show: false, message: "" });
+  const [showResidentSearch, setShowResidentSearch] = useState(false);
+  const [residentSearchQuery, setResidentSearchQuery] = useState("");
+  const [residents, setResidents] = useState([]);
+  const [loadingResidents, setLoadingResidents] = useState(false);
+  const [activePersonIndex, setActivePersonIndex] = useState(null);
   const showToast = (message) => {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: "" }), 3000);
@@ -90,7 +104,51 @@ function BrgyReport() {
       setLoadingReports(false);
     }
   };
+  const fetchResidents = async (q = "") => {
+    setLoadingResidents(true);
+    try {
+      const params = new URLSearchParams();
+      if (q) params.append("q", q);
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/residents?${params}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
+      const data = await res.json();
+      if (data.success) setResidents(data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingResidents(false);
+    }
+  };
 
+  const openResidentSearch = (index) => {
+    setActivePersonIndex(index);
+    setResidentSearchQuery("");
+    setResidents([]);
+    setShowResidentSearch(true);
+    fetchResidents();
+  };
+
+  const selectResident = (resident) => {
+    setVictims((prev) =>
+      prev.map((v, idx) =>
+        idx === activePersonIndex
+          ? {
+              ...v,
+              first_name: resident.first_name || "",
+              middle_name: resident.middle_name || "",
+              last_name: resident.last_name || "",
+              gender: resident.gender || "Male",
+              contact_number: resident.contact_number || "",
+            }
+          : v,
+      ),
+    );
+    setShowResidentSearch(false);
+  };
   const update = (field, value) => {
     setForm((p) => ({ ...p, [field]: value }));
     if (errors[field])
@@ -105,10 +163,19 @@ function BrgyReport() {
       prev.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
     );
   };
-  const addVictim = () =>
+  const addPerson = (role = "Victim") =>
     setVictims((prev) => [
       ...prev,
-      { first_name: "", last_name: "", gender: "Male", contact: "" },
+      {
+        first_name: "",
+        middle_name: "",
+        last_name: "",
+        gender: "Male",
+        contact_number: "",
+        role,
+        relationship_to_victim: "",
+        witness_statement: "",
+      },
     ]);
   const removeVictim = (i) =>
     setVictims((prev) => prev.filter((_, idx) => idx !== i));
@@ -150,6 +217,12 @@ function BrgyReport() {
     victims.forEach((v, i) => {
       if (!v.first_name) e[`victim_${i}_first_name`] = "Required";
       if (!v.last_name) e[`victim_${i}_last_name`] = "Required";
+      if (
+        v.contact_number &&
+        v.contact_number.length > 0 &&
+        v.contact_number.length !== 11
+      )
+        e[`victim_${i}_contact_number`] = "Must be 11 digits";
     });
     return e;
   };
@@ -176,7 +249,13 @@ function BrgyReport() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({ ...form, victims }),
+        body: JSON.stringify({
+          ...form,
+          victims: victims.map((v) => ({
+            ...v,
+            contact: v.contact_number,
+          })),
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -192,7 +271,16 @@ function BrgyReport() {
           narrative: "",
         });
         setVictims([
-          { first_name: "", last_name: "", gender: "Male", contact: "" },
+          {
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+            gender: "Male",
+            contact_number: "",
+            role: "Victim",
+            relationship_to_victim: "",
+            witness_statement: "",
+          },
         ]);
         fetchMyReports();
         document
@@ -441,10 +529,13 @@ function BrgyReport() {
           </div>
         </div>
 
-        {/* ── VICTIM INFO CARD ── */}
+        {/* ── PERSONS INVOLVED CARD ── */}
         <div className="br-card">
           <div className="br-card-header">
-            <div className="br-card-header-icon">
+            <div
+              className="br-card-header-icon"
+              style={{ background: "#c1272d" }}
+            >
               <svg
                 width="16"
                 height="16"
@@ -455,57 +546,96 @@ function BrgyReport() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
-            <h2 className="br-card-title">Victim Information</h2>
+            <h2 className="br-card-title">Persons Involved</h2>
           </div>
           <div className="br-card-body">
-            {victims.map((v, i) => (
-              <div
-                key={i}
-                style={{
-                  marginBottom: i < victims.length - 1 ? "20px" : 0,
-                  paddingBottom: i < victims.length - 1 ? "20px" : 0,
-                  borderBottom:
-                    i < victims.length - 1 ? "1px solid #e5e7eb" : "none",
-                }}
+            {/* ── RESIDENT SEARCH TRIGGER ── */}
+            <div className="br-resident-hint">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#1e3a5f"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <span
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+              <span>
+                Is the person a registered resident of {barangayName}?
+              </span>
+              <button
+                type="button"
+                className="br-resident-search-btn"
+                onClick={() => openResidentSearch(victims.length - 1)}
+              >
+                Search Resident
+              </button>
+            </div>
+
+            {/* ── PERSON ENTRIES ── */}
+            {victims.map((v, i) => (
+              <div key={i} className="br-person-entry">
+                {/* Entry header with role selector */}
+                <div className="br-person-entry-header">
+                  <div className="br-person-role-row">
+                    <span className="br-person-num">Person #{i + 1}</span>
+                    <div className="br-role-btns">
+                      {["Victim", "Complainant", "Witness", "Respondent"].map(
+                        (r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            className={`br-role-btn ${v.role === r ? "active" : ""}`}
+                            onClick={() => updateVictim(i, "role", r)}
+                          >
+                            {r}
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                  <div
                     style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "#1e3a5f",
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
                     }}
                   >
-                    Victim #{i + 1}
-                  </span>
-                  {victims.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => removeVictim(i)}
-                      style={{
-                        fontSize: "12px",
-                        color: "#ef4444",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
+                      className="br-resident-search-btn"
+                      style={{ fontSize: "11px", padding: "4px 10px" }}
+                      onClick={() => openResidentSearch(i)}
                     >
-                      Remove
+                      Search Resident
                     </button>
-                  )}
+                    {victims.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVictims((prev) =>
+                            prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        className="br-remove-btn"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {/* Fields */}
                 <div className="br-form-grid">
                   <div className="br-form-group">
                     <label className="br-label">
@@ -531,6 +661,25 @@ function BrgyReport() {
                       </span>
                     )}
                   </div>
+
+                  <div className="br-form-group">
+                    <label className="br-label">Middle Name</label>
+                    <input
+                      type="text"
+                      className="br-input"
+                      value={v.middle_name}
+                      placeholder="Middle Name"
+                      maxLength={50}
+                      onChange={(e) =>
+                        updateVictim(
+                          i,
+                          "middle_name",
+                          e.target.value.replace(/[^A-Za-zÑñ\s'-]/g, ""),
+                        )
+                      }
+                    />
+                  </div>
+
                   <div className="br-form-group">
                     <label className="br-label">
                       Last Name <span>*</span>
@@ -555,7 +704,34 @@ function BrgyReport() {
                       </span>
                     )}
                   </div>
+
                   <div className="br-form-group">
+                    <label className="br-label">Contact Number</label>
+                    <input
+                      type="text"
+                      className={`br-input ${errors[`victim_${i}_contact_number`] ? "error" : ""}`}
+                      value={v.contact_number}
+                      placeholder="09XXXXXXXXX"
+                      maxLength={11}
+                      onChange={(e) =>
+                        updateVictim(
+                          i,
+                          "contact_number",
+                          e.target.value.replace(/\D/g, ""),
+                        )
+                      }
+                    />
+                    {errors[`victim_${i}_contact_number`] && (
+                      <span className="br-error">
+                        {errors[`victim_${i}_contact_number`]}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="br-form-group"
+                    style={{ gridColumn: "span 2" }}
+                  >
                     <label className="br-label">Gender</label>
                     <div className="br-gender-row">
                       {["Male", "Female"].map((g) => (
@@ -565,77 +741,84 @@ function BrgyReport() {
                           className={`br-gender-btn ${v.gender === g ? "active" : ""}`}
                           onClick={() => updateVictim(i, "gender", g)}
                         >
-                          <svg
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            {g === "Male" ? (
-                              <>
-                                <circle cx="10" cy="7" r="4" />
-                                <path d="M21 2l-5.5 5.5" />
-                                <path d="M15 2h6v6" />
-                                <path d="M10 11v10" />
-                                <path d="M7 19h6" />
-                              </>
-                            ) : (
-                              <>
-                                <circle cx="12" cy="7" r="4" />
-                                <path d="M12 11v10" />
-                                <path d="M9 18h6" />
-                              </>
-                            )}
-                          </svg>
                           {g}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="br-form-group">
-                    <label className="br-label">Contact Number</label>
-                    <input
-                      type="text"
-                      className="br-input"
-                      value={v.contact}
-                      placeholder="09XXXXXXXXX"
-                      maxLength={11}
-                      onChange={(e) =>
-                        updateVictim(
-                          i,
-                          "contact",
-                          e.target.value.replace(/\D/g, ""),
-                        )
-                      }
-                    />
-                  </div>
+
+                  {/* Complainant extra field */}
+                  {v.role === "Complainant" && (
+                    <div
+                      className="br-form-group"
+                      style={{ gridColumn: "span 2" }}
+                    >
+                      <label className="br-label">Relationship to Victim</label>
+                      <select
+                        className="br-input"
+                        value={v.relationship_to_victim}
+                        onChange={(e) =>
+                          updateVictim(
+                            i,
+                            "relationship_to_victim",
+                            e.target.value,
+                          )
+                        }
+                      >
+                        <option value="">Select...</option>
+                        <option>Self</option>
+                        <option>Parent</option>
+                        <option>Spouse</option>
+                        <option>Guardian</option>
+                        <option>Sibling</option>
+                        <option>Child</option>
+                        <option>Relative</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Witness extra field */}
+                  {v.role === "Witness" && (
+                    <div
+                      className="br-form-group"
+                      style={{ gridColumn: "span 2" }}
+                    >
+                      <label className="br-label">
+                        Witness Statement (optional)
+                      </label>
+                      <textarea
+                        className="br-input"
+                        rows={3}
+                        maxLength={500}
+                        placeholder="Brief statement of what was witnessed..."
+                        value={v.witness_statement}
+                        onChange={(e) =>
+                          updateVictim(i, "witness_statement", e.target.value)
+                        }
+                      />
+                      <small style={{ color: "#9ca3af", fontSize: "11px" }}>
+                        {v.witness_statement.length}/500
+                      </small>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={addVictim}
-              style={{
-                marginTop: "12px",
-                marginBottom: "12px",
-                padding: "8px 16px",
-                background: "#f0f4f8",
-                border: "1px dashed #1e3a5f",
-                borderRadius: "7px",
-                color: "#1e3a5f",
-                fontWeight: 600,
-                fontSize: "13px",
-                cursor: "pointer",
-                width: "100%",
-              }}
-            >
-              + Add Another Victim
-            </button>
+            {/* ── ADD BUTTONS ── */}
+            <div className="br-add-person-row">
+              {["Victim", "Complainant", "Witness", "Respondent"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className="br-add-person-btn"
+                  onClick={() => addPerson(r)}
+                >
+                  + Add {r}
+                </button>
+              ))}
+            </div>
 
             <button
               type="submit"
@@ -801,6 +984,116 @@ function BrgyReport() {
               />
             </svg>
             <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+      {/* ── RESIDENT SEARCH POPUP ── */}
+      {showResidentSearch && (
+        <div
+          className="br-modal-overlay"
+          onClick={() => setShowResidentSearch(false)}
+        >
+          <div
+            className="br-resident-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="br-resident-modal-header">
+              <div>
+                <h3 className="br-resident-modal-title">Search Resident</h3>
+                <p className="br-resident-modal-sub">
+                  Select a resident to auto-fill Person #
+                  {(activePersonIndex ?? 0) + 1}
+                </p>
+              </div>
+              <span
+                className="br-resident-modal-close"
+                onClick={() => setShowResidentSearch(false)}
+              >
+                &times;
+              </span>
+            </div>
+
+            <div className="br-resident-modal-search">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9ca3af"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                className="br-resident-search-input"
+                placeholder="Type name to search..."
+                value={residentSearchQuery}
+                autoFocus
+                onChange={(e) => {
+                  setResidentSearchQuery(e.target.value);
+                  fetchResidents(e.target.value);
+                }}
+              />
+            </div>
+
+            <div className="br-resident-list">
+              {loadingResidents ? (
+                <div className="br-resident-loading">Searching...</div>
+              ) : residents.length === 0 ? (
+                <div className="br-resident-empty">
+                  {residentSearchQuery
+                    ? `No residents found for "${residentSearchQuery}"`
+                    : "Start typing to search residents"}
+                </div>
+              ) : (
+                residents.map((r) => (
+                  <div
+                    key={r.resident_id}
+                    className="br-resident-row"
+                    onClick={() => selectResident(r)}
+                  >
+                    <div className="br-resident-row-avatar">
+                      {r.first_name[0]}
+                      {r.last_name[0]}
+                    </div>
+                    <div className="br-resident-row-info">
+                      <div className="br-resident-row-name">
+                        {r.last_name}, {r.first_name}
+                        {r.middle_name ? ` ${r.middle_name[0]}.` : ""}
+                      </div>
+                      <div className="br-resident-row-sub">
+                        {r.gender || "—"} ·{" "}
+                        {r.house_street || "No address on file"}
+                      </div>
+                    </div>
+                    <div className="br-resident-row-select">Select →</div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="br-resident-modal-footer">
+              <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+                Person not found? Just fill in the fields manually.
+              </span>
+              <button
+                type="button"
+                className="br-pagination-btn"
+                onClick={() => setShowResidentSearch(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

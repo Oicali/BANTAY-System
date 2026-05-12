@@ -256,6 +256,9 @@ function EBlotter() {
       house_street: "",
       info_obtained: "PERSONAL",
       occupation: "",
+      role: "Victim",
+      relationship_to_victim: "",
+      witness_statement: "",
     },
   ]);
   const {
@@ -1559,6 +1562,9 @@ function EBlotter() {
         house_street: "",
         info_obtained: "PERSONAL",
         occupation: "",
+        role: "Victim",
+        relationship_to_victim: "",
+        witness_statement: "",
       },
     ]);
 
@@ -1679,6 +1685,9 @@ function EBlotter() {
         house_street: "",
         info_obtained: "PERSONAL",
         occupation: "",
+        role: "Victim",
+        relationship_to_victim: "",
+        witness_statement: "",
       },
     ]);
 
@@ -2419,11 +2428,13 @@ function EBlotter() {
               <div className="eb-view-content">
                 {/* Complainants */}
                 <div className="eb-view-section">
-                  <h3 className="eb-view-section-title">Victim Information</h3>
+                  <h3 className="eb-view-section-title">Persons Involved</h3>
                   <div className="eb-view-section-body">
                     {complainants.map((c, i) => (
                       <div className="eb-view-card" key={i}>
-                        <h4 className="eb-view-card-title">Victim #{i + 1}</h4>
+                        <h4 className="eb-view-card-title">
+                          {c.role || "Victim"} #{i + 1}
+                        </h4>
                         <div className="eb-view-grid">
                           <div className="eb-view-item">
                             <span className="eb-view-label">Name:</span>
@@ -2484,6 +2495,29 @@ function EBlotter() {
                               {c.info_obtained}
                             </span>
                           </div>
+
+                          {c.role === "Complainant" &&
+                            c.relationship_to_victim && (
+                              <div className="eb-view-item">
+                                <span className="eb-view-label">
+                                  Relationship to Victim:
+                                </span>
+                                <span className="eb-view-value">
+                                  {c.relationship_to_victim}
+                                </span>
+                              </div>
+                            )}
+
+                          {c.role === "Witness" && c.witness_statement && (
+                            <div className="eb-view-item eb-view-full">
+                              <span className="eb-view-label">
+                                Witness Statement:
+                              </span>
+                              <span className="eb-view-value">
+                                {c.witness_statement}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -2864,7 +2898,7 @@ function EBlotter() {
                     className={`eb-step ${currentStep === 1 ? "active" : ""}`}
                   >
                     <div className="eb-step-number">1</div>
-                    <div className="eb-step-label">Victim</div>
+                    <div className="eb-step-label">Persons Involved</div>
                   </div>
                   <div
                     className={`eb-step ${currentStep === 2 ? "active" : ""}`}
@@ -2882,11 +2916,34 @@ function EBlotter() {
 
                 {currentStep === 1 && (
                   <div className="eb-step-content">
-                    <h3 className="eb-section-title">1. Victim Information</h3>
+                    <h3 className="eb-section-title">1. Persons Involved</h3>
                     {complainants.map((c, i) => (
                       <div className="eb-complainant-entry" key={i}>
                         <div className="eb-entry-header">
-                          <h4 className="eb-entry-title">Victim #{i + 1}</h4>
+                          <h4 className="eb-entry-title">
+                            {c.role || "Victim"} #{i + 1}
+                          </h4>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            {[
+                              "Victim",
+                              "Complainant",
+                              "Witness",
+                              "Respondent",
+                            ].map((r) => (
+                              <button
+                                key={r}
+                                type="button"
+                                className={`eb-gender-btn ${(c.role || "Victim") === r ? "active" : ""}`}
+                                onClick={() => updateComplainant(i, "role", r)}
+                                style={{
+                                  fontSize: "12px",
+                                  padding: "4px 10px",
+                                }}
+                              >
+                                {r}
+                              </button>
+                            ))}
+                          </div>
                           {complainants.length > 1 && (
                             <button
                               type="button"
@@ -3539,23 +3596,116 @@ function EBlotter() {
                               }
                             />
                           </div>
+                          {/* Relationship to Victim — show if Complainant */}
+                          {c.role === "Complainant" && (
+                            <div className="eb-modal-form-group">
+                              <label className="eb-modal-label">
+                                Relationship to Victim
+                              </label>
+                              <select
+                                className="eb-modal-input"
+                                value={c.relationship_to_victim}
+                                onChange={(e) =>
+                                  updateComplainant(
+                                    i,
+                                    "relationship_to_victim",
+                                    e.target.value,
+                                  )
+                                }
+                              >
+                                <option value="">Select...</option>
+                                <option>Self</option>
+                                <option>Parent</option>
+                                <option>Spouse</option>
+                                <option>Guardian</option>
+                                <option>Sibling</option>
+                                <option>Child</option>
+                                <option>Relative</option>
+                                <option>Other</option>
+                              </select>
+                            </div>
+                          )}
 
+                          {/* Witness Statement — show if Witness */}
+                          {c.role === "Witness" && (
+                            <div
+                              className="eb-modal-form-group"
+                              style={{ gridColumn: "span 4" }}
+                            >
+                              <label className="eb-modal-label">
+                                Witness Statement (optional)
+                              </label>
+                              <textarea
+                                className="eb-modal-input"
+                                rows="3"
+                                maxLength="500"
+                                placeholder="Brief statement of what was witnessed..."
+                                value={c.witness_statement}
+                                onChange={(e) =>
+                                  updateComplainant(
+                                    i,
+                                    "witness_statement",
+                                    e.target.value,
+                                  )
+                                }
+                              />
+                              <small
+                                style={{ color: "#6b7280", fontSize: "12px" }}
+                              >
+                                {c.witness_statement.length}/500
+                              </small>
+                            </div>
+                          )}
                           <div className="eb-modal-form-group"></div>
                           <div className="eb-modal-form-group"></div>
                         </div>
                       </div>
                     ))}
                     <div className="eb-add-more-section">
-                      <button
-                        type="button"
-                        className="eb-btn-add-more"
-                        onClick={addComplainant}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          justifyContent: "center",
+                        }}
                       >
-                        Add Victim
-                      </button>
-                      <p className="eb-add-more-text">
-                        Click to add another victim.
-                      </p>
+                        {["Victim", "Complainant", "Witness", "Respondent"].map(
+                          (r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              className="eb-btn-add-more"
+                              onClick={() => {
+                                setComplainants([
+                                  ...complainants,
+                                  {
+                                    first_name: "",
+                                    middle_name: "",
+                                    last_name: "",
+                                    qualifier: "",
+                                    alias: "",
+                                    gender: "Male",
+                                    nationality: "FILIPINO",
+                                    contact_number: "",
+                                    region_code: "",
+                                    province_code: "",
+                                    municipality_code: "",
+                                    barangay_code: "",
+                                    house_street: "",
+                                    info_obtained: "PERSONAL",
+                                    occupation: "",
+                                    role: r,
+                                    relationship_to_victim: "",
+                                    witness_statement: "",
+                                  },
+                                ]);
+                              }}
+                            >
+                              + Add {r}
+                            </button>
+                          ),
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
