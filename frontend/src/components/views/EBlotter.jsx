@@ -2428,7 +2428,7 @@ function EBlotter() {
               <div className="eb-view-content">
                 {/* Complainants */}
                 <div className="eb-view-section">
-                  <h3 className="eb-view-section-title">Victim Information</h3>
+                  <h3 className="eb-view-section-title">Persons Involved</h3>
                   <div className="eb-view-section-body">
                     {complainants.map((c, i) => (
                       <div className="eb-view-card" key={i}>
@@ -2494,28 +2494,30 @@ function EBlotter() {
                             <span className="eb-view-value">
                               {c.info_obtained}
                             </span>
-                            {c.role === "Complainant" &&
-                              c.relationship_to_victim && (
-                                <div className="eb-view-item">
-                                  <span className="eb-view-label">
-                                    Relationship to Victim:
-                                  </span>
-                                  <span className="eb-view-value">
-                                    {c.relationship_to_victim}
-                                  </span>
-                                </div>
-                              )}
-                            {c.role === "Witness" && c.witness_statement && (
-                              <div className="eb-view-item eb-view-full">
+                          </div>
+
+                          {c.role === "Complainant" &&
+                            c.relationship_to_victim && (
+                              <div className="eb-view-item">
                                 <span className="eb-view-label">
-                                  Witness Statement:
+                                  Relationship to Victim:
                                 </span>
                                 <span className="eb-view-value">
-                                  {c.witness_statement}
+                                  {c.relationship_to_victim}
                                 </span>
                               </div>
                             )}
-                          </div>
+
+                          {c.role === "Witness" && c.witness_statement && (
+                            <div className="eb-view-item eb-view-full">
+                              <span className="eb-view-label">
+                                Witness Statement:
+                              </span>
+                              <span className="eb-view-value">
+                                {c.witness_statement}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
