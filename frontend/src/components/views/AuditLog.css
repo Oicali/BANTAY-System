@@ -1,0 +1,511 @@
+/* === AUDIT LOG — mirrors UserManagement.css conventions === */
+
+/* ── Content area ── */
+.al-content-area {
+  padding: 32px;
+  width: 100%;
+  max-width: none;
+}
+
+/* ── Page header ── */
+.al-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.al-page-header-left h1 {
+  font-family: "Inter", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--navy-dark, #0a1628);
+  margin-bottom: 8px;
+}
+
+.al-page-header-left p {
+  color: var(--gray-600, #6c757d);
+  font-size: 15px;
+}
+
+.al-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ── Buttons ── */
+.al-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.al-btn-primary {
+  background: var(--navy-dark, #0a1628);
+  color: #ffffff;
+}
+
+.al-btn-primary:hover {
+  background: #06101e;
+}
+
+.al-btn-secondary {
+  background: #ffffff;
+  color: var(--gray-700, #495057);
+  border: 1px solid var(--gray-300, #ced4da);
+}
+
+.al-btn-secondary:hover {
+  background: var(--gray-50, #f8f9fa);
+  border-color: var(--navy-primary, #1e3a5f);
+  color: var(--navy-primary, #1e3a5f);
+}
+
+/* ── Summary stat cards ── */
+.al-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.al-stat-card {
+  background: #ffffff;
+  border: 1px solid var(--gray-200, #dee2e6);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.al-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-600, #6c757d);
+  margin-bottom: 6px;
+}
+
+.al-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--navy-dark, #0a1628);
+  line-height: 1.2;
+}
+
+.al-stat-danger {
+  color: var(--red-primary, #c1272d);
+}
+
+.al-stat-sub {
+  font-size: 12px;
+  color: var(--gray-400, #adb5bd);
+  margin-top: 3px;
+}
+
+/* ── Filter bar ── */
+.al-filter-bar {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.al-filter-fields {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.al-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 150px;
+}
+
+.al-filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.al-filter-input {
+  padding: 10px 14px;
+  border: 1px solid var(--gray-300, #ced4da);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: "DM Sans", sans-serif;
+  background: #ffffff;
+  color: var(--gray-900, #212529);
+  transition: all 0.2s ease;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.al-filter-input:focus {
+  outline: none;
+  border-color: var(--navy-primary, #1e3a5f);
+}
+
+/* ── Filter action buttons ── */
+.al-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.al-apply-btn {
+  height: 42px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--red-primary, #c1272d);
+  color: #ffffff;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.al-apply-btn:hover {
+  background: var(--red-dark, #8b1a1f);
+}
+
+.al-apply-btn-dirty {
+  box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.22);
+}
+
+.al-reset-btn {
+  height: 42px;
+  width: 42px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--gray-300, #ced4da);
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: var(--gray-700, #495057);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.al-reset-btn:hover {
+  background: var(--gray-50, #f8f9fa);
+  border-color: var(--navy-primary, #1e3a5f);
+  color: var(--navy-primary, #1e3a5f);
+}
+
+/* ── Table card ── */
+.al-table-card {
+  background: #ffffff;
+  border: 1px solid var(--gray-200, #dee2e6);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.al-table-container {
+  overflow-x: auto;
+}
+
+.al-data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.al-data-table thead {
+  background: var(--gray-50, #f8f9fa);
+}
+
+.al-data-table th {
+  padding: 14px 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-700, #495057);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--gray-200, #dee2e6);
+  white-space: nowrap;
+}
+
+.al-data-table td {
+  padding: 13px 20px;
+  font-size: 13px;
+  color: var(--gray-900, #212529);
+  border-bottom: 1px solid var(--gray-200, #dee2e6);
+  vertical-align: middle;
+}
+
+.al-data-table tbody tr:hover {
+  background: var(--gray-50, #f8f9fa);
+}
+
+.al-data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Column widths ── */
+.al-col-id     { width: 80px; }
+.al-col-user   { width: 200px; }
+.al-col-action { width: 100px; }
+.al-col-module { width: 110px; }
+.al-col-record { width: 160px; }
+.al-col-ip     { width: 130px; }
+.al-col-time   { width: 160px; }
+
+/* ── Log ID ── */
+.al-log-id {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  color: var(--gray-600, #6c757d);
+}
+
+/* ── User cell ── */
+.al-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.al-user-avatar {
+  width: 34px;
+  height: 34px;
+  background: var(--navy-primary, #1e3a5f);
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.al-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.al-user-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gray-900, #212529);
+}
+
+.al-user-email {
+  font-size: 11px;
+  color: var(--gray-600, #6c757d);
+}
+
+/* ── Action badges ── */
+.al-action-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.al-action-insert  { background: #dcfce7; color: #166534; }
+.al-action-update  { background: #e6f1fb; color: #0c447c; }
+.al-action-delete  { background: #fcebeb; color: #791f1f; }
+.al-action-login   { background: #fef3c7; color: #92400e; }
+.al-action-logout  { background: #f3f4f6; color: #4b5563; }
+.al-action-view    { background: #eeedfe; color: #3c3489; }
+
+/* ── Module badge ── */
+.al-module-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--gray-100, #e9ecef);
+  color: var(--gray-700, #495057);
+}
+
+/* ── Record cell ── */
+.al-record-id {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy-primary, #1e3a5f);
+}
+
+.al-record-label {
+  font-size: 11px;
+  color: var(--gray-600, #6c757d);
+  margin-top: 2px;
+}
+
+.al-no-record {
+  color: var(--gray-300, #ced4da);
+  font-size: 13px;
+}
+
+/* ── IP address ── */
+.al-ip-address {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  color: var(--gray-600, #6c757d);
+}
+
+/* ── Timestamp ── */
+.al-timestamp {
+  font-size: 12px;
+  color: var(--gray-700, #495057);
+}
+
+/* ── Error / loading ── */
+.al-error-message {
+  padding: 16px 24px;
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 4px solid #ef4444;
+  color: #dc2626;
+  border-radius: 6px;
+  margin: 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.al-loading-message {
+  text-align: center;
+  padding: 48px;
+  font-size: 15px;
+  color: var(--gray-600, #6c757d);
+}
+
+/* ── Pagination ── */
+.al-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-top: 1px solid var(--gray-200, #dee2e6);
+  background: #ffffff;
+}
+
+.al-pagination-info {
+  font-size: 14px;
+  color: var(--gray-600, #6c757d);
+  font-weight: 500;
+}
+
+.al-pagination-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.al-pagination-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--gray-300, #ced4da);
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700, #495057);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "DM Sans", sans-serif;
+}
+
+.al-pagination-btn:hover:not(:disabled) {
+  background: var(--gray-50, #f8f9fa);
+  border-color: var(--navy-primary, #1e3a5f);
+  color: var(--navy-primary, #1e3a5f);
+}
+
+.al-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--gray-100, #e9ecef);
+}
+
+.al-pagination-current {
+  padding: 8px 16px;
+  color: var(--navy-primary, #1e3a5f);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1280px) {
+  .al-col-ip { display: none; }
+}
+
+@media (max-width: 1100px) {
+  .al-col-time { display: none; }
+}
+
+@media (max-width: 960px) {
+  .al-col-record { display: none; }
+}
+
+@media (max-width: 860px) {
+  .al-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .al-col-module { display: none; }
+  .al-user-name { font-size: 12px; }
+  .al-user-email { font-size: 11px; }
+  .al-user-avatar { width: 28px; height: 28px; font-size: 10px; }
+}
+
+@media (max-width: 768px) {
+  .al-content-area { padding: 20px; }
+
+  .al-page-header { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .al-header-actions { width: 100%; }
+  .al-btn { flex: 1; justify-content: center; }
+
+  .al-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  .al-filter-bar { flex-direction: column; align-items: stretch; }
+  .al-filter-fields { flex-direction: column; }
+  .al-filter-group { width: 100%; min-width: unset; }
+  .al-filter-actions { width: 100%; }
+  .al-apply-btn { flex: 1; }
+
+  .al-table-container { overflow-x: scroll; }
+
+  .al-pagination {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+  .al-pagination-info { text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .al-stats-grid { grid-template-columns: 1fr 1fr; }
+  .al-stat-value { font-size: 20px; }
+}

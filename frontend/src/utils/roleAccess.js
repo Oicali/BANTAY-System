@@ -8,8 +8,23 @@ export const roleAccess = {
   // ============================================
   // POLICE ROLES
   // ============================================
+
+  "Technical Administrator": [
+    "dashboard",
+    "crime-analytics",
+    "e-blotter",
+    "case-management",
+    "modus-management",
+    "crime-mapping",
+    "patrol-dashboard",
+    "patrol-scheduling",
+    "after-patrol",
+    "user-management",
+    "audit-log",
+    "profile-settings",
+  ],
   
-  Administrator: [
+  "Administrator": [
     "dashboard",
     "crime-analytics",
     "e-blotter",
@@ -23,7 +38,7 @@ export const roleAccess = {
     "profile-settings",
   ],
 
-  Investigator: [
+  "Investigator": [
     "dashboard",
     "crime-analytics",
     "e-blotter",
@@ -33,7 +48,7 @@ export const roleAccess = {
     "profile-settings",
   ],
 
-  Patrol: [
+  "Patrol": [
     "dashboard",
     "crime-mapping",
     "e-blotter",
@@ -46,5 +61,5 @@ export const roleAccess = {
   // BARANGAY ROLES
   // ============================================
   
-  Barangay: ["dashboard", "crime-mapping", "brgy-report", "resident-management", "profile-settings"],
+  "Barangay": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "profile-settings"],
 };

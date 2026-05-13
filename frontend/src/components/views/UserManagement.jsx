@@ -130,8 +130,7 @@ const UserManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Derived: is draft different from applied?
-  const isDirty =
-    JSON.stringify(draft) !== JSON.stringify(appliedFilters);
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
 
   // ===================================================
   // HELPER: resolve barangay name from map
@@ -428,11 +427,18 @@ const UserManagement = () => {
   const getRoleBadgeClass = (role) => {
     if (!role) return "um-role-default";
     const r = role.toLowerCase();
+    if (r === "technical administrator") return "um-role-technical"; // ← exact match FIRST
     if (r.includes("administrator")) return "um-role-admin";
     if (r.includes("investigator")) return "um-role-investigator";
     if (r.includes("patrol")) return "um-role-patrol";
     if (r.includes("barangay")) return "um-role-chairman";
     return "um-role-default";
+  };
+
+  const formatRoleLabel = (role) => {
+    if (!role) return "N/A";
+    if (role.toLowerCase() === "technical administrator") return "Tech Admin"; // ← display only
+    return role;
   };
 
   const getStatusText = (userData) => {
@@ -595,15 +601,27 @@ const UserManagement = () => {
               onChange={(e) =>
                 setDraft((f) => ({ ...f, statusFilter: e.target.value }))
               }
-              style={draft.statusFilter === "Default" ? { color: "#adb5bd" } : {}}
+              style={
+                draft.statusFilter === "Default"
+                  ? { color: "#adb5bd" }
+                  : { color: "#212529" }
+              } // ← explicitly reset to dark when value is chosen
             >
-              <option value="Default" style={{ color: "#adb5bd" }}>
+              <option value="Default" style={{ color: "#212529" }}>
                 Select Status
               </option>
-              <option value="Verified">Verified</option>
-              <option value="Unverified">Unverified</option>
-              <option value="Locked">Locked</option>
-              <option value="Deactivated">Deactivated</option>
+              <option value="Verified" style={{ color: "#212529" }}>
+                Verified
+              </option>
+              <option value="Unverified" style={{ color: "#212529" }}>
+                Unverified
+              </option>
+              <option value="Locked" style={{ color: "#212529" }}>
+                Locked
+              </option>
+              <option value="Deactivated" style={{ color: "#212529" }}>
+                Deactivated
+              </option>
             </select>
           </div>
         </div>
@@ -713,7 +731,8 @@ const UserManagement = () => {
                           <span
                             className={`um-role-badge ${getRoleBadgeClass(userData.role)}`}
                           >
-                            {userData.role || "N/A"}
+                            {formatRoleLabel(userData.role)}{" "}
+                            {/* ← was: userData.role || "N/A" */}
                           </span>
                         </td>
 

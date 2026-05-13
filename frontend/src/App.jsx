@@ -22,6 +22,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
 import PatrollerDashboard from "./components/views/PatrolDashboard";
 import ResidentManagement from "./components/views/ResidentManagement";
+import AuditLog from "./components/views/AuditLog";
 
 const getRole = () => {
   const raw = localStorage.getItem("token");
@@ -36,7 +37,7 @@ const getRole = () => {
 
 const RoleBasedPatrolDashboard = () => {
   const role = getRole();
-  return role === "Administrator" ? (
+  return role === "Administrator" || role === "Technical Administrator" ? (
     <PatrolScheduling />
   ) : (
     <PatrollerDashboardView />
@@ -70,10 +71,12 @@ function App() {
           />
           <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
+          
           <Route path="/profile" element={<ProfileSettings />} />
           <Route path="/modus-management" element={<ModusManagement />} />
           <Route path="/brgy-report" element={<BrgyReport />} />
           <Route path="/resident-management" element={<ResidentManagement />} />
+          <Route path="/audit-log" element={<AuditLog />} />
         </Route>
 
         {/* Fallback */}
