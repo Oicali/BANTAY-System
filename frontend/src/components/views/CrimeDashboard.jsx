@@ -2209,7 +2209,7 @@ const CrimeDashboard = () => {
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
   const role = localStorage.getItem("role");
-  const isAdmin = role === "Administrator";
+  const isAdmin = role === "Administrator" || role === "Technical Administrator";
 
   const [hasPatrolAssignment, setHasPatrolAssignment] = useState(false);
   const [patrolAssignedBarangays, setPatrolAssignedBarangays] = useState([]);
@@ -2689,13 +2689,14 @@ const CrimeDashboard = () => {
                   Generate Assessment
                 </button>
                 <p className="cd-ai-helper-text">
-                  Generates an AI-powered EMPO QUAD assessment based on current
-                  filters.{" "}
-                  <b>
-                    More historical data improves forecast confidence and trend
-                    accuracy.
-                  </b>
-                </p>
+  Generates an AI-powered EMPO QUAD assessment based on current filters.{" "}
+  <b>More historical data improves forecast confidence and trend accuracy.</b>
+  <br />
+  <span className="cd-ai-forecast-note">
+    ⓘ Trend sparklines and forecasts use all available historical weekly data — not just
+    the selected date range — to ensure reliable Croston forecast predictions.
+  </span>
+</p>
               </>
             ) : (
               <div className="cd-ai-loading-wrap">

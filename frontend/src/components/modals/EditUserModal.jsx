@@ -947,11 +947,12 @@ const EditUserModal = ({
                 </div>
               </div>
 
-              <div className="eum-password-toggle">
+              <div className="eum-password-toggle" hidden> 
                 <button
                   type="button"
                   className="eum-toggle-password-btn"
                   disabled={isSubmitting}
+                  
                   onClick={() => {
                     setShowPasswordFields(!showPasswordFields);
                     if (showPasswordFields) {

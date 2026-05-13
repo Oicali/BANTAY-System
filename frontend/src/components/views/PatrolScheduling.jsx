@@ -94,7 +94,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 
 const PatrolScheduling = () => {
   const token = () => localStorage.getItem("token");
- const [isAdmin] = useState(() => localStorage.getItem("role") === "Administrator");
+ const [isAdmin] = useState(() => localStorage.getItem("role") === "Administrator" || localStorage.getItem("role") === "Technical Administrator");
 
   const [patrols, setPatrols] = useState([]);
   const [mobileUnits, setMobileUnits] = useState([]);

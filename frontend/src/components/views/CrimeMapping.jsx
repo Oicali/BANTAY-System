@@ -1154,7 +1154,7 @@ function CrimeMapping() {
       "fill-color": ["get", "fillColor"],
       "fill-opacity": heatmapMode
         ? ["case", ["==", ["get", "isLocked"], true], 0.35, 0]
-        : ["case", ["==", ["get", "isSelected"], false], 0.08, 0.4],
+        : ["case", ["==", ["get", "isSelected"], false], 0.08, 0.5], // 0.4 → 0.5
     },
   };
 
@@ -2236,7 +2236,7 @@ function CrimeMapping() {
                     <div className="crmap-heat-sidebar-legend">
                       <div className="crmap-sidebar-title-row">
                         <div className="crmap-heat-sidebar-title">
-                          Density scale
+                          Crime scale
                         </div>
                         <button
                           type="button"
@@ -2323,7 +2323,12 @@ function CrimeMapping() {
                         );
 
                         const levels = [
-                          { color: "#adb5bd", label: "No crimes", range: "0" },
+                          {
+                            color: "#adb5bd",
+                            label: "No crimes",
+                            range: "0",
+                            opacity: 1,
+                          },
                           {
                             color: "#eab308",
                             label: "Low Incidence",
@@ -2331,6 +2336,7 @@ function CrimeMapping() {
                               t.low.min === t.low.max
                                 ? `${t.low.min}`
                                 : `${t.low.min}–${t.low.max}`,
+                            opacity: 0.55,
                           },
                           {
                             color: "#f97316",
@@ -2339,11 +2345,13 @@ function CrimeMapping() {
                               t.medium.min === t.medium.max
                                 ? `${t.medium.min}`
                                 : `${t.medium.min}–${t.medium.max}`,
+                            opacity: 0.55,
                           },
                           {
                             color: "#b91c1c",
                             label: "High Incidence",
                             range: `${t.high.min}+`,
+                            opacity: 0.55,
                           },
                         ];
 
@@ -2363,6 +2371,7 @@ function CrimeMapping() {
                                 height: 12,
                                 borderRadius: 3,
                                 background: lvl.color,
+                                opacity: lvl.opacity,
                                 flexShrink: 0,
                               }}
                             />
@@ -2618,11 +2627,15 @@ function CrimeMapping() {
                                     style={{
                                       width: `${Math.min(100, (h.crime_count / maxCount) * 100)}%`,
                                       background: barColor,
+                                      opacity: 0.5,
                                     }}
                                   />
                                 </div>
                               </div>
-                              <div className="crmap-hotspot-count">
+                              <div
+                                className="crmap-hotspot-count"
+                                style={{ color: barColor }}
+                              >
                                 {h.crime_count}
                               </div>
                             </div>

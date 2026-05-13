@@ -358,17 +358,23 @@ body {
   text-align: center;
 }
 
-.um-role-admin {
+.um-role-technical {
   color: #991b1b;
   border-color: #dc2626;
 }
 
-.um-role-investigator {
+.um-role-patrol {
+  color: #065f46;
+  border-color: #059669;
+}
+
+
+.um-role-admin {
   color: #1e40af;
   border-color: #2563eb;
 }
 
-.um-role-patrol {
+.um-role-investigator {
   color: #1f2937;
   border-color: #475569;
 }
