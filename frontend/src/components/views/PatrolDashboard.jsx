@@ -1,3 +1,5 @@
+// frontend\src\components\views\PatrolDashboard.jsx
+
 import { useState, useEffect } from "react";
 import "./PatrolDashboard.css";
 import LoadingModal from "../modals/LoadingModal";
@@ -594,15 +596,15 @@ const PatrollerDashboard = () => {
                                     const isOnline = secondsAgo <= 30;
 
                                     if (isOnline && officer.current_barangay) {
-                                      return `📍 ${officer.current_barangay}`;
+                                      return `${officer.current_barangay}`;
                                     } else if (officer.current_barangay) {
-                                      return `⏱️ Last: ${officer.current_barangay}`;
+                                      return `${officer.current_barangay}`;
                                     } else if (officer.location_name) {
                                       return `📍 ${officer.location_name}`;
                                     } else {
                                       return (
                                         <span className="unassigned-badge">
-                                          No GPS data
+                                          Unregistered Area
                                         </span>
                                       );
                                     }
@@ -616,7 +618,26 @@ const PatrollerDashboard = () => {
                             </td>
                             <td>
                               <span className="time-badge">
-                                {lastSeen ? lastSeen.toLocaleString() : "Never"}
+                                {lastSeen
+                                  ? (() => {
+                                      const dd = String(
+                                        lastSeen.getDate(),
+                                      ).padStart(2, "0");
+                                      const mm = String(
+                                        lastSeen.getMonth() + 1,
+                                      ).padStart(2, "0");
+                                      const yyyy = lastSeen.getFullYear();
+                                      const hours = lastSeen.getHours();
+                                      const mins = String(
+                                        lastSeen.getMinutes(),
+                                      ).padStart(2, "0");
+                                      const ampm = hours >= 12 ? "PM" : "AM";
+                                      const h = String(
+                                        hours % 12 || 12,
+                                      ).padStart(2, "0");
+                                      return `${dd}/${mm}/${yyyy}, ${h}:${mins} ${ampm}`;
+                                    })()
+                                  : "Never"}
                               </span>
                             </td>
                           </tr>

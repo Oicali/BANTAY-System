@@ -1,9 +1,12 @@
+// frontend\src\components\layout\PageLayout.jsx
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./Topbar";
 import { navItems } from "../../utils/navItems";
 import "./PageLayout.css";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function PageLayout() {
   const [openSections, setOpenSections] = useState(
@@ -21,9 +24,24 @@ export default function PageLayout() {
     }));
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = "/";
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method:  "POST",
+        headers: {
+          Authorization:  `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (err) {
+      // Server unreachable — still log the user out on the client side
+      console.error("Logout API error:", err);
+    } finally {
+      localStorage.clear();
+      window.location.href = "/";
+    }
   };
 
   return (

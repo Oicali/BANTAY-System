@@ -1,3 +1,5 @@
+//frontend\src\components\layout\Sidebar.jsx
+
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { navItems } from "../../utils/navItems";

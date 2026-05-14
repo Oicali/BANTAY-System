@@ -1,4 +1,4 @@
-/* === AUDIT LOG — mirrors UserManagement.css conventions === */
+/* === AUDIT LOG === */
 
 /* ── Content area ── */
 .al-content-area {
@@ -273,48 +273,23 @@
 }
 
 /* ── Column widths ── */
-.al-col-id     { width: 80px; }
-.al-col-user   { width: 200px; }
-.al-col-action { width: 100px; }
-.al-col-module { width: 110px; }
-.al-col-record { width: 160px; }
+.al-col-id     { width: 90px; }
+.al-col-user   { width: 160px; }
+.al-col-event  { width: 140px; }
+.al-col-desc   { min-width: 240px; }
+.al-col-status { width: 90px; }
+.al-col-source { width: 110px; }
 .al-col-ip     { width: 130px; }
-.al-col-time   { width: 160px; }
+.al-col-time   { width: 145px; }
 
 /* ── Log ID ── */
 .al-log-id {
   font-family: "DM Mono", monospace;
   font-size: 12px;
-  color: var(--gray-600, #6c757d);
+  color: var(--gray-500, #adb5bd);
 }
 
-/* ── User cell ── */
-.al-user-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.al-user-avatar {
-  width: 34px;
-  height: 34px;
-  background: var(--navy-primary, #1e3a5f);
-  color: #ffffff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.al-user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
+/* ── User cell — plain text, no avatar ── */
 .al-user-name {
   font-weight: 600;
   font-size: 13px;
@@ -323,54 +298,52 @@
 
 .al-user-email {
   font-size: 11px;
-  color: var(--gray-600, #6c757d);
+  color: var(--gray-500, #adb5bd);
+  margin-top: 2px;
 }
 
-/* ── Action badges ── */
-.al-action-badge {
-  display: inline-block;
-  padding: 3px 9px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-.al-action-insert  { background: #dcfce7; color: #166534; }
-.al-action-update  { background: #e6f1fb; color: #0c447c; }
-.al-action-delete  { background: #fcebeb; color: #791f1f; }
-.al-action-login   { background: #fef3c7; color: #92400e; }
-.al-action-logout  { background: #f3f4f6; color: #4b5563; }
-.al-action-view    { background: #eeedfe; color: #3c3489; }
-
-/* ── Module badge ── */
-.al-module-badge {
+/* ── Event name badge ── */
+.al-event-badge {
   display: inline-block;
   padding: 3px 9px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
   background: var(--gray-100, #e9ecef);
-  color: var(--gray-700, #495057);
-}
-
-/* ── Record cell ── */
-.al-record-id {
-  font-family: "DM Mono", monospace;
-  font-size: 12px;
-  font-weight: 600;
   color: var(--navy-primary, #1e3a5f);
+  white-space: nowrap;
 }
 
-.al-record-label {
+/* ── Description ── */
+.al-description {
+  font-size: 12px;
+  color: var(--gray-700, #495057);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Status badges ── */
+.al-status-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 4px;
   font-size: 11px;
-  color: var(--gray-600, #6c757d);
-  margin-top: 2px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
 }
 
-.al-no-record {
-  color: var(--gray-300, #ced4da);
-  font-size: 13px;
+.al-status-success { background: #dcfce7; color: #166534; }
+.al-status-failed  { background: #fcebeb; color: #791f1f; }
+
+/* ── Source ── */
+.al-source {
+  font-size: 12px;
+  color: var(--gray-600, #6c757d);
+  white-space: nowrap;
 }
 
 /* ── IP address ── */
@@ -382,8 +355,10 @@
 
 /* ── Timestamp ── */
 .al-timestamp {
+  font-family: "DM Mono", monospace;
   font-size: 12px;
   color: var(--gray-700, #495057);
+  white-space: nowrap;
 }
 
 /* ── Error / loading ── */
@@ -460,48 +435,40 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 1280px) {
+@media (max-width: 1300px) {
   .al-col-ip { display: none; }
 }
 
 @media (max-width: 1100px) {
-  .al-col-time { display: none; }
+  .al-col-source { display: none; }
 }
 
 @media (max-width: 960px) {
-  .al-col-record { display: none; }
+  .al-col-time { display: none; }
 }
 
 @media (max-width: 860px) {
   .al-stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .al-col-module { display: none; }
-  .al-user-name { font-size: 12px; }
-  .al-user-email { font-size: 11px; }
-  .al-user-avatar { width: 28px; height: 28px; font-size: 10px; }
+  .al-col-desc { display: none; }
+}
+
+@media (max-width: 680px) {
+  .al-col-event { display: none; }
 }
 
 @media (max-width: 768px) {
   .al-content-area { padding: 20px; }
-
   .al-page-header { flex-direction: column; align-items: flex-start; gap: 14px; }
   .al-header-actions { width: 100%; }
   .al-btn { flex: 1; justify-content: center; }
-
   .al-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-
   .al-filter-bar { flex-direction: column; align-items: stretch; }
   .al-filter-fields { flex-direction: column; }
   .al-filter-group { width: 100%; min-width: unset; }
   .al-filter-actions { width: 100%; }
   .al-apply-btn { flex: 1; }
-
   .al-table-container { overflow-x: scroll; }
-
-  .al-pagination {
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-  }
+  .al-pagination { flex-direction: column; gap: 12px; padding: 16px; }
   .al-pagination-info { text-align: center; }
 }
 

@@ -2,6 +2,8 @@
 // Generates a .pdf report from the crime dashboard data.
 // Internally builds .docx first, then converts to PDF via LibreOffice.
 
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
+
 const {
   Document,
   Packer,
@@ -27,7 +29,7 @@ const libreConvert = (buf, ext, opt) =>
     libre.convert(buf, ext, opt, (err, result) => {
       if (err) reject(err);
       else resolve(result);
-    })
+    }),
   );
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -1077,12 +1079,23 @@ const exportDashboard = async (req, res) => {
 
     // Step 2: Convert .docx → .pdf via LibreOffice
     const pdfBuffer = await libreConvert(docxBuffer, ".pdf", undefined);
-    console.log("PDF buffer size:", pdfBuffer?.length);
+    // console.log("PDF buffer size:", pdfBuffer?.length);
 
     const dateStr =
       meta.dateFrom && meta.dateTo
         ? `${meta.dateFrom}_to_${meta.dateTo}`
         : new Date().toISOString().slice(0, 10);
+
+    await logAudit({
+      userId:      req.user?.user_id,
+      username:    req.user?.username,
+      eventName:   "Dashboard Export",
+      description: `Crime dashboard report exported (${dateStr})`,
+      action:      "EXPORT",
+      status:      "success",
+      source:      "Web Portal",
+      ipAddress:   getClientIp(req),
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
@@ -1092,6 +1105,18 @@ const exportDashboard = async (req, res) => {
     res.send(pdfBuffer);
   } catch (err) {
     console.error("exportDashboard error:", err);
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Dashboard Export Failed",
+      description: err.message,
+      action: "EXPORT",
+      status: "failed",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.status(500).json({ success: false, message: err.message });
   }
 };

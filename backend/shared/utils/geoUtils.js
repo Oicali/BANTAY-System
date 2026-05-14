@@ -11,6 +11,7 @@ const loadBarangayGeoJSON = () => {
   
   // Path to your GeoJSON file - try multiple possible locations
   const possiblePaths = [
+    path.join(__dirname, "../../src/bacoor_barangays.geojson"),           // backend/src/  ← NEW (your file is here)
     path.join(__dirname, "../../../frontend/public/bacoor_barangays.geojson"),
     path.join(__dirname, "../../bacoor_barangays.geojson"),
     path.join(process.cwd(), "frontend/public/bacoor_barangays.geojson"),
@@ -35,16 +36,8 @@ const loadBarangayGeoJSON = () => {
   try {
     const fileContent = fs.readFileSync(geojsonPath, 'utf8');
     barangayGeoJSON = JSON.parse(fileContent);
-    console.log(`✅ Loaded GeoJSON from: ${geojsonPath}`);
-    console.log(`   Features count: ${barangayGeoJSON.features?.length || 0}`);
+    // console.log(`✅ Loaded GeoJSON from: ${geojsonPath}`);
     
-    // Log first few barangay names for verification
-    if (barangayGeoJSON.features && barangayGeoJSON.features.length > 0) {
-      const sampleNames = barangayGeoJSON.features.slice(0, 5).map(f => 
-        f.properties?.name_db || f.properties?.name_kml || 'Unknown'
-      );
-      console.log(`   Sample barangays: ${sampleNames.join(', ')}`);
-    }
   } catch (error) {
     geoJSONLoadError = error;
     console.error("Error loading GeoJSON:", error);
@@ -184,7 +177,7 @@ const buildSpatialIndex = () => {
     });
   }
   
-  console.log(`✅ Built spatial index with ${spatialIndex.length} barangays`);
+  // console.log(`✅ Built spatial index with ${spatialIndex.length} barangays`);
 };
 
 const getBarangayOptimized = (lng, lat) => {

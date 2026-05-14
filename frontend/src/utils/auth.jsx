@@ -1,10 +1,14 @@
+// frontend\src\utils\auth.jsx
+export const API_URL = import.meta.env.VITE_API_URL;
 export const logout = async () => {
   try {
     const token = localStorage.getItem('token');
+
+    
     
     if (token) {
       // Call backend logout to revoke token
-      await fetch('http://localhost:5000/auth/logout', {
+      await fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

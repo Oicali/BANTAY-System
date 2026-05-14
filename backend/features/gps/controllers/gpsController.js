@@ -81,7 +81,7 @@ const getActiveOfficers = async (req, res) => {
     const platform = req.query.platform; // 'mobile' | 'web' | undefined
 
     // Only Administrator and Patrol can see officers
-    if (role !== "Administrator" && role !== "Patrol") {
+    if (role !== "Administrator" && role !== "Patrol" && role !== "Technical Administrator") {
       return res.json({ success: true, data: [] });
     }
 
