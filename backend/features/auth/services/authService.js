@@ -1,5 +1,10 @@
+// ================================================================================
+// FILE: backend/features/auth/services/authService.js
+// ================================================================================
+
 const bcrypt = require("bcrypt");
-const pool = require("../../../config/database");
+const pool   = require("../../../config/database");
+const { logAudit } = require("../../../shared/utils/auditLogger");
 
 // Generate 6-digit OTP
 function generateOTP() {
@@ -65,7 +70,7 @@ async function sendBrevoEmail({ to, firstName, otp }) {
 // ============================================================
 // SEND OTP
 // ============================================================
-async function sendOTP(email) {
+async function sendOTP(email, ipAddress = null) {
   try {
     const userCheck = await pool.query(
       "SELECT email, first_name FROM users WHERE LOWER(email) = LOWER($1)",
@@ -95,6 +100,17 @@ async function sendOTP(email) {
       // Cooldown check: must wait 60 seconds between requests
       if (record.seconds_since_last !== null && record.seconds_since_last < 60) {
         const remaining = Math.ceil(60 - record.seconds_since_last);
+
+        await logAudit({
+          username:    email,
+          eventName:   "OTP Requested",
+          description: `OTP request rate-limited — ${remaining}s cooldown remaining`,
+          action:      "OTP",
+          status:      "failed",
+          source:      null,
+          ipAddress,
+        });
+
         return {
           success: false,
           message: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before requesting a new code.`,
@@ -104,6 +120,16 @@ async function sendOTP(email) {
       requestCount = record.is_same_day ? record.request_count + 1 : 1;
 
       if (requestCount > 10) {
+        await logAudit({
+          username:    email,
+          eventName:   "OTP Requested",
+          description: `Daily OTP limit reached for ${email}`,
+          action:      "OTP",
+          status:      "failed",
+          source:      null,
+          ipAddress,
+        });
+
         return {
           success: false,
           message: "Maximum OTP requests reached. Try again tomorrow or contact administrator.",
@@ -111,7 +137,7 @@ async function sendOTP(email) {
       }
     }
 
-    const otp = generateOTP();
+    const otp     = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
 
     await pool.query(
@@ -119,33 +145,59 @@ async function sendOTP(email) {
        VALUES ($1, $2, NOW() + INTERVAL '2 minutes', $3, CURRENT_TIMESTAMP)
        ON CONFLICT (email)
        DO UPDATE SET
-         otp_hash = EXCLUDED.otp_hash,
-         expires_at = EXCLUDED.expires_at,
-         request_count = EXCLUDED.request_count,
+         otp_hash        = EXCLUDED.otp_hash,
+         expires_at      = EXCLUDED.expires_at,
+         request_count   = EXCLUDED.request_count,
          last_request_at = EXCLUDED.last_request_at`,
       [email, otpHash, requestCount]
     );
 
     try {
-      await sendBrevoEmail({
-        to: email,
-        firstName: user.first_name,
-        otp,
-      });
+      await sendBrevoEmail({ to: email, firstName: user.first_name, otp });
     } catch (emailError) {
       // Roll back the OTP record since the email was never delivered
       await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
 
       if (emailError.message === "BREVO_RATE_LIMITED") {
+        await logAudit({
+          username:    email,
+          eventName:   "OTP Send Failed",
+          description: `OTP email delivery rate-limited by Brevo for ${email}`,
+          action:      "OTP",
+          status:      "failed",
+          source:      null,
+          ipAddress,
+        });
+
         return {
           success: false,
           message: "Email service is temporarily busy. Please wait a moment and try again.",
         };
       }
 
+      await logAudit({
+        username:    email,
+        eventName:   "OTP Send Failed",
+        description: `OTP email delivery failed for ${email} — record rolled back`,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
+        ipAddress,
+      });
+
       console.error("Error sending OTP email:", emailError);
       return { success: false, message: "Failed to send verification code. Please try again." };
     }
+
+    await logAudit({
+      username:    email,
+      eventName:   "OTP Requested",
+      description: `OTP sent successfully to ${email} (request #${requestCount} today)`,
+      action:      "OTP",
+      status:      "success",
+      source:      null,
+      ipAddress,
+    });
 
     return { success: true, message: "Verification code sent to your email" };
   } catch (error) {
@@ -157,7 +209,7 @@ async function sendOTP(email) {
 // ============================================================
 // VERIFY OTP
 // ============================================================
-async function verifyOTP(email, code) {
+async function verifyOTP(email, code, ipAddress = null) {
   try {
     const otpCheck = await pool.query(
       `SELECT otp_hash,
@@ -168,6 +220,16 @@ async function verifyOTP(email, code) {
     );
 
     if (otpCheck.rows.length === 0) {
+      await logAudit({
+        username:    email,
+        eventName:   "OTP Verification",
+        description: `OTP verification attempted but no OTP record found for ${email}`,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
+        ipAddress,
+      });
+
       return { success: false, message: "No OTP found. Please request a new one." };
     }
 
@@ -175,15 +237,48 @@ async function verifyOTP(email, code) {
 
     if (otp.is_expired) {
       await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
+
+      await logAudit({
+        username:    email,
+        eventName:   "OTP Verification",
+        description: `OTP expired for ${email}`,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
+        ipAddress,
+      });
+
       return { success: false, message: "OTP expired. Please request a new one." };
     }
 
     const valid = await bcrypt.compare(code, otp.otp_hash);
+
     if (!valid) {
+      await logAudit({
+        username:    email,
+        eventName:   "OTP Verification",
+        description: `Invalid OTP entered for ${email}`,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
+        ipAddress,
+      });
+
       return { success: false, message: "Invalid OTP." };
     }
 
     await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
+
+    await logAudit({
+      username:    email,
+      eventName:   "OTP Verification",
+      description: `OTP verified successfully for ${email}`,
+      action:      "OTP",
+      status:      "success",
+      source:      null,
+      ipAddress,
+    });
+
     return { success: true, message: "OTP verified." };
   } catch (error) {
     console.error("Error verifying OTP:", error);
@@ -194,8 +289,8 @@ async function verifyOTP(email, code) {
 // ============================================================
 // RESEND OTP
 // ============================================================
-async function resendOTP(email) {
-  return sendOTP(email);
+async function resendOTP(email, ipAddress = null) {
+  return sendOTP(email, ipAddress);
 }
 
 module.exports = { sendOTP, verifyOTP, resendOTP };

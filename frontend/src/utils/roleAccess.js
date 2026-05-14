@@ -34,7 +34,6 @@ export const roleAccess = {
     "patrol-dashboard",
     "patrol-scheduling",
     "after-patrol",
-    "user-management",
     "profile-settings",
   ],
 

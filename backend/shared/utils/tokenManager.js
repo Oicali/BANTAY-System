@@ -2,6 +2,7 @@
 // ║  🎫 TOKEN MANAGER - Handles token creation, verification, and revocation  ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
  
+//backend\shared\utils\tokenManager.js
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const pool = require("../../config/database");

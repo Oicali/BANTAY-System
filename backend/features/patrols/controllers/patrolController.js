@@ -1,8 +1,8 @@
-// patrolController.js
+// backend\features\patrols\controllers\patrolController.js
 
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
-const { getBarangayFromCoordinates } = require("../../../shared/utils/geoUtils");
+const { getBarangayOptimized } = require("../../../shared/utils/geoUtils");
 // ── Helper: generate date range ────────────────────────────
 
 const formatDateOnly = (d) => {
@@ -10,14 +10,14 @@ const formatDateOnly = (d) => {
   if (typeof d === "string") return d.substring(0, 10);
   // pg returns date columns as JS Date objects (UTC midnight) — read local parts
   const offset = d.getTimezoneOffset(); // in minutes
-  const local  = new Date(d.getTime() - offset * 60000);
+  const local = new Date(d.getTime() - offset * 60000);
   return local.toISOString().substring(0, 10);
 };
 
 const getDateRange = (start_date, end_date) => {
   const dates = [];
-  const cur   = new Date(start_date + "T12:00:00");
-  const last  = new Date(end_date   + "T12:00:00");
+  const cur = new Date(start_date + "T12:00:00");
+  const last = new Date(end_date + "T12:00:00");
   while (cur <= last) {
     dates.push(cur.toISOString().split("T")[0]);
     cur.setDate(cur.getDate() + 1);
@@ -35,9 +35,13 @@ const getPatrolStats = async (req, res) => {
       FROM patrol_assignment
       WHERE start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
     `);
-    const mobileUnits   = await pool.query(`SELECT COUNT(*) AS mobile_units FROM mobile_unit`);
-    const totalOfficers = await pool.query(`SELECT COUNT(*) AS total_officers FROM active_patroller`);
-    const unassigned    = await pool.query(`
+    const mobileUnits = await pool.query(
+      `SELECT COUNT(*) AS mobile_units FROM mobile_unit`,
+    );
+    const totalOfficers = await pool.query(
+      `SELECT COUNT(*) AS total_officers FROM active_patroller`,
+    );
+    const unassigned = await pool.query(`
       SELECT COUNT(*) AS unassigned_patrollers
       FROM active_patroller ap
       WHERE ap.active_patroller_id NOT IN (
@@ -47,9 +51,9 @@ const getPatrolStats = async (req, res) => {
     res.json({
       success: true,
       data: {
-        active_patrols_today:  activePatrols.rows[0].active_patrols_today,
-        mobile_units:          mobileUnits.rows[0].mobile_units,
-        total_officers:        totalOfficers.rows[0].total_officers,
+        active_patrols_today: activePatrols.rows[0].active_patrols_today,
+        mobile_units: mobileUnits.rows[0].mobile_units,
+        total_officers: totalOfficers.rows[0].total_officers,
         unassigned_patrollers: unassigned.rows[0].unassigned_patrollers,
       },
     });
@@ -66,45 +70,66 @@ const getPatrolStats = async (req, res) => {
 const getActivePatrollers = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT DISTINCT ON (ap.active_patroller_id)
-        ap.active_patroller_id,
-        ap.officer_id,
-        u.last_login,
-        TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-        u.profile_picture,
-        mu.mobile_unit_name AS mobile_unit_assigned,
-        ol.latitude,
-        ol.longitude,
-        ol.location_name  AS last_location_name,
-        ol.updated_at     AS last_location_at
-      FROM active_patroller ap
-      JOIN users u ON ap.officer_id = u.user_id
-      LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
-      LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
-      LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
-      LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
-      WHERE u.role_id = 3
-      ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
-    `);
-    
-    // Resolve barangay names for each officer
-    const officersWithBarangay = result.rows.map(officer => {
+  SELECT DISTINCT ON (ap.active_patroller_id)
+    ap.active_patroller_id,
+    ap.officer_id,
+    u.last_login,
+    TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+    u.profile_picture,
+    mu.mobile_unit_name AS mobile_unit_assigned,
+    ol.latitude,
+    ol.longitude,
+    ol.location_name  AS last_location_name,
+    ol.updated_at     AS last_location_at,
+    ol.is_on_duty,
+    EXTRACT(EPOCH FROM (NOW() - ol.updated_at))::int AS seconds_ago
+  FROM active_patroller ap
+  JOIN users u ON ap.officer_id = u.user_id
+  LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
+  LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+  LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+  LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
+  WHERE u.role_id = 3
+  ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
+`);
+
+    const officersWithBarangay = result.rows.map((officer) => {
       let barangay = officer.last_location_name;
-      
-      // If no location_name but we have coordinates, resolve from GeoJSON
-      if (!barangay && officer.latitude && officer.longitude) {
-        barangay = getBarangayFromCoordinates(
+
+      if (officer.latitude && officer.longitude) {
+        const resolved = getBarangayOptimized(
           parseFloat(officer.longitude),
-          parseFloat(officer.latitude)
+          parseFloat(officer.latitude),
         );
+        if (resolved) {
+          barangay = resolved;
+          if (resolved !== officer.last_location_name) {
+            pool
+              .query(
+                `UPDATE officer_locations SET location_name = $1 WHERE user_id = $2`,
+                [resolved, officer.officer_id],
+              )
+              .catch((err) =>
+                console.error("Failed to update barangay name:", err),
+              );
+          }
+        }
       }
-      
+
+      const lastSeen = officer.last_location_at
+        ? new Date(officer.last_location_at)
+        : null;
+      const isOnline = lastSeen && Date.now() - lastSeen.getTime() <= 30000;
+
       return {
         ...officer,
-        resolved_barangay: barangay || null
+        current_barangay: barangay || null,
+        resolved_barangay: barangay || null,
+        last_location_name: barangay || null,
+        is_online: isOnline,
       };
     });
-    
+
     res.json({ success: true, data: officersWithBarangay });
   } catch (error) {
     console.error("Patroller fetch error:", error);
@@ -120,7 +145,8 @@ const getAvailablePatrollers = async (req, res) => {
     let result;
     if (start && end) {
       if (exclude_patrol_id) {
-        result = await pool.query(`
+        result = await pool.query(
+          `
           SELECT ap.active_patroller_id, ap.officer_id,
             TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
             u.phone AS contact_number,
@@ -137,9 +163,12 @@ const getAvailablePatrollers = async (req, res) => {
                 AND pa.patrol_id  != $3
             )
           ORDER BY officer_name ASC
-        `, [start, end, parseInt(exclude_patrol_id)]);
+        `,
+          [start, end, parseInt(exclude_patrol_id)],
+        );
       } else {
-        result = await pool.query(`
+        result = await pool.query(
+          `
           SELECT ap.active_patroller_id, ap.officer_id,
             TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
             u.phone AS contact_number,
@@ -155,7 +184,9 @@ const getAvailablePatrollers = async (req, res) => {
                 AND pa.end_date   >= $1
             )
           ORDER BY officer_name ASC
-        `, [start, end]);
+        `,
+          [start, end],
+        );
       }
     } else {
       result = await pool.query(`
@@ -199,19 +230,25 @@ const createMobileUnit = async (req, res) => {
   const { mobile_unit_name, vehicle_type, plate_number } = req.body;
   const created_by = req.user?.user_id || null;
   if (!mobile_unit_name || !vehicle_type || !plate_number) {
-    return res.status(400).json({ success: false, message: "All fields required." });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields required." });
   }
   try {
     await pool.query(
       `INSERT INTO mobile_unit (mobile_unit_name, vehicle_type, plate_number, created_by)
        VALUES ($1, $2, $3, $4)`,
-      [mobile_unit_name, vehicle_type, plate_number, created_by]
+      [mobile_unit_name, vehicle_type, plate_number, created_by],
     );
     res.json({ success: true, message: "Mobile unit created." });
   } catch (error) {
     if (error.code === "23505") {
-      const field = error.constraint?.includes("plate") ? "Plate number" : "Mobile unit name";
-      return res.status(400).json({ success: false, message: `${field} already exists.` });
+      const field = error.constraint?.includes("plate")
+        ? "Plate number"
+        : "Mobile unit name";
+      return res
+        .status(400)
+        .json({ success: false, message: `${field} already exists.` });
     }
     res.status(500).json({ success: false, message: "Server error" });
   }
@@ -224,20 +261,27 @@ const updateMobileUnit = async (req, res) => {
   const { id } = req.params;
   const { mobile_unit_name, vehicle_type, plate_number } = req.body;
   if (!mobile_unit_name || !vehicle_type || !plate_number) {
-    return res.status(400).json({ success: false, message: "All fields required." });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields required." });
   }
   try {
     const result = await pool.query(
       `UPDATE mobile_unit SET mobile_unit_name=$1, vehicle_type=$2, plate_number=$3, updated_at=CURRENT_TIMESTAMP
        WHERE mobile_unit_id=$4`,
-      [mobile_unit_name, vehicle_type, plate_number, id]
+      [mobile_unit_name, vehicle_type, plate_number, id],
     );
-    if (result.rowCount === 0) return res.status(404).json({ success: false, message: "Not found." });
+    if (result.rowCount === 0)
+      return res.status(404).json({ success: false, message: "Not found." });
     res.json({ success: true, message: "Mobile unit updated." });
   } catch (error) {
     if (error.code === "23505") {
-      const field = error.constraint?.includes("plate") ? "Plate number" : "Mobile unit name";
-      return res.status(400).json({ success: false, message: `${field} already exists.` });
+      const field = error.constraint?.includes("plate")
+        ? "Plate number"
+        : "Mobile unit name";
+      return res
+        .status(400)
+        .json({ success: false, message: `${field} already exists.` });
     }
     res.status(500).json({ success: false, message: "Server error" });
   }
@@ -249,8 +293,12 @@ const updateMobileUnit = async (req, res) => {
 const deleteMobileUnit = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(`DELETE FROM mobile_unit WHERE mobile_unit_id=$1`, [id]);
-    if (result.rowCount === 0) return res.status(404).json({ success: false, message: "Not found." });
+    const result = await pool.query(
+      `DELETE FROM mobile_unit WHERE mobile_unit_id=$1`,
+      [id],
+    );
+    if (result.rowCount === 0)
+      return res.status(404).json({ success: false, message: "Not found." });
     res.json({ success: true, message: "Mobile unit deleted." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -343,11 +391,11 @@ const getPatrols = async (req, res) => {
       ORDER BY pa.start_date DESC, pa.patrol_id DESC
     `);
     const data = result.rows.map((p) => ({
-  ...p,
-  start_date: formatDateOnly(p.start_date),
-  end_date:   formatDateOnly(p.end_date),
-}));
-res.json({ success: true, data });
+      ...p,
+      start_date: formatDateOnly(p.start_date),
+      end_date: formatDateOnly(p.end_date),
+    }));
+    res.json({ success: true, data });
   } catch (error) {
     console.error("Get patrols error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -355,10 +403,19 @@ res.json({ success: true, data });
 };
 
 // ─────────────────────────────────────────────
-const checkPatrollerConflicts = async (client, patroller_ids, start_date, end_date, exclude_patrol_id = null) => {
+const checkPatrollerConflicts = async (
+  client,
+  patroller_ids,
+  start_date,
+  end_date,
+  exclude_patrol_id = null,
+) => {
   if (!patroller_ids || patroller_ids.length === 0) return [];
-  const excludeClause = exclude_patrol_id ? `AND pa.patrol_id != ${exclude_patrol_id}` : "";
-  const result = await client.query(`
+  const excludeClause = exclude_patrol_id
+    ? `AND pa.patrol_id != ${exclude_patrol_id}`
+    : "";
+  const result = await client.query(
+    `
     SELECT 
       pap.active_patroller_id,
       TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
@@ -374,7 +431,9 @@ const checkPatrollerConflicts = async (client, patroller_ids, start_date, end_da
       AND pa.end_date   >= $3
       ${excludeClause}
     LIMIT 1
-  `, [patroller_ids, end_date, start_date]);
+  `,
+    [patroller_ids, end_date, start_date],
+  );
   return result.rows;
 };
 
@@ -383,26 +442,49 @@ const checkPatrollerConflicts = async (client, patroller_ids, start_date, end_da
 // ─────────────────────────────────────────────
 const createPatrol = async (req, res) => {
   const {
-    patrol_name, mobile_unit_id, start_date, end_date,
-    patroller_ids_am, patroller_ids_pm, barangays, routes,
+    patrol_name,
+    mobile_unit_id,
+    start_date,
+    end_date,
+    patroller_ids_am,
+    patroller_ids_pm,
+    barangays,
+    routes,
   } = req.body;
   const created_by = req.user?.user_id || null;
 
   if (!patrol_name || !mobile_unit_id || !start_date || !end_date) {
-    return res.status(400).json({ success: false, message: "Patrol name, mobile unit, start and end date are required." });
+    return res.status(400).json({
+      success: false,
+      message: "Patrol name, mobile unit, start and end date are required.",
+    });
   }
 
   const client = await pool.connect();
   try {
-    const allIds = [...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])])];
-    const conflicts = await checkPatrollerConflicts(client, allIds, start_date, end_date);
+    const allIds = [
+      ...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])]),
+    ];
+    const conflicts = await checkPatrollerConflicts(
+      client,
+      allIds,
+      start_date,
+      end_date,
+    );
     if (conflicts.length > 0) {
       const c = conflicts[0];
       const fmt = (d) => {
-  const dt = new Date(d);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
-    .toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-};
+        const dt = new Date(d);
+        return new Date(
+          dt.getFullYear(),
+          dt.getMonth(),
+          dt.getDate(),
+        ).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      };
       return res.status(400).json({
         success: false,
         message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
@@ -414,10 +496,10 @@ const createPatrol = async (req, res) => {
     const patrolResult = await client.query(
       `INSERT INTO patrol_assignment (patrol_name, mobile_unit_id, start_date, end_date, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING patrol_id`,
-      [patrol_name, mobile_unit_id, start_date, end_date, created_by]
+      [patrol_name, mobile_unit_id, start_date, end_date, created_by],
     );
     const patrol_id = patrolResult.rows[0].patrol_id;
-    const dates     = getDateRange(start_date, end_date);
+    const dates = getDateRange(start_date, end_date);
 
     if (patroller_ids_am?.length > 0) {
       for (const date of dates) {
@@ -425,7 +507,7 @@ const createPatrol = async (req, res) => {
           await client.query(
             `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
              VALUES ($1, $2, 'AM', $3)`,
-            [patrol_id, active_patroller_id, date]
+            [patrol_id, active_patroller_id, date],
           );
         }
       }
@@ -437,7 +519,7 @@ const createPatrol = async (req, res) => {
           await client.query(
             `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
              VALUES ($1, $2, 'PM', $3)`,
-            [patrol_id, active_patroller_id, date]
+            [patrol_id, active_patroller_id, date],
           );
         }
       }
@@ -448,7 +530,7 @@ const createPatrol = async (req, res) => {
         await client.query(
           `INSERT INTO patrol_assignment_route (patrol_id, route_date, barangay, shift, stop_order)
            VALUES ($1, $2, $3, 'AM', $4)`,
-          [patrol_id, start_date, barangays[i], -(i + 1)]
+          [patrol_id, start_date, barangays[i], -(i + 1)],
         );
       }
     }
@@ -461,7 +543,15 @@ const createPatrol = async (req, res) => {
             `INSERT INTO patrol_assignment_route
                (patrol_id, route_date, barangay, shift, time_start, time_end, notes, stop_order)
              VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)`,
-            [patrol_id, date, task.shift, task.time_start || null, task.time_end || null, task.notes || null, i + 1]
+            [
+              patrol_id,
+              date,
+              task.shift,
+              task.time_start || null,
+              task.time_end || null,
+              task.notes || null,
+              i + 1,
+            ],
           );
         }
       }
@@ -472,7 +562,9 @@ const createPatrol = async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Create patrol error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   } finally {
     client.release();
   }
@@ -483,10 +575,13 @@ const createPatrol = async (req, res) => {
 // ─────────────────────────────────────────────
 const updatePatrol = async (req, res) => {
   const { id } = req.params;
-  const { patrol_name, mobile_unit_id, start_date, end_date, barangays } = req.body;
+  const { patrol_name, mobile_unit_id, start_date, end_date, barangays } =
+    req.body;
 
   if (!patrol_name || !mobile_unit_id || !start_date || !end_date) {
-    return res.status(400).json({ success: false, message: "All required fields must be filled." });
+    return res
+      .status(400)
+      .json({ success: false, message: "All required fields must be filled." });
   }
 
   const client = await pool.connect();
@@ -497,17 +592,20 @@ const updatePatrol = async (req, res) => {
       `UPDATE patrol_assignment
        SET patrol_name=$1, mobile_unit_id=$2, start_date=$3, end_date=$4, updated_at=CURRENT_TIMESTAMP
        WHERE patrol_id=$5`,
-      [patrol_name, mobile_unit_id, start_date, end_date, id]
+      [patrol_name, mobile_unit_id, start_date, end_date, id],
     );
 
     if (barangays !== undefined) {
-      await client.query(`DELETE FROM patrol_assignment_route WHERE patrol_id=$1 AND stop_order <= 0`, [id]);
+      await client.query(
+        `DELETE FROM patrol_assignment_route WHERE patrol_id=$1 AND stop_order <= 0`,
+        [id],
+      );
       if (barangays?.length > 0) {
         for (let i = 0; i < barangays.length; i++) {
           await client.query(
             `INSERT INTO patrol_assignment_route (patrol_id, route_date, barangay, shift, stop_order)
              VALUES ($1, $2, $3, 'AM', $4)`,
-            [id, start_date, barangays[i], -(i + 1)]
+            [id, start_date, barangays[i], -(i + 1)],
           );
         }
       }
@@ -518,7 +616,9 @@ const updatePatrol = async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Update patrol error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   } finally {
     client.release();
   }
@@ -533,15 +633,30 @@ const updatePatrollersForDate = async (req, res) => {
 
   const client = await pool.connect();
   try {
-    const allIds = [...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])])];
-    const conflicts = await checkPatrollerConflicts(client, allIds, date, date, parseInt(id));
+    const allIds = [
+      ...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])]),
+    ];
+    const conflicts = await checkPatrollerConflicts(
+      client,
+      allIds,
+      date,
+      date,
+      parseInt(id),
+    );
     if (conflicts.length > 0) {
       const c = conflicts[0];
-    const fmt = (d) => {
-  const dt = new Date(d);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
-    .toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-};
+      const fmt = (d) => {
+        const dt = new Date(d);
+        return new Date(
+          dt.getFullYear(),
+          dt.getMonth(),
+          dt.getDate(),
+        ).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      };
       client.release();
       return res.status(400).json({
         success: false,
@@ -552,7 +667,7 @@ const updatePatrollersForDate = async (req, res) => {
     await client.query("BEGIN");
     await client.query(
       `DELETE FROM patrol_assignment_patroller WHERE patrol_id=$1 AND route_date=$2`,
-      [id, date]
+      [id, date],
     );
 
     if (patroller_ids_am?.length > 0) {
@@ -560,7 +675,7 @@ const updatePatrollersForDate = async (req, res) => {
         await client.query(
           `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
            VALUES ($1, $2, 'AM', $3)`,
-          [id, active_patroller_id, date]
+          [id, active_patroller_id, date],
         );
       }
     }
@@ -570,7 +685,7 @@ const updatePatrollersForDate = async (req, res) => {
         await client.query(
           `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
            VALUES ($1, $2, 'PM', $3)`,
-          [id, active_patroller_id, date]
+          [id, active_patroller_id, date],
         );
       }
     }
@@ -580,7 +695,9 @@ const updatePatrollersForDate = async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Update patrollers for date error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   } finally {
     client.release();
   }
@@ -592,8 +709,14 @@ const updatePatrollersForDate = async (req, res) => {
 const deletePatrol = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(`DELETE FROM patrol_assignment WHERE patrol_id=$1`, [id]);
-    if (result.rowCount === 0) return res.status(404).json({ success: false, message: "Patrol not found." });
+    const result = await pool.query(
+      `DELETE FROM patrol_assignment WHERE patrol_id=$1`,
+      [id],
+    );
+    if (result.rowCount === 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "Patrol not found." });
     res.json({ success: true, message: "Patrol deleted." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -607,7 +730,10 @@ const updateRouteNotes = async (req, res) => {
   const { routeId } = req.params;
   const { notes } = req.body;
   try {
-    await pool.query(`UPDATE patrol_assignment_route SET notes=$1 WHERE route_id=$2`, [notes || null, routeId]);
+    await pool.query(
+      `UPDATE patrol_assignment_route SET notes=$1 WHERE route_id=$2`,
+      [notes || null, routeId],
+    );
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -623,7 +749,7 @@ const updateRouteTask = async (req, res) => {
   try {
     await pool.query(
       `UPDATE patrol_assignment_route SET time_start=$1, time_end=$2, notes=$3 WHERE route_id=$4`,
-      [time_start || null, time_end || null, notes || null, routeId]
+      [time_start || null, time_end || null, notes || null, routeId],
     );
     res.json({ success: true });
   } catch (error) {
@@ -635,14 +761,30 @@ const updateRouteTask = async (req, res) => {
 // POST /patrol/routes/add
 // ─────────────────────────────────────────────
 const addRouteTask = async (req, res) => {
-  const { patrol_id, route_date, shift, time_start, time_end, notes, stop_order } = req.body;
+  const {
+    patrol_id,
+    route_date,
+    shift,
+    time_start,
+    time_end,
+    notes,
+    stop_order,
+  } = req.body;
   try {
     const result = await pool.query(
       `INSERT INTO patrol_assignment_route
          (patrol_id, route_date, barangay, shift, time_start, time_end, notes, stop_order)
        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7)
        RETURNING route_id`,
-      [patrol_id, route_date, shift, time_start || null, time_end || null, notes || null, stop_order]
+      [
+        patrol_id,
+        route_date,
+        shift,
+        time_start || null,
+        time_end || null,
+        notes || null,
+        stop_order,
+      ],
     );
     res.json({ success: true, route_id: result.rows[0].route_id });
   } catch (error) {
@@ -657,7 +799,10 @@ const addRouteTask = async (req, res) => {
 const removeRouteTask = async (req, res) => {
   const { routeId } = req.params;
   try {
-    await pool.query(`DELETE FROM patrol_assignment_route WHERE route_id = $1`, [routeId]);
+    await pool.query(
+      `DELETE FROM patrol_assignment_route WHERE route_id = $1`,
+      [routeId],
+    );
     res.json({ success: true });
   } catch (error) {
     console.error("Remove route task error:", error);
@@ -670,10 +815,12 @@ const removeRouteTask = async (req, res) => {
 // ─────────────────────────────────────────────
 const getMyPatrols = async (req, res) => {
   const userId = req.user?.user_id;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
 
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT
         pa.patrol_id,
         pa.patrol_name,
@@ -756,14 +903,16 @@ const getMyPatrols = async (req, res) => {
         WHERE ap.officer_id = $1
       )
       ORDER BY pa.start_date DESC, pa.patrol_id DESC
-    `, [userId]);
+    `,
+      [userId],
+    );
 
     const data = result.rows.map((p) => ({
-  ...p,
-  start_date: formatDateOnly(p.start_date),
-  end_date:   formatDateOnly(p.end_date),
-}));
-res.json({ success: true, data });
+      ...p,
+      start_date: formatDateOnly(p.start_date),
+      end_date: formatDateOnly(p.end_date),
+    }));
+    res.json({ success: true, data });
   } catch (error) {
     console.error("getMyPatrols error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -790,24 +939,42 @@ res.json({ success: true, data });
 // ─────────────────────────────────────────────
 const submitAfterPatrolReport = async (req, res) => {
   const { id: patrol_id } = req.params;
-  const userId   = req.user?.user_id;
+  const userId = req.user?.user_id;
   const userRole = req.user?.role;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const {
-    date, timeFrom, timeTo,
-    preDeployment, action1, incidents, action2,
-    safetyConcerns, action3, otherServices, visitedAreas,
-    personsVisited, numOfficials, numGovt,
-    sector, mustDos, creditHours, remarks,
-    sigOfficer1, sigOfficer2, sigSupervisor,
+    date,
+    timeFrom,
+    timeTo,
+    preDeployment,
+    action1,
+    incidents,
+    action2,
+    safetyConcerns,
+    action3,
+    otherServices,
+    visitedAreas,
+    personsVisited,
+    numOfficials,
+    numGovt,
+    sector,
+    mustDos,
+    creditHours,
+    remarks,
+    sigOfficer1,
+    sigOfficer2,
+    sigSupervisor,
   } = req.body;
 
   // shift is resolved below — may come from DB for admins
   let shift = req.body.shift ?? null;
 
   if (!date) {
-    return res.status(400).json({ success: false, message: "Patrol date is required." });
+    return res
+      .status(400)
+      .json({ success: false, message: "Patrol date is required." });
   }
 
   try {
@@ -818,11 +985,11 @@ const submitAfterPatrolReport = async (req, res) => {
       // If a shift was sent use it, otherwise find any report for that date
       let existingQuery, existingParams;
       if (shift) {
-        existingQuery  = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
+        existingQuery = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
                           WHERE patrol_id = $1 AND patrol_date = $2 AND shift = $3 LIMIT 1`;
         existingParams = [patrol_id, date, shift];
       } else {
-        existingQuery  = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
+        existingQuery = `SELECT report_id, submitted_by, shift FROM after_patrol_reports
                           WHERE patrol_id = $1 AND patrol_date = $2 LIMIT 1`;
         existingParams = [patrol_id, date];
       }
@@ -832,39 +999,45 @@ const submitAfterPatrolReport = async (req, res) => {
       if (existingReport.rows.length === 0) {
         return res.status(403).json({
           success: false,
-          message: "Administrators can only edit existing reports, not create new ones.",
+          message:
+            "Administrators can only edit existing reports, not create new ones.",
         });
       }
 
       // Always derive shift and submitter from the stored record
       active_patroller_id = existingReport.rows[0].submitted_by;
-      shift               = existingReport.rows[0].shift; // use DB value, not frontend value
-
+      shift = existingReport.rows[0].shift; // use DB value, not frontend value
     } else {
       // ── Normal patroller flow ──────────────────────────────────
       const patrollerResult = await pool.query(
         `SELECT active_patroller_id FROM active_patroller WHERE officer_id = $1 LIMIT 1`,
-        [userId]
+        [userId],
       );
       if (patrollerResult.rows.length === 0) {
-        return res.status(403).json({ success: false, message: "You are not registered as an active patroller." });
+        return res.status(403).json({
+          success: false,
+          message: "You are not registered as an active patroller.",
+        });
       }
       active_patroller_id = patrollerResult.rows[0].active_patroller_id;
 
       const assignmentCheck = await pool.query(
         `SELECT 1 FROM patrol_assignment_patroller
          WHERE patrol_id = $1 AND active_patroller_id = $2 LIMIT 1`,
-        [patrol_id, active_patroller_id]
+        [patrol_id, active_patroller_id],
       );
       if (assignmentCheck.rows.length === 0) {
-        return res.status(403).json({ success: false, message: "You are not assigned to this patrol." });
+        return res.status(403).json({
+          success: false,
+          message: "You are not assigned to this patrol.",
+        });
       }
 
       if (shift && shift !== "AM & PM") {
         const shiftCheck = await pool.query(
           `SELECT 1 FROM patrol_assignment_patroller
            WHERE patrol_id = $1 AND active_patroller_id = $2 AND shift = $3 LIMIT 1`,
-          [patrol_id, active_patroller_id, shift]
+          [patrol_id, active_patroller_id, shift],
         );
         if (shiftCheck.rows.length === 0) {
           return res.status(403).json({
@@ -878,11 +1051,11 @@ const submitAfterPatrolReport = async (req, res) => {
     // ── Validate date within patrol duration ───────────────────
     const patrolDates = await pool.query(
       `SELECT start_date, end_date FROM patrol_assignment WHERE patrol_id = $1`,
-      [patrol_id]
+      [patrol_id],
     );
     if (patrolDates.rows.length > 0) {
       const start_date = formatDateOnly(patrolDates.rows[0].start_date);
-      const end_date   = formatDateOnly(patrolDates.rows[0].end_date);
+      const end_date = formatDateOnly(patrolDates.rows[0].end_date);
       if (date < start_date || date > end_date) {
         return res.status(400).json({
           success: false,
@@ -942,19 +1115,31 @@ const submitAfterPatrolReport = async (req, res) => {
         updated_at            = NOW()
       RETURNING report_id`,
       [
-        patrol_id,          active_patroller_id,  shift || null,
-        date,               timeFrom || null,      timeTo || null,
-        preDeployment  || null, action1 || null,
-        incidents      || null, action2 || null,
-        safetyConcerns || null, action3 || null,
-        otherServices  || null, visitedAreas   || null,
+        patrol_id,
+        active_patroller_id,
+        shift || null,
+        date,
+        timeFrom || null,
+        timeTo || null,
+        preDeployment || null,
+        action1 || null,
+        incidents || null,
+        action2 || null,
+        safetyConcerns || null,
+        action3 || null,
+        otherServices || null,
+        visitedAreas || null,
         personsVisited || null,
         numOfficials != null ? parseInt(numOfficials) : null,
-        numGovt      != null ? parseInt(numGovt)      : null,
-        sector         || null, mustDos  || null, creditHours || null,
-        remarks        || null,
-        sigOfficer1    || null, sigOfficer2 || null, sigSupervisor || null,
-      ]
+        numGovt != null ? parseInt(numGovt) : null,
+        sector || null,
+        mustDos || null,
+        creditHours || null,
+        remarks || null,
+        sigOfficer1 || null,
+        sigOfficer2 || null,
+        sigSupervisor || null,
+      ],
     );
 
     res.json({
@@ -964,7 +1149,9 @@ const submitAfterPatrolReport = async (req, res) => {
     });
   } catch (error) {
     console.error("submitAfterPatrolReport error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   }
 };
 
@@ -985,13 +1172,13 @@ const getAfterPatrolReports = async (req, res) => {
       JOIN users u ON ap.officer_id = u.user_id
       WHERE apr.patrol_id = $1
       ORDER BY apr.patrol_date DESC, apr.submitted_at DESC`,
-      [patrol_id]
+      [patrol_id],
     );
     const data = result.rows.map((r) => ({
-  ...r,
-  patrol_date: formatDateOnly(r.patrol_date),
-}));
-res.json({ success: true, data });
+      ...r,
+      patrol_date: formatDateOnly(r.patrol_date),
+    }));
+    res.json({ success: true, data });
   } catch (error) {
     console.error("getAfterPatrolReports error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -1008,7 +1195,8 @@ res.json({ success: true, data });
 const getMyAfterPatrolReports = async (req, res) => {
   const { id: patrol_id } = req.params;
   const userId = req.user?.user_id;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
 
   try {
     const result = await pool.query(
@@ -1032,14 +1220,14 @@ const getMyAfterPatrolReports = async (req, res) => {
            )
          )
        ORDER BY apr.patrol_date ASC`,
-      [patrol_id, userId]
+      [patrol_id, userId],
     );
 
-  const data = result.rows.map((r) => ({
-  ...r,
-  patrol_date: formatDateOnly(r.patrol_date),
-}));
-res.json({ success: true, data });
+    const data = result.rows.map((r) => ({
+      ...r,
+      patrol_date: formatDateOnly(r.patrol_date),
+    }));
+    res.json({ success: true, data });
   } catch (error) {
     console.error("getMyAfterPatrolReports error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -1062,7 +1250,7 @@ const deleteAfterPatrolReport = async (req, res) => {
       // Admins can delete any report
       result = await pool.query(
         `DELETE FROM after_patrol_reports WHERE report_id = $1`,
-        [reportId]
+        [reportId],
       );
     } else {
       // Patrollers can only delete reports belonging to their shift
@@ -1082,7 +1270,7 @@ const deleteAfterPatrolReport = async (req, res) => {
                SELECT active_patroller_id FROM active_patroller WHERE officer_id = $2
              )
            )`,
-        [reportId, userId]
+        [reportId, userId],
       );
     }
 
@@ -1102,17 +1290,21 @@ const deleteAfterPatrolReport = async (req, res) => {
 
 const updateOfficerLocation = async (req, res) => {
   const userId = req.user?.user_id;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const { latitude, longitude, location_name } = req.body;
 
   if (latitude == null || longitude == null) {
-    return res.status(400).json({ success: false, message: "latitude and longitude are required." });
+    return res.status(400).json({
+      success: false,
+      message: "latitude and longitude are required.",
+    });
   }
 
   try {
     await pool.query(
-     `INSERT INTO officer_locations (user_id, latitude, longitude, location_name, updated_at)
+      `INSERT INTO officer_locations (user_id, latitude, longitude, location_name, updated_at)
  VALUES ($1, $2, $3, $4, NOW())
  ON CONFLICT (user_id)
  DO UPDATE SET
@@ -1120,7 +1312,7 @@ const updateOfficerLocation = async (req, res) => {
    longitude     = EXCLUDED.longitude,
    location_name = EXCLUDED.location_name,
    updated_at    = NOW()`,
-      [userId, latitude, longitude, location_name || null]
+      [userId, latitude, longitude, location_name || null],
     );
     res.json({ success: true });
   } catch (error) {
@@ -1132,27 +1324,33 @@ const updateOfficerLocation = async (req, res) => {
 const uploadAfterPatrolPhotos = async (req, res) => {
   const { reportId } = req.params;
   const userId = req.user?.user_id;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
 
   if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ success: false, message: "No images provided." });
+    return res
+      .status(400)
+      .json({ success: false, message: "No images provided." });
   }
 
   try {
     // Upload each file to Cloudinary under folder "patrol_reports"
-    const uploadPromises = req.files.map((file) =>
-      new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          {
-            folder: "patrol_reports",
-            resource_type: "image",
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result.secure_url);
-          }
-        ).end(file.buffer);
-      })
+    const uploadPromises = req.files.map(
+      (file) =>
+        new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(
+              {
+                folder: "patrol_reports",
+                resource_type: "image",
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result.secure_url);
+              },
+            )
+            .end(file.buffer);
+        }),
     );
 
     const uploadedUrls = await Promise.all(uploadPromises);
@@ -1160,11 +1358,13 @@ const uploadAfterPatrolPhotos = async (req, res) => {
     // Get existing photos and merge (max 10 total)
     const existing = await pool.query(
       `SELECT photo_urls FROM after_patrol_reports WHERE report_id = $1`,
-      [reportId]
+      [reportId],
     );
 
     if (existing.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Report not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
     }
 
     const existingUrls = existing.rows[0].photo_urls || [];
@@ -1172,13 +1372,19 @@ const uploadAfterPatrolPhotos = async (req, res) => {
 
     await pool.query(
       `UPDATE after_patrol_reports SET photo_urls = $1 WHERE report_id = $2`,
-      [merged, reportId]
+      [merged, reportId],
     );
 
-    res.json({ success: true, message: "Photos uploaded successfully.", photo_urls: merged });
+    res.json({
+      success: true,
+      message: "Photos uploaded successfully.",
+      photo_urls: merged,
+    });
   } catch (error) {
     console.error("uploadAfterPatrolPhotos error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   }
 };
 
@@ -1190,36 +1396,46 @@ const deleteAfterPatrolPhoto = async (req, res) => {
   const { reportId } = req.params;
   const { photo_url } = req.body;
   const userId = req.user?.user_id;
-  if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-  if (!photo_url) return res.status(400).json({ success: false, message: "photo_url is required." });
+  if (!userId)
+    return res.status(401).json({ success: false, message: "Unauthorized" });
+  if (!photo_url)
+    return res
+      .status(400)
+      .json({ success: false, message: "photo_url is required." });
 
   try {
     const existing = await pool.query(
       `SELECT photo_urls FROM after_patrol_reports WHERE report_id = $1`,
-      [reportId]
+      [reportId],
     );
     if (existing.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Report not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
     }
 
-    const updated = (existing.rows[0].photo_urls || []).filter((u) => u !== photo_url);
+    const updated = (existing.rows[0].photo_urls || []).filter(
+      (u) => u !== photo_url,
+    );
 
     // Delete from Cloudinary too
     // Extract public_id from URL: "patrol_reports/filename"
-    const urlParts  = photo_url.split("/");
-    const filename  = urlParts[urlParts.length - 1].split(".")[0];
-    const publicId  = `patrol_reports/${filename}`;
+    const urlParts = photo_url.split("/");
+    const filename = urlParts[urlParts.length - 1].split(".")[0];
+    const publicId = `patrol_reports/${filename}`;
     await cloudinary.uploader.destroy(publicId);
 
     await pool.query(
       `UPDATE after_patrol_reports SET photo_urls = $1 WHERE report_id = $2`,
-      [updated, reportId]
+      [updated, reportId],
     );
 
     res.json({ success: true, message: "Photo deleted.", photo_urls: updated });
   } catch (error) {
     console.error("deleteAfterPatrolPhoto error:", error);
-    res.status(500).json({ success: false, message: "Server error: " + error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error: " + error.message });
   }
 };
 

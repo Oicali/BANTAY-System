@@ -4,19 +4,9 @@ import "./AuditLog.css";
 const ITEMS_PER_PAGE = 15;
 const API_URL = import.meta.env.VITE_API_URL;
 
-const ACTION_BADGE_CLASS = {
-  INSERT: "al-action-insert",
-  UPDATE: "al-action-update",
-  DELETE: "al-action-delete",
-  LOGIN:  "al-action-login",
-  LOGOUT: "al-action-logout",
-  VIEW:   "al-action-view",
-};
-
 const DEFAULT_FILTERS = {
   searchTerm:   "",
-  actionFilter: "all",
-  moduleFilter: "all",
+  statusFilter: "all",
   dateFrom:     "",
   dateTo:       "",
 };
@@ -54,9 +44,9 @@ const AuditLog = () => {
     total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1,
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [stats, setStats]             = useState({ total: 0, today: 0, uniqueUsers: 0, deletions: 0 });
+  const [stats, setStats]             = useState({ total: 0, today: 0, uniqueUsers: 0, failed: 0 });
 
-  const [draft, setDraft]                 = useState({ ...DEFAULT_FILTERS });
+  const [draft, setDraft]                   = useState({ ...DEFAULT_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
@@ -74,10 +64,8 @@ const AuditLog = () => {
 
       if (appliedFilters.searchTerm.trim())
         params.set("search", appliedFilters.searchTerm.trim());
-      if (appliedFilters.actionFilter !== "all")
-        params.set("action", appliedFilters.actionFilter);
-      if (appliedFilters.moduleFilter !== "all")
-        params.set("module", appliedFilters.moduleFilter);
+      if (appliedFilters.statusFilter !== "all")
+        params.set("status", appliedFilters.statusFilter);
       if (appliedFilters.dateFrom)
         params.set("dateFrom", appliedFilters.dateFrom);
       if (appliedFilters.dateTo)
@@ -96,7 +84,7 @@ const AuditLog = () => {
         setPagination(data.pagination || {
           total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1,
         });
-        setStats(data.stats || { total: 0, today: 0, uniqueUsers: 0, deletions: 0 });
+        setStats(data.stats || { total: 0, today: 0, uniqueUsers: 0, failed: 0 });
         setError("");
       } else {
         setError("Failed to fetch audit logs.");
@@ -137,11 +125,19 @@ const AuditLog = () => {
   // EXPORT CSV
   // ===================================================
   const handleExportCSV = () => {
-    const cols = ["log_id","username","action","module","record_id","record_label","ip_address","created_at"];
+    const cols = ["log_id", "username", "email", "event_name", "description", "status", "source", "ip_address", "created_at"];
     const rows = logs.map(r =>
-      [r.log_id, r.username, r.action, r.module,
-       r.record_id || "", r.record_label || "",
-       r.ip_address || "", r.created_at].join(",")
+      [
+        r.log_id,
+        r.username   || "",
+        r.email      || "",
+        r.event_name,
+        `"${(r.description || "").replace(/"/g, '""')}"`,
+        r.status,
+        r.source     || "",
+        r.ip_address || "",
+        r.created_at,
+      ].join(",")
     );
     const csv = [cols.join(","), ...rows].join("\n");
     const a = document.createElement("a");
@@ -153,23 +149,16 @@ const AuditLog = () => {
   // ===================================================
   // HELPERS
   // ===================================================
-  const getInitials = (firstName, lastName, username) => {
-    if (firstName && lastName)
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    if (username) return username.substring(0, 2).toUpperCase();
-    return "NA";
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return "—";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
+    const d     = new Date(dateString);
+    const day   = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year  = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, "0");
+    const mins  = String(d.getMinutes()).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${mins}`;
   };
-
-  const getActionBadgeClass = (action) =>
-    ACTION_BADGE_CLASS[action?.toUpperCase()] || "al-action-view";
 
   // ===================================================
   // RENDER
@@ -211,9 +200,9 @@ const AuditLog = () => {
           <div className="al-stat-sub">unique users logged</div>
         </div>
         <div className="al-stat-card">
-          <div className="al-stat-label">Deletions</div>
-          <div className="al-stat-value al-stat-danger">{stats.deletions.toLocaleString()}</div>
-          <div className="al-stat-sub">delete actions total</div>
+          <div className="al-stat-label">Failed attempts</div>
+          <div className="al-stat-value al-stat-danger">{stats.failed.toLocaleString()}</div>
+          <div className="al-stat-sub">failed events total</div>
         </div>
       </div>
 
@@ -226,7 +215,7 @@ const AuditLog = () => {
             <input
               type="text"
               className="al-filter-input"
-              placeholder="Username, record ID..."
+              placeholder="Username, description, IP..."
               value={draft.searchTerm}
               onChange={(e) => setDraft(f => ({ ...f, searchTerm: e.target.value }))}
               onKeyDown={(e) => { if (e.key === "Enter") handleApplyFilters(); }}
@@ -234,35 +223,15 @@ const AuditLog = () => {
           </div>
 
           <div className="al-filter-group">
-            <label className="al-filter-label">Action</label>
+            <label className="al-filter-label">Status</label>
             <select
               className="al-filter-input"
-              value={draft.actionFilter}
-              onChange={(e) => setDraft(f => ({ ...f, actionFilter: e.target.value }))}
+              value={draft.statusFilter}
+              onChange={(e) => setDraft(f => ({ ...f, statusFilter: e.target.value }))}
             >
-              <option value="all">All Actions</option>
-              <option value="INSERT">INSERT</option>
-              <option value="UPDATE">UPDATE</option>
-              <option value="DELETE">DELETE</option>
-              <option value="LOGIN">LOGIN</option>
-              <option value="LOGOUT">LOGOUT</option>
-              <option value="VIEW">VIEW</option>
-            </select>
-          </div>
-
-          <div className="al-filter-group">
-            <label className="al-filter-label">Module</label>
-            <select
-              className="al-filter-input"
-              value={draft.moduleFilter}
-              onChange={(e) => setDraft(f => ({ ...f, moduleFilter: e.target.value }))}
-            >
-              <option value="all">All Modules</option>
-              <option value="residents">residents</option>
-              <option value="clearances">clearances</option>
-              <option value="users">users</option>
-              <option value="cctv">cctv</option>
-              <option value="auth">auth</option>
+              <option value="all">All Status</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
             </select>
           </div>
 
@@ -285,6 +254,7 @@ const AuditLog = () => {
               onChange={(e) => setDraft(f => ({ ...f, dateTo: e.target.value }))}
             />
           </div>
+
         </div>
 
         <div className="al-filter-actions">
@@ -314,17 +284,18 @@ const AuditLog = () => {
                   <tr>
                     <th className="al-col-id">Log ID</th>
                     <th className="al-col-user">User</th>
-                    <th className="al-col-action">Action</th>
-                    <th className="al-col-module">Module</th>
-                    <th className="al-col-record">Record</th>
-                    <th className="al-col-ip">IP address</th>
+                    <th className="al-col-event">Event</th>
+                    <th className="al-col-desc">Description</th>
+                    <th className="al-col-status">Status</th>
+                    <th className="al-col-source">Source</th>
+                    <th className="al-col-ip">IP Address</th>
                     <th className="al-col-time">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: "center", padding: "40px" }}>
+                      <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "#6c757d" }}>
                         No audit log entries match your filters.
                       </td>
                     </tr>
@@ -334,46 +305,37 @@ const AuditLog = () => {
 
                         {/* Log ID */}
                         <td className="al-col-id">
-                          <span className="al-log-id">#{log.log_id}</span>
+                          <span className="al-log-id">#{log.log_id.slice(0, 8)}</span>
                         </td>
 
-                        {/* User */}
+                        {/* User — plain text, no avatar */}
                         <td className="al-col-user">
-                          <div className="al-user-cell">
-                            <div className="al-user-avatar">
-                              {getInitials(log.first_name, log.last_name, log.username)}
-                            </div>
-                            <div className="al-user-info">
-                              <div className="al-user-name">{log.username}</div>
-                              <div className="al-user-email">{log.email || ""}</div>
-                            </div>
-                          </div>
+                          <div className="al-user-name">{log.username || "—"}</div>
+                          {log.email && (
+                            <div className="al-user-email">{log.email}</div>
+                          )}
                         </td>
 
-                        {/* Action */}
-                        <td className="al-col-action">
-                          <span className={`al-action-badge ${getActionBadgeClass(log.action)}`}>
-                            {log.action}
+                        {/* Event name */}
+                        <td className="al-col-event">
+                          <span className="al-event-badge">{log.event_name}</span>
+                        </td>
+
+                        {/* Description */}
+                        <td className="al-col-desc">
+                          <span className="al-description">{log.description}</span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="al-col-status">
+                          <span className={`al-status-badge ${log.status === "success" ? "al-status-success" : "al-status-failed"}`}>
+                            {log.status}
                           </span>
                         </td>
 
-                        {/* Module */}
-                        <td className="al-col-module">
-                          <span className="al-module-badge">{log.module}</span>
-                        </td>
-
-                        {/* Record */}
-                        <td className="al-col-record">
-                          {log.record_id ? (
-                            <>
-                              <div className="al-record-id">{log.record_id}</div>
-                              {log.record_label && (
-                                <div className="al-record-label">{log.record_label}</div>
-                              )}
-                            </>
-                          ) : (
-                            <span className="al-no-record">—</span>
-                          )}
+                        {/* Source */}
+                        <td className="al-col-source">
+                          <span className="al-source">{log.source || "—"}</span>
                         </td>
 
                         {/* IP */}
@@ -381,7 +343,7 @@ const AuditLog = () => {
                           <span className="al-ip-address">{log.ip_address || "—"}</span>
                         </td>
 
-                        {/* Timestamp */}
+                        {/* Timestamp — DD/MM/YYYY HH:MM */}
                         <td className="al-col-time">
                           <span className="al-timestamp">{formatDate(log.created_at)}</span>
                         </td>

@@ -24,16 +24,28 @@ const INCIDENT_COLORS = {
   "SPECIAL COMPLEX CRIME": "#14b8a6",
 };
 
+const CRIME_WEIGHTS = {
+  MURDER: 1.0,
+  HOMICIDE: 1.0,
+  "SPECIAL COMPLEX CRIME": 1.0,
+  RAPE: 0.7,
+  ROBBERY: 0.5,
+  "CARNAPPING - MV": 0.3,
+  "CARNAPPING - MC": 0.3,
+  "PHYSICAL INJURY": 0.2,
+  THEFT: 0.1,
+};
+
 const LEGEND_ITEMS = [
-  { label: "Robbery", color: "#ef4444" },
-  { label: "Theft", color: "#f97316" },
-  { label: "Physical Injury", color: "#eab308" },
-  { label: "Homicide", color: "#8b5cf6" },
-  { label: "Murder", color: "#7c3aed" },
-  { label: "Rape", color: "#ec4899" },
-  { label: "Carnapping - MC", color: "#3b82f6" },
-  { label: "Carnapping - MV", color: "#0ea5e9" },
-  { label: "Special Complex Crime", color: "#14b8a6" },
+  { label: "Murder" },
+  { label: "Homicide" },
+  { label: "Special Complex Crime" },
+  { label: "Rape" },
+  { label: "Robbery" },
+  { label: "Carnapping - MV" },
+  { label: "Carnapping - MC" },
+  { label: "Physical Injury" },
+  { label: "Theft" },
 ];
 
 const HEATMAP_LAYER = {
@@ -41,71 +53,56 @@ const HEATMAP_LAYER = {
   type: "heatmap",
   paint: {
     "heatmap-weight": [
-      "interpolate",
-      ["linear"],
-      ["get", "weight"],
-      0,
-      0,
-      1,
-      1,
-    ],
-    // KEY CHANGE: much smaller radius at low zoom, grows as you zoom in
+  "interpolate", ["linear"], ["get", "weight"],
+  0,   0,
+  0.1, 0.2,    // Theft — was 0.05, now more visible
+  0.2, 0.35,   // Physical Injury
+  0.3, 0.45,   // Carnapping
+  0.5, 0.60,   // Robbery
+  0.7, 0.80,   // Rape
+  1.0, 1.0,    // Murder/Homicide/SCC
+],
     "heatmap-radius": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      10,
-      8, // was 18 — very tight at city overview
-      12,
-      16, // was 32
-      14,
-      28, // was 48
-      16,
-      48,
-    ],
-    // Stronger intensity at low zoom to keep spots visible despite small radius
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  10, 10,
+  12, 18,
+  14, 30,
+  16, 45,
+],
     "heatmap-intensity": [
       "interpolate",
       ["linear"],
       ["zoom"],
       10,
-      1.5, // was 0.6 — compensate for smaller radius
+      1.0,
       13,
-      1.8, // was 1.2
+      1.3,
       15,
-      2.5, // was 2.0
+      1.8, // was 2.5 — too high, washes out weight differences
     ],
     "heatmap-color": [
-      "interpolate",
-      ["linear"],
-      ["heatmap-density"],
-      0,
-      "rgba(0,0,0,0)",
-      0.15,
-      "rgba(234,179,8,0.75)",
-      0.4,
-      "rgba(249,115,22,0.85)",
-      0.65,
-      "rgba(220,38,38,0.90)",
-      0.85,
-      "rgba(153,27,27,0.94)",
-      1.0,
-      "rgba(69,10,10,0.97)",
-    ],
-    // Fade out earlier as you zoom in close (pins take over)
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0,    "rgba(0,0,0,0)",
+  0.05, "rgba(255,255,180,0.7)",   // light yellow — even single low-weight crimes visible
+  0.2,  "rgba(255,210,80,0.80)",   // yellow-orange
+  0.4,  "rgba(255,140,30,0.88)",   // orange
+  0.6,  "rgba(220,50,20,0.92)",    // red-orange
+  0.8,  "rgba(160,10,10,0.95)",    // dark red
+  1.0,  "rgba(80,0,0,0.97)",       // near black-red for dense clusters
+],
     "heatmap-opacity": [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      11,
-      0.9,
-      14,
-      0.7,
-      15,
-      0.35,
-      16,
-      0,
-    ],
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  11, 0.9,
+  14, 0.85,
+  16, 0.8,    // was 0 — kept visible when zoomed in
+  18, 0.75,
+],
   },
 };
 const CLUSTER_CIRCLE_LAYER = {
@@ -2236,7 +2233,7 @@ function CrimeMapping() {
                     <div className="crmap-heat-sidebar-legend">
                       <div className="crmap-sidebar-title-row">
                         <div className="crmap-heat-sidebar-title">
-                          Crime scale
+                          Crime Density
                         </div>
                         <button
                           type="button"
@@ -2254,6 +2251,7 @@ function CrimeMapping() {
                       <div className="crmap-heat-scale-bar" />
                       <div className="crmap-heat-scale-labels">
                         <span>Low</span>
+                        <span>Medium</span>
                         <span>High</span>
                       </div>
 
@@ -2261,7 +2259,7 @@ function CrimeMapping() {
                         className="crmap-heat-sidebar-title"
                         style={{ marginTop: 16 }}
                       >
-                        Crime Types Mapped
+                        Crime Types Points
                       </div>
 
                       {LEGEND_ITEMS.map((item) => {
@@ -2274,6 +2272,8 @@ function CrimeMapping() {
                             name.toUpperCase(),
                         );
                         const count = parseInt(statsEntry?.count) || 0;
+                        const weight =
+                          CRIME_WEIGHTS[name?.toUpperCase()] ?? 0.1;
 
                         return (
                           <div className="crmap-severity-row" key={name}>
@@ -2284,14 +2284,23 @@ function CrimeMapping() {
                                 gap: 6,
                               }}
                             >
-                              <LegendPin color={color} />
+                              {/* <LegendPin color={color} /> */}
                               <span className="crmap-severity-crime">
                                 {name}
                               </span>
                             </div>
-                            <span className="crmap-severity-weight">
-                              {count}
-                            </span>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
+                            >
+                              {/* just using css style  */}
+                              <span className="crmap-severity-weight">
+                                {weight.toFixed(1)}
+                              </span>
+                            </div>
                           </div>
                         );
                       })}
@@ -2402,6 +2411,7 @@ function CrimeMapping() {
                           Crime Types
                         </div>
 
+                        {/* Not heatmap mode */}
                         {LEGEND_ITEMS.map((item) => {
                           const name = item.label;
                           const color =
@@ -2412,6 +2422,8 @@ function CrimeMapping() {
                               name.toUpperCase(),
                           );
                           const count = parseInt(statsEntry?.count) || 0;
+                          const weight =
+                            CRIME_WEIGHTS[name?.toUpperCase()] ?? 0.1;
 
                           return (
                             <div className="crmap-legend-row" key={name}>
@@ -2422,9 +2434,17 @@ function CrimeMapping() {
                                     {name}
                                   </span>
                                 </div>
-                                <span className="crmap-legend-count">
-                                  {count}
-                                </span>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                  }}
+                                >
+                                  <span className="crmap-legend-count">
+                                    {count}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           );

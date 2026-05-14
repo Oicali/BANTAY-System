@@ -39,7 +39,8 @@ function getHighIncidenceMinCount(dateFrom, dateTo) {
 // ============================================================
 const getPatrolUserBarangays = async (userId) => {
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT DISTINCT par.barangay
       FROM patrol_assignment pa
       JOIN patrol_assignment_patroller pap ON pa.patrol_id = pap.patrol_id
@@ -50,9 +51,11 @@ const getPatrolUserBarangays = async (userId) => {
         AND pa.end_date >= CURRENT_DATE
         AND par.stop_order <= 0
         AND par.barangay IS NOT NULL
-    `, [userId]);
-    
-    return result.rows.map(r => r.barangay.toUpperCase());
+    `,
+      [userId],
+    );
+
+    return result.rows.map((r) => r.barangay.toUpperCase());
   } catch (error) {
     console.error("getPatrolUserBarangays error:", error);
     return [];
@@ -546,10 +549,13 @@ const getHeatmap = async (req, res) => {
         if (bdRes.rows.length > 0) {
           // Rebuild with barangay official filter
           const brgyCode = bdRes.rows[0].barangay_code.toUpperCase();
-          pointsResult = await client.query(pointsSQL.replace(
-            /UPPER\(TRIM\(place_barangay\)\) = ANY\(\$\d+::text\[\]\)/,
-            `UPPER(TRIM(place_barangay)) = UPPER($${params.length + 1})`
-          ), [...params, brgyCode]);
+          pointsResult = await client.query(
+            pointsSQL.replace(
+              /UPPER\(TRIM\(place_barangay\)\) = ANY\(\$\d+::text\[\]\)/,
+              `UPPER(TRIM(place_barangay)) = UPPER($${params.length + 1})`,
+            ),
+            [...params, brgyCode],
+          );
         } else {
           pointsResult = await client.query(pointsSQL, params);
         }
@@ -584,6 +590,18 @@ const getHeatmap = async (req, res) => {
       );
     }
 
+    const CRIME_WEIGHTS = {
+      MURDER: 1.0,
+      HOMICIDE: 1.0,
+      "SPECIAL COMPLEX CRIME": 1.0,
+      RAPE: 0.7,
+      ROBBERY: 0.5,
+      "CARNAPPING - MV": 0.3,
+      "CARNAPPING - MC": 0.3,
+      "PHYSICAL INJURY": 0.2,
+      THEFT: 0.1,
+    };
+
     const pointFeatures = pointsResult.rows.map((r) => ({
       type: "Feature",
       geometry: {
@@ -591,7 +609,7 @@ const getHeatmap = async (req, res) => {
         coordinates: [r.lng, r.lat],
       },
       properties: {
-        weight: 1.0,
+        weight: CRIME_WEIGHTS[r.incident_type?.toUpperCase()] ?? 0.1,
         incident_type: r.incident_type,
         barangay: r.place_barangay,
         date: r.date_time_commission,
@@ -640,10 +658,10 @@ const getHeatmap = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getBoundaries, 
-  getPins, 
-  getStatistics, 
+module.exports = {
+  getBoundaries,
+  getPins,
+  getStatistics,
   getHeatmap,
-  getPatrolUserBarangays
+  getPatrolUserBarangays,
 };

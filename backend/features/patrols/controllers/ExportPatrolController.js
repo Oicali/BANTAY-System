@@ -24,21 +24,23 @@ const {
   PageBreak,
 } = require("docx");
 
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
+
 const libre = require("libreoffice-convert");
 const libreConvert = (buf, ext, opt) =>
   new Promise((resolve, reject) =>
     libre.convert(buf, ext, opt, (err, result) => {
       if (err) reject(err);
       else resolve(result);
-    })
+    }),
   );
 
 // ─── SHARED DESIGN TOKENS ─────────────────────────────────────────────────────
-const DARK  = "1E3A5F";
+const DARK = "1E3A5F";
 const LIGHT = "D9E4F0";
 const WHITE = "FFFFFF";
-const GRAY  = "F3F4F6";
-const RED   = "DC2626";
+const GRAY = "F3F4F6";
+const RED = "DC2626";
 const GREEN = "15803D";
 const AMBER = "B45309";
 
@@ -46,8 +48,10 @@ const CONTENT_W = 10466; // A4 portrait: 11906 - 720*2 margins
 
 const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
 const borders = {
-  top: cellBorder, bottom: cellBorder,
-  left: cellBorder, right: cellBorder,
+  top: cellBorder,
+  bottom: cellBorder,
+  left: cellBorder,
+  right: cellBorder,
 };
 
 // ─── CELL BUILDERS ────────────────────────────────────────────────────────────
@@ -58,29 +62,46 @@ const hCell = (text, w, opts = {}) =>
     shading: { fill: DARK, type: ShadingType.CLEAR },
     margins: { top: 80, bottom: 80, left: 120, right: 120 },
     verticalAlign: VerticalAlign.CENTER,
-    children: [new Paragraph({
-      alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-      children: [new TextRun({ text, bold: true, color: WHITE, size: 18, font: "Arial" })],
-    })],
+    children: [
+      new Paragraph({
+        alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text,
+            bold: true,
+            color: WHITE,
+            size: 18,
+            font: "Arial",
+          }),
+        ],
+      }),
+    ],
   });
 
 const dCell = (text, w, opts = {}) =>
   new TableCell({
     borders,
     width: { size: w, type: WidthType.DXA },
-    shading: { fill: opts.shade ? LIGHT : opts.alt ? GRAY : WHITE, type: ShadingType.CLEAR },
+    shading: {
+      fill: opts.shade ? LIGHT : opts.alt ? GRAY : WHITE,
+      type: ShadingType.CLEAR,
+    },
     margins: { top: 80, bottom: 80, left: 120, right: 120 },
     verticalAlign: VerticalAlign.CENTER,
-    children: [new Paragraph({
-      alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-      children: [new TextRun({
-        text: String(text ?? "—"),
-        bold: opts.bold || false,
-        size: opts.size || 18,
-        font: "Arial",
-        color: opts.color || "000000",
-      })],
-    })],
+    children: [
+      new Paragraph({
+        alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+        children: [
+          new TextRun({
+            text: String(text ?? "—"),
+            bold: opts.bold || false,
+            size: opts.size || 18,
+            font: "Arial",
+            color: opts.color || "000000",
+          }),
+        ],
+      }),
+    ],
   });
 
 // ─── PARAGRAPH HELPERS ────────────────────────────────────────────────────────
@@ -88,15 +109,21 @@ const sectionHeading = (text) =>
   new Paragraph({
     spacing: { before: 320, after: 120 },
     keepNext: true,
-    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: DARK, space: 1 } },
-    children: [new TextRun({ text, bold: true, size: 28, font: "Arial", color: DARK })],
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 6, color: DARK, space: 1 },
+    },
+    children: [
+      new TextRun({ text, bold: true, size: 28, font: "Arial", color: DARK }),
+    ],
   });
 
 const subHeading = (text) =>
   new Paragraph({
     spacing: { before: 200, after: 80 },
     keepNext: true,
-    children: [new TextRun({ text, bold: true, size: 22, font: "Arial", color: DARK })],
+    children: [
+      new TextRun({ text, bold: true, size: 22, font: "Arial", color: DARK }),
+    ],
   });
 
 const bodyText = (text) =>
@@ -112,8 +139,15 @@ const spacer = (before = 120) =>
 const fmtDate = (d) => {
   if (!d) return "—";
   const dt = new Date(d);
-  return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())
-    .toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(
+    dt.getFullYear(),
+    dt.getMonth(),
+    dt.getDate(),
+  ).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 };
 
 const fmtTime = (t) => {
@@ -127,31 +161,83 @@ const fmtTime = (t) => {
 // ─── HEADER / FOOTER FACTORIES ────────────────────────────────────────────────
 const makeHeader = (title, subtitle = "") =>
   new Header({
-    children: [new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: DARK, space: 1 } },
-      spacing: { after: 60 },
-      children: [
-        new TextRun({ text: title, size: 16, color: "6B7280", font: "Arial" }),
-        ...(subtitle ? [new TextRun({ text: `  ·  ${subtitle}`, size: 16, color: "9CA3AF", font: "Arial" })] : []),
-      ],
-    })],
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: DARK, space: 1 },
+        },
+        spacing: { after: 60 },
+        children: [
+          new TextRun({
+            text: title,
+            size: 16,
+            color: "6B7280",
+            font: "Arial",
+          }),
+          ...(subtitle
+            ? [
+                new TextRun({
+                  text: `  ·  ${subtitle}`,
+                  size: 16,
+                  color: "9CA3AF",
+                  font: "Arial",
+                }),
+              ]
+            : []),
+        ],
+      }),
+    ],
   });
 
 const makeFooter = () =>
   new Footer({
-    children: [new Paragraph({
-      alignment: AlignmentType.CENTER,
-      border: { top: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB", space: 1 } },
-      spacing: { before: 60 },
-      children: [
-        new TextRun({ text: "Page ", size: 16, color: "9CA3AF", font: "Arial" }),
-        new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "9CA3AF", font: "Arial" }),
-        new TextRun({ text: " of ", size: 16, color: "9CA3AF", font: "Arial" }),
-        new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, color: "9CA3AF", font: "Arial" }),
-        new TextRun({ text: "  ·  For Official Use Only", size: 16, color: "9CA3AF", font: "Arial" }),
-      ],
-    })],
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        border: {
+          top: {
+            style: BorderStyle.SINGLE,
+            size: 4,
+            color: "D1D5DB",
+            space: 1,
+          },
+        },
+        spacing: { before: 60 },
+        children: [
+          new TextRun({
+            text: "Page ",
+            size: 16,
+            color: "9CA3AF",
+            font: "Arial",
+          }),
+          new TextRun({
+            children: [PageNumber.CURRENT],
+            size: 16,
+            color: "9CA3AF",
+            font: "Arial",
+          }),
+          new TextRun({
+            text: " of ",
+            size: 16,
+            color: "9CA3AF",
+            font: "Arial",
+          }),
+          new TextRun({
+            children: [PageNumber.TOTAL_PAGES],
+            size: 16,
+            color: "9CA3AF",
+            font: "Arial",
+          }),
+          new TextRun({
+            text: "  ·  For Official Use Only",
+            size: 16,
+            color: "9CA3AF",
+            font: "Arial",
+          }),
+        ],
+      }),
+    ],
   });
 
 // ─── IMAGE BLOCK ──────────────────────────────────────────────────────────────
@@ -162,11 +248,16 @@ const imageBlock = (b64, widthEmu, heightEmu) => {
   const buf = Buffer.from(b64, "base64");
   return new Paragraph({
     spacing: { before: 80, after: 120 },
-    children: [new ImageRun({
-      data: buf,
-      transformation: { width: emuToPx(widthEmu), height: emuToPx(heightEmu) },
-      type: "png",
-    })],
+    children: [
+      new ImageRun({
+        data: buf,
+        transformation: {
+          width: emuToPx(widthEmu),
+          height: emuToPx(heightEmu),
+        },
+        type: "png",
+      }),
+    ],
   });
 };
 
@@ -175,11 +266,11 @@ const getStatus = (patrol) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(patrol.start_date);
-  const end   = new Date(patrol.end_date);
+  const end = new Date(patrol.end_date);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
   if (today < start) return "upcoming";
-  if (today > end)   return "completed";
+  if (today > end) return "completed";
   return "active";
 };
 
@@ -201,26 +292,27 @@ const buildPatrolListTable = (patrols) => {
       new TableRow({
         tableHeader: true,
         children: [
-          hCell("#",            COL_LIST[0], { center: true }),
-          hCell("Patrol Name",  COL_LIST[1]),
-          hCell("Mobile Unit",  COL_LIST[2]),
-          hCell("Duration",     COL_LIST[3]),
-          hCell("Patrollers",   COL_LIST[4], { center: true }),
-          hCell("Barangays",    COL_LIST[5]),
+          hCell("#", COL_LIST[0], { center: true }),
+          hCell("Patrol Name", COL_LIST[1]),
+          hCell("Mobile Unit", COL_LIST[2]),
+          hCell("Duration", COL_LIST[3]),
+          hCell("Patrollers", COL_LIST[4], { center: true }),
+          hCell("Barangays", COL_LIST[5]),
         ],
       }),
       ...patrols.map((p, i) => {
-        const barangays = [
-          ...new Set(
-            (p.routes || [])
-              .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-              .map((r) => r.barangay)
-          ),
-        ].join(", ") || "—";
+        const barangays =
+          [
+            ...new Set(
+              (p.routes || [])
+                .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+                .map((r) => r.barangay),
+            ),
+          ].join(", ") || "—";
 
-        const patrollerCount = [...new Set(
-          (p.patrollers || []).map((pt) => pt.active_patroller_id)
-        )].length;
+        const patrollerCount = [
+          ...new Set((p.patrollers || []).map((pt) => pt.active_patroller_id)),
+        ].length;
 
         const duration = `${fmtDate(p.start_date)} – ${fmtDate(p.end_date)}`;
 
@@ -230,7 +322,11 @@ const buildPatrolListTable = (patrols) => {
             dCell(p.patrol_name, COL_LIST[1], { bold: true, alt: i % 2 === 1 }),
             dCell(p.mobile_unit_name || "—", COL_LIST[2], { alt: i % 2 === 1 }),
             dCell(duration, COL_LIST[3], { alt: i % 2 === 1 }),
-            dCell(patrollerCount, COL_LIST[4], { center: true, bold: true, alt: i % 2 === 1 }),
+            dCell(patrollerCount, COL_LIST[4], {
+              center: true,
+              bold: true,
+              alt: i % 2 === 1,
+            }),
             dCell(barangays, COL_LIST[5], { alt: i % 2 === 1, size: 16 }),
           ],
         });
@@ -244,12 +340,14 @@ const exportPatrolList = async (req, res) => {
   try {
     const { patrols = [] } = req.body;
 
-    const active    = patrols.filter((p) => getStatus(p) === "active");
-    const upcoming  = patrols.filter((p) => getStatus(p) === "upcoming");
+    const active = patrols.filter((p) => getStatus(p) === "active");
+    const upcoming = patrols.filter((p) => getStatus(p) === "upcoming");
     const completed = patrols.filter((p) => getStatus(p) === "completed");
 
     const now = new Date().toLocaleString("en-PH", {
-      dateStyle: "long", timeStyle: "short", hour12: true,
+      dateStyle: "long",
+      timeStyle: "short",
+      hour12: true,
     });
 
     // Summary stat cells
@@ -258,22 +356,44 @@ const exportPatrolList = async (req, res) => {
       width: { size: 4800, type: WidthType.DXA },
       columnWidths: statCOL,
       rows: [
-        new TableRow({ children: [
-          dCell("Total Patrols",   statCOL[0]),
-          dCell(patrols.length,   statCOL[1], { bold: true, center: true }),
-        ]}),
-        new TableRow({ children: [
-          dCell("Active",          statCOL[0], { alt: true }),
-          dCell(active.length,    statCOL[1], { bold: true, center: true, alt: true, color: GREEN }),
-        ]}),
-        new TableRow({ children: [
-          dCell("Upcoming",        statCOL[0]),
-          dCell(upcoming.length,  statCOL[1], { bold: true, center: true, color: DARK }),
-        ]}),
-        new TableRow({ children: [
-          dCell("Completed",       statCOL[0], { alt: true }),
-          dCell(completed.length, statCOL[1], { bold: true, center: true, alt: true, color: "6B7280" }),
-        ]}),
+        new TableRow({
+          children: [
+            dCell("Total Patrols", statCOL[0]),
+            dCell(patrols.length, statCOL[1], { bold: true, center: true }),
+          ],
+        }),
+        new TableRow({
+          children: [
+            dCell("Active", statCOL[0], { alt: true }),
+            dCell(active.length, statCOL[1], {
+              bold: true,
+              center: true,
+              alt: true,
+              color: GREEN,
+            }),
+          ],
+        }),
+        new TableRow({
+          children: [
+            dCell("Upcoming", statCOL[0]),
+            dCell(upcoming.length, statCOL[1], {
+              bold: true,
+              center: true,
+              color: DARK,
+            }),
+          ],
+        }),
+        new TableRow({
+          children: [
+            dCell("Completed", statCOL[0], { alt: true }),
+            dCell(completed.length, statCOL[1], {
+              bold: true,
+              center: true,
+              alt: true,
+              color: "6B7280",
+            }),
+          ],
+        }),
       ],
     });
 
@@ -282,15 +402,32 @@ const exportPatrolList = async (req, res) => {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 60 },
-        children: [new TextRun({ text: "PATROL SCHEDULING REPORT", bold: true, size: 40, font: "Arial", color: DARK })],
+        children: [
+          new TextRun({
+            text: "PATROL SCHEDULING REPORT",
+            bold: true,
+            size: 40,
+            font: "Arial",
+            color: DARK,
+          }),
+        ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 40 },
-        children: [new TextRun({ text: `Generated: ${now}`, size: 20, font: "Arial", color: "9CA3AF" })],
+        children: [
+          new TextRun({
+            text: `Generated: ${now}`,
+            size: 20,
+            font: "Arial",
+            color: "9CA3AF",
+          }),
+        ],
       }),
       new Paragraph({
-        border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: DARK, space: 1 } },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 8, color: DARK, space: 1 },
+        },
         spacing: { after: 200 },
         children: [new TextRun("")],
       }),
@@ -317,28 +454,56 @@ const exportPatrolList = async (req, res) => {
 
     const doc = new Document({
       styles: { default: { document: { run: { font: "Arial", size: 18 } } } },
-      sections: [{
-        properties: {
-          page: {
-            size: { width: 11906, height: 16838 },
-            margin: { top: 720, right: 720, bottom: 720, left: 720 },
+      sections: [
+        {
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838 },
+              margin: { top: 720, right: 720, bottom: 720, left: 720 },
+            },
           },
+          headers: { default: makeHeader("PATROL SCHEDULING REPORT") },
+          footers: { default: makeFooter() },
+          children,
         },
-        headers: { default: makeHeader("PATROL SCHEDULING REPORT") },
-        footers: { default: makeFooter() },
-        children,
-      }],
+      ],
     });
 
     const docxBuf = await Packer.toBuffer(doc);
-    const pdfBuf  = await libreConvert(docxBuf, ".pdf", undefined);
+    const pdfBuf = await libreConvert(docxBuf, ".pdf", undefined);
 
     const dateStr = new Date().toISOString().slice(0, 10);
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol List Exported",
+      description: `Exported patrol list — ${patrols.length} patrol(s) (${active.length} active, ${upcoming.length} upcoming, ${completed.length} completed)`,
+      action: "EXPORT",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="patrol_list_${dateStr}.pdf"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="patrol_list_${dateStr}.pdf"`,
+    );
     res.send(pdfBuf);
   } catch (err) {
     console.error("exportPatrolList error:", err);
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol List Export Failed",
+      description: err.message,
+      action: "EXPORT",
+      status: "failed",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -347,9 +512,12 @@ const exportPatrolList = async (req, res) => {
 const exportPatrolDetail = async (req, res) => {
   try {
     const { patrol, mapImage = null } = req.body;
-    if (!patrol) return res.status(400).json({ success: false, message: "patrol is required" });
+    if (!patrol)
+      return res
+        .status(400)
+        .json({ success: false, message: "patrol is required" });
 
-    const status      = getStatus(patrol);
+    const status = getStatus(patrol);
     const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
     const statusColor = getStatusColor(status);
 
@@ -357,14 +525,14 @@ const exportPatrolDetail = async (req, res) => {
       ...new Set(
         (patrol.routes || [])
           .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-          .map((r) => r.barangay)
+          .map((r) => r.barangay),
       ),
     ];
 
     // All unique dates in the patrol
     const dateRange = [];
     const start = new Date(patrol.start_date);
-    const end   = new Date(patrol.end_date);
+    const end = new Date(patrol.end_date);
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
     const cur = new Date(start);
@@ -381,7 +549,7 @@ const exportPatrolDetail = async (req, res) => {
       if (typeof d === "string") {
         if (d.includes("T") || d.includes("Z")) {
           const dt = new Date(d);
-          return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
         }
         return d.substring(0, 10);
       }
@@ -389,27 +557,32 @@ const exportPatrolDetail = async (req, res) => {
     };
 
     const now = new Date().toLocaleString("en-PH", {
-      dateStyle: "long", timeStyle: "short", hour12: true,
+      dateStyle: "long",
+      timeStyle: "short",
+      hour12: true,
     });
 
     // ── 1. Cover / Info block ──────────────────────────────────────
     const infoCOL = [2800, CONTENT_W - 2800];
     const infoRows = [
-      ["Patrol Name",   patrol.patrol_name],
-      ["Mobile Unit",   patrol.mobile_unit_name || "—"],
-      ["Status",        statusLabel],
-      ["Start Date",    fmtDate(patrol.start_date)],
-      ["End Date",      fmtDate(patrol.end_date)],
-      ["Barangays",     barangays.join(", ") || "—"],
-    ].map(([label, value], i) =>
-      new TableRow({ children: [
-        dCell(label, infoCOL[0], { alt: i % 2 === 1 }),
-        dCell(value, infoCOL[1], {
-          bold: label === "Patrol Name",
-          alt: i % 2 === 1,
-          color: label === "Status" ? statusColor : "000000",
+      ["Patrol Name", patrol.patrol_name],
+      ["Mobile Unit", patrol.mobile_unit_name || "—"],
+      ["Status", statusLabel],
+      ["Start Date", fmtDate(patrol.start_date)],
+      ["End Date", fmtDate(patrol.end_date)],
+      ["Barangays", barangays.join(", ") || "—"],
+    ].map(
+      ([label, value], i) =>
+        new TableRow({
+          children: [
+            dCell(label, infoCOL[0], { alt: i % 2 === 1 }),
+            dCell(value, infoCOL[1], {
+              bold: label === "Patrol Name",
+              alt: i % 2 === 1,
+              color: label === "Status" ? statusColor : "000000",
+            }),
+          ],
         }),
-      ]})
     );
 
     const infoTable = new Table({
@@ -420,10 +593,12 @@ const exportPatrolDetail = async (req, res) => {
 
     // ── 2. Map image ───────────────────────────────────────────────
     // ~17cm wide × ~10cm tall in EMU
-   // AFTER — taller to fit the full map
-const MAP_W_EMU = 6429600;  
-const MAP_H_EMU = 5143500;  
-    const mapBlock  = mapImage ? imageBlock(mapImage, MAP_W_EMU, MAP_H_EMU) : null;
+    // AFTER — taller to fit the full map
+    const MAP_W_EMU = 6429600;
+    const MAP_H_EMU = 5143500;
+    const mapBlock = mapImage
+      ? imageBlock(mapImage, MAP_W_EMU, MAP_H_EMU)
+      : null;
 
     // ── 3. Patrollers table ────────────────────────────────────────
     const buildPatrollersTable = (patrollers) => {
@@ -440,20 +615,26 @@ const MAP_H_EMU = 5143500;
           new TableRow({
             tableHeader: true,
             children: [
-              hCell("#",             COL[0], { center: true }),
-              hCell("Officer Name",  COL[1]),
-              hCell("Contact",       COL[2]),
-              hCell("Shift",         COL[3], { center: true }),
+              hCell("#", COL[0], { center: true }),
+              hCell("Officer Name", COL[1]),
+              hCell("Contact", COL[2]),
+              hCell("Shift", COL[3], { center: true }),
             ],
           }),
-          ...patrollers.map((p, i) =>
-            new TableRow({ children: [
-              dCell(i + 1,             COL[0], { center: true, alt: i % 2 === 1 }),
-              dCell(p.officer_name,    COL[1], { alt: i % 2 === 1 }),
-              dCell(p.contact_number || "—", COL[2], { alt: i % 2 === 1 }),
-              dCell(p.shift || "—",   COL[3], { center: true, alt: i % 2 === 1,
-                color: p.shift === "AM" ? DARK : AMBER }),
-            ]})
+          ...patrollers.map(
+            (p, i) =>
+              new TableRow({
+                children: [
+                  dCell(i + 1, COL[0], { center: true, alt: i % 2 === 1 }),
+                  dCell(p.officer_name, COL[1], { alt: i % 2 === 1 }),
+                  dCell(p.contact_number || "—", COL[2], { alt: i % 2 === 1 }),
+                  dCell(p.shift || "—", COL[3], {
+                    center: true,
+                    alt: i % 2 === 1,
+                    color: p.shift === "AM" ? DARK : AMBER,
+                  }),
+                ],
+              }),
           ),
         ],
       });
@@ -462,9 +643,12 @@ const MAP_H_EMU = 5143500;
     // Deduplicate patrollers for display
     const uniquePatrollers = [];
     const seen = new Set();
-    for (const p of (patrol.patrollers || [])) {
+    for (const p of patrol.patrollers || []) {
       const key = `${p.active_patroller_id}-${p.shift}`;
-      if (!seen.has(key)) { seen.add(key); uniquePatrollers.push(p); }
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniquePatrollers.push(p);
+      }
     }
 
     // ── 4. Timetable per date + shift ─────────────────────────────
@@ -480,18 +664,24 @@ const MAP_H_EMU = 5143500;
         rows: [
           new TableRow({
             tableHeader: true,
-            children: [
-              hCell("Time",         COL[0]),
-              hCell("Task / Notes", COL[1]),
-            ],
+            children: [hCell("Time", COL[0]), hCell("Task / Notes", COL[1])],
           }),
-          ...tasks.map((r, i) =>
-            new TableRow({ children: [
-              dCell(`${fmtTime(r.time_start)} — ${fmtTime(r.time_end)}`, COL[0], {
-                alt: i % 2 === 1, bold: true, color: DARK,
+          ...tasks.map(
+            (r, i) =>
+              new TableRow({
+                children: [
+                  dCell(
+                    `${fmtTime(r.time_start)} — ${fmtTime(r.time_end)}`,
+                    COL[0],
+                    {
+                      alt: i % 2 === 1,
+                      bold: true,
+                      color: DARK,
+                    },
+                  ),
+                  dCell(r.notes || "—", COL[1], { alt: i % 2 === 1 }),
+                ],
               }),
-              dCell(r.notes || "—", COL[1], { alt: i % 2 === 1 }),
-            ]})
           ),
         ],
       });
@@ -502,10 +692,20 @@ const MAP_H_EMU = 5143500;
     for (const date of dateRange) {
       const dateLabel = fmtDate(date);
       const amTasks = (patrol.routes || [])
-        .filter((r) => toDateStr(r.route_date) === date && r.shift === "AM" && (r.stop_order || 0) > 0)
+        .filter(
+          (r) =>
+            toDateStr(r.route_date) === date &&
+            r.shift === "AM" &&
+            (r.stop_order || 0) > 0,
+        )
         .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
       const pmTasks = (patrol.routes || [])
-        .filter((r) => toDateStr(r.route_date) === date && r.shift === "PM" && (r.stop_order || 0) > 0)
+        .filter(
+          (r) =>
+            toDateStr(r.route_date) === date &&
+            r.shift === "PM" &&
+            (r.stop_order || 0) > 0,
+        )
         .sort((a, b) => (a.stop_order || 0) - (b.stop_order || 0));
 
       if (amTasks.length === 0 && pmTasks.length === 0) continue;
@@ -530,20 +730,44 @@ const MAP_H_EMU = 5143500;
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 40 },
-        children: [new TextRun({ text: "PATROL DETAIL REPORT", bold: true, size: 40, font: "Arial", color: DARK })],
+        children: [
+          new TextRun({
+            text: "PATROL DETAIL REPORT",
+            bold: true,
+            size: 40,
+            font: "Arial",
+            color: DARK,
+          }),
+        ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 40 },
-        children: [new TextRun({ text: patrol.patrol_name, bold: true, size: 28, font: "Arial" })],
+        children: [
+          new TextRun({
+            text: patrol.patrol_name,
+            bold: true,
+            size: 28,
+            font: "Arial",
+          }),
+        ],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 200 },
-        children: [new TextRun({ text: `Generated: ${now}`, size: 18, font: "Arial", color: "9CA3AF" })],
+        children: [
+          new TextRun({
+            text: `Generated: ${now}`,
+            size: 18,
+            font: "Arial",
+            color: "9CA3AF",
+          }),
+        ],
       }),
       new Paragraph({
-        border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: DARK, space: 1 } },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 8, color: DARK, space: 1 },
+        },
         spacing: { after: 200 },
         children: [new TextRun("")],
       }),
@@ -578,28 +802,59 @@ const MAP_H_EMU = 5143500;
 
     const doc = new Document({
       styles: { default: { document: { run: { font: "Arial", size: 18 } } } },
-      sections: [{
-        properties: {
-          page: {
-            size: { width: 11906, height: 16838 },
-            margin: { top: 720, right: 720, bottom: 720, left: 720 },
+      sections: [
+        {
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838 },
+              margin: { top: 720, right: 720, bottom: 720, left: 720 },
+            },
           },
+          headers: {
+            default: makeHeader("PATROL DETAIL REPORT", patrol.patrol_name),
+          },
+          footers: { default: makeFooter() },
+          children,
         },
-        headers: { default: makeHeader("PATROL DETAIL REPORT", patrol.patrol_name) },
-        footers: { default: makeFooter() },
-        children,
-      }],
+      ],
     });
 
     const docxBuf = await Packer.toBuffer(doc);
-    const pdfBuf  = await libreConvert(docxBuf, ".pdf", undefined);
+    const pdfBuf = await libreConvert(docxBuf, ".pdf", undefined);
 
-    const safeName = (patrol.patrol_name || "patrol").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeName = (patrol.patrol_name || "patrol").replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_",
+    );
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Detail Exported",
+      description: `Exported patrol detail — "${patrol.patrol_name}"`,
+      action: "EXPORT",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="patrol_${safeName}.pdf"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="patrol_${safeName}.pdf"`,
+    );
     res.send(pdfBuf);
   } catch (err) {
     console.error("exportPatrolDetail error:", err);
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Detail Export Failed",
+      description: err.message,
+      action: "EXPORT",
+      status: "failed",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.status(500).json({ success: false, message: err.message });
   }
 };
