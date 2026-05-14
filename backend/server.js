@@ -47,7 +47,7 @@ app.use("/crime-dashboard",        require("./features/dashboard/routes/crimeDas
 app.use("/patrol", require("./features/patrols/routes/patrolRoutes"));
 app.use('/gps', require('./features/gps/routes/gpsRoutes'));
 app.use("/ai-assessment", require("./features/ai-assessment/routes/assessment.routes"));
-app.use("/api/residents", require("./features/residents/routes/residentRoutes"));
+app.use("/residents", require("./features/residents/routes/residentRoutes"));
 
 app.use("/audit-log", require("./features/audit/routes/auditRoutes"));
 
