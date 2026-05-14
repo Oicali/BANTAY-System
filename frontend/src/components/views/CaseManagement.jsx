@@ -28,17 +28,29 @@ function CaseManagement() {
   const [activeTab, setActiveTab] = useState("all");
 
   // Applied filters (used for actual fetching)
+  const getDefaultDateFrom = () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  };
+  const getDefaultDateTo = () => new Date().toISOString().split("T")[0];
+
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
     search: "",
     sort_updated: "",
+    date_from: getDefaultDateFrom(),
+    date_to: getDefaultDateTo(),
   });
   const [draftFilters, setDraftFilters] = useState({
     status: "",
     priority: "",
     search: "",
     sort_updated: "",
+    date_from: getDefaultDateFrom(),
+    date_to: getDefaultDateTo(),
   });
 
   // Modals
@@ -87,8 +99,16 @@ function CaseManagement() {
       setActiveTab("my");
       fetchCases("my");
     } else {
-      fetchCases("all");
-      fetchStats();
+      const defaultF = {
+        status: "",
+        priority: "",
+        search: "",
+        sort_updated: "",
+        date_from: getDefaultDateFrom(),
+        date_to: getDefaultDateTo(),
+      };
+      fetchCases("all", defaultF);
+      fetchStats(defaultF);
     }
   }, []);
 
@@ -108,6 +128,8 @@ function CaseManagement() {
       const params = new URLSearchParams();
       if (f.status) params.append("status", f.status);
       if (f.priority) params.append("priority", f.priority);
+      if (f.date_from) params.append("date_from", f.date_from);
+      if (f.date_to) params.append("date_to", f.date_to);
 
       const res = await fetch(`${API_URL}?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -160,9 +182,15 @@ function CaseManagement() {
     }
   };
 
-  const fetchStats = async () => {
+  const fetchStats = async (filterOverride = null) => {
     try {
-      const res = await fetch(`${API_URL}/statistics`, {
+      const f = filterOverride !== null ? filterOverride : filters;
+      const params = new URLSearchParams();
+      if (f.date_from) params.append("date_from", f.date_from);
+      if (f.date_to) params.append("date_to", f.date_to);
+      if (f.status) params.append("status", f.status);
+      if (f.priority) params.append("priority", f.priority);
+      const res = await fetch(`${API_URL}/statistics?${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
@@ -418,14 +446,23 @@ function CaseManagement() {
   const handleApplyFilters = () => {
     setFilters(draftFilters);
     fetchCases(null, draftFilters);
+    fetchStats(draftFilters);
   };
 
   // Reset filters — clears both draft and applied, fetches clean
   const handleResetFilters = () => {
-    const reset = { status: "", priority: "", search: "", sort_updated: "" };
+    const reset = {
+      status: "",
+      priority: "",
+      search: "",
+      sort_updated: "",
+      date_from: getDefaultDateFrom(),
+      date_to: getDefaultDateTo(),
+    };
     setDraftFilters(reset);
     setFilters(reset);
     fetchCases(null, reset);
+    fetchStats(reset);
   };
 
   const openViewDetail = async (c) => {
@@ -493,7 +530,9 @@ function CaseManagement() {
     draftFilters.status !== filters.status ||
     draftFilters.priority !== filters.priority ||
     draftFilters.search !== filters.search ||
-    draftFilters.sort_updated !== filters.sort_updated;
+    draftFilters.sort_updated !== filters.sort_updated ||
+    draftFilters.date_from !== filters.date_from ||
+    draftFilters.date_to !== filters.date_to;
 
   return (
     <div className="cm-content-area">
@@ -594,6 +633,7 @@ function CaseManagement() {
           className="cm-filter-input"
           placeholder="Search by Case No."
           name="search"
+          style={{ maxWidth: "140px" }}
           value={draftFilters.search || ""}
           onChange={handleFilterChange}
           autoComplete="off"
@@ -631,6 +671,26 @@ function CaseManagement() {
           <option value="newest">Last Updated: Newest</option>
           <option value="oldest">Last Updated: Oldest</option>
         </select>
+        <input
+          type="date"
+          className="cm-filter-input"
+          name="date_from"
+          value={draftFilters.date_from || ""}
+          max={draftFilters.date_to || getDefaultDateTo()}
+          onChange={handleFilterChange}
+          title="Date From"
+        />
+        <input
+          type="date"
+          className="cm-filter-input"
+          name="date_to"
+          value={draftFilters.date_to || ""}
+          min={draftFilters.date_from || ""}
+          max={getDefaultDateTo()}
+          onChange={handleFilterChange}
+          title="Date To"
+        />
+
         <button
           className="cm-btn cm-btn-primary"
           onClick={handleApplyFilters}
@@ -682,9 +742,7 @@ function CaseManagement() {
 
       {/* CASES LIST */}
       <div className="cm-cases-grid">
-        {loading ? (
-          <LoadingModal isOpen={true} message={"Loading cases..."} />
-        ) : cases.length === 0 ? (
+        {cases.length === 0 && !loading ? (
           <div className="cm-empty-state">No cases found.</div>
         ) : (
           paginatedCases.map((c) => (
@@ -729,10 +787,6 @@ function CaseManagement() {
                   <span>{c.location || c.barangay}</span>
                 </div>
                 <div className="cm-case-meta-item">
-                  <span className="cm-case-meta-label">Date Created:</span>
-                  <span>{formatDate(c.created_at)}</span>
-                </div>
-                <div className="cm-case-meta-item">
                   <span className="cm-case-meta-label">Last Updated:</span>
                   <span>{formatDate(c.updated_at)}</span>
                 </div>
@@ -758,14 +812,12 @@ function CaseManagement() {
                   )}
                   {(isAdmin || isInvestigator) && (
                     <>
-                      {c.status === "Under Investigation" && (
-                        <button
-                          className="cm-action-btn cm-action-btn-edit"
-                          onClick={() => openPriorityModal(c)}
-                        >
-                          Set Priority
-                        </button>
-                      )}
+                      <button
+                        className="cm-action-btn cm-action-btn-edit"
+                        onClick={() => openPriorityModal(c)}
+                      >
+                        Set Priority
+                      </button>
                       <button
                         className="cm-action-btn cm-action-btn-edit"
                         onClick={() => openStatusModal(c)}
@@ -1558,7 +1610,7 @@ function CaseManagement() {
                     borderRight: "1px solid #f3f4f6",
                   }}
                 >
-                  <span className="cm-detail-label">Date Opened</span>
+                  <span className="cm-detail-label">Date Created</span>
                   <span>{formatDate(selectedCase.created_at)}</span>
                 </div>
                 <div

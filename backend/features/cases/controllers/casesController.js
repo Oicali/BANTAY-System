@@ -8,7 +8,10 @@ const createCase = async (req, res) => {
     const { blotter_id } = req.body;
     if (!blotter_id) return res.status(400).json({ success: false, message: "blotter_id is required" });
 
-    const blotter = await pool.query("SELECT blotter_id FROM blotter_entries WHERE blotter_id = $1", [blotter_id]);
+    const blotter = await pool.query(
+  "SELECT blotter_id, incident_type, date_time_reported, date_time_commission FROM blotter_entries WHERE blotter_id = $1",
+  [blotter_id]
+);
     if (blotter.rows.length === 0) return res.status(404).json({ success: false, message: "Blotter not found" });
 
     const existing = await pool.query("SELECT id FROM cases WHERE blotter_id = $1", [blotter_id]);
@@ -19,14 +22,32 @@ const createCase = async (req, res) => {
     const count = parseInt(countResult.rows[0].count) + 1;
     const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
 
-    const result = await pool.query(
-      `INSERT INTO cases (blotter_id, case_number, created_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, case_number, blotter_id, status, priority, created_by, created_at`,
-      [blotter_id, case_number, req.user.user_id]
-    );
+const reportedDate = blotter.rows[0].date_time_reported || blotter.rows[0].date_time_commission;
+const blotterYear = reportedDate ? new Date(reportedDate).getFullYear() : new Date().getFullYear();
+const currentYear = new Date().getFullYear();
+const incidentType = (blotter.rows[0].incident_type || "").toLowerCase().trim();
 
-    return res.status(201).json({ success: true, message: "Case created successfully", data: result.rows[0] });
+let autoPriority = "Low";
+if (blotterYear === currentYear) {
+  const highCrimes = ["murder", "homicide", "rape", "special complex crime"];
+  const mediumCrimes = ["robbery", "carnapping - mc", "carnapping - mv"];
+ 
+
+  if (highCrimes.includes(incidentType)) {
+    autoPriority = "High";
+  } else if (mediumCrimes.includes(incidentType)) {
+    autoPriority = "Medium";
+  }
+}
+
+const result = await pool.query(
+  `INSERT INTO cases (blotter_id, case_number, created_by, priority)
+   VALUES ($1, $2, $3, $4)
+   RETURNING id, case_number, blotter_id, status, priority, created_by, created_at`,
+  [blotter_id, case_number, req.user.user_id, autoPriority]
+);
+
+return res.status(201).json({ success: true, message: "Case created successfully", data: result.rows[0] });
   } catch (error) {
     console.error("Create case error:", error);
     res.status(500).json({ success: false, message: "Error creating case" });
@@ -147,8 +168,8 @@ if (role === "Investigator") {
 
     if (status) { whereConditions.push(`c.status = $${paramCount++}`); params.push(status); }
     if (priority) { whereConditions.push(`c.priority = $${paramCount++}`); params.push(priority); }
-    if (date_from) { whereConditions.push(`c.created_at >= $${paramCount++}`); params.push(date_from); }
-    if (date_to) { whereConditions.push(`c.created_at <= $${paramCount++}`); params.push(date_to); }
+    if (date_from) { whereConditions.push(`b.date_time_commission >= $${paramCount++}`); params.push(date_from); }
+if (date_to) { whereConditions.push(`b.date_time_commission < ($${paramCount++}::date + interval '1 day')`); params.push(date_to); }
 
     const where = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
@@ -191,6 +212,15 @@ ${where}
 // GET /cases/statistics — Admin only
 const getStatistics = async (req, res) => {
   try {
+    const { date_from, date_to, status, priority } = req.query;
+    const conditions = ["b.deleted_at IS NULL"];
+    const params = [];
+    let p = 1;
+    if (date_from) { conditions.push(`b.date_time_commission >= $${p++}`); params.push(date_from); }
+if (date_to) { conditions.push(`b.date_time_commission < ($${p++}::date + interval '1 day')`); params.push(date_to); }
+    if (status) { conditions.push(`c.status = $${p++}`); params.push(status); }
+    if (priority) { conditions.push(`c.priority = $${p++}`); params.push(priority); }
+    const where = "WHERE " + conditions.join(" AND ");
     const result = await pool.query(
   `SELECT
     COUNT(*) AS total_cases,
@@ -201,7 +231,9 @@ const getStatistics = async (req, res) => {
     COUNT(*) FILTER (WHERE c.assigned_io_id IS NULL) AS unassigned_cases,
     COUNT(*) FILTER (WHERE c.priority = 'High') AS high_priority_cases
    FROM cases c
-   INNER JOIN blotter_entries b ON c.blotter_id = b.blotter_id AND b.deleted_at IS NULL`
+   INNER JOIN blotter_entries b ON c.blotter_id = b.blotter_id
+   ${where}`,
+  params
 );
 
     const row = result.rows[0];

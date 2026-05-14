@@ -331,9 +331,8 @@ function ResidentManagement() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07" />
-              <path d="M11 5a10 10 0 0 1 10 10" />
-              <circle cx="12" cy="12" r="3" />
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
             </svg>
           </div>
           <div>
@@ -462,9 +461,6 @@ function ResidentManagement() {
                               {r.last_name}, {r.first_name}
                               {r.middle_name ? ` ${r.middle_name[0]}.` : ""}
                               {r.qualifier ? ` ${r.qualifier}` : ""}
-                            </div>
-                            <div className="rm-resident-id">
-                              ID #{r.resident_id}
                             </div>
                           </div>
                         </div>

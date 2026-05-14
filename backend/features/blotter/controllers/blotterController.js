@@ -8,7 +8,6 @@ const autoCreateCase = async (client, blotterId, createdBy) => {
 
   const year = new Date().getFullYear();
 
-  // Use a DB-level sequence to avoid collision during bulk inserts
   const seqResult = await client.query(
     `INSERT INTO case_number_seq (year) VALUES ($1)
      ON CONFLICT (year) DO UPDATE SET seq = case_number_seq.seq + 1
@@ -19,20 +18,31 @@ const autoCreateCase = async (client, blotterId, createdBy) => {
   const case_number = `CASE-${year}-${String(seq).padStart(4, "0")}`;
 
   const blotterRow = await client.query(
-    "SELECT status FROM blotter_entries WHERE blotter_id = $1", [blotterId]
+    "SELECT status, incident_type, date_time_reported, date_time_commission FROM blotter_entries WHERE blotter_id = $1", [blotterId]
   );
   const blotterStatus = blotterRow.rows[0]?.status || "Under Investigation";
   const validStatuses = ["Under Investigation", "Solved", "Cleared"];
   const caseStatus = validStatuses.includes(blotterStatus) ? blotterStatus : "Under Investigation";
 
+  const incidentType = (blotterRow.rows[0]?.incident_type || "").toLowerCase().trim();
+  const reportedDate = blotterRow.rows[0]?.date_time_reported || blotterRow.rows[0]?.date_time_commission;
+  const blotterYear = reportedDate ? new Date(reportedDate).getFullYear() : new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  let autoPriority = "Low";
+  if (blotterYear === currentYear) {
+    const highCrimes = ["murder", "homicide", "rape", "special complex crime"];
+    const mediumCrimes = ["robbery", "carnapping - mc", "carnapping - mv"];
+    if (highCrimes.includes(incidentType)) autoPriority = "High";
+    else if (mediumCrimes.includes(incidentType)) autoPriority = "Medium";
+  }
   await client.query(
-    `INSERT INTO cases (blotter_id, case_number, status, created_by)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT DO NOTHING`,
-    [blotterId, case_number, caseStatus, createdBy]
+    [blotterId, case_number, caseStatus, autoPriority, createdBy]
   );
 };
-// import
 const xlsx = require("xlsx");
 const { normalizeOffense, normalizeBarangay, deriveFromDate } = require("../utils/importUtils");
 const { v4: uuidv4 } = require("uuid");
@@ -775,28 +785,35 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
         // ── complainant fields ──
         complainant: {
-          first_name: str(row["C_FIRST_NAME"]),
-          middle_name: str(row["C_MIDDLE_NAME"]),
-          last_name: str(row["C_LAST_NAME"]),
-          qualifier: str(row["C_QUALIFIER"]),
-          alias: str(row["C_ALIAS"]),
-          gender: str(row["C_GENDER"]) || "Male",
-          nationality: str(row["C_NATIONALITY"]) || "FILIPINO",
-          contact_number: (() => {
-  const num = str(row["C_CONTACT_NUMBER"]);
-  if (!num) return null;
-  const cleaned = num.replace(/\D/g, "");
-  if (cleaned.length === 10 && cleaned.startsWith("9")) return "0" + cleaned;
-  return cleaned;
-})(),
-          region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
-          district_province: str(row["C_PROVINCE"]) || "Cavite",
-          city_municipality: str(row["C_CITY_MUNICIPALITY"]) || "Bacoor City",
-          barangay: str(row["C_BARANGAY"]),
-          house_street: str(row["C_HOUSE_STREET"]) || "N/A",
-          info_obtained: str(row["C_INFO_OBTAINED"]) || "Walk-in",
-          occupation: str(row["C_OCCUPATION"]),
-        },
+  first_name: str(row["C_FIRST_NAME"]),
+  middle_name: str(row["C_MIDDLE_NAME"]),
+  last_name: str(row["C_LAST_NAME"]),
+  qualifier: str(row["C_QUALIFIER"]),
+  alias: str(row["C_ALIAS"]),
+  gender: str(row["C_GENDER"]) || "Male",
+  nationality: str(row["C_NATIONALITY"]) || "FILIPINO",
+  contact_number: (() => {
+    const num = str(row["C_CONTACT_NUMBER"]);
+    if (!num) return null;
+    const cleaned = num.replace(/\D/g, "");
+    if (cleaned.length === 10 && cleaned.startsWith("9")) return "0" + cleaned;
+    return cleaned;
+  })(),
+  region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
+  district_province: str(row["C_PROVINCE"]) || "Cavite",
+  city_municipality: str(row["C_CITY_MUNICIPALITY"]) || "Bacoor City",
+  barangay: str(row["C_BARANGAY"]),
+  house_street: str(row["C_HOUSE_STREET"]) || "N/A",
+  info_obtained: str(row["C_INFO_OBTAINED"]) || "Walk-in",
+  occupation: str(row["C_OCCUPATION"]),
+  role: (() => {
+    const r = str(row["C_ROLE"]);
+    const valid = ["Victim", "Complainant", "Witness", "Respondent"];
+    return valid.includes(r) ? r : "Victim";
+  })(),
+  relationship_to_victim: str(row["C_RELATIONSHIP_TO_VICTIM"]) || null,
+  witness_statement: str(row["C_WITNESS_STATEMENT"]) || null,
+},
 
         // ── suspect fields ──
         suspect: {
@@ -892,33 +909,36 @@ const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
         // 2. Insert complainant (only if first name exists)
         if (r.complainant.first_name) {
           await client.query(
-            `INSERT INTO complainants (
-              blotter_id, first_name, middle_name, last_name, qualifier, alias,
-              gender, nationality, contact_number,
-              region, district_province, city_municipality, barangay, house_street,
-              info_obtained, occupation
-            ) VALUES (
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
-            )`,
-            [
-              blotterId,
-              r.complainant.first_name || null,
-              r.complainant.middle_name || null,
-              r.complainant.last_name || null,
-              r.complainant.qualifier || null,
-              r.complainant.alias || null,
-              r.complainant.gender || "Male",
-              r.complainant.nationality || "FILIPINO",
-              r.complainant.contact_number || null,
-              r.complainant.region || null,
-              r.complainant.district_province || null,
-              r.complainant.city_municipality || null,
-              r.complainant.barangay || null,
-              r.complainant.house_street || null,
-              r.complainant.info_obtained || null,
-              r.complainant.occupation || null,
-            ]
-          );
+  `INSERT INTO complainants (
+    blotter_id, first_name, middle_name, last_name, qualifier, alias,
+    gender, nationality, contact_number,
+    region, district_province, city_municipality, barangay, house_street,
+    info_obtained, occupation, role, relationship_to_victim, witness_statement
+  ) VALUES (
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+  )`,
+  [
+    blotterId,
+    r.complainant.first_name || null,
+    r.complainant.middle_name || null,
+    r.complainant.last_name || null,
+    r.complainant.qualifier || null,
+    r.complainant.alias || null,
+    r.complainant.gender || "Male",
+    r.complainant.nationality || "FILIPINO",
+    r.complainant.contact_number || null,
+    r.complainant.region || null,
+    r.complainant.district_province || null,
+    r.complainant.city_municipality || null,
+    r.complainant.barangay || null,
+    r.complainant.house_street || null,
+    r.complainant.info_obtained || null,
+    r.complainant.occupation || null,
+    r.complainant.role || 'Victim',              
+    r.complainant.relationship_to_victim || null,  
+    r.complainant.witness_statement || null,       
+  ]
+);
         }
 
         // 3. Insert suspect
@@ -1203,7 +1223,6 @@ else {
       );
 
       const blotterId = blotterResult.rows[0].blotter_id;
-
       for (const v of victims) {
   await client.query(
     `INSERT INTO complainants (
@@ -1217,8 +1236,8 @@ else {
       v.middle_name || null,
       v.last_name,
       v.gender || "Male",
-      "FILIPINO",
-      v.house_street || "N/A",
+      v.nationality || "FILIPINO",
+      v.house_street || null,
       "Walk-in",
       v.contact_number || null,
       v.role || "Victim",

@@ -730,7 +730,7 @@ function EBlotter() {
 
         try {
           await Promise.all(
-            updatedComplainants.map(async (c, i) => {
+            (updatedComplainants || []).map(async (c, i) => {
               let provs = [],
                 cities = [],
                 brgys = [];
@@ -776,7 +776,7 @@ function EBlotter() {
 
         try {
           await Promise.all(
-            updatedSuspects.map(async (s, i) => {
+            (updatedSuspects || []).map(async (s, i) => {
               let provs = [],
                 cities = [],
                 brgys = [];
@@ -1019,7 +1019,7 @@ function EBlotter() {
         const newCProvinces = {},
           newCCities = {},
           newCBarangays = {};
-        const updatedComplainants = data.data.complainants.map((c) => ({
+        const updatedComplainants = (data.data.complainants || []).map((c) => ({
           ...c,
           region_code: c.region_code || "",
           province_code: c.province_code || "",
@@ -1059,7 +1059,7 @@ function EBlotter() {
         const newSProvinces = {},
           newSCities = {},
           newSBarangays = {};
-        const updatedSuspects = data.data.suspects.map((s) => ({
+        const updatedSuspects = (data.data.suspects || []).map((s) => ({
           ...s,
           region_code: s.region_code || "",
           province_code: s.province_code || "",
