@@ -104,14 +104,6 @@ function ImportResidentModal({ onClose, onSuccess }) {
     setLoading(false);
   };
 
-  const downloadTemplate = () => {
-    // Guide user to download the template
-    const link = document.createElement("a");
-    link.href = "/bantay_resident_template.xlsx";
-    link.download = "bantay_resident_template.xlsx";
-    link.click();
-  };
-
   return ReactDOM.createPortal(
     <div className="im-overlay">
       <div className="im-modal">
@@ -180,23 +172,6 @@ function ImportResidentModal({ onClose, onSuccess }) {
                       <strong>Required columns:</strong> FIRST_NAME, LAST_NAME
                       (others optional)
                     </span>
-                    <button
-                      onClick={downloadTemplate}
-                      style={{
-                        background: "#1e3a5f",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "5px 12px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        marginLeft: "12px",
-                      }}
-                    >
-                      Download Template
-                    </button>
                   </div>
 
                   <div

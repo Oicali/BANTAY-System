@@ -31,8 +31,11 @@ function BrgyReport() {
       gender: "Male",
       contact_number: "",
       role: "Victim",
+      nationality: "FILIPINO",
+      house_street: "",
       relationship_to_victim: "",
       witness_statement: "",
+      from_resident_db: false,
     },
   ]);
   const [form, setForm] = useState({
@@ -42,6 +45,7 @@ function BrgyReport() {
     place_barangay: "",
     place_street: "",
     narrative: "",
+    nationality: "FILIPINO",
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -143,6 +147,9 @@ function BrgyReport() {
               last_name: resident.last_name || "",
               gender: resident.gender || "Male",
               contact_number: resident.contact_number || "",
+              nationality: "FILIPINO",
+              house_street: resident.house_street || "",
+              from_resident_db: true,
             }
           : v,
       ),
@@ -173,8 +180,11 @@ function BrgyReport() {
         gender: "Male",
         contact_number: "",
         role,
+        nationality: "FILIPINO",
+        house_street: "",
         relationship_to_victim: "",
         witness_statement: "",
+        from_resident_db: false,
       },
     ]);
   const removeVictim = (i) =>
@@ -243,6 +253,17 @@ function BrgyReport() {
     }
     try {
       setSubmitting(true);
+      const debugPayload = {
+        ...form,
+        victims: victims.map((v) => ({
+          ...v,
+          contact: v.contact_number,
+        })),
+      };
+      console.log(
+        "VICTIMS PAYLOAD:",
+        JSON.stringify(debugPayload.victims, null, 2),
+      );
       const res = await fetch(`${API_URL}/brgy-report`, {
         method: "POST",
         headers: {
@@ -555,7 +576,7 @@ function BrgyReport() {
             <h2 className="br-card-title">Persons Involved</h2>
           </div>
           <div className="br-card-body">
-            {/* ── RESIDENT SEARCH TRIGGER ── */}
+            {/* ── RESIDENT HINT — no button, just info ── */}
             <div className="br-resident-hint">
               <svg
                 width="14"
@@ -571,15 +592,9 @@ function BrgyReport() {
                 <circle cx="9" cy="7" r="4" />
               </svg>
               <span>
-                Is the person a registered resident of {barangayName}?
+                Use <strong>Search Resident</strong> on each person entry to
+                auto-fill details from the {barangayName} resident database.
               </span>
-              <button
-                type="button"
-                className="br-resident-search-btn"
-                onClick={() => openResidentSearch(victims.length - 1)}
-              >
-                Search Resident
-              </button>
             </div>
 
             {/* ── PERSON ENTRIES ── */}
@@ -727,7 +742,68 @@ function BrgyReport() {
                       </span>
                     )}
                   </div>
-
+                  <div className="br-form-group">
+                    <label className="br-label">Nationality</label>
+                    <select
+                      className="br-input"
+                      value={v.nationality || "FILIPINO"}
+                      onChange={(e) =>
+                        updateVictim(i, "nationality", e.target.value)
+                      }
+                    >
+                      <option>FILIPINO</option>
+                      <option>AMERICAN</option>
+                      <option>CHINESE</option>
+                      <option>JAPANESE</option>
+                      <option>KOREAN</option>
+                      <option>INDIAN</option>
+                      <option>BRITISH</option>
+                      <option>AUSTRALIAN</option>
+                      <option>CANADIAN</option>
+                      <option>GERMAN</option>
+                      <option>FRENCH</option>
+                      <option>SPANISH</option>
+                      <option>INDONESIAN</option>
+                      <option>MALAYSIAN</option>
+                      <option>SINGAPOREAN</option>
+                      <option>THAI</option>
+                      <option>VIETNAMESE</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div
+                    className="br-form-group"
+                    style={{ gridColumn: "span 2" }}
+                  >
+                    <label className="br-label">
+                      House / Street Address
+                      {v.from_resident_db && (
+                        <span
+                          style={{
+                            marginLeft: "8px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            background: "#d1fae5",
+                            color: "#065f46",
+                            padding: "2px 7px",
+                            borderRadius: "20px",
+                          }}
+                        >
+                          Auto-filled from resident record
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      className="br-input"
+                      value={v.house_street || ""}
+                      placeholder="House No. / Street (optional)"
+                      maxLength={200}
+                      onChange={(e) =>
+                        updateVictim(i, "house_street", e.target.value)
+                      }
+                    />
+                  </div>
                   <div
                     className="br-form-group"
                     style={{ gridColumn: "span 2" }}
@@ -756,7 +832,7 @@ function BrgyReport() {
                       <label className="br-label">Relationship to Victim</label>
                       <select
                         className="br-input"
-                        value={v.relationship_to_victim}
+                        value={v.relationship_to_victim || ""}
                         onChange={(e) =>
                           updateVictim(
                             i,
@@ -792,7 +868,7 @@ function BrgyReport() {
                         rows={3}
                         maxLength={500}
                         placeholder="Brief statement of what was witnessed..."
-                        value={v.witness_statement}
+                        value={v.witness_statement || ""}
                         onChange={(e) =>
                           updateVictim(i, "witness_statement", e.target.value)
                         }
@@ -1025,7 +1101,7 @@ function BrgyReport() {
                 strokeLinejoin="round"
                 style={{
                   position: "absolute",
-                  left: "12px",
+                  left: "30px",
                   top: "50%",
                   transform: "translateY(-50%)",
                 }}

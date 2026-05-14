@@ -794,3 +794,25 @@ body {
   -webkit-box-shadow: 0 0 0 30px white inset !important;
   -webkit-text-fill-color: var(--gray-900) !important;
 }
+
+/* Fix date input calendar icon and popup */
+input[type="date"].cm-filter-input {
+  color-scheme: light;
+  color: #374151;
+}
+
+input[type="date"].cm-filter-input::-webkit-calendar-picker-indicator {
+  filter: invert(40%) sepia(0%) saturate(0%) brightness(60%);
+  cursor: pointer;
+  opacity: 1;
+}
+input[type="date"].cm-filter-input {
+  color-scheme: light;
+  color: #374151;
+}
+
+input[type="date"].cm-filter-input::-webkit-calendar-picker-indicator {
+  filter: invert(40%) sepia(0%) saturate(0%) brightness(60%);
+  cursor: pointer;
+  opacity: 1;
+}
