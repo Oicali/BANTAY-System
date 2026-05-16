@@ -598,7 +598,14 @@ function EBlotter() {
       const data = await response.json();
 
       if (data.success) {
-        setComplainants(data.data.complainants);
+        setComplainants(
+          (data.data.complainants || []).map((c) => ({
+            ...c,
+            role: c.role || "Victim",
+            relationship_to_victim: c.relationship_to_victim || "",
+            witness_statement: c.witness_statement || "",
+          })),
+        );
         setSuspects(data.data.suspects);
         setHasSuspect(true);
         const hasNoPsgcCodes = data.data.complainants.every(
@@ -831,7 +838,14 @@ function EBlotter() {
       const data = await response.json();
 
       if (data.success) {
-        setComplainants(data.data.complainants);
+        setComplainants(
+          (data.data.complainants || []).map((c) => ({
+            ...c,
+            role: c.role || "Victim",
+            relationship_to_victim: c.relationship_to_victim || "",
+            witness_statement: c.witness_statement || "",
+          })),
+        );
         setSuspects(data.data.suspects);
         setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
         const OFFENSE_NORMALIZE = {
@@ -1051,7 +1065,14 @@ function EBlotter() {
             }),
           );
         } catch (e) {}
-        setComplainants(updatedComplainants);
+        setComplainants(
+          updatedComplainants.map((c) => ({
+            ...c,
+            role: c.role || "Victim",
+            relationship_to_victim: c.relationship_to_victim || "",
+            witness_statement: c.witness_statement || "",
+          })),
+        );
         setCProvinces(newCProvinces);
         setCCities(newCCities);
         setCBarangays(newCBarangays);
@@ -3652,7 +3673,7 @@ function EBlotter() {
                               <small
                                 style={{ color: "#6b7280", fontSize: "12px" }}
                               >
-                                {c.witness_statement.length}/500
+                                {(c.witness_statement || "").length}/500
                               </small>
                             </div>
                           )}
