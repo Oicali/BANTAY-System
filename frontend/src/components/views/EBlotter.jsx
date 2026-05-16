@@ -370,7 +370,7 @@ function EBlotter() {
     }
   }, []);
   useEffect(() => {
-    fetchBlotters();
+    fetchBlotters(activeReportTab);
 
     const targetId = sessionStorage.getItem("openBlotterId");
     if (targetId) {
@@ -403,7 +403,9 @@ function EBlotter() {
     return () => clearInterval(interval); // ← cleanup at the END
   }, [activeReportTab]);
 
-  const fetchBlotters = async () => {
+  const fetchBlotters = async (tabOverride) => {
+    const currentTab =
+      tabOverride !== undefined ? tabOverride : activeReportTab;
     try {
       if (fetchControllerRef.current) {
         fetchControllerRef.current.abort();
@@ -412,7 +414,7 @@ function EBlotter() {
       fetchControllerRef.current = controller;
       setLoading(true);
       setBlotters([]);
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, 300));
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("search", filters.search);
       if (filters.status) queryParams.append("status", filters.status);
@@ -422,7 +424,7 @@ function EBlotter() {
       if (filters.date_to) queryParams.append("date_to", filters.date_to);
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
 
-      if (activeReportTab === "referred") {
+      if (currentTab === "referred") {
         queryParams.append("referred", "true");
       } else if (filters.data_source !== "brgy_referral") {
         queryParams.append("referred", "false");
@@ -439,6 +441,22 @@ function EBlotter() {
       const data = await response.json();
       if (data.success) {
         let results = data.data;
+
+        // Search filter — apply client-side for referred tab since backend
+        // may not filter by search when referred=true
+        if (filters.search && currentTab === "referred") {
+          const q = filters.search.toLowerCase();
+          results = results.filter(
+            (b) =>
+              (b.blotter_entry_number || "").toLowerCase().includes(q) ||
+              (b.incident_type || "").toLowerCase().includes(q) ||
+              (b.place_barangay || "").toLowerCase().includes(q) ||
+              (b.place_street || "").toLowerCase().includes(q) ||
+              (b.victim || "").toLowerCase().includes(q),
+          );
+        }
+
+        // Crime type filter
         if (filters.incident_type) {
           results = results.filter(
             (b) =>
@@ -446,6 +464,17 @@ function EBlotter() {
               filters.incident_type.toLowerCase(),
           );
         }
+
+        // Barangay filter — apply client-side for referred tab
+        if (filters.barangay && currentTab === "referred") {
+          results = results.filter(
+            (b) =>
+              (b.place_barangay || "").toUpperCase() ===
+              filters.barangay.toUpperCase(),
+          );
+        }
+
+        // Data source filter
         if (filters.data_source === "brgy_referral") {
           results = results.filter((b) =>
             (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
@@ -459,6 +488,7 @@ function EBlotter() {
             /^\d{4}/.test(b.blotter_entry_number || ""),
           );
         }
+
         setBlotters(results);
         setCurrentPage(1);
       }
@@ -508,7 +538,7 @@ function EBlotter() {
         const data = await response.json();
         if (data.success) {
           showReactToast("Report deleted successfully.");
-          fetchBlotters();
+          fetchBlotters(activeReportTab);
           fetchReferredCount();
         }
       } catch (error) {
@@ -526,7 +556,7 @@ function EBlotter() {
         if (data.success) {
           showReactToast("Report restored successfully.");
           fetchDeletedBlotters();
-          fetchBlotters();
+          fetchBlotters(activeReportTab);
           fetchReferredCount();
         }
       } catch (error) {
@@ -1153,7 +1183,7 @@ function EBlotter() {
     setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const clearFilters = async () => {
+  const clearFilters = () => {
     setFilters({
       search: "",
       status: "",
@@ -1163,24 +1193,7 @@ function EBlotter() {
       barangay: "",
       data_source: "",
     });
-
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setBlotters(data.data);
-        setCurrentPage(1);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
+    fetchBlotters(activeReportTab);
   };
 
   // Input helpers
@@ -6485,7 +6498,7 @@ function EBlotter() {
             <div style={{ display: "flex", gap: "8px" }}>
               <button
                 className="eb-btn eb-btn-primary eb-filter-apply-btn"
-                onClick={fetchBlotters}
+                onClick={() => fetchBlotters(activeReportTab)}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -6520,6 +6533,7 @@ function EBlotter() {
             setBlotters([]);
             setCurrentPage(1);
             setActiveReportTab("reports");
+            fetchBlotters("reports");
           }}
         >
           Reports
@@ -6531,6 +6545,7 @@ function EBlotter() {
             setBlotters([]);
             setCurrentPage(1);
             setActiveReportTab("referred");
+            fetchBlotters("referred");
           }}
         >
           <span
@@ -6744,7 +6759,7 @@ function EBlotter() {
         <ImportBlotterModal
           onClose={() => setShowImport(false)}
           onSuccess={() => {
-            fetchBlotters();
+            fetchBlotters(activeReportTab);
             setShowImport(false);
             showReactToast("Records imported successfully!");
           }}
