@@ -32,9 +32,10 @@ function CaseManagement() {
     const d = new Date();
     d.setFullYear(d.getFullYear() - 1);
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
   };
-  const getDefaultDateTo = () => new Date().toISOString().split("T")[0];
+  const getDefaultDateTo = () =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
   const [filters, setFilters] = useState({
     status: "",
@@ -502,6 +503,7 @@ function CaseManagement() {
       year: "numeric",
       month: "short",
       day: "numeric",
+      timeZone: "Asia/Manila",
     });
   };
 
@@ -1379,10 +1381,17 @@ function CaseManagement() {
                 <span style={{ fontSize: "12px", color: "#6b7280" }}>
                   Will be logged as:{" "}
                   <strong style={{ color: "#374151" }}>
+                    {new Date().toLocaleDateString("en-PH", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "Asia/Manila",
+                    })}{" "}
                     {new Date().toLocaleTimeString("en-PH", {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: true,
+                      timeZone: "Asia/Manila",
                     })}{" "}
                     · {user.username || "Officer"}
                   </strong>
