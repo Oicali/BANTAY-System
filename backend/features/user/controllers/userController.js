@@ -8,6 +8,8 @@ const crypto = require("crypto");
 const emailService = require("../../user/services/emailService");
 const UserValidator = require("../validators/userValidator");
 
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
+
 // =====================================================
 // GET ALL USERS (server-side paginated)
 // =====================================================
@@ -205,7 +207,7 @@ const registerUser = async (req, res) => {
       barangayCode,
       barangay,
       addressLine,
-      rankId
+      rankId,
     } = req.body;
 
     const cap = (str) =>
@@ -224,7 +226,6 @@ const registerUser = async (req, res) => {
     const trimmedBarangayCode =
       barangay?.trim() || barangayCode?.trim() || null;
     const trimmedAddressLine = addressLine?.trim() || null;
-  
 
     console.log("Registration attempt:", {
       userType,
@@ -272,7 +273,7 @@ const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
     const userResult = await client.query(
-  `INSERT INTO users (
+      `INSERT INTO users (
     username, email, password,
     first_name, last_name, middle_name, suffix,
     phone, alternate_phone,
@@ -281,15 +282,23 @@ const registerUser = async (req, res) => {
     status, created_at
   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'unverified',CURRENT_TIMESTAMP)
   RETURNING user_id`,
-  [
-    username, trimmedEmail, hashedPassword,
-    trimmedFirstName, trimmedLastName,
-    trimmedMiddleName || null, trimmedSuffix || null,
-    trimmedPhone, trimmedAlternatePhone || null,
-    gender, dateOfBirth,
-    userType, roleId, rankId ? parseInt(rankId) : null,
-  ],
-);
+      [
+        username,
+        trimmedEmail,
+        hashedPassword,
+        trimmedFirstName,
+        trimmedLastName,
+        trimmedMiddleName || null,
+        trimmedSuffix || null,
+        trimmedPhone,
+        trimmedAlternatePhone || null,
+        gender,
+        dateOfBirth,
+        userType,
+        roleId,
+        rankId ? parseInt(rankId) : null,
+      ],
+    );
     const userId = userResult.rows[0].user_id;
 
     await client.query(
@@ -361,7 +370,18 @@ const registerUser = async (req, res) => {
       console.error("Failed to send verification email:", emailResult.message);
     }
 
-    console.log("User registered (unverified):", username);
+    // console.log("User registered (unverified):", username);
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Registered",
+      description: `Registered new ${userType} user "${username}" with role ${role}`,
+      action: "CREATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
 
     res.status(201).json({
       success: true,
@@ -626,6 +646,17 @@ const resendVerificationEmail = async (req, res) => {
       verificationUrl,
     );
 
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Verification Email Resent",
+      description: `Resent verification email to user "${username}" (${trimmedEmail})`,
+      action: "CREATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.json({
       success: true,
       message: `Verification email resent to ${user.email}`,
@@ -665,7 +696,7 @@ const updateUser = async (req, res) => {
     barangay_code,
     assigned_barangay_code,
     address_line,
-    rank_id
+    rank_id,
   } = req.body;
 
   const client = await pool.connect();
@@ -827,7 +858,6 @@ const updateUser = async (req, res) => {
       );
     }
 
-
     // ── Barangay details ───────────────────────────────────────────────────
     if (existingUser.user_type === "barangay") {
       const brgyCode = assigned_barangay_code || barangay_code;
@@ -840,6 +870,16 @@ const updateUser = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Updated",
+      description: `Updated user ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "User updated successfully" });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -895,6 +935,16 @@ const deactivateUser = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
 
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Deactivated",
+      description: `Deactivated user ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "User deactivated successfully" });
   } catch (error) {
     console.error("Deactivate user error:", error);
@@ -938,6 +988,18 @@ const lockUser = async (req, res) => {
       "UPDATE users SET status = 'locked', updated_at = CURRENT_TIMESTAMP WHERE user_id = $1",
       [id],
     );
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Locked",
+      description: `Locked account for user ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.json({ success: true, message: "Account locked successfully" });
   } catch (err) {
     console.error("Lock account error:", err);
@@ -977,6 +1039,16 @@ const unlockUser = async (req, res) => {
        WHERE user_id = $1`,
       [id],
     );
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Unlocked",
+      description: `Unlocked account for user ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Account unlocked successfully" });
   } catch (err) {
     console.error("Unlock account error:", err);
@@ -1051,6 +1123,16 @@ const restoreUser = async (req, res) => {
       "UPDATE users SET status = 'verified', updated_at = NOW() WHERE user_id = $1",
       [id],
     );
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "User Restored",
+      description: `Restored user ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "User account restored successfully" });
   } catch (error) {
     console.error("Restore user error:", error);

@@ -1,5 +1,7 @@
 // backend\features\patrols\controllers\patrolController.js
 
+// updatePatrollersForDate still does not audit 
+
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
 const { getBarangayOptimized } = require("../../../shared/utils/geoUtils");
@@ -240,6 +242,18 @@ const createMobileUnit = async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [mobile_unit_name, vehicle_type, plate_number, created_by],
     );
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Mobile Unit Created",
+      description: `Created mobile unit "${mobile_unit_name}" (${vehicle_type} · ${plate_number})`,
+      action: "CREATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
     res.json({ success: true, message: "Mobile unit created." });
   } catch (error) {
     if (error.code === "23505") {
@@ -273,6 +287,17 @@ const updateMobileUnit = async (req, res) => {
     );
     if (result.rowCount === 0)
       return res.status(404).json({ success: false, message: "Not found." });
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Mobile Unit Updated",
+      description: `Updated mobile unit ID ${id} — "${mobile_unit_name}" (${vehicle_type} · ${plate_number})`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Mobile unit updated." });
   } catch (error) {
     if (error.code === "23505") {
@@ -299,6 +324,16 @@ const deleteMobileUnit = async (req, res) => {
     );
     if (result.rowCount === 0)
       return res.status(404).json({ success: false, message: "Not found." });
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Mobile Unit Deleted",
+      description: `Deleted mobile unit ID ${id}`,
+      action: "DELETE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Mobile unit deleted." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -558,6 +593,16 @@ const createPatrol = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Created",
+      description: `Created patrol "${patrol_name}" (${start_date} – ${end_date})`,
+      action: "CREATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Patrol created successfully." });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -612,6 +657,16 @@ const updatePatrol = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Updated",
+      description: `Updated patrol ID ${id} — "${patrol_name}" (${start_date} – ${end_date})`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Patrol updated successfully." });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -717,6 +772,17 @@ const deletePatrol = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Patrol not found." });
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Deleted",
+      description: `Deleted patrol ID ${id}`,
+      action: "DELETE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Patrol deleted." });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error" });
@@ -1141,7 +1207,17 @@ const submitAfterPatrolReport = async (req, res) => {
         sigSupervisor || null,
       ],
     );
-
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "After Patrol Report Submitted",
+      description:
+        `Submitted after patrol report for patrol ID ${patrol_id} — ${date} ${shift ?? ""}`.trim(),
+      action: "CREATE",
+      status: "success",
+      source: req.user?.role === "Administrator" ? "Web Portal" : "Mobile App",
+      ipAddress: getClientIp(req),
+    });
     res.json({
       success: true,
       message: "After Patrol Report submitted successfully.",
@@ -1178,6 +1254,7 @@ const getAfterPatrolReports = async (req, res) => {
       ...r,
       patrol_date: formatDateOnly(r.patrol_date),
     }));
+
     res.json({ success: true, data });
   } catch (error) {
     console.error("getAfterPatrolReports error:", error);
@@ -1280,7 +1357,16 @@ const deleteAfterPatrolReport = async (req, res) => {
         message: "Report not found or you do not have permission to delete it.",
       });
     }
-
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "After Patrol Report Deleted",
+      description: `Deleted after patrol report ID ${reportId}`,
+      action: "DELETE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Report deleted successfully." });
   } catch (error) {
     console.error("deleteAfterPatrolReport error:", error);
@@ -1429,7 +1515,16 @@ const deleteAfterPatrolPhoto = async (req, res) => {
       `UPDATE after_patrol_reports SET photo_urls = $1 WHERE report_id = $2`,
       [updated, reportId],
     );
-
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Photo Deleted",
+      description: `Deleted photo from report ID ${reportId}`,
+      action: "DELETE",
+      status: "success",
+      source: "Mobile App",
+      ipAddress: getClientIp(req),
+    });
     res.json({ success: true, message: "Photo deleted.", photo_urls: updated });
   } catch (error) {
     console.error("deleteAfterPatrolPhoto error:", error);

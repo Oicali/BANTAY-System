@@ -24,25 +24,29 @@ const bcrypt = require("bcrypt");
 const tokenManager = require("../../../shared/utils/tokenManager");
 const cloudinary = require("../../../config/cloudinary");
 const EmailVerificationController = require("./emailVerificationController");
-const { sendPasswordOtpEmail, sendPasswordChangedNotification } = require("../services/emailService");
+const {
+  sendPasswordOtpEmail,
+  sendPasswordChangedNotification,
+} = require("../services/emailService");
 const crypto = require("crypto");
-const pool   = require("../../../config/database");
+const pool = require("../../../config/database");
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
 
 // ── Password-change OTP store ─────────────────────────────────────────────────
 const pwOtpStore = new Map();
 
-const PW_OTP_EXPIRY        = 2  * 60 * 1000;
-const PW_MAX_OTP_ATTEMPTS  = 3;
-const PW_MAX_RESENDS       = 3;
-const PW_OTP_LOCKOUT_MS    = 15 * 60 * 1000;
-const PW_MAX_CHANGES       = 2;
-const PW_WINDOW_MS         = 24 * 60 * 60 * 1000;
-const PW_RESEND_WINDOW_MS  = 15 * 60 * 1000;
+const PW_OTP_EXPIRY = 2 * 60 * 1000;
+const PW_MAX_OTP_ATTEMPTS = 3;
+const PW_MAX_RESENDS = 3;
+const PW_OTP_LOCKOUT_MS = 15 * 60 * 1000;
+const PW_MAX_CHANGES = 2;
+const PW_WINDOW_MS = 24 * 60 * 60 * 1000;
+const PW_RESEND_WINDOW_MS = 15 * 60 * 1000;
 
 // ── Current-password attempt tracking ────────────────────────────────────────
 const pwCurrentAttemptStore = new Map();
 const PW_MAX_CURRENT_ATTEMPTS = 5;
-const PW_CURRENT_LOCKOUT_MS   = 15 * 60 * 1000;
+const PW_CURRENT_LOCKOUT_MS = 15 * 60 * 1000;
 
 // ── Persistent lock store for password OTP ────────────────────────────────────
 // Survives pwOtpStore session resets (modal close, logout, re-login).
@@ -71,11 +75,11 @@ function setPwLock(userId, value) {
 // causing requestPasswordOtp to immediately re-lock the user on their next attempt.
 function resetExpiredPwLock(userId, session) {
   if (session.lockedUntil && Date.now() >= session.lockedUntil) {
-    session.lockedUntil       = null;
-    session.resendCount       = 0;
+    session.lockedUntil = null;
+    session.resendCount = 0;
     session.resendWindowCount = 0;
     session.resendWindowStart = null;
-    session.attempts          = 0;
+    session.attempts = 0;
     setPwLock(userId, null);
   }
 }
@@ -93,13 +97,17 @@ function getPwSession(userId) {
   if (!pwOtpStore.has(key)) {
     const persistedLock = getPwPersistentLocks(key).lockedUntil;
     pwOtpStore.set(key, {
-      otp: null, hashedPassword: null,
-      expiresAt: null, sentAt: null,
+      otp: null,
+      hashedPassword: null,
+      expiresAt: null,
+      sentAt: null,
       attempts: 0,
       resendCount: 0,
       lockedUntil: persistedLock,
-      resendWindowStart: null, resendWindowCount: 0,
-      changeCount: 0, windowStart: null,
+      resendWindowStart: null,
+      resendWindowCount: 0,
+      changeCount: 0,
+      windowStart: null,
     });
   }
   return pwOtpStore.get(key);
@@ -121,27 +129,31 @@ async function getDbChangeCount(userId) {
   try {
     const { rows } = await pool.query(
       "SELECT pw_change_count, pw_window_start FROM users WHERE user_id = $1",
-      [userId]
+      [userId],
     );
     if (!rows[0]) return { changeCount: 0, windowStart: null };
-    const windowStart = rows[0].pw_window_start ? Number(rows[0].pw_window_start) : null;
+    const windowStart = rows[0].pw_window_start
+      ? Number(rows[0].pw_window_start)
+      : null;
     const changeCount = rows[0].pw_change_count || 0;
     return { changeCount, windowStart };
-  } catch { return { changeCount: 0, windowStart: null }; }
+  } catch {
+    return { changeCount: 0, windowStart: null };
+  }
 }
 
 async function resetDbChangeCountIfExpired(userId) {
   try {
     const { rows } = await pool.query(
       "SELECT pw_window_start, pw_change_count FROM users WHERE user_id = $1",
-      [userId]
+      [userId],
     );
     if (!rows[0]) return;
     const ws = rows[0].pw_window_start ? Number(rows[0].pw_window_start) : null;
     if (ws && Date.now() - ws >= PW_WINDOW_MS) {
       await pool.query(
         "UPDATE users SET pw_change_count = 0, pw_window_start = NULL WHERE user_id = $1",
-        [userId]
+        [userId],
       );
     }
   } catch {}
@@ -155,33 +167,39 @@ async function incrementDbChangeCount(userId) {
        SET pw_change_count  = pw_change_count + 1,
            pw_window_start  = COALESCE(pw_window_start, $2::BIGINT)
        WHERE user_id = $1`,
-      [userId, Date.now()]
+      [userId, Date.now()],
     );
-  } catch (e) { console.error("incrementDbChangeCount error:", e); }
+  } catch (e) {
+    console.error("incrementDbChangeCount error:", e);
+  }
 }
 
 function resetPwOtp(session) {
-  session.otp            = null;
+  session.otp = null;
   session.hashedPassword = null;
-  session.expiresAt      = null;
-  session.sentAt         = null;
-  session.attempts       = 0;
+  session.expiresAt = null;
+  session.sentAt = null;
+  session.attempts = 0;
 }
 
-
 class ProfileController {
-
   static async getProfile(req, res) {
     try {
       const userId = req.user.user_id;
       const profile = await User.getProfile(userId);
       if (!profile) {
-        return res.status(404).json({ success: false, message: "Profile not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Profile not found" });
       }
       res.json({ success: true, user: profile });
     } catch (error) {
       console.error("Get profile error:", error);
-      res.status(500).json({ success: false, message: "Failed to fetch profile", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch profile",
+        error: error.message,
+      });
     }
   }
 
@@ -190,14 +208,21 @@ class ProfileController {
       const { phone, excludeCurrent } = req.body;
       const userId = req.user.user_id;
       if (!phone) {
-        return res.status(400).json({ success: false, message: "Phone number is required" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Phone number is required" });
       }
       const excludeUserId = excludeCurrent ? userId : null;
-      const isAvailable = await User.checkPhoneAvailability(phone, excludeUserId);
+      const isAvailable = await User.checkPhoneAvailability(
+        phone,
+        excludeUserId,
+      );
       res.json({ available: isAvailable });
     } catch (error) {
       console.error("Check phone error:", error);
-      res.status(500).json({ success: false, message: "Error checking phone availability" });
+      res
+        .status(500)
+        .json({ success: false, message: "Error checking phone availability" });
     }
   }
 
@@ -205,20 +230,40 @@ class ProfileController {
     try {
       const userId = req.user.user_id;
       if (!req.file) {
-        return res.status(400).json({ success: false, message: "No image file provided" });
+        return res
+          .status(400)
+          .json({ success: false, message: "No image file provided" });
       }
       const result = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          { public_id: `${userId}`, overwrite: true, folder: "profiles", resource_type: "image" },
-          (error, result) => { if (error) reject(error); else resolve(result); }
-        ).end(req.file.buffer);
+        cloudinary.uploader
+          .upload_stream(
+            {
+              public_id: `${userId}`,
+              overwrite: true,
+              folder: "profiles",
+              resource_type: "image",
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            },
+          )
+          .end(req.file.buffer);
       });
       const profile_picture = result.secure_url;
       await User.updateProfilePicture(userId, profile_picture);
-      res.json({ success: true, message: "Profile picture updated successfully", profile_picture });
+      res.json({
+        success: true,
+        message: "Profile picture updated successfully",
+        profile_picture,
+      });
     } catch (error) {
       console.error("Upload profile picture error:", error);
-      res.status(500).json({ success: false, message: "Failed to upload profile picture", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Failed to upload profile picture",
+        error: error.message,
+      });
     }
   }
 
@@ -228,65 +273,108 @@ class ProfileController {
       const userId = req.user.user_id;
 
       if (String(userId) !== String(id)) {
-        return res.status(403).json({ success: false, message: "You can only update your own profile" });
+        return res.status(403).json({
+          success: false,
+          message: "You can only update your own profile",
+        });
       }
 
       const clean = (v) => (typeof v === "string" ? v.trim() : v) || null;
 
-      const first_name        = clean(req.body.first_name);
-      const last_name         = clean(req.body.last_name);
-      const middle_name       = clean(req.body.middle_name);
-      const suffix            = clean(req.body.suffix);
-      const gender            = clean(req.body.gender);
-      const phone             = clean(req.body.phone);
-      const alternate_phone   = clean(req.body.alternate_phone);
-      const region_code       = clean(req.body.region_code);
-      const province_code     = clean(req.body.province_code);
+      const first_name = clean(req.body.first_name);
+      const last_name = clean(req.body.last_name);
+      const middle_name = clean(req.body.middle_name);
+      const suffix = clean(req.body.suffix);
+      const gender = clean(req.body.gender);
+      const phone = clean(req.body.phone);
+      const alternate_phone = clean(req.body.alternate_phone);
+      const region_code = clean(req.body.region_code);
+      const province_code = clean(req.body.province_code);
       const municipality_code = clean(req.body.municipality_code);
-      const barangay_code     = clean(req.body.barangay_code);
-      const address_line      = clean(req.body.address_line);
+      const barangay_code = clean(req.body.barangay_code);
+      const address_line = clean(req.body.address_line);
 
-      const sessionVerifiedEmail = EmailVerificationController.getVerifiedEmail(req.user.user_id);
+      const sessionVerifiedEmail = EmailVerificationController.getVerifiedEmail(
+        req.user.user_id,
+      );
       const email = sessionVerifiedEmail || null;
 
       if (email) {
         const currentUser = await User.getUserById(userId);
         if (currentUser?.email) {
-          EmailVerificationController.setOldEmailForNotification(req.user.user_id, currentUser.email);
+          EmailVerificationController.setOldEmailForNotification(
+            req.user.user_id,
+            currentUser.email,
+          );
         }
       }
 
       const validation = ProfileValidator.validateProfileUpdate({
-        first_name, last_name, middle_name, suffix, gender,
-        phone, alternate_phone,
-        region_code, province_code, municipality_code, barangay_code, address_line,
+        first_name,
+        last_name,
+        middle_name,
+        suffix,
+        gender,
+        phone,
+        alternate_phone,
+        region_code,
+        province_code,
+        municipality_code,
+        barangay_code,
+        address_line,
       });
 
       if (!validation.isValid) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: validation.errors });
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validation.errors,
+        });
       }
 
       if (phone) {
         const phoneAvailable = await User.checkPhoneAvailability(phone, userId);
         if (!phoneAvailable) {
-          return res.status(400).json({ success: false, message: "Phone number is already registered to another user" });
+          return res.status(400).json({
+            success: false,
+            message: "Phone number is already registered to another user",
+          });
         }
       }
       if (alternate_phone) {
-        const altPhoneAvailable = await User.checkPhoneAvailability(alternate_phone, userId);
+        const altPhoneAvailable = await User.checkPhoneAvailability(
+          alternate_phone,
+          userId,
+        );
         if (!altPhoneAvailable) {
-          return res.status(400).json({ success: false, message: "Alternate phone number is already registered to another user" });
+          return res.status(400).json({
+            success: false,
+            message:
+              "Alternate phone number is already registered to another user",
+          });
         }
       }
 
       const updatedUser = await User.updateProfile(userId, {
-        first_name, last_name, middle_name, suffix, gender,
-        phone, alternate_phone, email,
-        region_code, province_code, municipality_code, barangay_code, address_line,
+        first_name,
+        last_name,
+        middle_name,
+        suffix,
+        gender,
+        phone,
+        alternate_phone,
+        email,
+        region_code,
+        province_code,
+        municipality_code,
+        barangay_code,
+        address_line,
       });
 
       if (!updatedUser) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       if (email) {
@@ -294,16 +382,38 @@ class ProfileController {
       }
 
       const freshProfile = await User.getProfile(userId);
-      res.json({ success: true, message: "Profile updated successfully", user: freshProfile });
-
+      await logAudit({
+        userId: req.user?.user_id,
+        username: req.user?.username,
+        eventName: email ? "Profile & Email Updated" : "Profile Updated",
+        description: email
+          ? `Updated profile and changed email to ${email}`
+          : `Updated profile`,
+        action: "UPDATE",
+        status: "success",
+        source: "Web Portal",
+        ipAddress: getClientIp(req),
+      });
+      res.json({
+        success: true,
+        message: "Profile updated successfully",
+        user: freshProfile,
+      });
     } catch (error) {
       console.error("Update profile error:", error);
       if (error.code === "23505") {
         if (error.constraint && error.constraint.includes("phone")) {
-          return res.status(400).json({ success: false, message: "Phone number is already registered to another user" });
+          return res.status(400).json({
+            success: false,
+            message: "Phone number is already registered to another user",
+          });
         }
       }
-      res.status(500).json({ success: false, message: "Failed to update profile", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Failed to update profile",
+        error: error.message,
+      });
     }
   }
 
@@ -315,50 +425,114 @@ class ProfileController {
       newPassword = newPassword?.trim();
       confirmPassword = confirmPassword?.trim();
 
-      const validation = ProfileValidator.validatePasswordChange({ currentPassword, newPassword, confirmPassword });
+      const validation = ProfileValidator.validatePasswordChange({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
       if (!validation.isValid) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: validation.errors });
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validation.errors,
+        });
       }
 
       const user = await User.getUserById(userId);
-      if (!user) return res.status(404).json({ success: false, message: "User not found" });
-      if (user.status === "deactivated") return res.status(403).json({ success: false, message: "Account is deactivated" });
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      if (user.status === "deactivated")
+        return res
+          .status(403)
+          .json({ success: false, message: "Account is deactivated" });
 
-      const validPassword = await bcrypt.compare(currentPassword, user.password);
-      if (!validPassword) return res.status(401).json({ success: false, message: "Current password is incorrect" });
+      const validPassword = await bcrypt.compare(
+        currentPassword,
+        user.password,
+      );
+      if (!validPassword)
+        return res
+          .status(401)
+          .json({ success: false, message: "Current password is incorrect" });
 
       const isSamePassword = await bcrypt.compare(newPassword, user.password);
-      if (isSamePassword) return res.status(400).json({ success: false, message: "New password cannot be the same as the current password" });
+      if (isSamePassword)
+        return res.status(400).json({
+          success: false,
+          message: "New password cannot be the same as the current password",
+        });
 
       const hashedPassword = await bcrypt.hash(newPassword, 12);
       await User.updatePassword(userId, hashedPassword);
       await tokenManager.revokeAllUserTokens(userId);
 
-      res.json({ success: true, message: "Password changed successfully. Please login again with your new password." });
+      res.json({
+        success: true,
+        message:
+          "Password changed successfully. Please login again with your new password.",
+      });
     } catch (error) {
       console.error("Change password error:", error);
-      res.status(500).json({ success: false, message: "Failed to change password", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Failed to change password",
+        error: error.message,
+      });
     }
   }
 
   static async uploadProfilePictureForUser(req, res) {
     try {
       const { userId } = req.params;
-      if (!req.file) return res.status(400).json({ success: false, message: "No image file provided" });
+      if (!req.file)
+        return res
+          .status(400)
+          .json({ success: false, message: "No image file provided" });
 
       const result = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream(
-          { public_id: `${userId}`, overwrite: true, folder: "profiles", resource_type: "image" },
-          (error, result) => { if (error) reject(error); else resolve(result); }
-        ).end(req.file.buffer);
+        cloudinary.uploader
+          .upload_stream(
+            {
+              public_id: `${userId}`,
+              overwrite: true,
+              folder: "profiles",
+              resource_type: "image",
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            },
+          )
+          .end(req.file.buffer);
       });
 
       const profile_picture = result.secure_url;
       await User.updateProfilePicture(userId, profile_picture);
-      res.json({ success: true, message: "Profile picture updated successfully", profile_picture });
+      await logAudit({
+        userId: req.user?.user_id,
+        username: req.user?.username,
+        eventName: "Profile Image Changed",
+        description: `Updated profile picture for user ID ${userId}`,
+        action: "UPDATE",
+        status: "success",
+        source: "Web Portal",
+        ipAddress: getClientIp(req),
+      });
+
+      res.json({
+        success: true,
+        message: "Profile picture updated successfully",
+        profile_picture,
+      });
     } catch (error) {
       console.error("Upload profile picture for user error:", error);
-      res.status(500).json({ success: false, message: "Failed to upload profile picture", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Failed to upload profile picture",
+        error: error.message,
+      });
     }
   }
 
@@ -378,7 +552,7 @@ class ProfileController {
 
       if (windowStart && Date.now() - windowStart < PW_WINDOW_MS) {
         if (changeCount >= PW_MAX_CHANGES) {
-          const msLeft    = PW_WINDOW_MS - (Date.now() - windowStart);
+          const msLeft = PW_WINDOW_MS - (Date.now() - windowStart);
           const hoursLeft = Math.ceil(msLeft / 3_600_000);
           return res.json({ blocked: true, hoursLeft, msLeft });
         }
@@ -394,8 +568,13 @@ class ProfileController {
       }
 
       const attemptSession = getPwCurrentAttemptSession(userId);
-      if (attemptSession.lockedUntil && Date.now() < attemptSession.lockedUntil) {
-        const minsLeft = Math.ceil((attemptSession.lockedUntil - Date.now()) / 60_000);
+      if (
+        attemptSession.lockedUntil &&
+        Date.now() < attemptSession.lockedUntil
+      ) {
+        const minsLeft = Math.ceil(
+          (attemptSession.lockedUntil - Date.now()) / 60_000,
+        );
         return res.json({ blocked: false, pwLocked: true, minsLeft });
       }
 
@@ -409,7 +588,7 @@ class ProfileController {
   // POST /users/password/force-lock
   static async forcePasswordLock(req, res) {
     try {
-      const userId  = String(req.user.user_id);
+      const userId = String(req.user.user_id);
       const session = getPwSession(userId);
 
       if (session.resendCount >= PW_MAX_RESENDS) {
@@ -431,7 +610,9 @@ class ProfileController {
       const currentPassword = (req.body.currentPassword || "").trim();
 
       if (!currentPassword) {
-        return res.status(400).json({ success: false, message: "Current password is required" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Current password is required" });
       }
 
       const session = getPwSession(userId);
@@ -440,15 +621,19 @@ class ProfileController {
 
       // FIX: Check DB-backed change count (survives server restarts)
       await resetDbChangeCountIfExpired(userId);
-      const { changeCount: dbCount, windowStart: dbWindowStart } = await getDbChangeCount(userId);
+      const { changeCount: dbCount, windowStart: dbWindowStart } =
+        await getDbChangeCount(userId);
       if (dbWindowStart && Date.now() - dbWindowStart < PW_WINDOW_MS) {
         if (dbCount >= PW_MAX_CHANGES) {
-          const msLeft    = PW_WINDOW_MS - (Date.now() - dbWindowStart);
+          const msLeft = PW_WINDOW_MS - (Date.now() - dbWindowStart);
           const hoursLeft = Math.ceil(msLeft / 3_600_000);
           return res.status(429).json({
-            success: false, blocked: true, rateLimited: true,
+            success: false,
+            blocked: true,
+            rateLimited: true,
             message: `You've already changed your password twice today. You can update it again after 24 hours.`,
-            hoursLeft, msLeft,
+            hoursLeft,
+            msLeft,
           });
         }
       }
@@ -456,8 +641,14 @@ class ProfileController {
       const attemptSession = getPwCurrentAttemptSession(userId);
 
       const user = await User.getUserById(userId);
-      if (!user) return res.status(404).json({ success: false, message: "User not found" });
-      if (user.status === "deactivated") return res.status(403).json({ success: false, message: "Account is deactivated" });
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      if (user.status === "deactivated")
+        return res
+          .status(403)
+          .json({ success: false, message: "Account is deactivated" });
 
       const valid = await bcrypt.compare(currentPassword, user.password);
       if (!valid) {
@@ -466,10 +657,12 @@ class ProfileController {
 
         if (attemptsLeft <= 0) {
           attemptSession.lockedUntil = Date.now() + PW_CURRENT_LOCKOUT_MS;
-          attemptSession.attempts    = 0;
+          attemptSession.attempts = 0;
           return res.status(401).json({
-            success: false, locked: true,
-            message: "Too many incorrect attempts. Your account is locked for 15 minutes.",
+            success: false,
+            locked: true,
+            message:
+              "Too many incorrect attempts. Your account is locked for 15 minutes.",
             attemptsLeft: 0,
             minutesLeft: 15,
           });
@@ -482,12 +675,14 @@ class ProfileController {
         });
       }
 
-      attemptSession.attempts    = 0;
+      attemptSession.attempts = 0;
       attemptSession.lockedUntil = null;
       res.json({ success: true });
     } catch (err) {
       console.error("verifyCurrentPassword error:", err);
-      res.status(500).json({ success: false, message: "Server error. Please try again." });
+      res
+        .status(500)
+        .json({ success: false, message: "Server error. Please try again." });
     }
   }
 
@@ -496,7 +691,7 @@ class ProfileController {
       const userId = req.user.user_id;
       let { currentPassword, newPassword, confirmPassword } = req.body;
       currentPassword = currentPassword?.trim();
-      newPassword     = newPassword?.trim();
+      newPassword = newPassword?.trim();
       confirmPassword = confirmPassword?.trim();
 
       const session = getPwSession(userId);
@@ -505,15 +700,19 @@ class ProfileController {
 
       // FIX: Use DB-backed 24h rate limit (survives server restarts)
       await resetDbChangeCountIfExpired(userId);
-      const { changeCount: dbCount, windowStart: dbWindowStart } = await getDbChangeCount(userId);
+      const { changeCount: dbCount, windowStart: dbWindowStart } =
+        await getDbChangeCount(userId);
       if (dbWindowStart && Date.now() - dbWindowStart < PW_WINDOW_MS) {
         if (dbCount >= PW_MAX_CHANGES) {
-          const msLeft    = PW_WINDOW_MS - (Date.now() - dbWindowStart);
+          const msLeft = PW_WINDOW_MS - (Date.now() - dbWindowStart);
           const hoursLeft = Math.ceil(msLeft / 3_600_000);
           return res.status(429).json({
-            success: false, blocked: true, rateLimited: true,
+            success: false,
+            blocked: true,
+            rateLimited: true,
             message: `You've already changed your password twice today. You can update it again after 24 hours.`,
-            hoursLeft, msLeft,
+            hoursLeft,
+            msLeft,
           });
         }
       }
@@ -522,7 +721,8 @@ class ProfileController {
       if (session.lockedUntil && Date.now() < session.lockedUntil) {
         const minsLeft = Math.ceil((session.lockedUntil - Date.now()) / 60_000);
         return res.status(429).json({
-          success: false, sessionLocked: true,
+          success: false,
+          sessionLocked: true,
           message: `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`,
           minutesLeft: minsLeft,
         });
@@ -533,19 +733,24 @@ class ProfileController {
         const lockUntil = Date.now() + PW_OTP_LOCKOUT_MS;
         setPwLock(userId, lockUntil);
         return res.status(429).json({
-          success: false, sessionLocked: true,
+          success: false,
+          sessionLocked: true,
           message: `Maximum codes sent. For security, this process is locked for 15 minutes.`,
           minutesLeft: 15,
         });
       }
 
       // Sliding window rate-limit
-      if (session.resendWindowStart && Date.now() - session.resendWindowStart < PW_RESEND_WINDOW_MS) {
+      if (
+        session.resendWindowStart &&
+        Date.now() - session.resendWindowStart < PW_RESEND_WINDOW_MS
+      ) {
         if (session.resendWindowCount >= PW_MAX_RESENDS) {
           const lockUntil = Date.now() + PW_OTP_LOCKOUT_MS;
           setPwLock(userId, lockUntil);
           return res.status(429).json({
-            success: false, sessionLocked: true,
+            success: false,
+            sessionLocked: true,
             message: `Maximum codes sent. For security, this process is locked for 15 minutes.`,
             minutesLeft: 15,
           });
@@ -556,50 +761,89 @@ class ProfileController {
       }
 
       const user = await User.getUserById(userId);
-      if (!user) return res.status(404).json({ success: false, message: "User not found" });
-      if (user.status === "deactivated") return res.status(403).json({ success: false, message: "Account is deactivated" });
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      if (user.status === "deactivated")
+        return res
+          .status(403)
+          .json({ success: false, message: "Account is deactivated" });
 
-      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      const validPassword = await bcrypt.compare(
+        currentPassword,
+        user.password,
+      );
       if (!validPassword) {
-        return res.status(401).json({ success: false, message: "Current password is incorrect. Please go back and re-enter it." });
+        return res.status(401).json({
+          success: false,
+          message:
+            "Current password is incorrect. Please go back and re-enter it.",
+        });
       }
 
-      const validation = ProfileValidator.validatePasswordChange({ currentPassword, newPassword, confirmPassword });
+      const validation = ProfileValidator.validatePasswordChange({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
       if (!validation.isValid) {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: validation.errors });
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: validation.errors,
+        });
       }
 
       const isSame = await bcrypt.compare(newPassword, user.password);
-      if (isSame) return res.status(400).json({ success: false, message: "New password cannot be the same as current password" });
+      if (isSame)
+        return res.status(400).json({
+          success: false,
+          message: "New password cannot be the same as current password",
+        });
 
-      const profileRow = await pool.query("SELECT email, first_name FROM users WHERE user_id = $1", [userId]);
+      const profileRow = await pool.query(
+        "SELECT email, first_name FROM users WHERE user_id = $1",
+        [userId],
+      );
       const { email, first_name } = profileRow.rows[0] || {};
-      if (!email) return res.status(400).json({ success: false, message: "No email address on file" });
+      if (!email)
+        return res
+          .status(400)
+          .json({ success: false, message: "No email address on file" });
 
-      const otp            = crypto.randomInt(100000, 999999).toString();
+      const otp = crypto.randomInt(100000, 999999).toString();
       const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-      session.otp               = otp;
-      session.hashedPassword    = hashedPassword;
-      session.expiresAt         = Date.now() + PW_OTP_EXPIRY;
-      session.sentAt            = Date.now();
-      session.attempts          = 0;
-      session.resendCount      += 1;
+      session.otp = otp;
+      session.hashedPassword = hashedPassword;
+      session.expiresAt = Date.now() + PW_OTP_EXPIRY;
+      session.sentAt = Date.now();
+      session.attempts = 0;
+      session.resendCount += 1;
       session.resendWindowCount += 1;
 
-      const result = await sendPasswordOtpEmail(email, first_name || "User", otp);
+      const result = await sendPasswordOtpEmail(
+        email,
+        first_name || "User",
+        otp,
+      );
       if (!result.success) {
-        session.resendCount      -= 1;
+        session.resendCount -= 1;
         session.resendWindowCount -= 1;
-        return res.status(500).json({ success: false, message: "Failed to send verification code. Please try again." });
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send verification code. Please try again.",
+        });
       }
 
-      const at     = email.indexOf("@");
-      const local  = email.slice(0, at);
+      const at = email.indexOf("@");
+      const local = email.slice(0, at);
       const domain = email.slice(at);
-      const masked = local.length <= 2
-        ? local[0] + "*" + domain
-        : local[0] + "*".repeat(local.length - 3) + local.slice(-2) + domain;
+      const masked =
+        local.length <= 2
+          ? local[0] + "*" + domain
+          : local[0] + "*".repeat(local.length - 3) + local.slice(-2) + domain;
 
       res.json({
         success: true,
@@ -609,15 +853,19 @@ class ProfileController {
       });
     } catch (error) {
       console.error("requestPasswordOtp error:", error);
-      res.status(500).json({ success: false, message: "Server error. Please try again.", detail: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Server error. Please try again.",
+        detail: error.message,
+      });
     }
   }
 
   static async changePasswordWithOtp(req, res) {
     try {
-      const userId    = req.user.user_id;
+      const userId = req.user.user_id;
       const submitted = (req.body.otp || "").trim();
-      const session   = getPwSession(userId);
+      const session = getPwSession(userId);
 
       // Reset counters if lock expired before checking
       resetExpiredPwLock(userId, session);
@@ -625,17 +873,24 @@ class ProfileController {
       if (session.lockedUntil && Date.now() < session.lockedUntil) {
         const minsLeft = Math.ceil((session.lockedUntil - Date.now()) / 60_000);
         return res.status(429).json({
-          success: false, locked: true,
+          success: false,
+          locked: true,
           message: `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`,
         });
       }
 
       if (!session.otp) {
-        return res.status(400).json({ success: false, message: "No pending verification. Please start over." });
+        return res.status(400).json({
+          success: false,
+          message: "No pending verification. Please start over.",
+        });
       }
       if (Date.now() > session.expiresAt) {
         resetPwOtp(session);
-        return res.status(400).json({ success: false, message: "Code expired. Please request a new one." });
+        return res.status(400).json({
+          success: false,
+          message: "Code expired. Please request a new one.",
+        });
       }
 
       session.attempts += 1;
@@ -651,14 +906,18 @@ class ProfileController {
             const lockUntil = Date.now() + PW_OTP_LOCKOUT_MS;
             setPwLock(userId, lockUntil);
             return res.status(429).json({
-              success: false, sessionLocked: true, autoClose: true,
-              message: "Too many incorrect attempts and no resends remaining. Please try again in 15 minutes.",
+              success: false,
+              sessionLocked: true,
+              autoClose: true,
+              message:
+                "Too many incorrect attempts and no resends remaining. Please try again in 15 minutes.",
               minutesLeft: 15,
             });
           }
 
           return res.status(400).json({
-            success: false, forceResend: true,
+            success: false,
+            forceResend: true,
             message: "Too many incorrect attempts. Please request a new code.",
             resendsLeft: PW_MAX_RESENDS - session.resendCount,
           });
@@ -678,7 +937,7 @@ class ProfileController {
       // FIX: Persist change count to DB so the 24h limit survives server restarts
       await incrementDbChangeCount(userId);
 
-      session.resendCount       = 0;
+      session.resendCount = 0;
       session.resendWindowCount = 0;
       session.resendWindowStart = null;
 
@@ -686,26 +945,44 @@ class ProfileController {
       setPwLock(userId, null);
 
       const attemptSession = getPwCurrentAttemptSession(userId);
-      attemptSession.attempts    = 0;
+      attemptSession.attempts = 0;
       attemptSession.lockedUntil = null;
 
       await User.updatePassword(userId, hashedPassword);
       await User.updatePasswordChangedAt(userId);
       await tokenManager.revokeAllUserTokens(userId);
 
-      const profileRow = await pool.query("SELECT email, first_name FROM users WHERE user_id = $1", [userId]);
+      const profileRow = await pool.query(
+        "SELECT email, first_name FROM users WHERE user_id = $1",
+        [userId],
+      );
       const { email, first_name } = profileRow.rows[0] || {};
       if (email) sendPasswordChangedNotification(email, first_name || "User");
 
       const { changeCount: newCount } = await getDbChangeCount(userId);
+      await logAudit({
+        userId: req.user?.user_id,
+        username: req.user?.username,
+        eventName: "Password Changed",
+        description: "Password changed via OTP verification",
+        action: "UPDATE",
+        status: "success",
+        source: "Web Portal",
+        ipAddress: getClientIp(req),
+      });
       res.json({
         success: true,
-        message: "Password changed successfully! Please login with your new password.",
+        message:
+          "Password changed successfully! Please login with your new password.",
         changesLeft: Math.max(0, PW_MAX_CHANGES - newCount),
       });
     } catch (error) {
       console.error("changePasswordWithOtp error:", error);
-      res.status(500).json({ success: false, message: "Server error. Please try again.", detail: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Server error. Please try again.",
+        detail: error.message,
+      });
     }
   }
 }
