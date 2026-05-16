@@ -50,6 +50,7 @@ app.use("/ai-assessment", require("./features/ai-assessment/routes/assessment.ro
 app.use("/residents", require("./features/residents/routes/residentRoutes"));
 
 app.use("/audit-log", require("./features/audit/routes/auditRoutes"));
+app.use("/notifications", require("./features/notifications/notificationRoutes"));
 
 
 // ── 5. Static uploads ─────────────────────────────────────────────────────────

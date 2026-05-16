@@ -5,6 +5,7 @@
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
 const { getBarangayOptimized } = require("../../../shared/utils/geoUtils");
+const { createNotification, notifyAllByRole } = require("../../notifications/notificationService");
 // ── Helper: generate date range ────────────────────────────
 
 const formatDateOnly = (d) => {
@@ -603,6 +604,27 @@ const createPatrol = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+    const patrollerIds = [
+  ...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])]),
+];
+const officerResult = await pool.query(
+  `SELECT ap.officer_id FROM active_patroller ap
+   WHERE ap.active_patroller_id = ANY($1::int[])`,
+  [patrollerIds]
+);
+await Promise.all(
+  officerResult.rows.map((row) =>
+    createNotification({
+      recipientId: row.officer_id,
+      senderId: req.user.user_id,
+      senderName: req.user.username,
+      type: "PATROL_ASSIGNED",
+      title: "New Patrol Assignment",
+      message: `You have been assigned to patrol "${patrol_name}" (${start_date} – ${end_date})`,
+      linkTo: "/patrol-scheduling",
+    })
+  )
+);
     res.json({ success: true, message: "Patrol created successfully." });
   } catch (error) {
     await client.query("ROLLBACK");

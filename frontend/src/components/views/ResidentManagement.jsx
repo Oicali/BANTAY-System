@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import "./ResidentManagement.css";
 import ImportResidentModal from "../modals/ImportResidentModal";
 import LoadingModal from "../modals/LoadingModal";
-
+import EditResidentModal from "../modals/EditResidentModal";
 const API_URL = `${import.meta.env.VITE_API_URL}/residents`;
 const ITEMS_PER_PAGE = 15;
 
@@ -104,12 +104,23 @@ function ResidentManagement() {
     id: null,
     name: "",
   });
+  const [editResident, setEditResident] = useState(null);
   const [toast, setToast] = useState({
     show: false,
     message: "",
     type: "success",
   });
-
+  const [filterGender, setFilterGender] = useState("");
+  const [filterCivilStatus, setFilterCivilStatus] = useState("");
+  const [filterVoterStatus, setFilterVoterStatus] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState({
+    gender: "",
+    civilStatus: "",
+    voterStatus: "",
+  });
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [removedResidents, setRemovedResidents] = useState([]);
+  const [loadingRemoved, setLoadingRemoved] = useState(false);
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(
@@ -146,12 +157,35 @@ function ResidentManagement() {
       })
       .catch(() => {});
   }, []);
+  const fetchRemovedResidents = useCallback(async () => {
+    setLoadingRemoved(true);
+    try {
+      const res = await fetch(`${API_URL}/removed`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await res.json();
+      if (data.success) setRemovedResidents(data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingRemoved(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    if (showRemoved) fetchRemovedResidents();
+  }, [showRemoved, fetchRemovedResidents]);
   const fetchResidents = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (debouncedSearch) params.append("q", debouncedSearch);
+      if (appliedFilters.gender) params.append("gender", appliedFilters.gender);
+      if (appliedFilters.civilStatus)
+        params.append("civil_status", appliedFilters.civilStatus);
+      if (appliedFilters.voterStatus)
+        params.append("voter_status", appliedFilters.voterStatus);
+
       const res = await fetch(`${API_URL}?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
@@ -165,7 +199,23 @@ function ResidentManagement() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, appliedFilters]);
+  const handleRestore = async (id, name) => {
+    try {
+      const res = await fetch(`${API_URL}/${id}/restore`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`${name} has been restored.`);
+        fetchRemovedResidents();
+        fetchResidents();
+      }
+    } catch (err) {
+      showToast("Failed to restore resident.", "error");
+    }
+  };
 
   useEffect(() => {
     fetchResidents();
@@ -213,6 +263,31 @@ function ResidentManagement() {
           </div>
         </div>
         <div className="rm-page-header-right">
+          <button
+            className="rm-btn rm-btn-secondary"
+            style={
+              showRemoved
+                ? { background: "rgba(220,38,38,0.2)", borderColor: "#dc2626" }
+                : {}
+            }
+            onClick={() => setShowRemoved((v) => !v)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+            {showRemoved ? "Hide Removed" : "Show Removed"}
+          </button>
           <button
             className="rm-btn rm-btn-secondary"
             onClick={() => setShowImport(true)}
@@ -351,7 +426,7 @@ function ResidentManagement() {
             display: "flex",
             alignItems: "center",
             gap: "8px",
-            marginBottom: "8px",
+            marginBottom: "12px",
           }}
         >
           <svg
@@ -382,10 +457,71 @@ function ResidentManagement() {
               </button>
             )}
           </div>
+
+          <select
+            className="rm-filter-select"
+            value={filterGender}
+            onChange={(e) => setFilterGender(e.target.value)}
+          >
+            <option value="">All Genders</option>
+            <option>Male</option>
+            <option>Female</option>
+          </select>
+
+          <select
+            className="rm-filter-select"
+            value={filterCivilStatus}
+            onChange={(e) => setFilterCivilStatus(e.target.value)}
+          >
+            <option value="">All Civil Status</option>
+            <option>Single</option>
+            <option>Married</option>
+            <option>Widowed</option>
+            <option>Separated</option>
+            <option>Annulled</option>
+          </select>
+
+          <select
+            className="rm-filter-select"
+            value={filterVoterStatus}
+            onChange={(e) => setFilterVoterStatus(e.target.value)}
+          >
+            <option value="">All Voter Status</option>
+            <option>Registered</option>
+            <option>Not Registered</option>
+          </select>
+
+          <button
+            className="rm-btn"
+            style={{
+              background: "#1e3a5f",
+              color: "white",
+              padding: "8px 16px",
+            }}
+            onClick={() =>
+              setAppliedFilters({
+                gender: filterGender,
+                civilStatus: filterCivilStatus,
+                voterStatus: filterVoterStatus,
+              })
+            }
+          >
+            Apply Filters
+          </button>
+
           <button
             className="rm-btn rm-btn-clear"
-            onClick={() => setSearch("")}
-            title="Clear"
+            onClick={() => {
+              setSearch("");
+              setFilterGender("");
+              setFilterCivilStatus("");
+              setFilterVoterStatus("");
+              setAppliedFilters({
+                gender: "",
+                civilStatus: "",
+                voterStatus: "",
+              });
+            }}
           >
             <span style={{ fontSize: "16px" }}>↻</span>
           </button>
@@ -452,9 +588,26 @@ function ResidentManagement() {
                         <div className="rm-resident-cell">
                           <div
                             className="rm-avatar"
-                            style={{ background: avatarColor }}
+                            style={{
+                              background: r.profile_picture
+                                ? "transparent"
+                                : avatarColor,
+                            }}
                           >
-                            {getInitials(r.first_name, r.last_name)}
+                            {r.profile_picture ? (
+                              <img
+                                src={r.profile_picture}
+                                alt={r.first_name}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  borderRadius: "50%",
+                                }}
+                              />
+                            ) : (
+                              getInitials(r.first_name, r.last_name)
+                            )}
                           </div>
                           <div>
                             <div className="rm-resident-name">
@@ -507,7 +660,26 @@ function ResidentManagement() {
                           <span className="rm-na">—</span>
                         )}
                       </td>
-                      <td>
+                      <td style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="rm-action-btn rm-action-edit"
+                          onClick={() => setEditResident(r)}
+                        >
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                          Edit
+                        </button>
                         <button
                           className="rm-action-btn rm-action-danger"
                           onClick={() =>
@@ -560,7 +732,140 @@ function ResidentManagement() {
           </div>
         </div>
       </div>
-
+      {showRemoved && (
+        <div
+          className="rm-table-card"
+          style={{ marginTop: 20, borderTop: "3px solid #dc2626" }}
+        >
+          <div
+            style={{
+              padding: "14px 20px",
+              background: "#fef2f2",
+              borderBottom: "1px solid #fecaca",
+            }}
+          >
+            <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 13 }}>
+              🗑 Removed Residents — {removedResidents.length} record(s)
+            </span>
+            <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 8 }}>
+              These residents were soft-deleted. You can restore them.
+            </span>
+          </div>
+          <div className="rm-table-container">
+            <table className="rm-data-table">
+              <thead>
+                <tr>
+                  <th>Resident</th>
+                  <th>Gender</th>
+                  <th>Date of Birth</th>
+                  <th>Contact</th>
+                  <th>Address</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingRemoved ? (
+                  <tr>
+                    <td
+                      colSpan="6"
+                      style={{
+                        textAlign: "center",
+                        padding: 24,
+                        color: "#9ca3af",
+                      }}
+                    >
+                      Loading...
+                    </td>
+                  </tr>
+                ) : removedResidents.length === 0 ? (
+                  <tr>
+                    <td colSpan="6">
+                      <div className="rm-empty-state">
+                        <div className="rm-empty-title">
+                          No removed residents
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  removedResidents.map((r) => {
+                    const fullName = `${r.first_name} ${r.last_name}`;
+                    return (
+                      <tr key={r.resident_id} style={{ opacity: 0.75 }}>
+                        <td>
+                          <div className="rm-resident-cell">
+                            <div
+                              className="rm-avatar"
+                              style={{
+                                background: r.profile_picture
+                                  ? "transparent"
+                                  : avatarColor,
+                              }}
+                            >
+                              {r.profile_picture ? (
+                                <img
+                                  src={r.profile_picture}
+                                  alt={r.first_name}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                  }}
+                                />
+                              ) : (
+                                getInitials(r.first_name, r.last_name)
+                              )}
+                            </div>
+                            <div className="rm-resident-name">
+                              {r.last_name}, {r.first_name}
+                              {r.middle_name ? ` ${r.middle_name[0]}.` : ""}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{r.gender || <span className="rm-na">—</span>}</td>
+                        <td style={{ fontSize: 13, color: "#6b7280" }}>
+                          {formatDate(r.date_of_birth)}
+                        </td>
+                        <td style={{ fontSize: 13 }}>
+                          {r.contact_number || <span className="rm-na">—</span>}
+                        </td>
+                        <td style={{ fontSize: 13, color: "#6b7280" }}>
+                          {r.house_street || <span className="rm-na">—</span>}
+                        </td>
+                        <td>
+                          <button
+                            className="rm-action-btn"
+                            style={{ background: "#d1fae5", color: "#065f46" }}
+                            onClick={() =>
+                              handleRestore(r.resident_id, fullName)
+                            }
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="1 4 1 10 7 10" />
+                              <path d="M3.51 15a9 9 0 1 0 .49-3.36" />
+                            </svg>
+                            Restore
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {/* ── IMPORT MODAL ── */}
       {showImport && (
         <ImportResidentModal
@@ -621,7 +926,17 @@ function ResidentManagement() {
           </div>
         </div>
       )}
-
+      {editResident && (
+        <EditResidentModal
+          resident={editResident}
+          onClose={() => setEditResident(null)}
+          onSuccess={() => {
+            fetchResidents();
+            setEditResident(null);
+            showToast("Resident updated successfully!");
+          }}
+        />
+      )}
       {/* ── TOAST ── */}
       {toast.show && (
         <div

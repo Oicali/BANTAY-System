@@ -153,27 +153,6 @@ function ImportResidentModal({ onClose, onSuccess }) {
             <div className="im-body">
               {!result ? (
                 <>
-                  {/* Template download hint */}
-                  <div
-                    style={{
-                      background: "#eff6ff",
-                      border: "1px solid #bfdbfe",
-                      borderRadius: "8px",
-                      padding: "10px 14px",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      fontSize: "13px",
-                      color: "#1e40af",
-                    }}
-                  >
-                    <span>
-                      <strong>Required columns:</strong> FIRST_NAME, LAST_NAME
-                      (others optional)
-                    </span>
-                  </div>
-
                   <div
                     className={`im-dropzone ${dragOver ? "dragover" : ""} ${file ? "has-file" : ""}`}
                     onDragOver={(e) => {

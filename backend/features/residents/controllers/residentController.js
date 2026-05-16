@@ -1,7 +1,7 @@
 const pool = require("../../../config/database");
 const xlsx = require("xlsx");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-
+const cloudinary = require("../../../config/cloudinary");
 // helper — get barangay_code of logged-in user
 const getUserBarangayCode = async (userId) => {
   const result = await pool.query(
@@ -25,9 +25,21 @@ const getResidents = async (req, res) => {
     const params = [barangayCode];
 
     if (q) {
-      query += ` AND (first_name ILIKE $2 OR last_name ILIKE $2 OR middle_name ILIKE $2)`;
-      params.push(`%${q}%`);
-    }
+  query += ` AND (first_name ILIKE $${params.length+1} OR last_name ILIKE $${params.length+1} OR middle_name ILIKE $${params.length+1})`;
+  params.push(`%${q}%`);
+}
+if (req.query.gender) {
+  query += ` AND LOWER(gender) = LOWER($${params.length+1})`;
+  params.push(req.query.gender);
+}
+if (req.query.civil_status) {
+  query += ` AND LOWER(civil_status) = LOWER($${params.length+1})`;
+  params.push(req.query.civil_status);
+}
+if (req.query.voter_status) {
+  query += ` AND LOWER(voter_status) = LOWER($${params.length+1})`;
+  params.push(req.query.voter_status);
+}
 
     query += ` ORDER BY last_name ASC, first_name ASC`;
     const result = await pool.query(query, params);
@@ -141,7 +153,79 @@ const importResidents = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+// GET /api/residents/:id
+const getResidentById = async (req, res) => {
+  try {
+    const barangayCode = await getUserBarangayCode(req.user.user_id);
+    const result = await pool.query(
+      `SELECT * FROM barangay_residents WHERE resident_id = $1 AND barangay_code = $2 AND is_active = true`,
+      [req.params.id, barangayCode]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, message: "Resident not found" });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
+// PUT /api/residents/:id
+const updateResident = async (req, res) => {
+  try {
+    const barangayCode = await getUserBarangayCode(req.user.user_id);
+    const {
+      first_name, middle_name, last_name, qualifier,
+      gender, date_of_birth, contact_number,
+      house_street, civil_status, voter_status
+    } = req.body;
+
+    // Validation
+    if (!first_name?.trim() || !last_name?.trim())
+      return res.status(400).json({ success: false, message: "First name and last name are required" });
+
+    if (contact_number && !/^09\d{9}$/.test(contact_number.trim()))
+      return res.status(400).json({ success: false, message: "Contact number must be 09XXXXXXXXX format" });
+
+    let profile_picture = undefined;
+
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          { public_id: `resident_${req.params.id}`, overwrite: true, folder: "residents", resource_type: "image" },
+          (error, result) => { if (error) reject(error); else resolve(result); }
+        ).end(req.file.buffer);
+      });
+      profile_picture = result.secure_url;
+    }
+
+    const setPic = profile_picture !== undefined ? `, profile_picture = '${profile_picture}'` : "";
+
+    await pool.query(
+      `UPDATE barangay_residents SET
+        first_name = $1, middle_name = $2, last_name = $3, qualifier = $4,
+        gender = $5, date_of_birth = $6, contact_number = $7,
+        house_street = $8, civil_status = $9, voter_status = $10
+        ${setPic}
+       WHERE resident_id = $11 AND barangay_code = $12`,
+      [
+        first_name.trim(), middle_name?.trim() || null, last_name.trim(), qualifier?.trim() || null,
+        gender || null, date_of_birth || null, contact_number?.trim() || null,
+        house_street?.trim() || null, civil_status || null, voter_status || null,
+        req.params.id, barangayCode
+      ]
+    );
+
+    await logAudit({
+      userId: req.user?.user_id, username: req.user?.username,
+      eventName: "Resident Updated", description: `Updated resident ID ${req.params.id}`,
+      action: "UPDATE", status: "success", source: "Web Portal", ipAddress: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Resident updated", profile_picture });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 // DELETE /api/residents/:id
 const deleteResident = async (req, res) => {
   try {
@@ -167,4 +251,45 @@ const deleteResident = async (req, res) => {
   }
 };
 
-module.exports = { getResidents, importResidents, deleteResident };
+// GET /api/residents/removed
+const getRemovedResidents = async (req, res) => {
+  try {
+    const barangayCode = await getUserBarangayCode(req.user.user_id);
+    if (!barangayCode)
+      return res.status(403).json({ success: false, message: "No barangay assigned" });
+
+    const result = await pool.query(
+      `SELECT * FROM barangay_residents 
+       WHERE barangay_code = $1 AND is_active = false
+       ORDER BY last_name ASC, first_name ASC`,
+      [barangayCode]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// PUT /api/residents/:id/restore
+const restoreResident = async (req, res) => {
+  try {
+    const barangayCode = await getUserBarangayCode(req.user.user_id);
+    await pool.query(
+      `UPDATE barangay_residents SET is_active = true 
+       WHERE resident_id = $1 AND barangay_code = $2`,
+      [req.params.id, barangayCode]
+    );
+    await logAudit({
+      userId: req.user?.user_id, username: req.user?.username,
+      eventName: "Resident Restored",
+      description: `Restored resident ID ${req.params.id}`,
+      action: "UPDATE", status: "success", source: "Web Portal", ipAddress: getClientIp(req),
+    });
+    res.json({ success: true, message: "Resident restored" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Update module.exports:
+module.exports = { getResidents, importResidents, deleteResident, getResidentById, updateResident, getRemovedResidents, restoreResident };

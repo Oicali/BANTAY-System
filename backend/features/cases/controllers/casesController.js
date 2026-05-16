@@ -2,7 +2,7 @@
 
 const pool = require("../../../config/database");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-
+const { createNotification, notifyAllByRole } = require("../../notifications/notificationService");
 // POST /cases — Admin only
 const createCase = async (req, res) => {
   try {
@@ -119,21 +119,21 @@ const assignInvestigator = async (req, res) => {
         [id],
       );
 
-      await logAudit({
-        userId: req.user?.user_id,
-        username: req.user?.username,
-        eventName: "Investigator Unassigned",
-        description: `Unassigned investigator from case ID ${id}`,
-        action: "UPDATE",
-        status: "success",
-        source: "Web Portal",
-        ipAddress: getClientIp(req),
-      });
-      return res.status(200).json({
-        success: true,
-        message: "Investigator unassigned successfully",
-        data: { ...result.rows[0], assigned_io_name: null },
-      });
+    await logAudit({
+  userId: req.user?.user_id,
+  username: req.user?.username,
+  eventName: "Investigator Unassigned",
+  description: `Unassigned investigator from case ID ${id}`,
+  action: "UPDATE",
+  status: "success",
+  source: "Web Portal",
+  ipAddress: getClientIp(req),
+});
+return res.status(200).json({
+  success: true,
+  message: "Investigator unassigned successfully",
+  data: { ...result.rows[0], assigned_io_name: null },
+});
     }
 
     const user = await pool.query(
@@ -172,6 +172,16 @@ const assignInvestigator = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+    console.log("Sending notif to:", assigned_io_id, "type:", typeof assigned_io_id);
+      await createNotification({
+      recipientId: assigned_io_id,
+      senderId: req.user.user_id,
+      senderName: req.user.username,
+      type: "CASE_ASSIGNED",
+      title: "Case Assigned to You",
+      message: `You have been assigned to case ${result.rows[0].case_number}`,
+      linkTo: "/case-management",
+    });
     return res.status(200).json({
       success: true,
       message: "Investigator assigned successfully",
@@ -180,6 +190,7 @@ const assignInvestigator = async (req, res) => {
         assigned_io_name: `${io.first_name} ${io.last_name}`,
       },
     });
+    
   } catch (error) {
     console.error("Assign investigator error:", error);
     res
@@ -242,6 +253,30 @@ const updateStatus = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+    // Notify the assigned investigator (only if someone is assigned)
+const assignedIoId = caseResult.rows[0].assigned_io_id;
+if (assignedIoId && assignedIoId !== req.user.user_id) {
+  await createNotification({
+    recipientId: assignedIoId,
+    senderId: req.user.user_id,
+    senderName: req.user.username,
+    type: "CASE_ASSIGNED",
+    title: "Case Status Updated",
+    message: `Case ${result.rows[0].case_number} status changed to "${status}"`,
+    linkTo: "/case-management",
+  });
+}
+// Notify admins only when investigator changes it (exclude self)
+if (req.user.role === "Investigator") {
+  await notifyAllByRole(["Administrator", "Technical Administrator"], {
+    senderId: req.user.user_id,
+    senderName: req.user.username,
+    type: "CASE_ASSIGNED",
+    title: "Case Status Updated",
+    message: `${req.user.username} updated case ${result.rows[0].case_number} to "${status}"`,
+    linkTo: "/case-management",
+  }, req.user.user_id);
+}
     return res.status(200).json({
       success: true,
       message: "Case status updated successfully",
@@ -504,7 +539,32 @@ const addNote = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+const theCase = caseResult.rows[0];
+const assignedIoId = theCase.assigned_io_id;
 
+// Notify investigator if someone else added the note
+if (assignedIoId && assignedIoId !== req.user.user_id) {
+  await createNotification({
+    recipientId: assignedIoId,
+    senderId: req.user.user_id,
+    senderName: req.user.username,
+    type: "CASE_ASSIGNED",
+    title: "New Note Added",
+    message: `${req.user.username} added a note to case ${theCase.case_number}`,
+    linkTo: "/case-management",
+  });
+}
+// Notify admins if investigator added the note
+if (req.user.role === "Investigator") {
+  await notifyAllByRole(["Administrator", "Technical Administrator"], {
+    senderId: req.user.user_id,
+    senderName: req.user.username,
+    type: "CASE_ASSIGNED",
+    title: "New Note Added",
+    message: `${req.user.username} added a note to case ${theCase.case_number}`,
+    linkTo: "/case-management",
+  }, req.user.user_id);
+}
     return res.status(201).json({
       success: true,
       message: "Note added",
