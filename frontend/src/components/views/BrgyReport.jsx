@@ -22,6 +22,12 @@ const getStatusClass = (status) => {
   return "br-status-pending";
 };
 
+const toLocalDateTimeString = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
 function BrgyReport() {
   const [victims, setVictims] = useState([
     {
@@ -54,16 +60,20 @@ function BrgyReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const [barangayName, setBarangayName] = useState("Loading...");
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [toast, setToast] = useState({ show: false, message: "" });
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [showResidentSearch, setShowResidentSearch] = useState(false);
   const [residentSearchQuery, setResidentSearchQuery] = useState("");
   const [residents, setResidents] = useState([]);
   const [loadingResidents, setLoadingResidents] = useState(false);
   const [activePersonIndex, setActivePersonIndex] = useState(null);
-  const showToast = (message) => {
-    setToast({ show: true, message });
-    setTimeout(() => setToast({ show: false, message: "" }), 3000);
-  };
+  const [detectingCrime, setDetectingCrime] = useState(false);
+  const [crimeAutoDetected, setCrimeAutoDetected] = useState(false);
+  const [crimeDetectFailed, setCrimeDetectFailed] = useState(false);
+
+  const showToast = (message, type = "success") => {
+  setToast({ show: true, message, type });
+  setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+};
   useEffect(() => {
     fetchMyReports();
     setLoadingProfile(true);
@@ -170,6 +180,50 @@ function BrgyReport() {
       prev.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
     );
   };
+  const detectCrimeFromNarrative = async (narrativeText) => {
+  if (!narrativeText || narrativeText.trim().length < 20) return;
+  if (form.incident_type) return;
+
+  try {
+    setDetectingCrime(true);
+    setCrimeAutoDetected(false);
+    setCrimeDetectFailed(false);
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/blotters/detect-crime-type`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ narrative: narrativeText }),
+      },
+    );
+
+    const data = await res.json();
+    if (data.success && data.crime_type) {
+      setForm((prev) => ({ ...prev, incident_type: data.crime_type }));
+
+      if (data.rate_limited) {
+        showToast("⚠ AI detection unavailable — daily request limit reached. Please select the crime type manually.", "error");
+        setCrimeAutoDetected(false);
+      } else if (data.fallback) {
+        setCrimeAutoDetected(true);
+        setCrimeDetectFailed(true);
+      } else {
+        setCrimeAutoDetected(true);
+        setCrimeDetectFailed(!data.confident);
+      }
+    }
+  } catch (err) {
+    console.error("Crime detection failed:", err);
+    showToast("AI detection failed. Please select the crime type manually.", "error");
+  } finally {
+    setDetectingCrime(false);
+  }
+};
+
   const addPerson = (role = "Victim") =>
     setVictims((prev) => [
       ...prev,
@@ -191,7 +245,7 @@ function BrgyReport() {
     setVictims((prev) => prev.filter((_, idx) => idx !== i));
   const validate = () => {
     const e = {};
-    if (!form.incident_type) e.incident_type = "Required";
+    // if (!form.incident_type) e.incident_type = "Required";
     if (!form.date_time_commission) {
       e.date_time_commission = "Required";
     } else {
@@ -238,85 +292,82 @@ function BrgyReport() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      setTimeout(() => {
-        const firstError = document.querySelector(".br-input.error");
-        if (firstError) {
-          firstError.scrollIntoView({ behavior: "smooth", block: "center" });
-          firstError.focus();
-        }
-      }, 100);
-      return;
-    }
-    try {
-      setSubmitting(true);
-      const debugPayload = {
+  e.preventDefault();
+  const errs = validate();
+  if (Object.keys(errs).length > 0) {
+    setErrors(errs);
+    setTimeout(() => {
+      const firstError = document.querySelector(".br-input.error");
+      if (firstError) {
+        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+        firstError.focus();
+      }
+    }, 100);
+    return;
+  }
+  try {
+    const resolvedIncidentType = form.incident_type || "Special Complex Crime";
+
+    setSubmitting(true);
+    const res = await fetch(`${API_URL}/brgy-report`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
         ...form,
+        incident_type: resolvedIncidentType,
         victims: victims.map((v) => ({
           ...v,
           contact: v.contact_number,
         })),
-      };
-      console.log(
-        "VICTIMS PAYLOAD:",
-        JSON.stringify(debugPayload.victims, null, 2),
+      }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(
+        `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
       );
-      const res = await fetch(`${API_URL}/brgy-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          ...form,
-          victims: victims.map((v) => ({
-            ...v,
-            contact: v.contact_number,
-          })),
-        }),
+      setForm({
+        incident_type: "",
+        date_time_commission: "",
+        date_time_reported: "",
+        place_barangay: form.place_barangay,
+        place_street: "",
+        narrative: "",
       });
-      const data = await res.json();
-      if (data.success) {
-        showToast(
-          `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
-        );
-        setForm({
-          incident_type: "",
-          date_time_commission: "",
-          date_time_reported: "",
-          place_barangay: form.place_barangay,
-          place_street: "",
-          narrative: "",
-        });
-        setVictims([
-          {
-            first_name: "",
-            middle_name: "",
-            last_name: "",
-            gender: "Male",
-            contact_number: "",
-            role: "Victim",
-            relationship_to_victim: "",
-            witness_statement: "",
-          },
-        ]);
-        fetchMyReports();
-        document
-          .querySelector(".content-wrapper")
-          ?.scrollTo({ top: 0, behavior: "smooth" });
-      } else {
-        const msg = data.errors ? data.errors.join("\n") : data.message;
-        alert("Submission failed:\n" + msg);
-      }
-    } catch (err) {
-      alert("Failed to submit. Please try again.");
-    } finally {
-      setSubmitting(false);
+      setCrimeAutoDetected(false);
+      setCrimeDetectFailed(false);
+      setVictims([
+        {
+          first_name: "",
+          middle_name: "",
+          last_name: "",
+          gender: "Male",
+          contact_number: "",
+          role: "Victim",
+          nationality: "FILIPINO",
+          house_street: "",
+          relationship_to_victim: "",
+          witness_statement: "",
+          from_resident_db: false,
+        },
+      ]);
+      fetchMyReports();
+      document
+        .querySelector(".content-wrapper")
+        ?.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      const msg = data.errors ? data.errors.join("\n") : data.message;
+      alert("Submission failed:\n" + msg);
     }
-  };
+  } catch (err) {
+    alert("Failed to submit. Please try again.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const totalPages = Math.ceil(reports.length / ITEMS_PER_PAGE);
   const paginated = reports.slice(
@@ -413,14 +464,63 @@ function BrgyReport() {
             <div className="br-form-grid">
               <div className="br-form-group">
                 <label className="br-label">
-                  Crime Type <span>*</span>
+                  Crime Type
+                  {detectingCrime && (
+                    <span
+                      style={{
+                        marginLeft: "8px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        background: "#dbeafe",
+                        color: "#1e40af",
+                        padding: "2px 8px",
+                        borderRadius: "20px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: "6px",
+                          height: "6px",
+                          borderRadius: "50%",
+                          background: "#3b82f6",
+                          display: "inline-block",
+                          animation: "pulse 1s infinite",
+                        }}
+                      />
+                      Detecting...
+                    </span>
+                  )}
+                  {crimeAutoDetected && !detectingCrime && (
+                    <span
+                      style={{
+                        marginLeft: "8px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        background: crimeDetectFailed ? "#fef3c7" : "#d1fae5",
+                        color: crimeDetectFailed ? "#92400e" : "#065f46",
+                        padding: "2px 8px",
+                        borderRadius: "20px",
+                      }}
+                    >
+                      {crimeDetectFailed
+                        ? "⚠ AI best guess — please verify"
+                        : "✓ Auto-detected by AI"}
+                    </span>
+                  )}
                 </label>
                 <select
                   className={`br-input ${errors.incident_type ? "error" : ""}`}
                   value={form.incident_type}
-                  onChange={(e) => update("incident_type", e.target.value)}
+                  onChange={(e) => {
+                    update("incident_type", e.target.value);
+                    setCrimeAutoDetected(false);
+                    setCrimeDetectFailed(false);
+                  }}
                 >
-                  <option value="">Select Crime Type</option>
+                  <option value="">Auto-detect with AI</option>
                   <option value="Carnapping - MC">Carnapping - MC</option>
                   <option value="Carnapping - MV">Carnapping - MV</option>
                   <option>Homicide</option>
@@ -466,7 +566,7 @@ function BrgyReport() {
                   type="datetime-local"
                   className={`br-input ${errors.date_time_commission ? "error" : ""}`}
                   value={form.date_time_commission}
-                  max={new Date().toISOString().slice(0, 16)}
+                  max={toLocalDateTimeString()}
                   onKeyDown={(e) => e.preventDefault()}
                   onChange={(e) =>
                     update("date_time_commission", e.target.value)
@@ -487,7 +587,8 @@ function BrgyReport() {
                   type="datetime-local"
                   className={`br-input ${errors.date_time_reported ? "error" : ""}`}
                   value={form.date_time_reported}
-                  max={new Date().toISOString().slice(0, 16)}
+                  min={form.date_time_commission || undefined}
+                  max={toLocalDateTimeString()}
                   onKeyDown={(e) => e.preventDefault()}
                   onChange={(e) => update("date_time_reported", e.target.value)}
                 />
@@ -532,6 +633,7 @@ function BrgyReport() {
                   maxLength={3000}
                   placeholder="Describe what happened in detail — include time, location, persons involved, and sequence of events (minimum 20 characters)"
                   onChange={(e) => update("narrative", e.target.value)}
+                  onBlur={(e) => detectCrimeFromNarrative(e.target.value)} // ← add this
                 />
                 {errors.narrative && (
                   <span className="br-error">{errors.narrative}</span>
@@ -1046,7 +1148,7 @@ function BrgyReport() {
         )}
       </div>
       {toast.show && (
-        <div className="um-toast um-toast-success" style={{ zIndex: 99999 }}>
+        <div className={`um-toast ${toast.type === "error" ? "um-toast-error" : "um-toast-success"}`} style={{ zIndex: 99999 }}>
           <div className="um-toast-content">
             <svg
               className="um-toast-icon"

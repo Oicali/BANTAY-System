@@ -1,11 +1,12 @@
 const pool = require("../../../config/database");
 const xlsx = require("xlsx");
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
 
 // helper — get barangay_code of logged-in user
 const getUserBarangayCode = async (userId) => {
   const result = await pool.query(
     `SELECT barangay_code FROM barangay_details WHERE user_id = $1`,
-    [userId]
+    [userId],
   );
   return result.rows[0]?.barangay_code || null;
 };
@@ -15,7 +16,9 @@ const getResidents = async (req, res) => {
   try {
     const barangayCode = await getUserBarangayCode(req.user.user_id);
     if (!barangayCode)
-      return res.status(403).json({ success: false, message: "No barangay assigned" });
+      return res
+        .status(403)
+        .json({ success: false, message: "No barangay assigned" });
 
     const { q } = req.query;
     let query = `SELECT * FROM barangay_residents WHERE barangay_code = $1 AND is_active = true`;
@@ -37,12 +40,16 @@ const getResidents = async (req, res) => {
 // POST /api/residents/import — import Excel
 const importResidents = async (req, res) => {
   if (!req.file)
-    return res.status(400).json({ success: false, message: "No file uploaded" });
+    return res
+      .status(400)
+      .json({ success: false, message: "No file uploaded" });
 
   try {
     const barangayCode = await getUserBarangayCode(req.user.user_id);
     if (!barangayCode)
-      return res.status(403).json({ success: false, message: "No barangay assigned" });
+      return res
+        .status(403)
+        .json({ success: false, message: "No barangay assigned" });
 
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -56,10 +63,12 @@ const importResidents = async (req, res) => {
     if (!("FIRST_NAME" in first) || !("LAST_NAME" in first))
       return res.status(400).json({
         success: false,
-        message: "Invalid template. Use the official Bantay Resident import template.",
+        message:
+          "Invalid template. Use the official Bantay Resident import template.",
       });
 
-    const str = (v) => (v === null || v === undefined || v === "" ? null : String(v).trim());
+    const str = (v) =>
+      v === null || v === undefined || v === "" ? null : String(v).trim();
     const parseDate = (v) => {
       if (!v || v === "") return null;
       if (typeof v === "number") return new Date((v - 25569) * 86400 * 1000);
@@ -105,12 +114,22 @@ const importResidents = async (req, res) => {
             str(row["CIVIL_STATUS"]),
             str(row["VOTER_STATUS"]),
             req.user.user_id,
-          ]
+          ],
         );
         inserted++;
       }
 
       await client.query("COMMIT");
+      await logAudit({
+        userId: req.user?.user_id,
+        username: req.user?.username,
+        eventName: "Residents Imported",
+        description: `Imported ${inserted} resident(s) to barangay ${barangayCode} — ${skipped} skipped`,
+        action: "CREATE",
+        status: "success",
+        source: "Web Portal",
+        ipAddress: getClientIp(req),
+      });
       res.json({ success: true, summary: { inserted, skipped, errors } });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -130,8 +149,18 @@ const deleteResident = async (req, res) => {
     await pool.query(
       `UPDATE barangay_residents SET is_active = false 
        WHERE resident_id = $1 AND barangay_code = $2`,
-      [req.params.id, barangayCode]
+      [req.params.id, barangayCode],
     );
+    await logAudit({
+  userId:      req.user?.user_id,
+  username:    req.user?.username,
+  eventName:   "Resident Removed",
+  description: `Soft-deleted resident ID ${req.params.id} from barangay ${barangayCode}`,
+  action:      "DELETE",
+  status:      "success",
+  source:      "Web Portal",
+  ipAddress:   getClientIp(req),
+});
     res.json({ success: true, message: "Resident removed" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

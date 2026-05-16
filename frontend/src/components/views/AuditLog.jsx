@@ -287,7 +287,7 @@ const AuditLog = () => {
                     <th className="al-col-event">Event</th>
                     <th className="al-col-desc">Description</th>
                     <th className="al-col-status">Status</th>
-                    <th className="al-col-source">Source</th>
+                    {/* <th className="al-col-source">Source</th> */}
                     <th className="al-col-ip">IP Address</th>
                     <th className="al-col-time">Timestamp</th>
                   </tr>
@@ -334,9 +334,9 @@ const AuditLog = () => {
                         </td>
 
                         {/* Source */}
-                        <td className="al-col-source">
+                        {/* <td className="al-col-source">
                           <span className="al-source">{log.source || "—"}</span>
-                        </td>
+                        </td> */}
 
                         {/* IP */}
                         <td className="al-col-ip">

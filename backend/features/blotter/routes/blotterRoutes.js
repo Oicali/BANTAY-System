@@ -14,7 +14,7 @@ const {
   getDeletedBlotters,
   restoreBlotter,
   importBlotters,
-  acceptReferral, createBrgyReport, getBrgyReports, getReferredCount
+  acceptReferral, createBrgyReport, getBrgyReports, getReferredCount, detectCrimeType
 } = require("../controllers/blotterController");
 
 router.post("/", authenticate, createBlotter);
@@ -31,4 +31,6 @@ router.put("/:id", authenticate, updateBlotter);
 router.delete("/:id", authenticate, deleteBlotter);
 router.put("/:id/restore", authenticate, restoreBlotter);
 router.patch("/:id/accept", authenticate, acceptReferral);
+// Add this line after the existing brgy-report route:
+router.post("/detect-crime-type", authenticate, detectCrimeType);
 module.exports = router;
