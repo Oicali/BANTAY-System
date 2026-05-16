@@ -1,0 +1,290 @@
+.erm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 40, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10003;
+}
+
+.erm-modal {
+  background: white;
+  border-radius: 10px;
+  width: 720px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  font-family: "DM Sans", sans-serif;
+}
+
+/* Header */
+.erm-header {
+  padding: 20px 28px;
+  background: linear-gradient(135deg, #0a1628, #1e3a5f);
+  border-bottom: 3px solid #c1272d;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.erm-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  font-family: "Inter", sans-serif;
+}
+
+.erm-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+
+.erm-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.erm-close:hover { color: white; }
+
+/* Body */
+.erm-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Sections */
+.erm-section {
+  margin-bottom: 28px;
+}
+
+.erm-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3a5f;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e5e7eb;
+  font-family: "Inter", sans-serif;
+}
+
+/* Photo */
+.erm-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.erm-photo-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px dashed #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: white;
+  transition: border-color 0.15s;
+}
+.erm-photo-circle:hover { border-color: #1e3a5f; }
+
+.erm-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.erm-photo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.erm-photo-placeholder span {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.erm-photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.erm-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* Grid layouts */
+.erm-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Fields */
+.erm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.erm-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.erm-required { color: #c1272d; }
+
+.erm-input {
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: "DM Sans", sans-serif;
+  color: #111827;
+  background: white;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.erm-input:focus {
+  border-color: #1e3a5f;
+  box-shadow: 0 0 0 3px rgba(30,58,95,0.08);
+}
+
+.erm-input-err {
+  border-color: #c1272d;
+  background: #fef2f2;
+}
+
+.erm-err {
+  font-size: 11px;
+  color: #c1272d;
+  font-weight: 500;
+}
+
+/* Buttons */
+.erm-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.erm-btn-outline:hover { background: #f3f4f6; }
+
+/* Footer */
+.erm-footer {
+  padding: 16px 28px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #f9fafb;
+  border-radius: 0 0 10px 10px;
+}
+
+.erm-btn-cancel {
+  padding: 10px 24px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+}
+.erm-btn-cancel:hover { background: #f3f4f6; }
+.erm-btn-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.erm-btn-save {
+  padding: 10px 28px;
+  border: none;
+  border-radius: 6px;
+  background: #1e3a5f;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.erm-btn-save:hover:not(:disabled) { background: #0a1628; }
+.erm-btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .erm-grid-3 { grid-template-columns: 1fr; }
+  .erm-modal { max-width: 98vw; }
+  .erm-body { padding: 16px; }
+  .erm-header { padding: 16px; }
+  .erm-footer { padding: 12px 16px; }
+}
+.erm-input:-webkit-autofill,
+.erm-input[type="date"] {
+  background: white !important;
+  color: #111827 !important;
+}
+
+select.erm-input {
+  background: white !important;
+  appearance: auto;
+}
+
+/* Add at bottom of EditResidentModal.css */
+
+/* Fix gray date input background */
+input[type="date"].erm-input {
+  background: white !important;
+  color: #111827 !important;
+  color-scheme: light;
+}
+
+/* Fix calendar icon visibility */
+input[type="date"].erm-input::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+/* Allow future dates — remove max attr from JSX too */
