@@ -501,7 +501,12 @@ function CaseManagement() {
     });
     setShowNoteModal(true);
   };
-
+  const parseNoteDate = (d) => {
+    if (!d) return null;
+    // If no timezone info, treat as UTC
+    const s = d.endsWith("Z") || d.includes("+") ? d : d + "Z";
+    return new Date(s);
+  };
   // Helpers
   const formatDate = (d) => {
     if (!d) return "N/A";
@@ -1886,44 +1891,40 @@ function CaseManagement() {
                                   style={{ fontSize: "12px", color: "#6b7280" }}
                                 >
                                   {n.edited_at
-                                    ? new Date(n.edited_at).toLocaleDateString(
-                                        "en-PH",
-                                        {
-                                          year: "numeric",
-                                          month: "short",
-                                          day: "numeric",
-                                          timeZone: "Asia/Manila",
-                                        },
-                                      )
-                                    : new Date(n.created_at).toLocaleDateString(
-                                        "en-PH",
-                                        {
-                                          year: "numeric",
-                                          month: "short",
-                                          day: "numeric",
-                                          timeZone: "Asia/Manila",
-                                        },
-                                      )}
+                                    ? parseNoteDate(
+                                        n.edited_at,
+                                      ).toLocaleDateString("en-PH", {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                        timeZone: "Asia/Manila",
+                                      })
+                                    : parseNoteDate(
+                                        n.created_at,
+                                      ).toLocaleDateString("en-PH", {
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                        timeZone: "Asia/Manila",
+                                      })}
                                   {" · "}
                                   {n.edited_at
-                                    ? new Date(n.edited_at).toLocaleTimeString(
-                                        "en-PH",
-                                        {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                          hour12: true,
-                                          timeZone: "Asia/Manila",
-                                        },
-                                      )
-                                    : new Date(n.created_at).toLocaleTimeString(
-                                        "en-PH",
-                                        {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                          hour12: true,
-                                          timeZone: "Asia/Manila",
-                                        },
-                                      )}
+                                    ? parseNoteDate(
+                                        n.edited_at,
+                                      ).toLocaleTimeString("en-PH", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                        timeZone: "Asia/Manila",
+                                      })
+                                    : parseNoteDate(
+                                        n.created_at,
+                                      ).toLocaleTimeString("en-PH", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                        timeZone: "Asia/Manila",
+                                      })}
                                 </span>
                                 {!n.deleted_at &&
                                   (isAdmin ||
