@@ -503,9 +503,9 @@ function CaseManagement() {
   };
   const parseNoteDate = (d) => {
     if (!d) return null;
-    // If no timezone info, treat as UTC
-    const s = d.endsWith("Z") || d.includes("+") ? d : d + "Z";
-    return new Date(s);
+    // Strip any timezone info and treat as Manila local time
+    const clean = d.replace("Z", "").replace(/\+.*$/, "");
+    return new Date(clean + "+08:00");
   };
   // Helpers
   const formatDate = (d) => {

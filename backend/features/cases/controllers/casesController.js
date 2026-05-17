@@ -479,8 +479,11 @@ const getCaseById = async (req, res) => {
 
     // Get notes
     const isAdmin = req.user.role === "Administrator";
-    const notes = await pool.query(
-      `SELECT cn.id, cn.note, cn.note_date, cn.created_at, cn.edited_at, cn.deleted_at,
+     const notes = await pool.query(
+      `SELECT cn.id, cn.note, cn.note_date,
+to_char(cn.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
+to_char(cn.edited_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS edited_at,
+to_char(cn.deleted_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS deleted_at,
           cn.added_by_id,
           CONCAT(u.first_name, ' ', u.last_name) AS added_by_name
    FROM case_notes cn
