@@ -6,6 +6,7 @@ const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
 const { getBarangayOptimized } = require("../../../shared/utils/geoUtils");
 const { createNotification, notifyAllByRole } = require("../../notifications/notificationService");
+const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
 // ── Helper: generate date range ────────────────────────────
 
 const formatDateOnly = (d) => {
