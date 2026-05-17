@@ -11,6 +11,7 @@ const {
   getPatrolStats,
   getActivePatrollers,
   getAvailablePatrollers,
+  getAvailableMobileUnits,
   getMobileUnits,
   createMobileUnit,
   submitAfterPatrolReport,
@@ -39,6 +40,7 @@ const { exportPatrolList, exportPatrolDetail } = require("../controllers/ExportP
 router.get("/stats",               authenticate, getPatrolStats);
 router.get("/active",              authenticate, getActivePatrollers);
 router.get("/available-patrollers",authenticate, getAvailablePatrollers);
+router.get("/available-mobile-units", getAvailableMobileUnits);
 
 // Mobile units
 router.get   ("/mobile-units",     authenticate, getMobileUnits);

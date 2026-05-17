@@ -1,15 +1,274 @@
 // frontend\src\components\views\PatrolDashboard.jsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import "./PatrolDashboard.css";
 import LoadingModal from "../modals/LoadingModal";
 import Notification from "../modals/Notification";
-import { ShieldCheck, AlertTriangle, Car, Users, Search } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Car, Users } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 const VEHICLE_TYPES = ["Car/Sedan", "SUV/Van"];
 const PAGE_SIZE = 5;
 
+// ── FIX 1: FilterBar and Pagination are defined OUTSIDE the component.
+//    This prevents React from treating them as new components on every render,
+//    which was causing the search field to lose focus on every keystroke.
+
+// ── Pagination component ───────────────────────────────────────────────────
+const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
+  <div className="pd-table-footer">
+    <span className="pd-footer-count">
+      Showing {filtered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
+      {Math.min(page * PAGE_SIZE, filtered)} of {filtered} records
+      {filtered !== total && (
+        <span className="pd-filtered-label"> (filtered)</span>
+      )}
+    </span>
+    <div className="pd-pagination">
+      <button
+        className="pd-page-btn"
+        onClick={() => onPage(page - 1)}
+        disabled={page === 1}
+      >
+        Previous
+      </button>
+      <span className="pd-page-current">
+        Page {page} of {totalPages || 1}
+      </span>
+      <button
+        className="pd-page-btn"
+        onClick={() => onPage(page + 1)}
+        disabled={page === totalPages}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+);
+
+// ── FIX 2 & 3: PatrollerFilterBar — replaces date filter with Status + Location dropdowns
+//    Accepts `barangayOptions` (derived from live data) for the searchable location dropdown.
+const PatrollerFilterBar = ({
+  search,
+  onSearch,
+  statusFilter,
+  onStatusFilter,
+  locationFilter,
+  onLocationFilter,
+  locationSearch,
+  onLocationSearch,
+  barangayOptions,
+  onApply,
+  onReset,
+  // FIX 4: reset button is always shown (controlled by parent, not filtersApplied flag)
+}) => {
+  const [locationOpen, setLocationOpen] = useState(false);
+  const locationRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (locationRef.current && !locationRef.current.contains(e.target)) {
+        setLocationOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filteredLocations = barangayOptions.filter((b) =>
+    b.toLowerCase().includes(locationSearch.toLowerCase())
+  );
+
+  return (
+    <div className="pd-filter-bar">
+      <div className="pd-filter-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+      </div>
+
+      {/* Search by name */}
+      <input
+        className="pd-filter-search"
+        type="text"
+        placeholder="Search officer..."
+        value={search}
+        onChange={(e) => onSearch(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onApply()}
+      />
+
+      {/* FIX 2: Status dropdown — Online / Offline */}
+      <select
+        className="pd-filter-select"
+        value={statusFilter}
+        onChange={(e) => onStatusFilter(e.target.value)}
+      >
+        <option value="">All Status</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+      </select>
+
+      {/* FIX 2: Searchable barangay dropdown */}
+      <div className="pd-location-dropdown" ref={locationRef}>
+        <input
+          className="pd-filter-search pd-location-input"
+          type="text"
+          placeholder={locationFilter || "Last Location..."}
+          value={locationFilter ? locationFilter : locationSearch}
+          onChange={(e) => {
+            onLocationSearch(e.target.value);
+            onLocationFilter(""); // clear selection when typing
+            setLocationOpen(true);
+          }}
+          onFocus={() => setLocationOpen(true)}
+        />
+        {locationOpen && (
+          <div className="pd-location-list">
+            <div
+              className="pd-location-option pd-location-clear"
+              onMouseDown={() => {
+                onLocationFilter("");
+                onLocationSearch("");
+                setLocationOpen(false);
+              }}
+            >
+              — All Locations —
+            </div>
+            {filteredLocations.length === 0 ? (
+              <div className="pd-location-option pd-location-empty">No results</div>
+            ) : (
+              filteredLocations.map((b) => (
+                <div
+                  key={b}
+                  className={`pd-location-option ${locationFilter === b ? "pd-location-selected" : ""}`}
+                  onMouseDown={() => {
+                    onLocationFilter(b);
+                    onLocationSearch("");
+                    setLocationOpen(false);
+                  }}
+                >
+                  {b}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      <button className="pd-filter-apply" onClick={onApply}>
+        Apply
+      </button>
+
+      {/* FIX 4: Reset button is ALWAYS visible */}
+      <button className="pd-filter-reset" onClick={onReset} title="Reset filters">
+        ↺
+      </button>
+    </div>
+  );
+};
+
+// ── FIX 3 & 4: MobileUnitFilterBar — no date filter, search + vehicle type dropdown.
+//    Reset always visible. Reset is between Apply and Add button.
+const MobileUnitFilterBar = ({
+  search,
+  onSearch,
+  vehicleFilter,
+  onVehicleFilter,
+  onApply,
+  onReset,
+}) => (
+  <div className="pd-filter-bar">
+    <div className="pd-filter-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+      </svg>
+    </div>
+
+    {/* Search */}
+    <input
+      className="pd-filter-search"
+      type="text"
+      placeholder="Search unit, plate..."
+      value={search}
+      onChange={(e) => onSearch(e.target.value)}
+      onKeyDown={(e) => e.key === "Enter" && onApply()}
+    />
+
+    {/* FIX 3: Vehicle type dropdown */}
+    <select
+      className="pd-filter-select"
+      value={vehicleFilter}
+      onChange={(e) => onVehicleFilter(e.target.value)}
+    >
+      <option value="">All Vehicle Types</option>
+      {VEHICLE_TYPES.map((t) => (
+        <option key={t} value={t}>{t}</option>
+      ))}
+    </select>
+
+    <button className="pd-filter-apply" onClick={onApply}>
+      Apply
+    </button>
+
+    {/* FIX 4: Reset always visible, placed between Apply and Add button */}
+    <button className="pd-filter-reset" onClick={onReset} title="Reset filters">
+      ↺
+    </button>
+  </div>
+);
+const DeleteConfirmDialog = ({ itemName, onConfirm, onCancel }) =>
+  createPortal(
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",
+          width: "360px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          display: "flex", flexDirection: "column", gap: "12px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Delete Mobile Unit</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          Are you sure you want to delete{" "}
+          <strong style={{ color: "#212529" }}>{itemName}</strong>?{" "}
+          This action cannot be undone.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: "8px 18px", background: "transparent", border: "1px solid #ced4da",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: "8px 20px", background: "#dc2626", border: "none",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+
+// ─────────────────────────────────────────────────────────────────────────────
 const PatrollerDashboard = () => {
   const token = () => localStorage.getItem("token");
 
@@ -29,30 +288,28 @@ const PatrollerDashboard = () => {
 
   // ── Patroller filters & pagination ────────────────────
   const [patrollerSearch, setPatrollerSearch] = useState("");
-  const [patrollerDateFrom, setPatrollerDateFrom] = useState("");
-  const [patrollerDateTo, setPatrollerDateTo] = useState("");
+  const [patrollerStatusFilter, setPatrollerStatusFilter] = useState("");
+  const [patrollerLocationFilter, setPatrollerLocationFilter] = useState("");
+  const [patrollerLocationSearch, setPatrollerLocationSearch] = useState("");
   const [appliedPatrollerFilters, setAppliedPatrollerFilters] = useState({
     search: "",
-    dateFrom: "",
-    dateTo: "",
+    status: "",
+    location: "",
   });
-  const [patrollerFiltersApplied, setPatrollerFiltersApplied] = useState(false);
   const [patrollerPage, setPatrollerPage] = useState(1);
 
   // ── Mobile unit filters & pagination ──────────────────
   const [unitSearch, setUnitSearch] = useState("");
-  const [unitDateFrom, setUnitDateFrom] = useState("");
-  const [unitDateTo, setUnitDateTo] = useState("");
+  const [unitVehicleFilter, setUnitVehicleFilter] = useState("");
   const [appliedUnitFilters, setAppliedUnitFilters] = useState({
     search: "",
-    dateFrom: "",
-    dateTo: "",
+    vehicle: "",
   });
-  const [unitFiltersApplied, setUnitFiltersApplied] = useState(false);
   const [unitPage, setUnitPage] = useState(1);
 
   // ── Modal state ────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
   const [modalMode, setModalMode] = useState("add");
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [form, setForm] = useState({
@@ -101,17 +358,23 @@ const PatrollerDashboard = () => {
   useEffect(() => {
     const loadData = async (isInitial = false) => {
       if (isInitial) setLoading(true);
-      await Promise.all([
-        fetchPatrolStats(),
-        fetchPatrollers(),
-        fetchMobileUnits(),
-      ]);
+      await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
       if (isInitial) setLoading(false);
     };
     loadData(true);
     const interval = setInterval(() => loadData(false), 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── FIX 5: Compute online/offline counts from patrollers array ─────────────
+  //    "Online Patrollers Today" = patrollers whose last_location_at is within 30s
+  //    "Offline Patrollers"      = all others (previously "Unassigned Patrollers")
+  const onlineCount = patrollers.filter((o) => {
+    const lastSeen = o.last_location_at ? new Date(o.last_location_at) : null;
+    return lastSeen && Date.now() - lastSeen.getTime() <= 30000;
+  }).length;
+
+  const offlineCount = patrollers.length - onlineCount;
 
   // ── Modal handlers ─────────────────────────────────────
   const openAddModal = () => {
@@ -144,10 +407,7 @@ const PatrollerDashboard = () => {
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
-      setNotif({
-        message: "Please fill in all required fields.",
-        type: "warning",
-      });
+      setNotif({ message: "Please fill in all required fields.", type: "warning" });
       return;
     }
     setSubmitLoading(true);
@@ -171,17 +431,11 @@ const PatrollerDashboard = () => {
         closeModal();
         await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
         setNotif({
-          message:
-            modalMode === "add"
-              ? "Mobile unit added successfully!"
-              : "Mobile unit updated successfully!",
+          message: modalMode === "add" ? "Mobile unit added successfully!" : "Mobile unit updated successfully!",
           type: "success",
         });
       } else {
-        setNotif({
-          message: data.message || "Something went wrong.",
-          type: "error",
-        });
+        setNotif({ message: data.message || "Something went wrong.", type: "error" });
       }
     } catch (err) {
       setNotif({ message: "Server error. Please try again.", type: "error" });
@@ -191,115 +445,107 @@ const PatrollerDashboard = () => {
   };
 
   // ── Delete ─────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this mobile unit?")) return;
-    setSubmitLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token()}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
-        setNotif({ message: "Mobile unit deleted.", type: "success" });
-      } else {
-        setNotif({
-          message: data.message || "Something went wrong.",
-          type: "error",
-        });
-      }
-    } catch (err) {
-      setNotif({ message: "Server error. Please try again.", type: "error" });
-    } finally {
-      setSubmitLoading(false);
+const confirmDelete = (id, name) => {
+  setDeleteTarget({ id, name });
+};
+
+const handleDelete = async () => {
+  if (!deleteTarget) return;
+  const id = deleteTarget.id;
+  setDeleteTarget(null);
+  setSubmitLoading(true);
+  try {
+    const res = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    const data = await res.json();
+    if (data.success) {
+      await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
+      setNotif({ message: "Mobile unit deleted.", type: "success" });
+    } else {
+      setNotif({ message: data.message || "Something went wrong.", type: "error" });
     }
-  };
+  } catch (err) {
+    setNotif({ message: "Server error. Please try again.", type: "error" });
+  } finally {
+    setSubmitLoading(false);
+  }
+};
 
   // ── Helpers ────────────────────────────────────────────
-  const getInitials = (name) =>
-    name ? name.substring(0, 2).toUpperCase() : "NA";
-  const formatTime = (ts) => (ts ? new Date(ts).toLocaleString() : "No Data");
-  const formatDateTime = (ts) =>
-    ts ? new Date(ts).toLocaleDateString() : "No Data";
+  const getInitials = (name) => (name ? name.substring(0, 2).toUpperCase() : "NA");
 
-  const isInDateRange = (ts, from, to) => {
-    if (!ts) return !from && !to;
-    const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    if (from) {
-      const f = new Date(from);
-      f.setHours(0, 0, 0, 0);
-      if (d < f) return false;
-    }
-    if (to) {
-      const t = new Date(to);
-      t.setHours(23, 59, 59, 999);
-      if (d > t) return false;
-    }
-    return true;
-  };
+  const formatDateTime = (ts) => (ts ? new Date(ts).toLocaleDateString() : "No Data");
+
+  // ── FIX 2: Build barangay options from live patroller data ─────────────────
+  const barangayOptions = [
+    ...new Set(
+      patrollers
+        .map((o) => o.current_barangay || o.last_location_name)
+        .filter(Boolean)
+    ),
+  ].sort();
 
   // ── Patroller filter logic ─────────────────────────────
   const applyPatrollerFilters = () => {
     setAppliedPatrollerFilters({
       search: patrollerSearch,
-      dateFrom: patrollerDateFrom,
-      dateTo: patrollerDateTo,
+      status: patrollerStatusFilter,
+      location: patrollerLocationFilter,
     });
-    setPatrollerFiltersApplied(
-      patrollerSearch !== "" ||
-        patrollerDateFrom !== "" ||
-        patrollerDateTo !== "",
-    );
     setPatrollerPage(1);
   };
 
   const resetPatrollerFilters = () => {
     setPatrollerSearch("");
-    setPatrollerDateFrom("");
-    setPatrollerDateTo("");
-    setAppliedPatrollerFilters({ search: "", dateFrom: "", dateTo: "" });
-    setPatrollerFiltersApplied(false);
+    setPatrollerStatusFilter("");
+    setPatrollerLocationFilter("");
+    setPatrollerLocationSearch("");
+    setAppliedPatrollerFilters({ search: "", status: "", location: "" });
     setPatrollerPage(1);
   };
 
   const filteredPatrollers = patrollers.filter((o) => {
-    const { search: s, dateFrom: df, dateTo: dt } = appliedPatrollerFilters;
+    const { search: s, status, location } = appliedPatrollerFilters;
+
+    // Name search
     if (s && !(o.officer_name || "").toLowerCase().includes(s.toLowerCase()))
       return false;
-    if ((df || dt) && !isInDateRange(o.last_login, df, dt)) return false;
+
+    // Status filter
+    if (status) {
+      const lastSeen = o.last_location_at ? new Date(o.last_location_at) : null;
+      const isOnline = lastSeen && Date.now() - lastSeen.getTime() <= 30000;
+      if (status === "online" && !isOnline) return false;
+      if (status === "offline" && isOnline) return false;
+    }
+
+    // Location filter
+    if (location) {
+      const barangay = o.current_barangay || o.last_location_name || "";
+      if (!barangay.toLowerCase().includes(location.toLowerCase())) return false;
+    }
+
     return true;
   });
 
-  const totalPatrollerPages = Math.max(
-    1,
-    Math.ceil(filteredPatrollers.length / PAGE_SIZE),
-  );
+  const totalPatrollerPages = Math.max(1, Math.ceil(filteredPatrollers.length / PAGE_SIZE));
   const paginatedPatrollers = filteredPatrollers.slice(
     (patrollerPage - 1) * PAGE_SIZE,
-    patrollerPage * PAGE_SIZE,
+    patrollerPage * PAGE_SIZE
   );
 
   // ── Mobile unit filter logic ───────────────────────────
   const applyUnitFilters = () => {
-    setAppliedUnitFilters({
-      search: unitSearch,
-      dateFrom: unitDateFrom,
-      dateTo: unitDateTo,
-    });
-    setUnitFiltersApplied(
-      unitSearch !== "" || unitDateFrom !== "" || unitDateTo !== "",
-    );
+    setAppliedUnitFilters({ search: unitSearch, vehicle: unitVehicleFilter });
     setUnitPage(1);
   };
 
   const resetUnitFilters = () => {
     setUnitSearch("");
-    setUnitDateFrom("");
-    setUnitDateTo("");
-    setAppliedUnitFilters({ search: "", dateFrom: "", dateTo: "" });
-    setUnitFiltersApplied(false);
+    setUnitVehicleFilter("");
+    setAppliedUnitFilters({ search: "", vehicle: "" });
     setUnitPage(1);
   };
 
@@ -307,11 +553,11 @@ const PatrollerDashboard = () => {
     a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, {
       numeric: true,
       sensitivity: "base",
-    }),
+    })
   );
 
   const filteredUnits = sortedUnits.filter((u) => {
-    const { search: s, dateFrom: df, dateTo: dt } = appliedUnitFilters;
+    const { search: s, vehicle } = appliedUnitFilters;
     if (
       s &&
       !(u.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase()) &&
@@ -319,120 +565,14 @@ const PatrollerDashboard = () => {
       !(u.vehicle_type || "").toLowerCase().includes(s.toLowerCase())
     )
       return false;
-    if ((df || dt) && !isInDateRange(u.created_at, df, dt)) return false;
+    if (vehicle && u.vehicle_type !== vehicle) return false;
     return true;
   });
 
-  const totalUnitPages = Math.max(
-    1,
-    Math.ceil(filteredUnits.length / PAGE_SIZE),
-  );
+  const totalUnitPages = Math.max(1, Math.ceil(filteredUnits.length / PAGE_SIZE));
   const paginatedUnits = filteredUnits.slice(
     (unitPage - 1) * PAGE_SIZE,
-    unitPage * PAGE_SIZE,
-  );
-
-  // ── Pagination component — CaseManagement style ────────
-  const Pagination = ({ page, totalPages, onPage, total, filtered }) => (
-    <div className="pd-table-footer">
-      <span className="pd-footer-count">
-        Showing {filtered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–
-        {Math.min(page * PAGE_SIZE, filtered)} of {filtered} records
-        {filtered !== total && (
-          <span className="pd-filtered-label"> (filtered)</span>
-        )}
-      </span>
-      <div className="pd-pagination">
-        <button
-          className="pd-page-btn"
-          onClick={() => onPage(page - 1)}
-          disabled={page === 1}
-        >
-          Previous
-        </button>
-        <span className="pd-page-current">
-          Page {page} of {totalPages || 1}
-        </span>
-        <button
-          className="pd-page-btn"
-          onClick={() => onPage(page + 1)}
-          disabled={page === totalPages}
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  );
-
-  // ── Filter bar component ───────────────────────────────
-  const FilterBar = ({
-    search,
-    onSearch,
-    dateFrom,
-    onDateFrom,
-    dateTo,
-    onDateTo,
-    onApply,
-    onReset,
-    filtersApplied,
-    searchPlaceholder,
-    rightContent,
-  }) => (
-    <div className="pd-filter-bar">
-      <div className="pd-filter-icon">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-        </svg>
-      </div>
-      <input
-        className="pd-filter-search"
-        type="text"
-        placeholder={searchPlaceholder || "Search..."}
-        value={search}
-        onChange={(e) => onSearch(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onApply()}
-      />
-      <div className="pd-filter-date-group">
-        <input
-          type="date"
-          className="pd-filter-date"
-          value={dateFrom}
-          onChange={(e) => onDateFrom(e.target.value)}
-          title="From date"
-        />
-        <span className="pd-filter-arrow">→</span>
-        <input
-          type="date"
-          className="pd-filter-date"
-          value={dateTo}
-          min={dateFrom}
-          onChange={(e) => onDateTo(e.target.value)}
-          title="To date"
-        />
-      </div>
-      <button className="pd-filter-apply" onClick={onApply}>
-        Apply
-      </button>
-      {filtersApplied && (
-        <button
-          className="pd-filter-reset"
-          onClick={onReset}
-          title="Reset filters"
-        >
-          ↺
-        </button>
-      )}
-      {rightContent && <div className="pd-filter-right">{rightContent}</div>}
-    </div>
+    unitPage * PAGE_SIZE
   );
 
   // ── Render ─────────────────────────────────────────────
@@ -445,7 +585,7 @@ const PatrollerDashboard = () => {
           <p>Real-time Patroller status and monitoring</p>
         </div>
 
-        {/* STATS */}
+        {/* FIX 5: STATS — Online Patrollers Today + Offline Patrollers */}
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-card-header">
@@ -453,8 +593,9 @@ const PatrollerDashboard = () => {
                 <ShieldCheck size={20} />
               </div>
             </div>
-            <div className="stat-value">{stats.active_patrols_today}</div>
-            <div className="stat-label">Active Patrols Today</div>
+            {/* FIX 5: Was "active_patrols_today" from server. Now computed client-side from patrollers. */}
+            <div className="stat-value">{onlineCount}</div>
+            <div className="stat-label">Online Patrollers Today</div>
           </div>
           <div className="stat-card">
             <div className="stat-card-header">
@@ -462,8 +603,9 @@ const PatrollerDashboard = () => {
                 <AlertTriangle size={20} />
               </div>
             </div>
-            <div className="stat-value">{stats.unassigned_patrollers}</div>
-            <div className="stat-label">Unassigned Patrollers</div>
+            {/* FIX 5: Was "unassigned_patrollers". Now counts offline patrollers. */}
+            <div className="stat-value">{offlineCount}</div>
+            <div className="stat-label">Offline Patrollers</div>
           </div>
           <div className="stat-card">
             <div className="stat-card-header">
@@ -487,7 +629,7 @@ const PatrollerDashboard = () => {
 
         {/* TABLE CARD */}
         <div className="table-card">
-          {/* Toggle */}
+          {/* Toggle + Add button (Add only shows on Mobile tab) */}
           <div className="table-header">
             <div className="table-toggle">
               <button
@@ -503,22 +645,31 @@ const PatrollerDashboard = () => {
                 Mobile Units
               </button>
             </div>
+            {activeTable === "mobile" && (
+              <button className="add-btn" onClick={openAddModal}>
+                + Add Mobile Unit
+              </button>
+            )}
           </div>
 
           {/* ── PATROLLERS ── */}
           {activeTable === "patrollers" && (
             <>
-              <FilterBar
+              {/* FIX 1: PatrollerFilterBar is defined outside — no focus loss
+                  FIX 2: Status + Location dropdowns replace date filter
+                  FIX 4: Reset always visible */}
+              <PatrollerFilterBar
                 search={patrollerSearch}
                 onSearch={setPatrollerSearch}
-                dateFrom={patrollerDateFrom}
-                onDateFrom={setPatrollerDateFrom}
-                dateTo={patrollerDateTo}
-                onDateTo={setPatrollerDateTo}
+                statusFilter={patrollerStatusFilter}
+                onStatusFilter={setPatrollerStatusFilter}
+                locationFilter={patrollerLocationFilter}
+                onLocationFilter={setPatrollerLocationFilter}
+                locationSearch={patrollerLocationSearch}
+                onLocationSearch={setPatrollerLocationSearch}
+                barangayOptions={barangayOptions}
                 onApply={applyPatrollerFilters}
                 onReset={resetPatrollerFilters}
-                filtersApplied={patrollerFiltersApplied}
-                searchPlaceholder="Search officer..."
               />
               <div className="table-container">
                 <table className="data-table">
@@ -587,17 +738,7 @@ const PatrollerDashboard = () => {
                               <span className="location-text">
                                 {officer.latitude && officer.longitude ? (
                                   (() => {
-                                    const lastSeen = new Date(
-                                      officer.updated_at ||
-                                        officer.last_location_at,
-                                    );
-                                    const now = new Date();
-                                    const secondsAgo = (now - lastSeen) / 1000;
-                                    const isOnline = secondsAgo <= 30;
-
-                                    if (isOnline && officer.current_barangay) {
-                                      return `${officer.current_barangay}`;
-                                    } else if (officer.current_barangay) {
+                                    if (officer.current_barangay) {
                                       return `${officer.current_barangay}`;
                                     } else if (officer.location_name) {
                                       return `📍 ${officer.location_name}`;
@@ -610,9 +751,7 @@ const PatrollerDashboard = () => {
                                     }
                                   })()
                                 ) : (
-                                  <span className="unassigned-badge">
-                                    No signal
-                                  </span>
+                                  <span className="unassigned-badge">No signal</span>
                                 )}
                               </span>
                             </td>
@@ -620,21 +759,13 @@ const PatrollerDashboard = () => {
                               <span className="time-badge">
                                 {lastSeen
                                   ? (() => {
-                                      const dd = String(
-                                        lastSeen.getDate(),
-                                      ).padStart(2, "0");
-                                      const mm = String(
-                                        lastSeen.getMonth() + 1,
-                                      ).padStart(2, "0");
+                                      const dd = String(lastSeen.getDate()).padStart(2, "0");
+                                      const mm = String(lastSeen.getMonth() + 1).padStart(2, "0");
                                       const yyyy = lastSeen.getFullYear();
                                       const hours = lastSeen.getHours();
-                                      const mins = String(
-                                        lastSeen.getMinutes(),
-                                      ).padStart(2, "0");
+                                      const mins = String(lastSeen.getMinutes()).padStart(2, "0");
                                       const ampm = hours >= 12 ? "PM" : "AM";
-                                      const h = String(
-                                        hours % 12 || 12,
-                                      ).padStart(2, "0");
+                                      const h = String(hours % 12 || 12).padStart(2, "0");
                                       return `${dd}/${mm}/${yyyy}, ${h}:${mins} ${ampm}`;
                                     })()
                                   : "Never"}
@@ -662,22 +793,16 @@ const PatrollerDashboard = () => {
           {/* ── MOBILE UNITS ── */}
           {activeTable === "mobile" && (
             <>
-              <FilterBar
+              {/* FIX 1: MobileUnitFilterBar defined outside — no focus loss
+                  FIX 3: No date filter, vehicle type dropdown added
+                  FIX 4: Reset always visible and between Apply and Add button */}
+              <MobileUnitFilterBar
                 search={unitSearch}
                 onSearch={setUnitSearch}
-                dateFrom={unitDateFrom}
-                onDateFrom={setUnitDateFrom}
-                dateTo={unitDateTo}
-                onDateTo={setUnitDateTo}
+                vehicleFilter={unitVehicleFilter}
+                onVehicleFilter={setUnitVehicleFilter}
                 onApply={applyUnitFilters}
                 onReset={resetUnitFilters}
-                filtersApplied={unitFiltersApplied}
-                searchPlaceholder="Search unit, plate..."
-                rightContent={
-                  <button className="add-btn" onClick={openAddModal}>
-                    + Add Mobile Unit
-                  </button>
-                }
               />
               <div className="table-container">
                 <table className="data-table">
@@ -701,9 +826,7 @@ const PatrollerDashboard = () => {
                       paginatedUnits.map((unit, index) => (
                         <tr key={unit.mobile_unit_id || index}>
                           <td>
-                            <span className="unit-badge">
-                              {unit.mobile_unit_name}
-                            </span>
+                            <span className="unit-badge">{unit.mobile_unit_name}</span>
                           </td>
                           <td>
                             <span
@@ -713,9 +836,7 @@ const PatrollerDashboard = () => {
                             </span>
                           </td>
                           <td>
-                            <span className="plate-number">
-                              {unit.plate_number}
-                            </span>
+                            <span className="plate-number">{unit.plate_number}</span>
                           </td>
                           <td>
                             <span className="time-badge">
@@ -731,13 +852,11 @@ const PatrollerDashboard = () => {
                                 Edit
                               </button>
                               <button
-                                className="delete-btn"
-                                onClick={() =>
-                                  handleDelete(unit.mobile_unit_id)
-                                }
-                              >
-                                Delete
-                              </button>
+  className="delete-btn"
+  onClick={() => confirmDelete(unit.mobile_unit_id, unit.mobile_unit_name)}
+>
+  Delete
+</button>
                             </div>
                           </td>
                         </tr>
@@ -760,17 +879,14 @@ const PatrollerDashboard = () => {
         </div>
       </div>
 
+
       {/* ── ADD / EDIT MODAL ── */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                {modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}
-              </h3>
-              <button className="modal-close" onClick={closeModal}>
-                ✕
-              </button>
+              <h3>{modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}</h3>
+              <button className="modal-close" onClick={closeModal}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -796,9 +912,7 @@ const PatrollerDashboard = () => {
                 >
                   <option value="">— Select Vehicle Type —</option>
                   {VEHICLE_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
@@ -817,9 +931,7 @@ const PatrollerDashboard = () => {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal}>
-                Cancel
-              </button>
+              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
               <button className="btn-save" onClick={handleSubmit}>
                 {modalMode === "add" ? "Add Unit" : "Save Changes"}
               </button>
@@ -828,12 +940,18 @@ const PatrollerDashboard = () => {
         </div>
       )}
 
+      
+{deleteTarget && (
+  <DeleteConfirmDialog
+    itemName={deleteTarget.name}
+    onConfirm={handleDelete}
+    onCancel={() => setDeleteTarget(null)}
+  />
+)}
       <LoadingModal isOpen={loading} message="Loading dashboard..." />
       <LoadingModal
         isOpen={submitLoading}
-        message={
-          modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."
-        }
+        message={modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."}
       />
 
       {notif && (

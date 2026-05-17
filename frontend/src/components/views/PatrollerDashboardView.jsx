@@ -443,7 +443,7 @@ const PatrollerDashboardView = () => {
       {/* ── PAGE HEADER ── */}
       <div className="pdv-page-header">
         <div>
-          <h1 className="pdv-page-title">Patroller Dashboard</h1>
+          <h1 className="pdv-page-title">Patrol Scheduling</h1>
           <p className="pdv-page-sub">Real-time Patroller status and monitoring</p>
         </div>
       </div>

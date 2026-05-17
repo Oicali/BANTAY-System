@@ -1,9 +1,11 @@
 // src/components/views/AfterPatrol.jsx
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import "./AfterPatrol.css";
 import TimePicker from "../modals/TimePicker";
 import Notification from "../modals/Notification";
 import BeatCard from "../modals/BeatCard";
+import LoadingModal from "../modals/LoadingModal";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -17,8 +19,6 @@ const todayDate = () => {
   const t = new Date();
   return new Date(t.getFullYear(), t.getMonth(), t.getDate());
 };
-
-
 
 const getPatrolStatus = (patrol) => {
   const t     = todayDate();
@@ -88,6 +88,7 @@ const getMyUserId = () => {
     return null;
   }
 };
+
 const getMyRole = () => {
   const raw = localStorage.getItem("token");
   if (!raw) return null;
@@ -97,6 +98,10 @@ const getMyRole = () => {
     return json.role ?? json.user_role ?? json.roles ?? null;
   } catch { return null; }
 };
+
+// ── Top-level helper: covers both admin roles ──────────────────────
+const isAdminRole = (role) =>
+  role === "Administrator" || role === "Technical Administrator";
 
 const getMyShift = (patrol) => {
   if (!patrol?.patrollers) return null;
@@ -336,7 +341,7 @@ const SignatureSelect = ({ label, value, onChange, patrollers, shift }) => {
   );
 };
 
-// ── Toggle Field ── OUTSIDE AfterPatrolModal ───────────────────────
+// ── Toggle Field ───────────────────────────────────────────────────
 const ToggleField = ({ fieldKey, label, children, shown, onShow, onHide, required }) => (
   <div className="pd-form-group pd-full" style={{ marginBottom: 8 }}>
     {!shown ? (
@@ -373,50 +378,102 @@ const ToggleField = ({ fieldKey, label, children, shown, onShow, onHide, require
   </div>
 );
 
+// ── Delete Confirm Dialog ──────────────────────────────────────────
+const DeleteConfirmDialog = ({ reportDate, onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",
+          width: "360px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          display: "flex", flexDirection: "column", gap: "12px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Delete Report</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          Are you sure you want to delete the report for{" "}
+          <strong style={{ color: "#212529" }}>{reportDate}</strong>?
+          This action cannot be undone.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: "8px 18px", background: "transparent", border: "1px solid #ced4da",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: "8px 20px", background: "#dc2626", border: "none",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // ── After Patrol Report Modal ──────────────────────────────────────
 const AfterPatrolModal = ({ patrol, existingReport, myShift, onClose, onSubmit, onShowToast }) => {
-  const [form,       setForm]       = useState(
+  const [form, setForm] = useState(
     existingReport ? dbRowToForm(existingReport) : emptyForm(patrol, myShift)
   );
 
   const savedValues = useRef(
-  existingReport ? dbRowToForm(existingReport) : {}
-);
-const [isAdmin] = useState(() => getMyRole() === "Administrator");
+    existingReport ? dbRowToForm(existingReport) : {}
+  );
+
   const [shown, setShown] = useState(() => {
-  // If editing, auto-show any field that has saved data
-  const src = existingReport || {};
-  return {
-    preDeployment:  !!(src.pre_deployment),
-    action1:        !!(src.action_pre_deployment),
-    incidents:      !!(src.incidents),
-    action2:        !!(src.action_incidents),
-    safetyConcerns: !!(src.safety_concerns),
-    action3:        !!(src.action_safety),
-    otherServices:  !!(src.other_services),
-    visitedAreas:   !!(src.visited_areas),
-    personsVisited: !!(src.persons_visited),
-    numOfficials:   !!(src.num_officials != null && src.num_officials !== ""),
-    numGovt:        !!(src.num_govt_officials != null && src.num_govt_officials !== ""),
-    sector:         true,
-    creditHours:     true,
-    mustDos:        !!(src.must_dos),
-  };
-});
-  const [submitting, setSubmitting] = useState(false);
+    const src = existingReport || {};
+    return {
+      preDeployment:  !!(src.pre_deployment),
+      action1:        !!(src.action_pre_deployment),
+      incidents:      !!(src.incidents),
+      action2:        !!(src.action_incidents),
+      safetyConcerns: !!(src.safety_concerns),
+      action3:        !!(src.action_safety),
+      otherServices:  !!(src.other_services),
+      visitedAreas:   !!(src.visited_areas),
+      personsVisited: !!(src.persons_visited),
+      numOfficials:   !!(src.num_officials != null && src.num_officials !== ""),
+      numGovt:        !!(src.num_govt_officials != null && src.num_govt_officials !== ""),
+      sector:         true,
+      creditHours:    true,
+      mustDos:        !!(src.must_dos),
+    };
+  });
+
+ 
 
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
   const minDate     = toInputDate(patrol?.start_date);
   const maxDate     = toInputDate(patrol?.end_date);
   const patrollers  = patrol?.patrollers || [];
 
-
- const [images, setImages] = useState([]);
-const fileInputRef = useRef(null); 
-const [existingPhotos, setExistingPhotos] = useState(
-  existingReport?.photo_urls || []
-);
+  const [images, setImages] = useState([]);
+  const fileInputRef = useRef(null);
+  const [existingPhotos, setExistingPhotos] = useState(
+    existingReport?.photo_urls || []
+  );
 const [deletingPhoto, setDeletingPhoto] = useState(null);
+const [deletingPhotoConfirm, setDeletingPhotoConfirm] = useState(null); // ← add this
 
   const set     = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const setTime = (key) => (v) => {
@@ -427,54 +484,57 @@ const [deletingPhoto, setDeletingPhoto] = useState(null);
     });
   };
 
-const toggleShow = (key) => {
-  setShown(s => ({ ...s, [key]: true }));
-  // Restore saved value if it exists, otherwise keep current form value
-  if (savedValues.current[key]) {
-    setForm(f => ({ ...f, [key]: savedValues.current[key] }));
-  }
-  if (key === "creditHours") {
-    setForm(f => ({
-      ...f,
-      creditHours: savedValues.current["creditHours"] || calcCreditHours(f.timeFrom, f.timeTo),
-    }));
-  }
-};
+  const toggleShow = (key) => {
+    setShown(s => ({ ...s, [key]: true }));
+    if (savedValues.current[key]) {
+      setForm(f => ({ ...f, [key]: savedValues.current[key] }));
+    }
+    if (key === "creditHours") {
+      setForm(f => ({
+        ...f,
+        creditHours: savedValues.current["creditHours"] || calcCreditHours(f.timeFrom, f.timeTo),
+      }));
+    }
+  };
 
-const toggleHide = (key) => {
-  setShown(s => ({ ...s, [key]: false }));
-  setForm(f => ({ ...f, [key]: "" }));
-};
+  const toggleHide = (key) => {
+    setShown(s => ({ ...s, [key]: false }));
+    setForm(f => ({ ...f, [key]: "" }));
+  };
 
-const handleFileSelect = (files) => {
-  const newFiles = Array.from(files)
-    .filter((f) => f.type.startsWith("image/"))
-    .slice(0, 10 - images.length)
-    .map((file) => ({
-      id: Math.random().toString(36).slice(2),
-      file,
-      preview: URL.createObjectURL(file),
-      name: file.name,
-    }));
-  setImages((prev) => [...prev, ...newFiles].slice(0, 10));
-};
+  const handleFileSelect = (files) => {
+    const newFiles = Array.from(files)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, 10 - images.length)
+      .map((file) => ({
+        id: Math.random().toString(36).slice(2),
+        file,
+        preview: URL.createObjectURL(file),
+        name: file.name,
+      }));
+    setImages((prev) => [...prev, ...newFiles].slice(0, 10));
+  };
 
-const handleDrop = (e) => {
-  e.preventDefault();
-  handleFileSelect(e.dataTransfer.files);
-};
+  const handleDrop = (e) => {
+    e.preventDefault();
+    handleFileSelect(e.dataTransfer.files);
+  };
 
-const removeImage = (id) => {
-  setImages((prev) => {
-    const img = prev.find((i) => i.id === id);
-    if (img) URL.revokeObjectURL(img.preview);
-    return prev.filter((i) => i.id !== id);
-  });
-};
+  const removeImage = (id) => {
+    setImages((prev) => {
+      const img = prev.find((i) => i.id === id);
+      if (img) URL.revokeObjectURL(img.preview);
+      return prev.filter((i) => i.id !== id);
+    });
+  };
 
-const handleDeleteExistingPhoto = async (photoUrl) => {
+  const handleDeleteExistingPhoto = (photoUrl) => {
   if (!existingReport?.report_id) return;
-  if (!window.confirm("Remove this photo? This cannot be undone.")) return;
+  setDeletingPhotoConfirm(photoUrl);
+};
+const confirmDeletePhoto = async () => {
+  const photoUrl = deletingPhotoConfirm;
+  setDeletingPhotoConfirm(null);
   setDeletingPhoto(photoUrl);
   try {
     const res = await fetch(`${API_BASE}/patrol/after-reports/${existingReport.report_id}/photos`, {
@@ -499,24 +559,22 @@ const handleDeleteExistingPhoto = async (photoUrl) => {
   }
 };
 
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
     if (!form.date) { alert("Patrol date is required."); return; }
     const chosen = parseLocalDate(form.date);
     const start  = parseLocalDate(patrol?.start_date);
     const end    = parseLocalDate(patrol?.end_date);
-   if (chosen < start || chosen > end) {
-  onShowToast(`Date must be within the patrol duration: ${formatDate(patrol?.start_date)} – ${formatDate(patrol?.end_date)}`, "error");
-  return;
-}
+    if (chosen < start || chosen > end) {
+      onShowToast(`Date must be within the patrol duration: ${formatDate(patrol?.start_date)} – ${formatDate(patrol?.end_date)}`, "error");
+      return;
+    }
 
-// Active patrol — can only report for past/today dates, not future ones
-const status = getPatrolStatus(patrol);
-if (status === "active" && chosen > todayDate()) {
-  onShowToast("You can only submit a report for today or a past date. This date has not happened yet.", "error");
-  return;
-}
+    const status = getPatrolStatus(patrol);
+    if (status === "active" && chosen > todayDate()) {
+      onShowToast("You can only submit a report for today or a past date. This date has not happened yet.", "error");
+      return;
+    }
 
-    // ── ADD THIS BLOCK ────────────────────────────────────────────
     const requiredWhenShown = {
       preDeployment:  "Specific instructions received",
       action1:        "Action Taken (Pre-Deployment)",
@@ -539,36 +597,37 @@ if (status === "active" && chosen > todayDate()) {
         return;
       }
     }
-    // ── END ADD ───────────────────────────────────────────────────
-if (!form.remarks.trim()) {
-  onShowToast("Remarks / Recommendations is required.", "error");
-  return;
-}
-    if (!isEditing) {
-    try {
-      const res  = await fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
-        headers: { Authorization: `Bearer ${token()}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        const existing = data.data.find((r) => toInputDate(r.patrol_date) === form.date);
-        if (existing) {
-          const confirmed = window.confirm(
-            `A report has already been submitted for this date (${formatDate(form.date)}) by your shift.\n\nDo you want to overwrite it with your new entries?`
-          );
-          if (!confirmed) return;
-        }
-      }
-    } catch {
-      // If the check fails, let the submit proceed — backend upsert handles deduplication
-    }
-  }
 
-  setSubmitting(true);
-await onSubmit(patrol.patrol_id, form, myShift, images);
-  setSubmitting(false);
-  onClose();
-};
+    if (!form.remarks.trim()) {
+      onShowToast("Remarks / Recommendations is required.", "error");
+      return;
+    }
+
+    if (!isEditing) {
+      try {
+        const res  = await fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
+          headers: { Authorization: `Bearer ${token()}` },
+        });
+        const data = await res.json();
+        if (data.success) {
+          const existing = data.data.find((r) => toInputDate(r.patrol_date) === form.date);
+          if (existing) {
+            const confirmed = window.confirm(
+              `A report has already been submitted for this date (${formatDate(form.date)}) by your shift.\n\nDo you want to overwrite it with your new entries?`
+            );
+            if (!confirmed) return;
+          }
+        }
+      } catch {
+        // fail silently — backend upsert handles deduplication
+      }
+    }
+
+    setSubmitting(true);
+    await onSubmit(patrol.patrol_id, form, myShift, images);
+    setSubmitting(false);
+    onClose();
+  };
 
   const isEditing = !!existingReport;
 
@@ -659,27 +718,27 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
             </span>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginLeft: 4 }}>
               {patrolDates.map((key) => {
-  const isSelected = form.date === key;
-  const pillDate   = parseLocalDate(key);
-  const isFuture   = getPatrolStatus(patrol) === "active" && pillDate > todayDate();
-  return (
-    <button key={key} type="button"
-      onClick={() => !isFuture && setForm((f) => ({ ...f, date: key }))}
-      disabled={isFuture}
-      style={{
-        padding: "2px 10px", fontSize: 11, fontWeight: 700,
-        borderRadius: 20, cursor: isFuture ? "not-allowed" : "pointer",
-        border: "1px solid",
-        borderColor: isSelected ? "#1e3a5f" : isFuture ? "#e5e7eb" : "#93afc9",
-        background:  isSelected ? "#1e3a5f" : isFuture ? "#f3f4f6" : "white",
-        color:       isSelected ? "white"   : isFuture ? "#d1d5db" : "#1e3a5f",
-        transition:  "all 0.15s",
-        opacity:     isFuture ? 0.5 : 1,
-      }}>
-      {formatDateShort(key)}
-    </button>
-  );
-})}
+                const isSelected = form.date === key;
+                const pillDate   = parseLocalDate(key);
+                const isFuture   = getPatrolStatus(patrol) === "active" && pillDate > todayDate();
+                return (
+                  <button key={key} type="button"
+                    onClick={() => !isFuture && setForm((f) => ({ ...f, date: key }))}
+                    disabled={isFuture}
+                    style={{
+                      padding: "2px 10px", fontSize: 11, fontWeight: 700,
+                      borderRadius: 20, cursor: isFuture ? "not-allowed" : "pointer",
+                      border: "1px solid",
+                      borderColor: isSelected ? "#1e3a5f" : isFuture ? "#e5e7eb" : "#93afc9",
+                      background:  isSelected ? "#1e3a5f" : isFuture ? "#f3f4f6" : "white",
+                      color:       isSelected ? "white"   : isFuture ? "#d1d5db" : "#1e3a5f",
+                      transition:  "all 0.15s",
+                      opacity:     isFuture ? 0.5 : 1,
+                    }}>
+                    {formatDateShort(key)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -687,11 +746,11 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
             <div className="pd-form-group">
               <label className="pd-modal-label">Date *</label>
               <input type="date" className="pd-modal-input" value={form.date}
-                onChange={set("date")} min={minDate} max={maxDate}readOnly />
+                onChange={set("date")} min={minDate} max={maxDate} readOnly />
             </div>
             <div className="pd-form-group">
               <label className="pd-modal-label">Time From</label>
-              <TimePicker value={form.timeFrom} onChange={setTime("timeFrom")}  disabled={!!myShift}/>
+              <TimePicker value={form.timeFrom} onChange={setTime("timeFrom")} disabled={!!myShift} />
             </div>
             <div className="pd-form-group">
               <label className="pd-modal-label">Time To</label>
@@ -699,476 +758,422 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
             </div>
           </div>
 
+          <h3 className="pd-section-title">2. Patrol Information</h3>
+          <div className="pd-form-grid">
+            <div className="pd-form-group">
+              <label className="pd-modal-label">Sector / Beat Patrolled</label>
+              <input type="text" className="pd-modal-input" value={form.sector}
+                readOnly
+                style={{ background: "rgba(30,58,95,0.05)", cursor: "not-allowed", color: "#6b7280" }} />
+            </div>
+            <div className="pd-form-group">
+              <label className="pd-modal-label">Total Patrol Credit Hours</label>
+              <input type="text" className="pd-modal-input"
+                placeholder="Auto-calculated from times"
+                value={form.creditHours}
+                readOnly
+                style={{
+                  background: form.creditHours ? "rgba(34,197,94,0.05)" : "rgba(30,58,95,0.05)",
+                  cursor: "not-allowed",
+                  color: form.creditHours ? "#16a34a" : "#6b7280",
+                  fontWeight: form.creditHours ? 700 : 400,
+                }} />
+            </div>
+            <ToggleField fieldKey="mustDos" label="Patrolled MUST DOs"
+              shown={shown.mustDos} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={2} value={form.mustDos}
+                onChange={set("mustDos")}
+                placeholder="List MUST DOs patrolled..." />
+            </ToggleField>
+          </div>
 
-<h3 className="pd-section-title">2. Patrol Information</h3>
-<div className="pd-form-grid">
+          <h3 className="pd-section-title">3. Pre-Deployment Instructions</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+            <ToggleField fieldKey="preDeployment" label="Specific instructions received"
+              shown={shown.preDeployment} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={3} value={form.preDeployment}
+                onChange={set("preDeployment")}
+                placeholder="Enter pre-deployment instructions..." />
+            </ToggleField>
+            <ToggleField fieldKey="action1" label="Action Taken"
+              shown={shown.action1} onShow={toggleShow} onHide={toggleHide} required>
+              <input type="text" className="pd-modal-input" placeholder="Action taken..."
+                value={form.action1} onChange={set("action1")} />
+            </ToggleField>
+          </div>
 
-  {/* Sector — always visible, read-only */}
-  <div className="pd-form-group">
-    <label className="pd-modal-label">Sector / Beat Patrolled</label>
-    <input type="text" className="pd-modal-input" value={form.sector}
-      readOnly
-      style={{ background: "rgba(30,58,95,0.05)", cursor: "not-allowed", color: "#6b7280" }} />
-  </div>
+          <h3 className="pd-section-title">4. Incidents &amp; Unusual Events</h3>
+          <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
+            Crime incidents, public disturbance, major events, etc.
+          </div>
+          <div className="pd-form-grid">
+            <ToggleField fieldKey="incidents" label="Incidents / Unusual situations"
+              shown={shown.incidents} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={3} value={form.incidents}
+                onChange={set("incidents")}
+                placeholder="Describe incidents or unusual events..." />
+            </ToggleField>
+            <ToggleField fieldKey="action2" label="Action Taken"
+              shown={shown.action2} onShow={toggleShow} onHide={toggleHide} required>
+              <input type="text" className="pd-modal-input" placeholder="Action taken..."
+                value={form.action2} onChange={set("action2")} />
+            </ToggleField>
+          </div>
 
-  {/* Credit Hours — always visible, read-only, auto-calculated */}
-  <div className="pd-form-group">
-    <label className="pd-modal-label">Total Patrol Credit Hours</label>
-    <input type="text" className="pd-modal-input"
-      placeholder="Auto-calculated from times"
-      value={form.creditHours}
-      readOnly
-      style={{
-        background: form.creditHours ? "rgba(34,197,94,0.05)" : "rgba(30,58,95,0.05)",
-        cursor: "not-allowed",
-        color: form.creditHours ? "#16a34a" : "#6b7280",
-        fontWeight: form.creditHours ? 700 : 400,
-      }} />
-  </div>
+          <h3 className="pd-section-title">5. Public Safety Concerns</h3>
+          <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
+            Uncovered manholes, busted lights, uncollected garbage, fire hazard, missing bridge railings, etc.
+          </div>
+          <div className="pd-form-grid">
+            <ToggleField fieldKey="safetyConcerns" label="Safety concerns observed"
+              shown={shown.safetyConcerns} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={3} value={form.safetyConcerns}
+                onChange={set("safetyConcerns")}
+                placeholder="Describe public safety concerns..." />
+            </ToggleField>
+            <ToggleField fieldKey="action3" label="Action Taken"
+              shown={shown.action3} onShow={toggleShow} onHide={toggleHide} required>
+              <input type="text" className="pd-modal-input" placeholder="Action taken..."
+                value={form.action3} onChange={set("action3")} />
+            </ToggleField>
+          </div>
 
-  <ToggleField fieldKey="mustDos" label="Patrolled MUST DOs"
-    shown={shown.mustDos} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={2} value={form.mustDos}
-      onChange={set("mustDos")}
-      placeholder="List MUST DOs patrolled..." />
-  </ToggleField>
+          <h3 className="pd-section-title">6. Other Services &amp; Visited Areas</h3>
+          <div className="pd-form-grid">
+            <ToggleField fieldKey="otherServices" label="Other public safety services rendered"
+              shown={shown.otherServices} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={2} value={form.otherServices}
+                onChange={set("otherServices")}
+                placeholder="Area and route security, assistance to PWD, recovered property, etc." />
+            </ToggleField>
+            <ToggleField fieldKey="visitedAreas" label="Visited areas"
+              shown={shown.visitedAreas} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={2} value={form.visitedAreas}
+                onChange={set("visitedAreas")}
+                placeholder="House, school, church, business, barangay, etc." />
+            </ToggleField>
+          </div>
 
-</div>
+          <h3 className="pd-section-title">7. Persons Visited</h3>
+          <div className="pd-form-grid">
+            <ToggleField fieldKey="personsVisited" label="Name of persons visited / local officials"
+              shown={shown.personsVisited} onShow={toggleShow} onHide={toggleHide} required>
+              <textarea className="pd-modal-input" rows={2} value={form.personsVisited}
+                onChange={set("personsVisited")}
+                placeholder="List persons visited..." />
+            </ToggleField>
+            <ToggleField fieldKey="numOfficials" label="No. of officials visited"
+              shown={shown.numOfficials} onShow={toggleShow} onHide={toggleHide} required>
+              <input type="number" min={0} className="pd-modal-input" placeholder="0"
+                value={form.numOfficials} onChange={set("numOfficials")} />
+            </ToggleField>
+            <ToggleField fieldKey="numGovt" label="Total gov't officials in area (incl. brgy.)"
+              shown={shown.numGovt} onShow={toggleShow} onHide={toggleHide} required>
+              <input type="number" min={0} className="pd-modal-input" placeholder="0"
+                value={form.numGovt} onChange={set("numGovt")} />
+            </ToggleField>
+          </div>
 
-   <h3 className="pd-section-title">3. Pre-Deployment Instructions</h3>
-<div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-  <ToggleField fieldKey="preDeployment" label="Specific instructions received"
-    shown={shown.preDeployment} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={3} value={form.preDeployment}
-      onChange={set("preDeployment")}
-      placeholder="Enter pre-deployment instructions..." />
-  </ToggleField>
-  <ToggleField fieldKey="action1" label="Action Taken"
-    shown={shown.action1} onShow={toggleShow} onHide={toggleHide} required>
-    <input type="text" className="pd-modal-input" placeholder="Action taken..."
-      value={form.action1} onChange={set("action1")} />
-  </ToggleField>
-</div>
+          <h3 className="pd-section-title">8. Remarks &amp; Recommendations</h3>
+          <div className="pd-form-grid">
+            <div className="pd-form-group pd-full">
+              <label className="pd-modal-label">Remarks / Recommendations <span style={{ color: "#dc2626" }}>*</span></label>
+              <textarea className="pd-modal-input" rows={3} value={form.remarks}
+                onChange={set("remarks")}
+                placeholder="Best practices, traffic assistance rendered, etc." />
+            </div>
+          </div>
 
-<h3 className="pd-section-title">4. Incidents &amp; Unusual Events</h3>
-<div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
-  Crime incidents, public disturbance, major events, etc.
-</div>
-<div className="pd-form-grid">
-  <ToggleField fieldKey="incidents" label="Incidents / Unusual situations"
-    shown={shown.incidents} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={3} value={form.incidents}
-      onChange={set("incidents")}
-      placeholder="Describe incidents or unusual events..." />
-  </ToggleField>
-  <ToggleField fieldKey="action2" label="Action Taken"
-    shown={shown.action2} onShow={toggleShow} onHide={toggleHide} required>
-    <input type="text" className="pd-modal-input" placeholder="Action taken..."
-      value={form.action2} onChange={set("action2")} />
-  </ToggleField>
-</div>
-
-<h3 className="pd-section-title">5. Public Safety Concerns</h3>
-<div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 12, fontStyle: "italic" }}>
-  Uncovered manholes, busted lights, uncollected garbage, fire hazard, missing bridge railings, etc.
-</div>
-<div className="pd-form-grid">
-  <ToggleField fieldKey="safetyConcerns" label="Safety concerns observed"
-    shown={shown.safetyConcerns} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={3} value={form.safetyConcerns}
-      onChange={set("safetyConcerns")}
-      placeholder="Describe public safety concerns..." />
-  </ToggleField>
-  <ToggleField fieldKey="action3" label="Action Taken"
-    shown={shown.action3} onShow={toggleShow} onHide={toggleHide} required>
-    <input type="text" className="pd-modal-input" placeholder="Action taken..."
-      value={form.action3} onChange={set("action3")} />
-  </ToggleField>
-</div>
-
-<h3 className="pd-section-title">6. Other Services &amp; Visited Areas</h3>
-<div className="pd-form-grid">
-  <ToggleField fieldKey="otherServices" label="Other public safety services rendered"
-    shown={shown.otherServices} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={2} value={form.otherServices}
-      onChange={set("otherServices")}
-      placeholder="Area and route security, assistance to PWD, recovered property, etc." />
-  </ToggleField>
-  <ToggleField fieldKey="visitedAreas" label="Visited areas"
-    shown={shown.visitedAreas} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={2} value={form.visitedAreas}
-      onChange={set("visitedAreas")}
-      placeholder="House, school, church, business, barangay, etc." />
-  </ToggleField>
-</div>
-
-<h3 className="pd-section-title">7. Persons Visited</h3>
-<div className="pd-form-grid">
-  <ToggleField fieldKey="personsVisited" label="Name of persons visited / local officials"
-    shown={shown.personsVisited} onShow={toggleShow} onHide={toggleHide} required>
-    <textarea className="pd-modal-input" rows={2} value={form.personsVisited}
-      onChange={set("personsVisited")}
-      placeholder="List persons visited..." />
-  </ToggleField>
-  <ToggleField fieldKey="numOfficials" label="No. of officials visited"
-    shown={shown.numOfficials} onShow={toggleShow} onHide={toggleHide} required>
-    <input type="number" min={0} className="pd-modal-input" placeholder="0"
-      value={form.numOfficials} onChange={set("numOfficials")} />
-  </ToggleField>
-  <ToggleField fieldKey="numGovt" label="Total gov't officials in area (incl. brgy.)"
-    shown={shown.numGovt} onShow={toggleShow} onHide={toggleHide} required>
-    <input type="number" min={0} className="pd-modal-input" placeholder="0"
-      value={form.numGovt} onChange={set("numGovt")} />
-  </ToggleField>
-</div>
-
-<h3 className="pd-section-title">8. Remarks &amp; Recommendations</h3>
-<div className="pd-form-grid">
-  <div className="pd-form-group pd-full">
-    <label className="pd-modal-label">Remarks / Recommendations <span style={{ color: "#dc2626" }}>*</span></label>
-    <textarea className="pd-modal-input" rows={3} value={form.remarks}
-      onChange={set("remarks")}
-      placeholder="Best practices, traffic assistance rendered, etc." />
-  </div>
-</div>
-
-<h3 className="pd-section-title">9. Photo Documentation</h3>
-<div style={{ marginBottom: 24 }}>
-
-  {/* Existing photos (edit mode) */}
-  {isEditing && existingPhotos.length > 0 && (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: "#6b7280",
-        textTransform: "uppercase", letterSpacing: "0.6px",
-        marginBottom: 10,
-        display: "flex", alignItems: "center", gap: 8,
-      }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-          viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        Uploaded Photos ({existingPhotos.length})
-      </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-        gap: 10,
-      }}>
-        {existingPhotos.map((url, i) => (
-          <div key={url} style={{
-            position: "relative", borderRadius: 8,
-            overflow: "hidden", aspectRatio: "1",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-            background: "#f3f4f6",
-          }}>
-            <img
-              src={url}
-              alt={`Photo ${i + 1}`}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-            {/* Dim overlay while deleting */}
-            {deletingPhoto === url && (
-              <div style={{
-                position: "absolute", inset: 0,
-                background: "rgba(0,0,0,0.6)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <div style={{ color: "white", fontSize: 11, fontWeight: 700 }}>Removing…</div>
+          <h3 className="pd-section-title">9. Photo Documentation</h3>
+          <div style={{ marginBottom: 24 }}>
+            {isEditing && existingPhotos.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: "#6b7280",
+                  textTransform: "uppercase", letterSpacing: "0.6px",
+                  marginBottom: 10,
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  Uploaded Photos ({existingPhotos.length})
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                  gap: 10,
+                }}>
+                  {existingPhotos.map((url, i) => (
+                    <div key={url} style={{
+                      position: "relative", borderRadius: 8,
+                      overflow: "hidden", aspectRatio: "1",
+                      border: "1px solid #e5e7eb",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                      background: "#f3f4f6",
+                    }}>
+                      <img src={url} alt={`Photo ${i + 1}`}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      {deletingPhoto === url && (
+                        <div style={{
+                          position: "absolute", inset: 0,
+                          background: "rgba(0,0,0,0.6)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <div style={{ color: "white", fontSize: 11, fontWeight: 700 }}>Removing…</div>
+                        </div>
+                      )}
+                      {deletingPhoto !== url && (
+                        <div
+                          style={{
+                            position: "absolute", inset: 0,
+                            background: "rgba(0,0,0,0.45)",
+                            display: "flex", flexDirection: "column",
+                            alignItems: "center", justifyContent: "center",
+                            gap: 6, opacity: 0, transition: "opacity 0.2s",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
+                        >
+                          <a href={url} target="_blank" rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              background: "rgba(255,255,255,0.9)", color: "#1e3a5f",
+                              border: "none", borderRadius: 4,
+                              fontSize: 11, fontWeight: 700,
+                              padding: "4px 10px", cursor: "pointer",
+                              fontFamily: "DM Sans, sans-serif",
+                              textDecoration: "none",
+                            }}>
+                            View
+                          </a>
+                          <button type="button"
+                            onClick={() => handleDeleteExistingPhoto(url)}
+                            style={{
+                              background: "#dc2626", color: "white",
+                              border: "none", borderRadius: 4,
+                              fontSize: 11, fontWeight: 700,
+                              padding: "4px 10px", cursor: "pointer",
+                              fontFamily: "DM Sans, sans-serif",
+                            }}>
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                      <div style={{
+                        position: "absolute", top: 5, left: 5,
+                        background: "rgba(255,255,255,0.9)",
+                        borderRadius: 4, padding: "1px 5px",
+                        fontSize: 9, fontWeight: 700, color: "#1e3a5f",
+                      }}>
+                        {i + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {existingPhotos.length < 10 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    margin: "16px 0 12px",
+                  }}>
+                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                    <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" }}>
+                      Add more photos
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+                  </div>
+                )}
               </div>
             )}
-            {/* Hover overlay */}
-            {deletingPhoto !== url && (
+
+            {(existingPhotos.length + images.length) < 10 && (
               <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
                 style={{
-                  position: "absolute", inset: 0,
-                  background: "rgba(0,0,0,0.45)",
-                  display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center",
-                  gap: 6, opacity: 0, transition: "opacity 0.2s",
+                  border: "2px dashed #93afc9", borderRadius: 10,
+                  padding: "32px 24px", textAlign: "center", cursor: "pointer",
+                  background: "rgba(30,58,95,0.03)", transition: "all 0.2s", marginBottom: 16,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(30,58,95,0.07)";
+                  e.currentTarget.style.borderColor = "#1e3a5f";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(30,58,95,0.03)";
+                  e.currentTarget.style.borderColor = "#93afc9";
+                }}
               >
-                
- <a             
-  href={url}
-  target="_blank"
-  rel="noreferrer"
-  onClick={(e) => e.stopPropagation()}
-  style={{
-    background: "rgba(255,255,255,0.9)", color: "#1e3a5f",
-    border: "none", borderRadius: 4,
-    fontSize: 11, fontWeight: 700,
-    padding: "4px 10px", cursor: "pointer",
-    fontFamily: "DM Sans, sans-serif",
-    textDecoration: "none",
-  }}
->
-  View
-</a>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteExistingPhoto(url)}
+                <input type="file" ref={fileInputRef} accept="image/*" multiple
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileSelect(e.target.files)} />
+                <div style={{
+                  width: 52, height: 52, borderRadius: "50%",
+                  background: "rgba(30,58,95,0.08)", margin: "0 auto 12px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
+                    viewBox="0 0 24 24" fill="none" stroke="#1e3a5f"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 16 12 12 8 16"/>
+                    <line x1="12" y1="12" x2="12" y2="21"/>
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                  </svg>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a5f", marginBottom: 4 }}>
+                  Drag photos here, or click to browse
+                </div>
+                <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                  Supports JPG, PNG, WEBP &nbsp;·&nbsp;{" "}
+                  {existingPhotos.length + images.length}/10 uploaded
+                </div>
+                <button type="button"
                   style={{
-                    background: "#dc2626", color: "white",
-                    border: "none", borderRadius: 4,
-                    fontSize: 11, fontWeight: 700,
-                    padding: "4px 10px", cursor: "pointer",
-                    fontFamily: "DM Sans, sans-serif",
+                    marginTop: 14, padding: "8px 22px",
+                    background: "#1e3a5f", color: "white",
+                    border: "none", borderRadius: 6,
+                    fontSize: 13, fontWeight: 700,
+                    fontFamily: "DM Sans, sans-serif", cursor: "pointer",
                   }}
-                >
-                  Remove
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                  Browse files
                 </button>
               </div>
             )}
-            {/* Number badge */}
-            <div style={{
-              position: "absolute", top: 5, left: 5,
-              background: "rgba(255,255,255,0.9)",
-              borderRadius: 4, padding: "1px 5px",
-              fontSize: 9, fontWeight: 700, color: "#1e3a5f",
-            }}>
-              {i + 1}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Divider before new uploads */}
-      {existingPhotos.length < 10 && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
-          margin: "16px 0 12px",
-        }}>
-          <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
-          <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, whiteSpace: "nowrap" }}>
-            Add more photos
-          </span>
-          <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
-        </div>
-      )}
-    </div>
-  )}
-
-  {/* Drop zone — hide if total is already 10 */}
-  {(existingPhotos.length + images.length) < 10 && (
-    <div
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleDrop}
-      onClick={() => fileInputRef.current?.click()}
-      style={{
-        border: "2px dashed #93afc9",
-        borderRadius: 10,
-        padding: "32px 24px",
-        textAlign: "center",
-        cursor: "pointer",
-        background: "rgba(30,58,95,0.03)",
-        transition: "all 0.2s",
-        marginBottom: 16,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(30,58,95,0.07)";
-        e.currentTarget.style.borderColor = "#1e3a5f";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(30,58,95,0.03)";
-        e.currentTarget.style.borderColor = "#93afc9";
-      }}
-    >
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => handleFileSelect(e.target.files)}
-      />
-      <div style={{
-        width: 52, height: 52, borderRadius: "50%",
-        background: "rgba(30,58,95,0.08)", margin: "0 auto 12px",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"
-          viewBox="0 0 24 24" fill="none" stroke="#1e3a5f"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="16 16 12 12 8 16"/>
-          <line x1="12" y1="12" x2="12" y2="21"/>
-          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-        </svg>
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "#1e3a5f", marginBottom: 4 }}>
-        Drag photos here, or click to browse
-      </div>
-      <div style={{ fontSize: 12, color: "#9ca3af" }}>
-        Supports JPG, PNG, WEBP &nbsp;·&nbsp;{" "}
-        {existingPhotos.length + images.length}/10 uploaded
-      </div>
-      <button
-        type="button"
-        style={{
-          marginTop: 14, padding: "8px 22px",
-          background: "#1e3a5f", color: "white",
-          border: "none", borderRadius: 6,
-          fontSize: 13, fontWeight: 700,
-          fontFamily: "DM Sans, sans-serif",
-          cursor: "pointer",
-        }}
-        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-      >
-        Browse files
-      </button>
-    </div>
-  )}
-
-  {/* Max reached banner */}
-  {(existingPhotos.length + images.length) >= 10 && (
-    <div style={{
-      padding: "12px 16px", borderRadius: 8,
-      background: "rgba(245,158,11,0.08)",
-      border: "1px solid #fcd34d",
-      fontSize: 12, fontWeight: 600, color: "#92400e",
-      display: "flex", alignItems: "center", gap: 8,
-      marginBottom: 16,
-    }}>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
-        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-      Maximum of 10 photos reached. Remove existing photos to add new ones.
-    </div>
-  )}
-
-  {/* New photos preview grid */}
-  {images.length > 0 && (
-    <>
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: "#6b7280",
-        textTransform: "uppercase", letterSpacing: "0.6px",
-        marginBottom: 10,
-        display: "flex", alignItems: "center", gap: 8,
-      }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-          viewBox="0 0 24 24" fill="none" stroke="#16a34a"
-          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="16 16 12 12 8 16"/>
-          <line x1="12" y1="12" x2="12" y2="21"/>
-          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-        </svg>
-        <span style={{ color: "#16a34a" }}>New photos to upload ({images.length})</span>
-      </div>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-        gap: 10,
-      }}>
-        {images.map((img, i) => (
-          <div key={img.id} style={{
-            position: "relative", borderRadius: 8,
-            overflow: "hidden", aspectRatio: "1",
-            border: "2px solid #86efac",
-            boxShadow: "0 1px 4px rgba(34,197,94,0.15)",
-            background: "#f3f4f6",
-          }}>
-            <img
-              src={img.preview}
-              alt={img.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-            <div
-              style={{
-                position: "absolute", inset: 0,
-                background: "rgba(0,0,0,0.45)",
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                gap: 6, opacity: 0, transition: "opacity 0.2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
-            >
+            {(existingPhotos.length + images.length) >= 10 && (
               <div style={{
-                fontSize: 10, color: "white", fontWeight: 600,
-                padding: "2px 6px", textAlign: "center",
-                maxWidth: "90%", overflow: "hidden",
-                textOverflow: "ellipsis", whiteSpace: "nowrap",
+                padding: "12px 16px", borderRadius: 8,
+                background: "rgba(245,158,11,0.08)", border: "1px solid #fcd34d",
+                fontSize: 12, fontWeight: 600, color: "#92400e",
+                display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
               }}>
-                {img.name}
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Maximum of 10 photos reached. Remove existing photos to add new ones.
               </div>
-              <button
-                type="button"
-                onClick={() => removeImage(img.id)}
-                style={{
-                  background: "#dc2626", color: "white",
-                  border: "none", borderRadius: 4,
-                  fontSize: 11, fontWeight: 700,
-                  padding: "4px 10px", cursor: "pointer",
-                  fontFamily: "DM Sans, sans-serif",
-                }}
-              >
-                Remove
-              </button>
-            </div>
-            {/* "New" badge */}
-            <div style={{
-              position: "absolute", top: 5, left: 5,
-              background: "#16a34a",
-              borderRadius: 4, padding: "1px 5px",
-              fontSize: 9, fontWeight: 700, color: "white",
-            }}>
-              NEW
-            </div>
-            <div style={{
-              position: "absolute", top: 5, right: 5,
-              background: "rgba(255,255,255,0.9)",
-              borderRadius: 4, padding: "1px 5px",
-              fontSize: 9, fontWeight: 700, color: "#1e3a5f",
-            }}>
-              {existingPhotos.length + i + 1}
-            </div>
-          </div>
-        ))}
+            )}
 
-        {(existingPhotos.length + images.length) < 10 && (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              borderRadius: 8, border: "2px dashed #cbd5e1",
-              aspectRatio: "1", display: "flex",
-              flexDirection: "column", alignItems: "center",
-              justifyContent: "center", cursor: "pointer",
-              background: "rgba(30,58,95,0.02)",
-              transition: "all 0.15s", gap: 4,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(30,58,95,0.07)";
-              e.currentTarget.style.borderColor = "#1e3a5f";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(30,58,95,0.02)";
-              e.currentTarget.style.borderColor = "#cbd5e1";
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-              viewBox="0 0 24 24" fill="none" stroke="#93afc9"
-              strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <span style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Add more</span>
+            {images.length > 0 && (
+              <>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: "#6b7280",
+                  textTransform: "uppercase", letterSpacing: "0.6px",
+                  marginBottom: 10, display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
+                    viewBox="0 0 24 24" fill="none" stroke="#16a34a"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 16 12 12 8 16"/>
+                    <line x1="12" y1="12" x2="12" y2="21"/>
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                  </svg>
+                  <span style={{ color: "#16a34a" }}>New photos to upload ({images.length})</span>
+                </div>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                  gap: 10,
+                }}>
+                  {images.map((img, i) => (
+                    <div key={img.id} style={{
+                      position: "relative", borderRadius: 8,
+                      overflow: "hidden", aspectRatio: "1",
+                      border: "2px solid #86efac",
+                      boxShadow: "0 1px 4px rgba(34,197,94,0.15)",
+                      background: "#f3f4f6",
+                    }}>
+                      <img src={img.preview} alt={img.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <div
+                        style={{
+                          position: "absolute", inset: 0,
+                          background: "rgba(0,0,0,0.45)",
+                          display: "flex", flexDirection: "column",
+                          alignItems: "center", justifyContent: "center",
+                          gap: 6, opacity: 0, transition: "opacity 0.2s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
+                      >
+                        <div style={{
+                          fontSize: 10, color: "white", fontWeight: 600,
+                          padding: "2px 6px", textAlign: "center",
+                          maxWidth: "90%", overflow: "hidden",
+                          textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {img.name}
+                        </div>
+                        <button type="button" onClick={() => removeImage(img.id)}
+                          style={{
+                            background: "#dc2626", color: "white",
+                            border: "none", borderRadius: 4,
+                            fontSize: 11, fontWeight: 700,
+                            padding: "4px 10px", cursor: "pointer",
+                            fontFamily: "DM Sans, sans-serif",
+                          }}>
+                          Remove
+                        </button>
+                      </div>
+                      <div style={{
+                        position: "absolute", top: 5, left: 5,
+                        background: "#16a34a", borderRadius: 4, padding: "1px 5px",
+                        fontSize: 9, fontWeight: 700, color: "white",
+                      }}>
+                        NEW
+                      </div>
+                      <div style={{
+                        position: "absolute", top: 5, right: 5,
+                        background: "rgba(255,255,255,0.9)",
+                        borderRadius: 4, padding: "1px 5px",
+                        fontSize: 9, fontWeight: 700, color: "#1e3a5f",
+                      }}>
+                        {existingPhotos.length + i + 1}
+                      </div>
+                    </div>
+                  ))}
+                  {(existingPhotos.length + images.length) < 10 && (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        borderRadius: 8, border: "2px dashed #cbd5e1",
+                        aspectRatio: "1", display: "flex",
+                        flexDirection: "column", alignItems: "center",
+                        justifyContent: "center", cursor: "pointer",
+                        background: "rgba(30,58,95,0.02)", transition: "all 0.15s", gap: 4,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(30,58,95,0.07)";
+                        e.currentTarget.style.borderColor = "#1e3a5f";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(30,58,95,0.02)";
+                        e.currentTarget.style.borderColor = "#cbd5e1";
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                        viewBox="0 0 24 24" fill="none" stroke="#93afc9"
+                        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                      <span style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Add more</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        )}
-      </div>
-    </>
-  )}
-</div>
-
         </div>
 
         <div className="pd-modal-footer">
@@ -1178,6 +1183,13 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
             {submitting ? "Submitting..." : isEditing ? "Update After Patrol Report" : "Submit After Patrol Report"}
           </button>
         </div>
+        {deletingPhotoConfirm && (
+  <DeleteConfirmDialog
+    reportDate="this photo"
+    onConfirm={confirmDeletePhoto}
+    onCancel={() => setDeletingPhotoConfirm(null)}
+  />
+)}
       </div>
     </div>
   );
@@ -1185,43 +1197,40 @@ await onSubmit(patrol.patrol_id, form, myShift, images);
 
 // ── My Reports History Modal ───────────────────────────────────────
 const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
-   const [isAdmin] = useState(() => getMyRole() === "Administrator");
+  const [isAdmin]    = useState(() => isAdminRole(getMyRole()));
   const [reports,    setReports]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [activeDate, setActiveDate] = useState(null);
   const [deleting,   setDeleting]   = useState(null);
-  
+  const [confirmDelete, setConfirmDelete] = useState(null); // { reportId, reportDate }
 
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
 
   const fetchReports = async () => {
-  setLoading(true);
-  try {
-    const role = getMyRole();
-    const isAdmin = role === "Administrator";
-    const endpoint = isAdmin
-      ? `${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports`
-      : `${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`;
+    setLoading(true);
+    try {
+      const role    = getMyRole();
+      const adminOk = isAdminRole(role);
+      const endpoint = adminOk
+        ? `${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports`
+        : `${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`;
 
-    const res = await fetch(endpoint, {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const data = await res.json();
-    if (data.success) {
-      setReports(data.data);
-      if (data.data.length > 0 && !activeDate) {
-        setActiveDate(toInputDate(data.data[0].patrol_date));
+      const res  = await fetch(endpoint, { headers: { Authorization: `Bearer ${token()}` } });
+      const data = await res.json();
+      if (data.success) {
+        setReports(data.data);
+        if (data.data.length > 0 && !activeDate) {
+          setActiveDate(toInputDate(data.data[0].patrol_date));
+        }
       }
+    } catch (err) {
+      console.error("Fetch my reports error:", err);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Fetch my reports error:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleDelete = async (reportId) => {
-    if (!window.confirm("Delete this report? This cannot be undone.")) return;
     setDeleting(reportId);
     try {
       const res  = await fetch(`${API_BASE}/patrol/after-reports/${reportId}`, {
@@ -1392,7 +1401,7 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                         </button>
                         <button className="pd-action-btn pd-action-btn-delete"
                           disabled={deleting === r.report_id}
-                          onClick={() => handleDelete(r.report_id)}>
+                          onClick={() => setConfirmDelete({ reportId: r.report_id, reportDate: formatDate(r.patrol_date) })}>
                           {deleting === r.report_id ? "Deleting…" : (
                             <>
                               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
@@ -1443,6 +1452,18 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
         <div className="pd-modal-footer">
           <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Close</button>
         </div>
+
+        {confirmDelete && (
+          <DeleteConfirmDialog
+            reportDate={confirmDelete.reportDate}
+            onConfirm={() => {
+              const id = confirmDelete.reportId;
+              setConfirmDelete(null);
+              handleDelete(id);
+            }}
+            onCancel={() => setConfirmDelete(null)}
+          />
+        )}
       </div>
     </div>
   );
@@ -1620,12 +1641,12 @@ const PatrollerCard = ({ p }) => (
   </div>
 );
 
-
 // ── Main AfterPatrol ───────────────────────────────────────────────
 const AfterPatrol = () => {
-   const [isAdmin] = useState(() => getMyRole() === "Administrator");
+  const [isAdmin] = useState(() => isAdminRole(getMyRole()));
   const [patrols,         setPatrols]         = useState([]);
   const [loading,         setLoading]         = useState(false);
+  const [submitLoading,   setSubmitLoading]   = useState(false);
   const [notif,           setNotif]           = useState(null);
   const [selectedReport,  setSelectedReport]  = useState(null);
   const [selectedView,    setSelectedView]    = useState(null);
@@ -1634,80 +1655,75 @@ const AfterPatrol = () => {
   const [currentPage,     setCurrentPage]     = useState(1);
   const ITEMS_PER_PAGE = 15;
   const [selectedBeat, setSelectedBeat] = useState(null);
-  const [geoJSONData, setGeoJSONData] = useState(null);
-
+  const [geoJSONData,  setGeoJSONData]  = useState(null);
 
   const showToast = (message, type = "success") => {
     setNotif({ message, type });
   };
 
   const fetchMyPatrols = async () => {
-  setLoading(true);
-  try {
-    const role = getMyRole();
-    const isAdmin = role === "Administrator";
-    const endpoint = isAdmin
-      ? `${API_BASE}/patrol/patrols`
-      : `${API_BASE}/patrol/my-patrols`;
+    setLoading(true);
+    try {
+      const role    = getMyRole();
+      const adminOk = isAdminRole(role);
+      const endpoint = adminOk
+        ? `${API_BASE}/patrol/patrols`
+        : `${API_BASE}/patrol/my-patrols`;
 
-    const res = await fetch(endpoint, {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const data = await res.json();
-    if (data.success) setPatrols(data.data);
-  } catch (err) {
-    console.error("AfterPatrol fetch error:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+      const res  = await fetch(endpoint, { headers: { Authorization: `Bearer ${token()}` } });
+      const data = await res.json();
+      if (data.success) setPatrols(data.data);
+    } catch (err) {
+      console.error("AfterPatrol fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => { fetchMyPatrols(); }, []);
   useEffect(() => {
-  fetch("/bacoor_barangays.geojson")
-    .then((r) => r.json())
-    .then((data) => setGeoJSONData(data))
-    .catch((err) => console.error("GeoJSON load error:", err));
-}, []);
+    fetch("/bacoor_barangays.geojson")
+      .then((r) => r.json())
+      .then((data) => setGeoJSONData(data))
+      .catch((err) => console.error("GeoJSON load error:", err));
+  }, []);
 
+  const handleSubmitReport = async (patrolId, formData, shift, images = []) => {
+     setSubmitLoading(true); 
+    try {
+      const cleaned = {
+        ...formData,
+        numOfficials: formData.numOfficials !== "" && formData.numOfficials != null
+          ? Number(formData.numOfficials) : null,
+        numGovt: formData.numGovt !== "" && formData.numGovt != null
+          ? Number(formData.numGovt) : null,
+      };
 
-const handleSubmitReport = async (patrolId, formData, shift, images = []) => {
-  try {
-    const cleaned = {
-      ...formData,
-      numOfficials: formData.numOfficials !== "" && formData.numOfficials != null
-        ? Number(formData.numOfficials) : null,
-      numGovt: formData.numGovt !== "" && formData.numGovt != null
-        ? Number(formData.numGovt) : null,
-    };
+      const res  = await fetch(`${API_BASE}/patrol/patrols/${patrolId}/after-report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ ...cleaned, shift }),
+      });
+      const data = await res.json();
 
-    const res  = await fetch(`${API_BASE}/patrol/patrols/${patrolId}/after-report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-      body: JSON.stringify({ ...cleaned, shift }),
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      // Upload images if any
-      if (images.length > 0) {
-        const formDataImg = new FormData();
-        images.forEach((img) => formDataImg.append("photos", img.file));
-
-        await fetch(`${API_BASE}/patrol/after-reports/${data.report_id}/photos`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token()}` },
-          body: formDataImg,
-        });
+      if (data.success) {
+        if (images.length > 0) {
+          const formDataImg = new FormData();
+          images.forEach((img) => formDataImg.append("photos", img.file));
+          await fetch(`${API_BASE}/patrol/after-reports/${data.report_id}/photos`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token()}` },
+            body: formDataImg,
+          });
+        }
+        showToast(data.message || "After Patrol Report submitted successfully!", "success");
+      } else {
+        showToast(data.message || "Something went wrong.", "error");
       }
-      showToast(data.message || "After Patrol Report submitted successfully!", "success");
-    } else {
-      showToast(data.message || "Something went wrong.", "error");
+    } catch {
+      showToast("Server error while submitting report.", "error");
     }
-  } catch {
-    showToast("Server error while submitting report.", "error");
-  }
-};
+  };
 
   const handleEditFromHistory = (patrol, existingReport) => {
     const myShift = getMyShift(patrol);
@@ -1718,85 +1734,66 @@ const handleSubmitReport = async (patrolId, formData, shift, images = []) => {
     }, 150);
   };
 
-  // ── KEY FUNCTION: check for existing report before opening form ──
   const handleOpenAfterReport = (patrol, myShift) => {
-
     if (isAdmin) {
-    showToast("Administrators cannot submit after patrol reports. Use History to edit existing reports.", "error");
-    return;
-  }
-const status = getPatrolStatus(patrol);
+      showToast("Administrators cannot submit after patrol reports. Use History to edit existing reports.", "error");
+      return;
+    }
+    const status = getPatrolStatus(patrol);
+    if (status === "upcoming") {
+      showToast("This patrol has not started yet. You cannot submit a report for an upcoming patrol.", "error");
+      return;
+    }
 
-  if (status === "upcoming") {
-    showToast("This patrol has not started yet. You cannot submit a report for an upcoming patrol.", "error");
-    return;
-  }
+    setSelectedReport({ patrol, existingReport: null, myShift });
 
-  // Open modal instantly — no waiting
-  setSelectedReport({ patrol, existingReport: null, myShift });
-
-  // Check for existing report in the background
-  fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
-    headers: { Authorization: `Bearer ${token()}` },
-  })
-    .then((r) => r.json())
-    .then((data) => {
-      if (!data.success) return;
-      const todayStr = toInputDate(new Date());
-      const existing = data.data.find(
-        (r) => toInputDate(r.patrol_date) === todayStr &&
-               (r.shift === myShift || !myShift)
-      );
-      if (existing) {
-        // Silently swap to the existing report — modal is already open
-        setSelectedReport({ patrol, existingReport: existing, myShift });
-        showToast("A report for today already exists. Loaded for editing.", "info");
-      }
+    fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
+      headers: { Authorization: `Bearer ${token()}` },
     })
-    .catch(() => {
-      // Fail silently — user can still submit, backend handles deduplication
-    });
-};
-
-  // ── Filter + paginate ──────────────────────────────────────────
-const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
-
-const filtered = patrols.filter((p) => {
-  const status      = getPatrolStatus(p);
-  const matchSearch = !filters.search ||
-    (p.patrol_name      || "").toLowerCase().includes(filters.search.toLowerCase()) ||
-    (p.mobile_unit_name || "").toLowerCase().includes(filters.search.toLowerCase());
-  const matchStatus = !filters.status    || status === filters.status;
-  const matchFrom   = !filters.date_from || new Date(p.start_date) >= new Date(filters.date_from);
-  const matchTo     = !filters.date_to   || new Date(p.end_date)   <= new Date(filters.date_to);
-  return matchSearch && matchStatus && matchFrom && matchTo;
-});
-
-const sorted = [...filtered].sort((a, b) => {
-  const statusA = STATUS_ORDER[getPatrolStatus(a)] ?? 3;
-  const statusB = STATUS_ORDER[getPatrolStatus(b)] ?? 3;
-  if (statusA !== statusB) return statusA - statusB;
-
-  const startA = parseLocalDate(a.start_date)?.getTime() ?? 0;
-  const startB = parseLocalDate(b.start_date)?.getTime() ?? 0;
-  if (startA !== startB) return startA - startB;
-
-  const endA = parseLocalDate(a.end_date)?.getTime() ?? 0;
-  const endB = parseLocalDate(b.end_date)?.getTime() ?? 0;
-  return endA - endB;
-});
-
- 
-
- const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
-const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-  const stats = {
-    total:     patrols.length,
-    active:    patrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming:  patrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
-    completed: patrols.filter((p) => getPatrolStatus(p) === "completed").length,
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) return;
+        const todayStr = toInputDate(new Date());
+        const existing = data.data.find(
+          (r) => toInputDate(r.patrol_date) === todayStr &&
+                 (r.shift === myShift || !myShift)
+        );
+        if (existing) {
+          setSelectedReport({ patrol, existingReport: existing, myShift });
+          showToast("A report for today already exists. Loaded for editing.", "info");
+        }
+      })
+      .catch(() => {});
   };
+
+  // ── Filter + paginate ────────────────────────────────────────────
+  const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
+
+  const filtered = patrols.filter((p) => {
+    const status      = getPatrolStatus(p);
+    const matchSearch = !filters.search ||
+      (p.patrol_name      || "").toLowerCase().includes(filters.search.toLowerCase()) ||
+      (p.mobile_unit_name || "").toLowerCase().includes(filters.search.toLowerCase());
+    const matchStatus = !filters.status    || status === filters.status;
+    const matchFrom   = !filters.date_from || new Date(p.start_date) >= new Date(filters.date_from);
+    const matchTo     = !filters.date_to   || new Date(p.end_date)   <= new Date(filters.date_to);
+    return matchSearch && matchStatus && matchFrom && matchTo;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const statusA = STATUS_ORDER[getPatrolStatus(a)] ?? 3;
+    const statusB = STATUS_ORDER[getPatrolStatus(b)] ?? 3;
+    if (statusA !== statusB) return statusA - statusB;
+    const startA = parseLocalDate(a.start_date)?.getTime() ?? 0;
+    const startB = parseLocalDate(b.start_date)?.getTime() ?? 0;
+    if (startA !== startB) return startA - startB;
+    const endA = parseLocalDate(a.end_date)?.getTime() ?? 0;
+    const endB = parseLocalDate(b.end_date)?.getTime() ?? 0;
+    return endA - endB;
+  });
+
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
+  const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleFilterChange = (e) => {
     setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -1809,17 +1806,13 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
   };
 
   return (
-     <div className="ap-wrap pd-content-area">
-
+    <div className="ap-wrap pd-content-area">
       <div className="pd-page-header">
         <div className="pd-page-header-left">
-          <h1>After Patrol </h1>
+          <h1>After Patrol</h1>
           <p>Your assigned patrol duties and after-patrol reports</p>
         </div>
-       
       </div>
-
-      
 
       <div className="ap-filterbar">
         <div className="ap-filterbar-inner">
@@ -1829,21 +1822,11 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
           </div>
-          <input
-            className="ap-fsel"
-            type="text"
+          <input className="ap-fsel" type="text"
             placeholder="Search by patrol name or unit..."
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            style={{ flex: 1, minWidth: 160 }}
-          />
-          <select
-            className="ap-fsel"
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-          >
+            name="search" value={filters.search}
+            onChange={handleFilterChange} style={{ flex: 1, minWidth: 160 }} />
+          <select className="ap-fsel" name="status" value={filters.status} onChange={handleFilterChange}>
             <option value="">All Statuses</option>
             <option value="active">Active</option>
             <option value="upcoming">Upcoming</option>
@@ -1851,17 +1834,12 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
           </select>
           <div className="ap-date-range">
             <input type="date" className="ap-fsel ap-fsel-date"
-              name="date_from" value={filters.date_from}
-              onChange={handleFilterChange} />
+              name="date_from" value={filters.date_from} onChange={handleFilterChange} />
             <span className="ap-date-arrow">→</span>
             <input type="date" className="ap-fsel ap-fsel-date"
-              name="date_to" value={filters.date_to}
-              onChange={handleFilterChange} />
+              name="date_to" value={filters.date_to} onChange={handleFilterChange} />
           </div>
-          <button className="ap-apply-btn"
-            onClick={() => setCurrentPage(1)}>
-            Apply Filters
-          </button>
+          <button className="ap-apply-btn" onClick={() => setCurrentPage(1)}>Apply Filters</button>
           {(filters.search || filters.status || filters.date_from || filters.date_to) && (
             <button className="ap-clear-btn" onClick={clearFilters}>↺</button>
           )}
@@ -1871,114 +1849,95 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
       <div className="pd-table-card">
         <div className="pd-table-container">
           <table className="pd-data-table">
-           <thead>
-  <tr>
-    <th>Patrol Name</th>
-    <th>Status</th>
-    <th>Duration</th>
-  {isAdmin ? <th>Patrollers</th> : <th>My Shift</th>}
-    <th>Actions</th>
-  </tr>
-</thead>
+            <thead>
+              <tr>
+                <th>Patrol Name</th>
+                <th>Status</th>
+                <th>Duration</th>
+                {isAdmin ? <th>Patrollers</th> : <th>My Shift</th>}
+                <th>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>Loading...</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>Loading...</td></tr>
               ) : paginated.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No patrol assignments found.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: "center", padding: 32, color: "#9ca3af" }}>No patrol assignments found.</td></tr>
               ) : paginated.map((patrol) => {
                 const status     = getPatrolStatus(patrol);
                 const myShift    = getMyShift(patrol);
                 const patrollers = patrol.patrollers || [];
                 const amCount    = patrollers.filter((p) => p.shift === "AM").length;
                 const pmCount    = patrollers.filter((p) => p.shift === "PM").length;
-                const barangays  = [...new Set(
-                  (patrol.routes || [])
-                    .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-                    .map((r) => r.barangay)
-                )];
                 return (
-                 <tr key={patrol.patrol_id}>
-  <td>
-    <span className="ap-patrol-name-badge">
-      {patrol.patrol_name}
-    </span>
-  </td>
-  <td><StatusBadge status={status} /></td>
-  <td>
-    <span className="ap-duration">
-      {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
-    </span>
-  </td>
-  {isAdmin ? (
-    <td>
-      {patrollers.length > 0 ? (
-        <div className="ap-patroller-counts">
-          {amCount > 0 && <span className="ap-shift-pill ap-shift-am">AM · {amCount} officer{amCount !== 1 ? "s" : ""}</span>}
-          {pmCount > 0 && <span className="ap-shift-pill ap-shift-pm">PM · {pmCount} officer{pmCount !== 1 ? "s" : ""}</span>}
-          {patrollers.length - amCount - pmCount > 0 && (
-            <span className="pd-count-pill pd-count-patroller">{patrollers.length - amCount - pmCount} other</span>
-          )}
-        </div>
-      ) : <span className="ap-empty">—</span>}
-    </td>
-  ) : (
-    <td>
-      {myShift ? <ShiftBadge shift={myShift} /> : <span className="ap-empty">—</span>}
-    </td>
-  )}
-  <td>
-    <div className="ap-wrap pd-action-links">
-      <button className="pd-action-btn pd-action-btn-view"
-        onClick={() => setSelectedBeat(patrol)}>
-        <ViewIcon /> View
-      </button>
-      <button className="pd-action-btn pd-action-btn-history"
-        onClick={() => setSelectedHistory(patrol)}>
-        <HistoryIcon /> History
-      </button>
-      {!isAdmin && (
-  <button className="pd-action-btn pd-action-btn-report"
-    onClick={() => handleOpenAfterReport(patrol, myShift)}>
-    <ReportIcon /> After Report
-  </button>
-)}
-    </div>
-  </td>
-</tr> 
+                  <tr key={patrol.patrol_id}>
+                    <td>
+                      <span className="ap-patrol-name-badge">{patrol.patrol_name}</span>
+                    </td>
+                    <td><StatusBadge status={status} /></td>
+                    <td>
+                      <span className="ap-duration">
+                        {formatDate(patrol.start_date)} — {formatDate(patrol.end_date)}
+                      </span>
+                    </td>
+                    {isAdmin ? (
+                      <td>
+                        {patrollers.length > 0 ? (
+                          <div className="ap-patroller-counts">
+                            {amCount > 0 && <span className="ap-shift-pill ap-shift-am">AM · {amCount} officer{amCount !== 1 ? "s" : ""}</span>}
+                            {pmCount > 0 && <span className="ap-shift-pill ap-shift-pm">PM · {pmCount} officer{pmCount !== 1 ? "s" : ""}</span>}
+                            {patrollers.length - amCount - pmCount > 0 && (
+                              <span className="pd-count-pill pd-count-patroller">{patrollers.length - amCount - pmCount} other</span>
+                            )}
+                          </div>
+                        ) : <span className="ap-empty">—</span>}
+                      </td>
+                    ) : (
+                      <td>
+                        {myShift ? <ShiftBadge shift={myShift} /> : <span className="ap-empty">—</span>}
+                      </td>
+                    )}
+                    <td>
+                      <div className="ap-wrap pd-action-links">
+                        <button className="pd-action-btn pd-action-btn-view"
+                          onClick={() => setSelectedBeat(patrol)}>
+                          <ViewIcon /> View
+                        </button>
+                        <button className="pd-action-btn pd-action-btn-history"
+                          onClick={() => setSelectedHistory(patrol)}>
+                          <HistoryIcon /> History
+                        </button>
+                        {!isAdmin && (
+                          <button className="pd-action-btn pd-action-btn-report"
+                            onClick={() => handleOpenAfterReport(patrol, myShift)}>
+                            <ReportIcon /> After Report
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-
-       {!loading && filtered.length > 0 && (
-  <div className="psch-table-footer">
-    <span>
-      Showing {sorted.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–
-{Math.min(currentPage * ITEMS_PER_PAGE, sorted.length)} of {sorted.length} records
-    </span>
-    <div className="psch-pagination">
-      <button
-        className="psch-page-btn"
-        disabled={currentPage === 1}
-        onClick={() => setCurrentPage((p) => p - 1)}
-      >
-        Previous
-      </button>
-      <span className="psch-page-current">
-        Page {currentPage} of {totalPages || 1}
-      </span>
-      <button
-        className="psch-page-btn"
-        disabled={currentPage === totalPages || totalPages === 0}
-        onClick={() => setCurrentPage((p) => p + 1)}
-      >
-        Next
-      </button>
-    </div>
-  </div>
-)}
-
+         
+        {!loading && filtered.length > 0 && (
+          <div className="psch-table-footer">
+            <span>
+              Showing {sorted.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–
+              {Math.min(currentPage * ITEMS_PER_PAGE, sorted.length)} of {sorted.length} records
+            </span>
+            <div className="psch-pagination">
+              <button className="psch-page-btn" disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}>Previous</button>
+              <span className="psch-page-current">Page {currentPage} of {totalPages || 1}</span>
+              <button className="psch-page-btn"
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage((p) => p + 1)}>Next</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedReport && (
@@ -1988,14 +1947,11 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
           myShift={selectedReport.myShift}
           onClose={() => setSelectedReport(null)}
           onSubmit={handleSubmitReport}
-           onShowToast={showToast}
+          onShowToast={showToast}
         />
       )}
       {selectedView && (
-        <ViewPatrolModal
-          patrol={selectedView}
-          onClose={() => setSelectedView(null)}
-        />
+        <ViewPatrolModal patrol={selectedView} onClose={() => setSelectedView(null)} />
       )}
       {selectedHistory && (
         <MyReportsModal
@@ -2014,17 +1970,19 @@ const paginated  = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage 
           duration={3500}
         />
       )}
-    {selectedBeat && geoJSONData && (
-  <BeatCard
-    patrol={selectedBeat}
-    geoJSONData={geoJSONData}
-    onClose={() => setSelectedBeat(null)}
-    onEdit={() => {}}
-    onDelete={() => {}}
-    hideEdit={true}
-    hideDelete={true}
-  />
-)}
+
+      {selectedBeat && geoJSONData && (
+        <BeatCard
+          patrol={selectedBeat}
+          geoJSONData={geoJSONData}
+          onClose={() => setSelectedBeat(null)}
+          onEdit={() => {}}
+          onDelete={() => {}}
+          hideEdit={true}
+          hideDelete={true}
+        />
+      )}
+      <LoadingModal isOpen={loading || submitLoading} message={loading ? "Loading patrols..." : "Submitting report..."} />
     </div>
   );
 };

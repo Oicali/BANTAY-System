@@ -304,6 +304,157 @@ body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; ba
 
 .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
 
+/* ─────────────────────────────────────────────────────────────────
+   ADD THESE RULES to the bottom of PatrolDashboard.css
+   ───────────────────────────────────────────────────────────────── */
+
+/* Filter select dropdown (Status, Vehicle Type) */
+.pd-filter-select {
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+  background: var(--white);
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 130px;
+}
+.pd-filter-select:focus {
+  border-color: var(--navy-primary);
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.08);
+}
+
+/* Searchable barangay location dropdown */
+.pd-location-dropdown {
+  position: relative;
+  min-width: 170px;
+  flex: 1;
+}
+
+.pd-location-input {
+  width: 100%;
+}
+
+.pd-location-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pd-location-option {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pd-location-option:hover {
+  background: var(--gray-50);
+}
+.pd-location-selected {
+  background: rgba(30, 58, 95, 0.08);
+  color: var(--navy-primary);
+  font-weight: 600;
+}
+.pd-location-clear {
+  color: var(--gray-400);
+  border-bottom: 1px solid var(--gray-200);
+  font-style: italic;
+}
+.pd-location-empty {
+  color: var(--gray-400);
+  font-style: italic;
+  cursor: default;
+}
+/* ─────────────────────────────────────────────────────────────────
+   ADD THESE RULES to the bottom of PatrolDashboard.css
+   ───────────────────────────────────────────────────────────────── */
+
+/* Make the toggle row push the Add button to the far right */
+.table-header {
+  justify-content: space-between;
+}
+
+/* Filter select dropdown (Status, Vehicle Type) */
+.pd-filter-select {
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+  background: var(--white);
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 130px;
+}
+.pd-filter-select:focus {
+  border-color: var(--navy-primary);
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.08);
+}
+
+/* Searchable barangay location dropdown */
+.pd-location-dropdown {
+  position: relative;
+  min-width: 170px;
+  flex: 1;
+}
+
+.pd-location-input {
+  width: 100%;
+}
+
+.pd-location-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pd-location-option {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pd-location-option:hover {
+  background: var(--gray-50);
+}
+.pd-location-selected {
+  background: rgba(30, 58, 95, 0.08);
+  color: var(--navy-primary);
+  font-weight: 600;
+}
+.pd-location-clear {
+  color: var(--gray-400);
+  border-bottom: 1px solid var(--gray-200);
+  font-style: italic;
+}
+.pd-location-empty {
+  color: var(--gray-400);
+  font-style: italic;
+  cursor: default;
+}
 /* FORM */
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: 13px; font-weight: 600; color: var(--gray-700); }

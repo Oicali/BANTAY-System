@@ -210,6 +210,52 @@ const getAvailablePatrollers = async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+// ─────────────────────────────────────────────
+// GET /patrol/available-mobile-units
+// ─────────────────────────────────────────────
+const getAvailableMobileUnits = async (req, res) => {
+  const { start, end, exclude_patrol_id } = req.query;
+  try {
+    let result;
+    if (start && end) {
+      if (exclude_patrol_id) {
+        result = await pool.query(
+          `SELECT mobile_unit_id, mobile_unit_name, vehicle_type, plate_number
+           FROM mobile_unit
+           WHERE mobile_unit_id NOT IN (
+             SELECT mobile_unit_id FROM patrol_assignment
+             WHERE start_date <= $2
+               AND end_date   >= $1
+               AND patrol_id  != $3
+           )
+           ORDER BY mobile_unit_name`,
+          [start, end, parseInt(exclude_patrol_id)]
+        );
+      } else {
+        result = await pool.query(
+          `SELECT mobile_unit_id, mobile_unit_name, vehicle_type, plate_number
+           FROM mobile_unit
+           WHERE mobile_unit_id NOT IN (
+             SELECT mobile_unit_id FROM patrol_assignment
+             WHERE start_date <= $2
+               AND end_date   >= $1
+           )
+           ORDER BY mobile_unit_name`,
+          [start, end]
+        );
+      }
+    } else {
+      result = await pool.query(
+        `SELECT mobile_unit_id, mobile_unit_name, vehicle_type, plate_number
+         FROM mobile_unit ORDER BY mobile_unit_name`
+      );
+    }
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error("Available mobile units error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 // ─────────────────────────────────────────────
 // GET /patrol/mobile-units
@@ -503,32 +549,50 @@ const createPatrol = async (req, res) => {
       ...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])]),
     ];
     const conflicts = await checkPatrollerConflicts(
-      client,
-      allIds,
-      start_date,
-      end_date,
-    );
-    if (conflicts.length > 0) {
-      const c = conflicts[0];
-      const fmt = (d) => {
-        const dt = new Date(d);
-        return new Date(
-          dt.getFullYear(),
-          dt.getMonth(),
-          dt.getDate(),
-        ).toLocaleDateString("en-PH", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
-      };
-      return res.status(400).json({
-        success: false,
-        message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
-      });
-    }
+  client,
+  allIds,
+  start_date,
+  end_date,
+);
+if (conflicts.length > 0) {
+  const c = conflicts[0];
+  const fmt = (d) => {
+    const dt = new Date(d);
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).toLocaleDateString("en-PH", {
+      month: "short", day: "numeric", year: "numeric",
+    });
+  };
+  return res.status(400).json({
+    success: false,
+    message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
+  });
+}
 
-    await client.query("BEGIN");
+// ── NEW: mobile unit conflict check ──
+const mobileConflict = await client.query(
+  `SELECT patrol_name, start_date, end_date
+   FROM patrol_assignment
+   WHERE mobile_unit_id = $1
+     AND start_date <= $2
+     AND end_date   >= $3
+   LIMIT 1`,
+  [mobile_unit_id, end_date, start_date]
+);
+if (mobileConflict.rows.length > 0) {
+  const c = mobileConflict.rows[0];
+  const fmt = (d) => {
+    const dt = new Date(d);
+    return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).toLocaleDateString("en-PH", {
+      month: "short", day: "numeric", year: "numeric",
+    });
+  };
+  return res.status(400).json({
+    success: false,
+    message: `This mobile unit is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
+  });
+}
+
+await client.query("BEGIN");
 
     const patrolResult = await client.query(
       `INSERT INTO patrol_assignment (patrol_name, mobile_unit_id, start_date, end_date, created_by)
@@ -653,15 +717,55 @@ const updatePatrol = async (req, res) => {
   }
 
   const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+try {
+  // Check mobile unit conflict — exclude current patrol
+  const mobileConflict = await client.query(
+    `SELECT pa.patrol_name, pa.start_date, pa.end_date
+     FROM patrol_assignment pa
+     WHERE pa.mobile_unit_id = $1
+       AND pa.start_date <= $2
+       AND pa.end_date   >= $3
+       AND pa.patrol_id  != $4
+     LIMIT 1`,
+    [mobile_unit_id, end_date, start_date, id]
+  );
+  if (mobileConflict.rows.length > 0) {
+    const c = mobileConflict.rows[0];
+    const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+    client.release();
+    return res.status(400).json({
+      success: false,
+      message: `This mobile unit is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
+    });
+  }
 
-    await client.query(
-      `UPDATE patrol_assignment
-       SET patrol_name=$1, mobile_unit_id=$2, start_date=$3, end_date=$4, updated_at=CURRENT_TIMESTAMP
-       WHERE patrol_id=$5`,
-      [patrol_name, mobile_unit_id, start_date, end_date, id],
-    );
+  // Check patroller conflicts — exclude current patrol
+  const allPatrollerIds = await client.query(
+    `SELECT DISTINCT active_patroller_id FROM patrol_assignment_patroller WHERE patrol_id = $1`,
+    [id]
+  );
+  const patrollerIds = allPatrollerIds.rows.map((r) => r.active_patroller_id);
+  if (patrollerIds.length > 0) {
+    const conflicts = await checkPatrollerConflicts(client, patrollerIds, start_date, end_date, parseInt(id));
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+      client.release();
+      return res.status(400).json({
+        success: false,
+        message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
+      });
+    }
+  }
+
+  await client.query("BEGIN");
+
+  await client.query(
+    `UPDATE patrol_assignment
+     SET patrol_name=$1, mobile_unit_id=$2, start_date=$3, end_date=$4, updated_at=CURRENT_TIMESTAMP
+     WHERE patrol_id=$5`,
+    [patrol_name, mobile_unit_id, start_date, end_date, id],
+  );
 
     if (barangays !== undefined) {
       await client.query(
@@ -1069,7 +1173,7 @@ const submitAfterPatrolReport = async (req, res) => {
   try {
     let active_patroller_id;
 
-    if (userRole === "Administrator") {
+    if (userRole === "Administrator" || userRole === "Technical Administrator") {
       // Admins edit only — find the existing report by patrol + date
       // If a shift was sent use it, otherwise find any report for that date
       let existingQuery, existingParams;
@@ -1346,7 +1450,7 @@ const deleteAfterPatrolReport = async (req, res) => {
   try {
     let result;
 
-    if (userRole === "Administrator") {
+    if (userRole === "Administrator" || userRole === "Technical Administrator"){
       // Admins can delete any report
       result = await pool.query(
         `DELETE FROM after_patrol_reports WHERE report_id = $1`,
@@ -1564,6 +1668,7 @@ module.exports = {
   getPatrolStats,
   getActivePatrollers,
   getAvailablePatrollers,
+  getAvailableMobileUnits,
   getMobileUnits,
   createMobileUnit,
   submitAfterPatrolReport,

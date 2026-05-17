@@ -121,6 +121,8 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
   const [patrollerSearch, setPatrollerSearch] = useState("");
   const [showPatrollers, setShowPatrollers]   = useState(false);
   const [patrollerPage, setPatrollerPage]     = useState(1);
+  const [availableMobileUnits, setAvailableMobileUnits] = useState(null);
+const [loadingMobileUnits, setLoadingMobileUnits]     = useState(false);
 
   // The full list shown in the checklist (available + already assigned to this patrol)
   const [patrollerList, setPatrollerList]         = useState([]);
@@ -215,6 +217,31 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
       })
       .finally(() => setLoadingPatrollers(false));
   }, [patrol?.patrol_id]);
+
+  useEffect(() => {
+  if (!form.start_date || !form.end_date) return;
+
+  setLoadingMobileUnits(true);
+  fetch(
+    `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}&exclude_patrol_id=${patrol.patrol_id}`,
+    { headers: { Authorization: `Bearer ${token()}` } }
+  )
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.success) {
+        // Always include the currently assigned unit even if it conflicts with itself
+        const list = data.data;
+        const alreadyIn = list.find((u) => u.mobile_unit_id === patrol.mobile_unit_id);
+        if (!alreadyIn && patrol.mobile_unit_id) {
+          const current = mobileUnits.find((u) => u.mobile_unit_id === patrol.mobile_unit_id);
+          if (current) list.unshift({ ...current, _isCurrent: true });
+        }
+        setAvailableMobileUnits(list);
+      }
+    })
+    .catch(console.error)
+    .finally(() => setLoadingMobileUnits(false));
+}, [form.start_date, form.end_date]);
 
   // Derived for current date + shift
   const activeDatePatrollers = patrollersByDate[activeDate] || { am: [], pm: [] };
@@ -616,18 +643,33 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
                 onChange={(e) => setForm((p) => ({ ...p, patrol_name: e.target.value }))}
                 placeholder="e.g. Sector 6 Beat 2" />
             </div>
-            <div className="epm-field">
-              <label>Mobile Unit <span className="epm-req">*</span></label>
-              <select value={form.mobile_unit_id}
-                onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}>
-                <option value="">— Select —</option>
-                {mobileUnits.map((mu) => (
-                  <option key={mu.mobile_unit_id} value={mu.mobile_unit_id}>
-                    {mu.mobile_unit_name} ({mu.plate_number})
-                  </option>
-                ))}
-              </select>
-            </div>
+           <div className="epm-field">
+  <label>Mobile Unit <span className="epm-req">*</span></label>
+  <select
+    value={form.mobile_unit_id}
+    onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}
+    disabled={loadingMobileUnits}
+  >
+    {loadingMobileUnits
+      ? <option value="">Loading...</option>
+      : <>
+          <option value="">— Select —</option>
+          {(availableMobileUnits || mobileUnits).map((mu) => {
+            const isConflict = mu._isCurrent;
+            return (
+              <option
+                key={mu.mobile_unit_id}
+                value={mu.mobile_unit_id}
+                disabled={isConflict}
+              >
+                {mu.mobile_unit_name} ({mu.plate_number}){isConflict ? " — Unavailable" : ""}
+              </option>
+            );
+          })}
+        </>
+    }
+  </select>
+</div>
             <div className="epm-field">
               <label>Start Date <span className="epm-req">*</span></label>
               <input type="date" value={form.start_date}
