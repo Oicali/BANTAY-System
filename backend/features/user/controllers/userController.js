@@ -1067,8 +1067,8 @@ const unlockUser = async (req, res) => {
   senderId: req.user.user_id,
   senderName: req.user.username,
   type: "ACCOUNT_LOCKED",
-  title: "Account Locked",
-  message: `${req.user.username} locked account ID ${id}`,
+  title: "Account Unlocked",
+  message: `${req.user.username} unlocked account ID ${id}`,
   linkTo: "/user-management",
 }, req.user.user_id);
     res.json({ success: true, message: "Account unlocked successfully" });

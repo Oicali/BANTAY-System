@@ -160,6 +160,13 @@ return res.status(200).json({
        WHERE id = $2 RETURNING id, case_number, assigned_io_id, updated_at`,
       [assigned_io_id, id],
     );
+const blotterRef = await pool.query(
+  `SELECT b.blotter_entry_number FROM cases c 
+   JOIN blotter_entries b ON c.blotter_id = b.blotter_id 
+   WHERE c.id = $1`,
+  [id]
+);
+const blotterEntryNumber = blotterRef.rows[0]?.blotter_entry_number || result.rows[0].case_number;
 
     const io = user.rows[0];
     await logAudit({
@@ -179,7 +186,7 @@ return res.status(200).json({
       senderName: req.user.username,
       type: "CASE_ASSIGNED",
       title: "Case Assigned to You",
-      message: `You have been assigned to case ${result.rows[0].case_number}`,
+      message: `You have been assigned to ${blotterEntryNumber}`,
       linkTo: "/case-management",
     });
     return res.status(200).json({
@@ -238,11 +245,12 @@ const updateStatus = async (req, res) => {
       Solved: "Solved",
       Cleared: "Cleared",
     };
-    await pool.query(
-      `UPDATE blotter_entries SET status = $1 WHERE blotter_id = $2`,
-      [blotterStatusMap[status], result.rows[0].blotter_id],
-    );
-
+    const blotterUpdate = await pool.query(
+  `UPDATE blotter_entries SET status = $1 WHERE blotter_id = $2 
+   RETURNING blotter_entry_number`,
+  [blotterStatusMap[status], result.rows[0].blotter_id],
+);
+const blotterEntryNumber = blotterUpdate.rows[0]?.blotter_entry_number || result.rows[0].case_number;
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
@@ -262,7 +270,7 @@ if (assignedIoId && assignedIoId !== req.user.user_id) {
     senderName: req.user.username,
     type: "CASE_ASSIGNED",
     title: "Case Status Updated",
-    message: `Case ${result.rows[0].case_number} status changed to "${status}"`,
+    message: `${blotterEntryNumber} status changed to "${status}"`,
     linkTo: "/case-management",
   });
 }
@@ -273,7 +281,7 @@ if (req.user.role === "Investigator") {
     senderName: req.user.username,
     type: "CASE_ASSIGNED",
     title: "Case Status Updated",
-    message: `${req.user.username} updated case ${result.rows[0].case_number} to "${status}"`,
+    message: `${req.user.username} updated ${blotterEntryNumber} to "${status}"`,
     linkTo: "/case-management",
   }, req.user.user_id);
 }
@@ -540,6 +548,11 @@ const addNote = async (req, res) => {
       ipAddress: getClientIp(req),
     });
 const theCase = caseResult.rows[0];
+const blotterRow = await pool.query(
+  `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
+  [theCase.blotter_id]
+);
+const blotterEntryNumber = blotterRow.rows[0]?.blotter_entry_number || theCase.case_number;
 const assignedIoId = theCase.assigned_io_id;
 
 // Notify investigator if someone else added the note
@@ -550,7 +563,7 @@ if (assignedIoId && assignedIoId !== req.user.user_id) {
     senderName: req.user.username,
     type: "CASE_ASSIGNED",
     title: "New Note Added",
-    message: `${req.user.username} added a note to case ${theCase.case_number}`,
+    message: `${req.user.username} added a note to ${blotterEntryNumber}`,
     linkTo: "/case-management",
   });
 }
@@ -561,7 +574,7 @@ if (req.user.role === "Investigator") {
     senderName: req.user.username,
     type: "CASE_ASSIGNED",
     title: "New Note Added",
-    message: `${req.user.username} added a note to case ${theCase.case_number}`,
+    message: `${req.user.username} added a note to ${blotterEntryNumber}`,
     linkTo: "/case-management",
   }, req.user.user_id);
 }
