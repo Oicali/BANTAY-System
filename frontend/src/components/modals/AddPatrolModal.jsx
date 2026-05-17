@@ -47,6 +47,8 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
   const [selectedPMIds, setSelectedPMIds]         = useState([]);
   const [patrollerSearch, setPatrollerSearch]     = useState("");
   const [availableForDates, setAvailableForDates] = useState(null); // null = no dates yet
+  const [availableMobileUnits, setAvailableMobileUnits] = useState(null); // null = no dates yet
+const [loadingMobileUnits, setLoadingMobileUnits] = useState(false);
   const [loadingPatrollers, setLoadingPatrollers] = useState(false);
   const [barangays, setBarangays]                 = useState([]);
   const [tasks, setTasks]                         = useState([]);
@@ -69,6 +71,21 @@ const [patrollerPage, setPatrollerPage]   = useState(1);
       .catch(console.error)
       .finally(() => setLoadingPatrollers(false));
   }, [form.start_date, form.end_date]);
+  useEffect(() => {
+  setAvailableMobileUnits(null);
+  setForm((p) => ({ ...p, mobile_unit_id: "" }));
+  if (!form.start_date || !form.end_date || form.end_date < form.start_date) return;
+
+  setLoadingMobileUnits(true);
+  fetch(
+    `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}`,
+    { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+  )
+    .then((r) => r.json())
+    .then((data) => { if (data.success) setAvailableMobileUnits(data.data); })
+    .catch(console.error)
+    .finally(() => setLoadingMobileUnits(false));
+}, [form.start_date, form.end_date]);
 
   const amTasks      = tasks.filter((t) => t.shift === "AM");
   const pmTasks      = tasks.filter((t) => t.shift === "PM");
@@ -353,18 +370,30 @@ for (const task of tasks) {
                 onChange={(e) => setForm((p) => ({ ...p, patrol_name: e.target.value }))}
                 placeholder="e.g. Sector 6 Beat 2" />
             </div>
-            <div className="apm-field">
-              <label>Mobile Unit <span className="apm-req">*</span></label>
-              <select value={form.mobile_unit_id}
-                onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}>
-                <option value="">— Select —</option>
-                {mobileUnits.map((mu) => (
-                  <option key={mu.mobile_unit_id} value={mu.mobile_unit_id}>
-                    {mu.mobile_unit_name} ({mu.plate_number})
-                  </option>
-                ))}
-              </select>
-            </div>
+           <div className="apm-field">
+  <label>Mobile Unit <span className="apm-req">*</span></label>
+  <select
+    value={form.mobile_unit_id}
+    onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}
+    disabled={!form.start_date || !form.end_date || loadingMobileUnits}
+  >
+    {!form.start_date || !form.end_date
+      ? <option value="">— Select dates first —</option>
+      : loadingMobileUnits
+      ? <option value="">Loading...</option>
+      : availableMobileUnits?.length === 0
+      ? <option value="">No units available</option>
+      : <>
+          <option value="">— Select Mobile Unit —</option>
+          {(availableMobileUnits || []).map((mu) => (
+            <option key={mu.mobile_unit_id} value={mu.mobile_unit_id}>
+              {mu.mobile_unit_name} ({mu.plate_number})
+            </option>
+          ))}
+        </>
+    }
+  </select>
+</div>
             <div className="apm-field">
               <label>Start Date <span className="apm-req">*</span></label>
               <input type="date" value={form.start_date}
