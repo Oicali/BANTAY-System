@@ -16,6 +16,13 @@ const {
   importBlotters,
   acceptReferral, createBrgyReport, getBrgyReports, getReferredCount, detectCrimeType
 } = require("../controllers/blotterController");
+const {
+  uploadAttachment,
+  getAttachments,
+  deleteAttachment,
+} = require("../controllers/attachmentController");
+
+const imageUpload = require("../middleware/imageUploadMiddleware");
 
 router.post("/", authenticate, createBlotter);
 router.get("/", authenticate, getAllBlotters);
@@ -33,4 +40,7 @@ router.put("/:id/restore", authenticate, restoreBlotter);
 router.patch("/:id/accept", authenticate, acceptReferral);
 // Add this line after the existing brgy-report route:
 router.post("/detect-crime-type", authenticate, detectCrimeType);
+router.get("/:id/attachments", authenticate, getAttachments);
+router.post("/:id/attachments", authenticate, imageUpload.single("file"), uploadAttachment);
+router.delete("/:id/attachments/:attachmentId", authenticate, deleteAttachment);
 module.exports = router;
