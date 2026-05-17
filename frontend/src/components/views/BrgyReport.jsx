@@ -1364,7 +1364,6 @@ function BrgyReport() {
                         {r.blotter_entry_number}
                       </span>
                     </td>
-                    <td></td>
                     <td style={{ fontWeight: 500, color: "#374151" }}>
                       {r.incident_type}
                     </td>
