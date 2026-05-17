@@ -69,7 +69,9 @@ function CaseManagement() {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [noteForm, setNoteForm] = useState({
     note: "",
-    note_date: new Date().toISOString().split("T")[0],
+    note_date: new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Manila",
+    }),
   });
   const [modalLoading, setModalLoading] = useState(false);
   const [toast, setToast] = useState({
@@ -349,7 +351,9 @@ function CaseManagement() {
         showToast("Note added!");
         setNoteForm({
           note: "",
-          note_date: new Date().toISOString().split("T")[0],
+          note_date: new Date().toLocaleDateString("en-CA", {
+            timeZone: "Asia/Manila",
+          }),
         });
         setShowNoteModal(false);
         if (showDetailModal) fetchCaseDetail(selectedCase.id);
@@ -491,7 +495,9 @@ function CaseManagement() {
     setSelectedCase(c);
     setNoteForm({
       note: "",
-      note_date: new Date().toISOString().split("T")[0],
+      note_date: new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Manila",
+      }),
     });
     setShowNoteModal(true);
   };
