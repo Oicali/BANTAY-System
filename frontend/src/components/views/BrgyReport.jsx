@@ -1364,32 +1364,7 @@ function BrgyReport() {
                         {r.blotter_entry_number}
                       </span>
                     </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="br-pagination-btn"
-                        style={{ fontSize: "11px" }}
-                        onClick={async () => {
-                          const res = await fetch(
-                            `${import.meta.env.VITE_API_URL}/blotters/${r.blotter_id}/attachments`,
-                            {
-                              headers: {
-                                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                              },
-                            },
-                          );
-                          const data = await res.json();
-                          if (data.success && data.data.length > 0) {
-                            alert(`${data.data.length} photo(s) attached`);
-                            // or open a simple lightbox
-                          } else {
-                            alert("No photos attached");
-                          }
-                        }}
-                      >
-                        View Photos
-                      </button>
-                    </td>
+                    <td></td>
                     <td style={{ fontWeight: 500, color: "#374151" }}>
                       {r.incident_type}
                     </td>
