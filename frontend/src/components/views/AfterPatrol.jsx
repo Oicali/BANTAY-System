@@ -461,7 +461,7 @@ const AfterPatrolModal = ({ patrol, existingReport, myShift, onClose, onSubmit, 
   });
 
  
-
+const [submitting, setSubmitting] = useState(false);
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
   const minDate     = toInputDate(patrol?.start_date);
   const maxDate     = toInputDate(patrol?.end_date);
