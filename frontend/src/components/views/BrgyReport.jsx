@@ -60,7 +60,11 @@ function BrgyReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const [barangayName, setBarangayName] = useState("Loading...");
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
   const [showResidentSearch, setShowResidentSearch] = useState(false);
   const [residentSearchQuery, setResidentSearchQuery] = useState("");
   const [residents, setResidents] = useState([]);
@@ -69,11 +73,16 @@ function BrgyReport() {
   const [detectingCrime, setDetectingCrime] = useState(false);
   const [crimeAutoDetected, setCrimeAutoDetected] = useState(false);
   const [crimeDetectFailed, setCrimeDetectFailed] = useState(false);
-
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [pendingCaption, setPendingCaption] = useState("");
+  const [lightboxImage, setLightboxImage] = useState(null);
   const showToast = (message, type = "success") => {
-  setToast({ show: true, message, type });
-  setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
-};
+    setToast({ show: true, message, type });
+    setTimeout(
+      () => setToast({ show: false, message: "", type: "success" }),
+      3000,
+    );
+  };
   useEffect(() => {
     fetchMyReports();
     setLoadingProfile(true);
@@ -166,6 +175,50 @@ function BrgyReport() {
     );
     setShowResidentSearch(false);
   };
+  const addPendingFile = (file, caption) => {
+    if (pendingFiles.length >= 5) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      showToast("Only JPG, PNG, WEBP allowed", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("Max 5MB per photo", "error");
+      return;
+    }
+    const preview = URL.createObjectURL(file);
+    setPendingFiles((prev) => [...prev, { file, caption, preview }]);
+    setPendingCaption("");
+  };
+
+  const removePendingFile = (index) => {
+    setPendingFiles((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const uploadPendingFiles = async (blotterId) => {
+    for (const item of pendingFiles) {
+      try {
+        const formData = new FormData();
+        formData.append("file", item.file);
+        if (item.caption) formData.append("caption", item.caption);
+        await fetch(
+          `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/attachments`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: formData,
+          },
+        );
+      } catch (err) {
+        console.error("Failed to upload attachment:", err);
+      }
+    }
+  };
   const update = (field, value) => {
     setForm((p) => ({ ...p, [field]: value }));
     if (errors[field])
@@ -181,48 +234,54 @@ function BrgyReport() {
     );
   };
   const detectCrimeFromNarrative = async (narrativeText) => {
-  if (!narrativeText || narrativeText.trim().length < 20) return;
-  if (form.incident_type) return;
+    if (!narrativeText || narrativeText.trim().length < 20) return;
+    if (form.incident_type) return;
 
-  try {
-    setDetectingCrime(true);
-    setCrimeAutoDetected(false);
-    setCrimeDetectFailed(false);
+    try {
+      setDetectingCrime(true);
+      setCrimeAutoDetected(false);
+      setCrimeDetectFailed(false);
 
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/blotters/detect-crime-type`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters/detect-crime-type`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ narrative: narrativeText }),
         },
-        body: JSON.stringify({ narrative: narrativeText }),
-      },
-    );
+      );
 
-    const data = await res.json();
-    if (data.success && data.crime_type) {
-      setForm((prev) => ({ ...prev, incident_type: data.crime_type }));
+      const data = await res.json();
+      if (data.success && data.crime_type) {
+        setForm((prev) => ({ ...prev, incident_type: data.crime_type }));
 
-      if (data.rate_limited) {
-        showToast("⚠ AI detection unavailable — daily request limit reached. Please select the crime type manually.", "error");
-        setCrimeAutoDetected(false);
-      } else if (data.fallback) {
-        setCrimeAutoDetected(true);
-        setCrimeDetectFailed(true);
-      } else {
-        setCrimeAutoDetected(true);
-        setCrimeDetectFailed(!data.confident);
+        if (data.rate_limited) {
+          showToast(
+            "⚠ AI detection unavailable — daily request limit reached. Please select the crime type manually.",
+            "error",
+          );
+          setCrimeAutoDetected(false);
+        } else if (data.fallback) {
+          setCrimeAutoDetected(true);
+          setCrimeDetectFailed(true);
+        } else {
+          setCrimeAutoDetected(true);
+          setCrimeDetectFailed(!data.confident);
+        }
       }
+    } catch (err) {
+      console.error("Crime detection failed:", err);
+      showToast(
+        "AI detection failed. Please select the crime type manually.",
+        "error",
+      );
+    } finally {
+      setDetectingCrime(false);
     }
-  } catch (err) {
-    console.error("Crime detection failed:", err);
-    showToast("AI detection failed. Please select the crime type manually.", "error");
-  } finally {
-    setDetectingCrime(false);
-  }
-};
+  };
 
   const addPerson = (role = "Victim") =>
     setVictims((prev) => [
@@ -292,82 +351,88 @@ function BrgyReport() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  const errs = validate();
-  if (Object.keys(errs).length > 0) {
-    setErrors(errs);
-    setTimeout(() => {
-      const firstError = document.querySelector(".br-input.error");
-      if (firstError) {
-        firstError.scrollIntoView({ behavior: "smooth", block: "center" });
-        firstError.focus();
-      }
-    }, 100);
-    return;
-  }
-  try {
-    const resolvedIncidentType = form.incident_type || "Special Complex Crime";
-
-    setSubmitting(true);
-    const res = await fetch(`${API_URL}/brgy-report`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({
-        ...form,
-        incident_type: resolvedIncidentType,
-        victims: victims.map((v) => ({
-          ...v,
-          contact: v.contact_number,
-        })),
-      }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(
-        `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
-      );
-      setForm({
-        incident_type: "",
-        date_time_commission: "",
-        date_time_reported: "",
-        place_barangay: form.place_barangay,
-        place_street: "",
-        narrative: "",
-      });
-      setCrimeAutoDetected(false);
-      setCrimeDetectFailed(false);
-      setVictims([
-        {
-          first_name: "",
-          middle_name: "",
-          last_name: "",
-          gender: "Male",
-          contact_number: "",
-          role: "Victim",
-          nationality: "FILIPINO",
-          house_street: "",
-          relationship_to_victim: "",
-          witness_statement: "",
-          from_resident_db: false,
-        },
-      ]);
-      fetchMyReports();
-      document
-        .querySelector(".content-wrapper")
-        ?.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      const msg = data.errors ? data.errors.join("\n") : data.message;
-      alert("Submission failed:\n" + msg);
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      setTimeout(() => {
+        const firstError = document.querySelector(".br-input.error");
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+          firstError.focus();
+        }
+      }, 100);
+      return;
     }
-  } catch (err) {
-    alert("Failed to submit. Please try again.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+    try {
+      const resolvedIncidentType =
+        form.incident_type || "Special Complex Crime";
+
+      setSubmitting(true);
+      const res = await fetch(`${API_URL}/brgy-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          ...form,
+          incident_type: resolvedIncidentType,
+          victims: victims.map((v) => ({
+            ...v,
+            contact: v.contact_number,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (pendingFiles.length > 0) {
+          await uploadPendingFiles(data.data.blotter_id);
+        }
+        showToast(
+          `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
+        );
+        setPendingFiles([]);
+        setPendingCaption("");
+        setForm({
+          incident_type: "",
+          date_time_commission: "",
+          date_time_reported: "",
+          place_barangay: form.place_barangay,
+          place_street: "",
+          narrative: "",
+        });
+        setCrimeAutoDetected(false);
+        setCrimeDetectFailed(false);
+        setVictims([
+          {
+            first_name: "",
+            middle_name: "",
+            last_name: "",
+            gender: "Male",
+            contact_number: "",
+            role: "Victim",
+            nationality: "FILIPINO",
+            house_street: "",
+            relationship_to_victim: "",
+            witness_statement: "",
+            from_resident_db: false,
+          },
+        ]);
+        fetchMyReports();
+        document
+          .querySelector(".content-wrapper")
+          ?.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        const msg = data.errors ? data.errors.join("\n") : data.message;
+        alert("Submission failed:\n" + msg);
+      }
+    } catch (err) {
+      alert("Failed to submit. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const totalPages = Math.ceil(reports.length / ITEMS_PER_PAGE);
   const paginated = reports.slice(
@@ -997,7 +1062,218 @@ function BrgyReport() {
                 </button>
               ))}
             </div>
+            {/* ── EVIDENCE UPLOAD CARD ── */}
+            <div className="br-card">
+              <div
+                className="br-card-header"
+                style={{ borderLeft: "4px solid #f59e0b" }}
+              >
+                <div
+                  className="br-card-header-icon"
+                  style={{ background: "#d97706" }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </div>
+                <h2 className="br-card-title">Attach CCTV / Evidence Photos</h2>
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    background: "#f3f4f6",
+                    padding: "3px 10px",
+                    borderRadius: "20px",
+                  }}
+                >
+                  Optional · Max 5 photos
+                </span>
+              </div>
+              <div className="br-card-body">
+                <div
+                  style={{
+                    background: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    marginBottom: "20px",
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "flex-start",
+                    fontSize: "13px",
+                    color: "#92400e",
+                  }}
+                >
+                  <span>
+                    Attach CCTV snapshots or scene photos. These will be
+                    submitted with your report.{" "}
+                    <strong>JPG, PNG only · Max 5MB per photo.</strong>
+                  </span>
+                </div>
 
+                {/* Preview grid */}
+                {pendingFiles.length > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(150px, 1fr))",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    {pendingFiles.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          position: "relative",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid #e5e7eb",
+                          background: "#f9fafb",
+                        }}
+                      >
+                        <img
+                          src={item.preview}
+                          alt={item.caption || "Evidence"}
+                          style={{
+                            width: "100%",
+                            height: "120px",
+                            objectFit: "cover",
+                            display: "block",
+                            cursor: "zoom-in",
+                          }}
+                          onClick={() =>
+                            setLightboxImage({
+                              url: item.preview,
+                              caption: item.caption,
+                            })
+                          }
+                        />
+
+                        <button
+                          onClick={() => removePendingFile(index)}
+                          type="button"
+                          style={{
+                            position: "absolute",
+                            top: "6px",
+                            right: "6px",
+                            background: "rgba(0,0,0,0.6)",
+                            border: "none",
+                            borderRadius: "50%",
+                            width: "24px",
+                            height: "24px",
+                            cursor: "pointer",
+                            color: "white",
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload area */}
+                {pendingFiles.length < 5 && (
+                  <div>
+                    <label
+                      htmlFor="evidence-upload"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "10px",
+                        padding: "32px 20px",
+                        cursor: "pointer",
+                        background: "white",
+                        transition: "all 0.2s",
+                        textAlign: "center",
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files[0];
+                        if (file) addPendingFile(file, pendingCaption);
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#374151",
+                        }}
+                      >
+                        Click to upload or drag & drop
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                        CCTV snapshot, scene photo — JPG or PNG, max 5MB
+                      </div>
+                      <input
+                        id="evidence-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            addPendingFile(file, pendingCaption);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                    </label>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginTop: "8px",
+                        fontSize: "12px",
+                        color: "#9ca3af",
+                      }}
+                    >
+                      <span>{pendingFiles.length}/5 photos added</span>
+                      <span>Photos will upload when you submit the report</span>
+                    </div>
+                  </div>
+                )}
+
+                {pendingFiles.length >= 5 && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "16px",
+                      background: "#f0fdf4",
+                      borderRadius: "8px",
+                      border: "1px solid #bbf7d0",
+                      color: "#065f46",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ Maximum 5 photos added. They will upload with your report.
+                  </div>
+                )}
+              </div>
+            </div>
             <button
               type="submit"
               className="br-submit-btn"
@@ -1088,6 +1364,32 @@ function BrgyReport() {
                         {r.blotter_entry_number}
                       </span>
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="br-pagination-btn"
+                        style={{ fontSize: "11px" }}
+                        onClick={async () => {
+                          const res = await fetch(
+                            `${import.meta.env.VITE_API_URL}/blotters/${r.blotter_id}/attachments`,
+                            {
+                              headers: {
+                                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                              },
+                            },
+                          );
+                          const data = await res.json();
+                          if (data.success && data.data.length > 0) {
+                            alert(`${data.data.length} photo(s) attached`);
+                            // or open a simple lightbox
+                          } else {
+                            alert("No photos attached");
+                          }
+                        }}
+                      >
+                        View Photos
+                      </button>
+                    </td>
                     <td style={{ fontWeight: 500, color: "#374151" }}>
                       {r.incident_type}
                     </td>
@@ -1148,7 +1450,10 @@ function BrgyReport() {
         )}
       </div>
       {toast.show && (
-        <div className={`um-toast ${toast.type === "error" ? "um-toast-error" : "um-toast-success"}`} style={{ zIndex: 99999 }}>
+        <div
+          className={`um-toast ${toast.type === "error" ? "um-toast-error" : "um-toast-success"}`}
+          style={{ zIndex: 99999 }}
+        >
           <div className="um-toast-content">
             <svg
               className="um-toast-icon"
@@ -1272,6 +1577,60 @@ function BrgyReport() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: "relative" }}
+          >
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.caption || "Evidence"}
+              style={{
+                maxWidth: "90vw",
+                maxHeight: "80vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+                display: "block",
+              }}
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              style={{
+                position: "absolute",
+                top: "-12px",
+                right: "-12px",
+                background: "#dc2626",
+                border: "none",
+                borderRadius: "50%",
+                width: "32px",
+                height: "32px",
+                cursor: "pointer",
+                color: "white",
+                fontSize: "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+              }}
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

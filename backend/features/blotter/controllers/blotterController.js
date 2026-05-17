@@ -1617,10 +1617,10 @@ const createBrgyReport = async (req, res) => {
   linkTo: "/e-blotter",
 }, req.user.user_id); 
       return res.status(201).json({
-        success: true,
-        message: "Report submitted successfully! Awaiting police review.",
-        data: { blotter_entry_number: blotterNumber },
-      });
+  success: true,
+  message: "Report submitted successfully! Awaiting police review.",
+  data: { blotter_entry_number: blotterNumber, blotter_id: blotterId }
+});
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

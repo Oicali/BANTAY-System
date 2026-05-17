@@ -209,8 +209,13 @@ function EBlotter() {
     message: "",
     type: "success",
   });
+  const [viewAttachments, setViewAttachments] = useState([]);
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
+  const [modalAttachments, setModalAttachments] = useState([]);
+  const [pendingModalFiles, setPendingModalFiles] = useState([]);
+  const [modalCaption, setModalCaption] = useState("");
+  const [lightboxImage, setLightboxImage] = useState(null);
   const showReactToast = (message, type = "success") => {
     setReactToast({ show: true, message, type });
     setTimeout(
@@ -849,6 +854,18 @@ function EBlotter() {
         setViewMode(false);
         setEditingBlotterId(blotterId);
         setShowModal(true);
+        try {
+          const attRes = await fetch(`${API_URL}/${blotterId}/attachments`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          const attData = await attRes.json();
+          if (attData.success) setModalAttachments(attData.data);
+          else setModalAttachments([]);
+        } catch {
+          setModalAttachments([]);
+        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -960,6 +977,22 @@ function EBlotter() {
         setEditMode(false);
         setEditingBlotterId(blotterId);
         setShowModal(true);
+        // Fetch attachments
+        try {
+          const attRes = await fetch(
+            `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/attachments`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
+          const attData = await attRes.json();
+          if (attData.success) setViewAttachments(attData.data);
+          else setViewAttachments([]);
+        } catch {
+          setViewAttachments([]);
+        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -1153,6 +1186,21 @@ function EBlotter() {
         setEditingBlotterId(blotterId);
         setCurrentStep(1);
         setShowModal(true);
+        try {
+          const attRes = await fetch(
+            `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/attachments`,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+            },
+          );
+          const attData = await attRes.json();
+          if (attData.success) setModalAttachments(attData.data);
+          else setModalAttachments([]);
+        } catch {
+          setViewAttachments([]);
+        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -1911,6 +1959,11 @@ function EBlotter() {
     setHasSuspect(false);
     setIsImportedRecord(false);
     setSelectedBrgyFeature(null);
+    setViewAttachments([]);
+    setModalAttachments([]);
+    setPendingModalFiles([]);
+    setModalCaption("");
+    setLightboxImage(null);
   };
 
   const cancelClose = () => {
@@ -2064,7 +2117,48 @@ function EBlotter() {
         });
         const data = await res.json();
         if (data.success) {
-          showReactToast("Referral accepted! Case created automatically.");
+          for (const item of pendingModalFiles) {
+            try {
+              const formData = new FormData();
+              formData.append("file", item.file);
+              if (item.caption) formData.append("caption", item.caption);
+              await fetch(`${API_URL}/${editingBlotterId}/attachments`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+                body: formData,
+              });
+            } catch (e) {
+              console.error(e);
+            }
+          }
+          if (
+            !editMode &&
+            pendingModalFiles.length > 0 &&
+            data.data?.blotter_id
+          ) {
+            for (const item of pendingModalFiles) {
+              try {
+                const formData = new FormData();
+                formData.append("file", item.file);
+                await fetch(`${API_URL}/${data.data.blotter_id}/attachments`, {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  },
+                  body: formData,
+                });
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          }
+          const message = editMode
+            ? "Report updated successfully!"
+            : `Report created successfully!`;
+          showReactToast(message);
+          setOriginalData(null);
           closeModal();
           fetchBlotters();
           fetchReferredCount();
@@ -2168,15 +2262,33 @@ function EBlotter() {
       if (!response) return;
       const data = await response.json();
       if (data.success) {
+        const targetBlotterId = editMode
+          ? editingBlotterId
+          : data.data?.blotter_id;
+        for (const item of pendingModalFiles) {
+          try {
+            const formData = new FormData();
+            formData.append("file", item.file);
+            if (item.caption) formData.append("caption", item.caption);
+            await fetch(`${API_URL}/${targetBlotterId}/attachments`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              body: formData,
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        }
         const message = editMode
           ? "Report updated successfully!"
-          : `Report created successfully!\nReport ID: ${data.data.blotter_entry_number}`;
-
-        // Show toast notification
+          : `Report created successfully!`;
         showReactToast(message);
         setOriginalData(null);
         closeModal();
         fetchBlotters();
+        fetchReferredCount();
       } else {
         let errorMsg = "Submission Failed:\n\n";
         if (data.errors) errorMsg += data.errors.join("\n");
@@ -2923,6 +3035,101 @@ function EBlotter() {
                     </div>
                   </div>
                 </div>
+                {/* ── EVIDENCE ATTACHMENTS ── */}
+                {viewAttachments.length > 0 && (
+                  <div className="eb-view-section">
+                    <h3 className="eb-view-section-title">
+                      Evidence & CCTV Attachments
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          background: "#fef3c7",
+                          color: "#92400e",
+                          padding: "2px 8px",
+                          borderRadius: "20px",
+                        }}
+                      >
+                        {viewAttachments.length} photo
+                        {viewAttachments.length > 1 ? "s" : ""}
+                      </span>
+                    </h3>
+                    <div className="eb-view-section-body">
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(180px, 1fr))",
+                          gap: "14px",
+                        }}
+                      >
+                        {viewAttachments.map((a) => (
+                          <div
+                            key={a.attachment_id}
+                            style={{
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                              border: "1px solid #e5e7eb",
+                              background: "#f9fafb",
+                            }}
+                          >
+                            <img
+                              src={a.file_url}
+                              alt={a.caption || "Evidence"}
+                              style={{
+                                width: "100%",
+                                height: "140px",
+                                objectFit: "cover",
+                                display: "block",
+                                transition: "opacity 0.2s",
+                                cursor: "zoom-in",
+                              }}
+                              onClick={() =>
+                                setLightboxImage({
+                                  url: a.file_url,
+                                  caption: a.caption,
+                                })
+                              }
+                              onMouseOver={(e) =>
+                                (e.target.style.opacity = "0.85")
+                              }
+                              onMouseOut={(e) => (e.target.style.opacity = "1")}
+                            />
+                            <div style={{ padding: "8px 10px" }}>
+                              {a.caption && (
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    color: "#374151",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  {a.caption}
+                                </div>
+                              )}
+                              <div
+                                style={{ fontSize: "11px", color: "#9ca3af" }}
+                              >
+                                {new Date(a.uploaded_at).toLocaleDateString(
+                                  "en-PH",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               // ========== EDIT/CREATE MODE - ORIGINAL FORM ==========
@@ -5661,6 +5868,419 @@ function EBlotter() {
                         </div>
                       )}
                     </div>
+                    {/* ── ATTACHMENTS PANEL (accept + edit mode) ── */}
+                    {(acceptMode || editMode) && (
+                      <div
+                        className="eb-modal-form-group"
+                        style={{ gridColumn: "span 4" }}
+                      >
+                        <div
+                          style={{
+                            background:
+                              "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
+                            padding: "10px 16px",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: "white",
+                              fontWeight: 700,
+                              fontSize: "12px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.8px",
+                            }}
+                          >
+                            Evidence & CCTV Attachments
+                          </span>
+                          <span
+                            style={{
+                              color: "rgba(255,255,255,0.6)",
+                              fontSize: "11px",
+                            }}
+                          >
+                            {modalAttachments.length + pendingModalFiles.length}
+                            /5 photos
+                          </span>
+                        </div>
+
+                        {/* Existing saved attachments */}
+                        {modalAttachments.length > 0 && (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fill, minmax(140px, 1fr))",
+                              gap: "10px",
+                              marginBottom: "14px",
+                            }}
+                          >
+                            {modalAttachments.map((a) => (
+                              <div
+                                key={a.attachment_id}
+                                style={{
+                                  position: "relative",
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  border: "1px solid #e5e7eb",
+                                  background: "#f9fafb",
+                                }}
+                              >
+                                <img
+                                  src={a.file_url}
+                                  alt={a.caption || "Evidence"}
+                                  style={{
+                                    width: "100%",
+                                    height: "110px",
+                                    objectFit: "cover",
+                                    display: "block",
+                                    cursor: "zoom-in",
+                                  }}
+                                  onClick={() =>
+                                    setLightboxImage({
+                                      url: a.file_url,
+                                      caption: a.caption,
+                                    })
+                                  }
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await fetch(
+                                        `${API_URL}/${editingBlotterId}/attachments/${a.attachment_id}`,
+                                        {
+                                          method: "DELETE",
+                                          headers: {
+                                            Authorization: `Bearer ${localStorage.getItem("token")}`,
+                                          },
+                                        },
+                                      );
+                                      setModalAttachments((prev) =>
+                                        prev.filter(
+                                          (x) =>
+                                            x.attachment_id !== a.attachment_id,
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      console.error(e);
+                                    }
+                                  }}
+                                  style={{
+                                    position: "absolute",
+                                    top: "5px",
+                                    right: "5px",
+                                    background: "rgba(0,0,0,0.6)",
+                                    border: "none",
+                                    borderRadius: "50%",
+                                    width: "22px",
+                                    height: "22px",
+                                    cursor: "pointer",
+                                    color: "white",
+                                    fontSize: "13px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Pending new files */}
+                        {pendingModalFiles.length > 0 && (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fill, minmax(140px, 1fr))",
+                              gap: "10px",
+                              marginBottom: "14px",
+                            }}
+                          >
+                            {pendingModalFiles.map((item, index) => (
+                              <div
+                                key={index}
+                                style={{
+                                  position: "relative",
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  border: "2px dashed #f59e0b",
+                                  background: "#fffbeb",
+                                }}
+                              >
+                                <img
+                                  src={item.preview}
+                                  alt={item.caption || "New"}
+                                  style={{
+                                    width: "100%",
+                                    height: "110px",
+                                    objectFit: "cover",
+                                    display: "block",
+                                    cursor: "zoom-in",
+                                  }}
+                                  onClick={() =>
+                                    setLightboxImage({
+                                      url: item.preview,
+                                      caption: item.caption,
+                                    })
+                                  }
+                                />
+
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "5px",
+                                    left: "5px",
+                                    background: "#f59e0b",
+                                    color: "white",
+                                    fontSize: "9px",
+                                    fontWeight: 700,
+                                    padding: "2px 5px",
+                                    borderRadius: "4px",
+                                  }}
+                                >
+                                  NEW
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    URL.revokeObjectURL(item.preview);
+                                    setPendingModalFiles((prev) =>
+                                      prev.filter((_, i) => i !== index),
+                                    );
+                                  }}
+                                  style={{
+                                    position: "absolute",
+                                    top: "5px",
+                                    right: "5px",
+                                    background: "rgba(0,0,0,0.6)",
+                                    border: "none",
+                                    borderRadius: "50%",
+                                    width: "22px",
+                                    height: "22px",
+                                    cursor: "pointer",
+                                    color: "white",
+                                    fontSize: "13px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Upload input */}
+                        {modalAttachments.length + pendingModalFiles.length <
+                          5 && (
+                          <div>
+                            <label
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "10px",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                cursor: "pointer",
+                                background: "white",
+                                fontSize: "13px",
+                                color: "#6b7280",
+                              }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const file = e.dataTransfer.files[0];
+                                if (!file) return;
+                                const preview = URL.createObjectURL(file);
+                                setPendingModalFiles((prev) => [
+                                  ...prev,
+                                  { file, caption: modalCaption, preview },
+                                ]);
+                                setModalCaption("");
+                              }}
+                            >
+                              Click to add photo or drag & drop — JPG/PNG, max
+                              5MB
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                style={{ display: "none" }}
+                                onChange={(e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  const preview = URL.createObjectURL(file);
+                                  setPendingModalFiles((prev) => [
+                                    ...prev,
+                                    { file, caption: modalCaption, preview },
+                                  ]);
+                                  setModalCaption("");
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Attachments for NEW report */}
+                    {!editMode && !acceptMode && (
+                      <div
+                        className="eb-modal-form-group"
+                        style={{ gridColumn: "span 4" }}
+                      >
+                        <div
+                          style={{
+                            background:
+                              "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
+                            padding: "10px 16px",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: "white",
+                              fontWeight: 700,
+                              fontSize: "12px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.8px",
+                            }}
+                          >
+                            Evidence & CCTV Attachments
+                          </span>
+                          <span
+                            style={{
+                              color: "rgba(255,255,255,0.6)",
+                              fontSize: "11px",
+                            }}
+                          >
+                            {pendingModalFiles.length}/5 photos
+                          </span>
+                        </div>
+
+                        {pendingModalFiles.length > 0 && (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fill, minmax(140px, 1fr))",
+                              gap: "10px",
+                              marginBottom: "14px",
+                            }}
+                          >
+                            {pendingModalFiles.map((item, index) => (
+                              <div
+                                key={index}
+                                style={{
+                                  position: "relative",
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  border: "2px dashed #f59e0b",
+                                  background: "#fffbeb",
+                                }}
+                              >
+                                <img
+                                  src={item.preview}
+                                  alt="Evidence"
+                                  style={{
+                                    width: "100%",
+                                    height: "110px",
+                                    objectFit: "cover",
+                                    display: "block",
+                                    cursor: "zoom-in",
+                                  }}
+                                  onClick={() =>
+                                    setLightboxImage({
+                                      url: item.preview,
+                                      caption: item.caption,
+                                    })
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    URL.revokeObjectURL(item.preview);
+                                    setPendingModalFiles((prev) =>
+                                      prev.filter((_, i) => i !== index),
+                                    );
+                                  }}
+                                  style={{
+                                    position: "absolute",
+                                    top: "5px",
+                                    right: "5px",
+                                    background: "rgba(0,0,0,0.6)",
+                                    border: "none",
+                                    borderRadius: "50%",
+                                    width: "22px",
+                                    height: "22px",
+                                    cursor: "pointer",
+                                    color: "white",
+                                    fontSize: "13px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {pendingModalFiles.length < 5 && (
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "10px",
+                              border: "2px dashed #d1d5db",
+                              borderRadius: "8px",
+                              padding: "20px",
+                              cursor: "pointer",
+                              background: "white",
+                              fontSize: "13px",
+                              color: "#6b7280",
+                            }}
+                          >
+                            Click to add photo or drag & drop — JPG/PNG, max 5MB
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              style={{ display: "none" }}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+                                const preview = URL.createObjectURL(file);
+                                setPendingModalFiles((prev) => [
+                                  ...prev,
+                                  { file, caption: "", preview },
+                                ]);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -6792,6 +7412,78 @@ function EBlotter() {
               )}
             </svg>
             <span>{reactToast.message}</span>
+          </div>
+        </div>
+      )}
+      {/* ── LIGHTBOX ── */}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+            }}
+          >
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.caption || "Evidence"}
+              style={{
+                maxWidth: "90vw",
+                maxHeight: "80vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+                display: "block",
+              }}
+            />
+            {lightboxImage.caption && (
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "white",
+                  marginTop: "10px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+              >
+                {lightboxImage.caption}
+              </div>
+            )}
+            <button
+              onClick={() => setLightboxImage(null)}
+              style={{
+                position: "absolute",
+                top: "-12px",
+                right: "-12px",
+                background: "#dc2626",
+                border: "none",
+                borderRadius: "50%",
+                width: "32px",
+                height: "32px",
+                cursor: "pointer",
+                color: "white",
+                fontSize: "18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+              }}
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
