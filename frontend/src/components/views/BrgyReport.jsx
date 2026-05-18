@@ -1346,43 +1346,67 @@ function BrgyReport() {
           </div>
         ) : (
           <>
-            <table className="br-table">
-              <thead>
-                <tr>
-                  <th>Reference No.</th>
-                  <th>Crime Type</th>
-                  <th>Street / Location</th>
-                  <th>Date Reported</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((r) => (
-                  <tr key={r.blotter_id}>
-                    <td>
-                      <span className="br-ref-num">
-                        {r.blotter_entry_number}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 500, color: "#374151" }}>
-                      {r.incident_type}
-                    </td>
-                    <td style={{ color: "#6b7280" }}>{r.place_street}</td>
-                    <td style={{ color: "#6b7280" }}>
-                      {formatDate(r.date_time_reported)}
-                    </td>
-                    <td>
-                      <span
-                        className={`br-status-badge ${getStatusClass(r.status)}`}
-                      >
-                        <span className="br-status-dot" />
-                        {r.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* My Submitted Reports table - update the table headers */}
+<table className="br-table">
+  <thead>
+    <tr>
+      <th>Reference No.</th>
+      <th>Crime Type</th>
+      <th>Street / Location</th>
+      <th>Date Reported</th>
+      <th>Responder</th> {/* Add this column */}
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {paginated.map((r) => (
+      <tr key={r.blotter_id}>
+        <td>
+          <span className="br-ref-num">
+            {r.blotter_entry_number}
+          </span>
+        </td>
+        <td style={{ fontWeight: 500, color: "#374151" }}>
+          {r.incident_type}
+        </td>
+        <td style={{ color: "#6b7280" }}>{r.place_street}</td>
+        <td style={{ color: "#6b7280" }}>
+          {formatDate(r.date_time_reported)}
+        </td>
+        <td>
+  {r.responder ? (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div className="br-responder-avatar">
+        {r.responder.profile_picture ? (
+          <img
+            src={r.responder.profile_picture}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          `${r.responder.first_name?.[0] || ""}${r.responder.last_name?.[0] || ""}`.toUpperCase()
+        )}
+      </div>
+      <span className="br-responder-name">
+        {`${r.responder.rank_abbreviation ? r.responder.rank_abbreviation + ". " : ""}${r.responder.first_name || ""} ${r.responder.last_name || ""}`}
+      </span>
+    </div>
+  ) : (
+    <span style={{ fontSize: "12px", color: "#9ca3af" }}>—</span>
+  )}
+</td>
+        <td>
+          <span
+            className={`br-status-badge ${getStatusClass(r.status)}`}
+          >
+            <span className="br-status-dot" />
+            {r.status}
+          </span>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 
             {totalPages > 1 && (
               <div className="br-pagination">

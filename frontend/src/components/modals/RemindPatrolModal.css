@@ -1,0 +1,313 @@
+/* ================================================================================
+   FILE: frontend/src/components/modals/RemindPatrolModal.css
+   Matches ChangePasswordModal design system
+   ================================================================================ */
+
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 28, 60, 0.7);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 16px;
+}
+
+/* ── Modal box ───────────────────────────────────────────────────────────── */
+.modal-container {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: remind-slide-in 0.22s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes remind-slide-in {
+  from { opacity: 0; transform: translateY(-18px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.remind-modal {
+  max-width: 500px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
+  border-radius: 14px 14px 0 0;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.modal-header-icon {
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.modal-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-header-text h3 {
+  margin: 0 0 3px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.modal-header-text p {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.4;
+}
+
+.modal-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  line-height: 1;
+}
+.modal-close:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.modal-body {
+  padding: 20px;
+  background: #f8f9fa;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ── Select All Row ──────────────────────────────────────────────────────── */
+.remind-select-all {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 12px;
+}
+
+.remind-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
+  user-select: none;
+}
+
+.remind-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #1e3a5f;
+}
+
+.remind-count {
+  font-size: 12px;
+  color: #6b7280;
+  background: #e9ecef;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* ── Patrol List ─────────────────────────────────────────────────────────── */
+.remind-patrol-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.remind-patrol-list::-webkit-scrollbar { width: 5px; }
+.remind-patrol-list::-webkit-scrollbar-track { background: transparent; }
+.remind-patrol-list::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 3px; }
+
+.remind-patrol-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  user-select: none;
+}
+
+.remind-patrol-item:hover {
+  background: #f0f4fa;
+  border-color: #c8d6ea;
+}
+
+.remind-patrol-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #1e3a5f;
+}
+
+/* ── Avatar ──────────────────────────────────────────────────────────────── */
+.remind-patrol-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3a5f, #2e4a7a);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.remind-patrol-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Patrol Info ─────────────────────────────────────────────────────────── */
+.remind-patrol-info { flex: 1; min-width: 0; }
+
+.remind-patrol-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remind-patrol-email {
+  font-size: 11.5px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Empty / Loading States ──────────────────────────────────────────────── */
+.remind-loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.remind-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+.remind-empty svg { margin-bottom: 12px; }
+
+.remind-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  flex-shrink: 0;
+  border-radius: 0 0 14px 14px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.modal-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid #ced4da;
+  background: #fff;
+  color: #495057;
+  transition: background 0.15s, transform 0.1s;
+  line-height: 1;
+}
+.modal-btn-secondary:hover { background: #f1f3f5; }
+.modal-btn-secondary:active { transform: scale(0.97); }
+
+.modal-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%);
+  color: #fff;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
+  line-height: 1;
+}
+.modal-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #25487a 0%, #0e1f3a 100%);
+}
+.modal-btn-primary:active:not(:disabled) { transform: scale(0.97); }
+.modal-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Scrollbar (modal container) ─────────────────────────────────────────── */
+.modal-container::-webkit-scrollbar { width: 5px; }
+.modal-container::-webkit-scrollbar-track { background: transparent; }
+.modal-container::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 3px; }

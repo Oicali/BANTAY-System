@@ -1,4 +1,9 @@
+// backend\features\blotter\models\Blotter.js
+
 const pool = require("../../../config/database");
+const {
+  getRespondersForReferrals,
+} = require("../../notifications/notificationService");
 
 class Blotter {
   // Generate blotter entry number
@@ -121,9 +126,9 @@ class Blotter {
             complainant.province_code || null,
             complainant.municipality_code || null,
             complainant.barangay_code || null,
-            complainant.role || 'Victim',
-complainant.relationship_to_victim || null,
-complainant.witness_statement || null,
+            complainant.role || "Victim",
+            complainant.relationship_to_victim || null,
+            complainant.witness_statement || null,
           ],
         );
       }
@@ -268,10 +273,10 @@ FROM blotter_entries WHERE is_deleted = false`;
     }
 
     if (filters.search) {
-  query += ` AND blotter_entry_number ILIKE $${paramCount}`;
-  params.push(`%${filters.search}%`);
-  paramCount++;
-}
+      query += ` AND blotter_entry_number ILIKE $${paramCount}`;
+      params.push(`%${filters.search}%`);
+      paramCount++;
+    }
 
     if (filters.date_from) {
       query += ` AND date_time_reported >= $${paramCount}`;
@@ -303,7 +308,19 @@ FROM blotter_entries WHERE is_deleted = false`;
     query += ` ORDER BY date_time_reported DESC`;
 
     const result = await pool.query(query, params);
-    return result.rows;
+    const blotters = result.rows;
+
+    // Enrich referred blotters with responder info from notifications
+    if (filters.referred === "true" && blotters.length > 0) {
+      const ids = blotters.map((b) => b.blotter_id);
+      const responderMap = await getRespondersForReferrals(ids);
+      return blotters.map((b) => ({
+        ...b,
+        responder: responderMap[String(b.blotter_id)] || null,
+      }));
+    }
+
+    return blotters;
   }
 
   // Get blotter by ID with all related data
@@ -373,7 +390,7 @@ FROM blotter_entries WHERE is_deleted = false`;
 
       // Update blotter entry (WITHOUT changing blotter_entry_number)
       await client.query(
-  `UPDATE blotter_entries SET
+        `UPDATE blotter_entries SET
     incident_type = $1, cop = $2, date_time_commission = $3,
     date_time_reported = $4, place_region = $5,
     place_district_province = $6, place_city_municipality = $7,
@@ -383,23 +400,23 @@ FROM blotter_entries WHERE is_deleted = false`;
     day_of_incident = $17, month_of_incident = $18,
     updated_at = CURRENT_TIMESTAMP
   WHERE blotter_id = $19`,
-  [
-    blotterData.incident_type,
-    blotterData.cop,
-    blotterData.date_time_commission,
-    blotterData.date_time_reported,
-    blotterData.place_region,
-    blotterData.place_district_province,
-    blotterData.place_city_municipality,
-    blotterData.place_barangay,
-    blotterData.place_street,
-    blotterData.is_private_place || null,
-    blotterData.narrative,
-    blotterData.amount_involved || null,
-    blotterData.referred_by_barangay ?? false,  
-    blotterData.referred_by_dilg ?? false,       
-    blotterData.lat || null,
-    blotterData.lng || null,
+        [
+          blotterData.incident_type,
+          blotterData.cop,
+          blotterData.date_time_commission,
+          blotterData.date_time_reported,
+          blotterData.place_region,
+          blotterData.place_district_province,
+          blotterData.place_city_municipality,
+          blotterData.place_barangay,
+          blotterData.place_street,
+          blotterData.is_private_place || null,
+          blotterData.narrative,
+          blotterData.amount_involved || null,
+          blotterData.referred_by_barangay ?? false,
+          blotterData.referred_by_dilg ?? false,
+          blotterData.lat || null,
+          blotterData.lng || null,
           new Date(blotterData.date_time_commission).toLocaleDateString(
             "en-US",
             { weekday: "long" },
@@ -462,7 +479,7 @@ FROM blotter_entries WHERE is_deleted = false`;
       // Re-insert complainants
       for (const c of complainants) {
         await client.query(
-`INSERT INTO complainants (
+          `INSERT INTO complainants (
   blotter_id, first_name, middle_name, last_name, qualifier, alias,
   gender, nationality, contact_number, region, district_province,
   city_municipality, barangay, house_street, info_obtained, occupation,
@@ -490,9 +507,9 @@ FROM blotter_entries WHERE is_deleted = false`;
             c.province_code || null,
             c.municipality_code || null,
             c.barangay_code || null,
-            c.role || 'Victim',
-c.relationship_to_victim || null,
-c.witness_statement || null,
+            c.role || "Victim",
+            c.relationship_to_victim || null,
+            c.witness_statement || null,
           ],
         );
       }

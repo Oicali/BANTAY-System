@@ -1,3 +1,4 @@
+// frontend\src\components\layout\Topbar.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { getUserFromToken } from "../../utils/auth";
 
@@ -21,17 +22,157 @@ const LINK_MAP = {
   "/crime-dashboard": "/crime-dashboard",
 };
 
+// ── Notification Toast ──────────────────────────────────────────────────────
+const NotifToast = ({ notif, onDone }) => {
+  const [phase, setPhase] = useState("enter"); // enter → stay → exit
+
+  useEffect(() => {
+    if (!notif) return;
+    setPhase("enter");
+    const stayTimer = setTimeout(() => setPhase("exit"), 4000);
+    const doneTimer = setTimeout(() => onDone(), 4600);
+    return () => {
+      clearTimeout(stayTimer);
+      clearTimeout(doneTimer);
+    };
+  }, [notif]);
+
+  if (!notif) return null;
+
+  const isExiting = phase === "exit";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "24px",
+        left: "50%",
+        transform: isExiting
+          ? "translateX(-50%) translateY(-20px)"
+          : "translateX(-50%) translateY(0px)",
+        opacity: isExiting ? 0 : 1,
+        transition:
+          "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease",
+        zIndex: 99999,
+        pointerEvents: "none",
+        animation:
+          phase === "enter"
+            ? "notifSlideDown 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards"
+            : "none",
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)",
+          border: "1px solid #e5e7eb",
+          padding: "14px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          minWidth: "280px",
+          maxWidth: "400px",
+        }}
+      >
+        {/* Left accent bar */}
+        <div
+          style={{
+            width: "4px",
+            height: "40px",
+            borderRadius: "4px",
+            background: "#1e3a5f",
+            flexShrink: 0,
+          }}
+        />
+        {/* Bell icon */}
+        <div
+          style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "#eff6ff",
+            border: "2px solid #bfdbfe",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth="2.5"
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+        </div>
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: "700",
+              color: "#111827",
+              marginBottom: "2px",
+            }}
+          >
+            {notif.title}
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#6b7280",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {notif.message}
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes notifSlideDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0px); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+
 const TopBar = ({ onMenuClick }) => {
   const [user, setUser] = useState(null);
-  const [profileData, setProfileData] = useState(null);
-  const [profilePicture, setProfilePicture] = useState(null);
+  const [profileData, setProfileData] = useState(() => {
+    const cached = localStorage.getItem("cachedProfile");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [profilePicture, setProfilePicture] = useState(() => {
+    const cached = localStorage.getItem("cachedProfile");
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return parsed.profile_picture || null;
+    }
+    return null;
+  });
 
-  // ── Notification state ──
   const [notifs, setNotifs] = useState([]);
   const [unread, setUnread] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
   const pollRef = useRef(null);
+
+  // ── Toast state ──
+  const [toastNotif, setToastNotif] = useState(null);
+  const prevNotifIdsRef = useRef(null); // null = first load, Set after first load
 
   useEffect(() => {
     const userData = getUserFromToken();
@@ -39,13 +180,14 @@ const TopBar = ({ onMenuClick }) => {
     fetchProfileData();
     fetchNotifications();
 
-    // Poll every 15 seconds for real-time feel
     pollRef.current = setInterval(fetchNotifications, 15000);
 
-    const handleProfileUpdated = () => fetchProfileData();
+    const handleProfileUpdated = () => {
+      localStorage.removeItem("cachedProfile");
+      fetchProfileData();
+    };
     window.addEventListener("profileUpdated", handleProfileUpdated);
 
-    // Close dropdown on outside click
     const handleClickOutside = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
         setNotifOpen(false);
@@ -69,6 +211,12 @@ const TopBar = ({ onMenuClick }) => {
   const fetchProfileData = async () => {
     try {
       const token = localStorage.getItem("token");
+      const cached = localStorage.getItem("cachedProfile");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setProfileData(parsed);
+        setProfilePicture(parsed.profile_picture || null);
+      }
       const response = await fetch(`${API_URL}/users/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -77,6 +225,7 @@ const TopBar = ({ onMenuClick }) => {
         if (data.user) {
           setProfileData(data.user);
           setProfilePicture(data.user.profile_picture || null);
+          localStorage.setItem("cachedProfile", JSON.stringify(data.user));
         }
       }
     } catch (error) {
@@ -93,7 +242,25 @@ const TopBar = ({ onMenuClick }) => {
       });
       if (res.ok) {
         const data = await res.json();
-        setNotifs(data.data || []);
+        const incoming = data.data || [];
+
+        // ── Detect new notifications after first load ──
+        if (prevNotifIdsRef.current === null) {
+          // First fetch — just record what we have, no toast
+          prevNotifIdsRef.current = new Set(incoming.map((n) => n.id));
+        } else {
+          const newOnes = incoming.filter(
+            (n) => !prevNotifIdsRef.current.has(n.id),
+          );
+          if (newOnes.length > 0) {
+            // Show toast for the newest one
+            setToastNotif(newOnes[0]);
+            // Update the known set
+            prevNotifIdsRef.current = new Set(incoming.map((n) => n.id));
+          }
+        }
+
+        setNotifs(incoming);
         setUnread(data.unread || 0);
       }
     } catch (err) {
@@ -166,7 +333,6 @@ const TopBar = ({ onMenuClick }) => {
     return (rank + fullName).trim() || user?.username || "User";
   };
 
-  // ── Notif icon color per type ──
   const NOTIF_ICONS = {
     NEW_REFERRAL: {
       color: "#ef4444",
@@ -210,6 +376,21 @@ const TopBar = ({ onMenuClick }) => {
           viewBox="0 0 24 24"
           fill="none"
           stroke="#3b82f6"
+          strokeWidth="2.5"
+        >
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      ),
+    },
+    REFERRAL_RESPONDED: {
+      color: "#2563eb",
+      svg: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#2563eb"
           strokeWidth="2.5"
         >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -308,323 +489,335 @@ const TopBar = ({ onMenuClick }) => {
   };
 
   const getNotifIcon = (type) => NOTIF_ICONS[type] || DEFAULT_ICON;
-  return (
-    <header className="top-bar">
-      <div
-        className="top-bar-left"
-        style={{ display: "flex", alignItems: "center", gap: "12px" }}
-      >
-        <button
-          className="hamburger-btn"
-          onClick={onMenuClick}
-          aria-label="Open menu"
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
-      </div>
 
-      <div
-        className="top-bar-right"
-        style={{ display: "flex", alignItems: "center", gap: "12px" }}
-      >
-        {/* ── BELL ICON ── */}
-        <div ref={notifRef} style={{ position: "relative" }}>
+  return (
+    <>
+      {/* ── Toast — rendered outside the header so it's truly centered ── */}
+      <NotifToast notif={toastNotif} onDone={() => setToastNotif(null)} />
+
+      <header className="top-bar">
+        <div
+          className="top-bar-left"
+          style={{ display: "flex", alignItems: "center", gap: "12px" }}
+        >
           <button
-            onClick={() => setNotifOpen((v) => !v)}
-            style={{
-              position: "relative",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "6px",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            className="hamburger-btn"
+            onClick={onMenuClick}
+            aria-label="Open menu"
           >
             <svg
-              width="22"
-              height="22"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#374151"
+              stroke="currentColor"
               strokeWidth="2"
             >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
-            {unread > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "2px",
-                  right: "2px",
-                  background: "#ef4444",
-                  color: "#fff",
-                  fontSize: "10px",
-                  fontWeight: "700",
-                  borderRadius: "999px",
-                  minWidth: "16px",
-                  height: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 4px",
-                  lineHeight: 1,
-                }}
-              >
-                {unread > 99 ? "99+" : unread}
-              </span>
-            )}
           </button>
+        </div>
 
-          {/* ── DROPDOWN ── */}
-          {notifOpen && (
-            <div
+        <div
+          className="top-bar-right"
+          style={{ display: "flex", alignItems: "center", gap: "12px" }}
+        >
+          {/* ── BELL ICON ── */}
+          <div ref={notifRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setNotifOpen((v) => !v)}
               style={{
-                position: "absolute",
-                top: "calc(100% + 8px)",
-                right: 0,
-                width: "360px",
-                maxHeight: "480px",
-                background: "#fff",
-                borderRadius: "12px",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                border: "1px solid #e5e7eb",
-                zIndex: 9999,
+                position: "relative",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "6px",
+                borderRadius: "8px",
                 display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background 0.2s",
               }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#f1f5f9")
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
             >
-              {/* Header */}
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#374151"
+                strokeWidth="2"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {unread > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "2px",
+                    right: "2px",
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: "10px",
+                    fontWeight: "700",
+                    borderRadius: "999px",
+                    minWidth: "16px",
+                    height: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 4px",
+                    lineHeight: 1,
+                  }}
+                >
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </button>
+
+            {/* ── DROPDOWN ── */}
+            {notifOpen && (
               <div
                 style={{
-                  padding: "14px 16px",
-                  borderBottom: "1px solid #f3f4f6",
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  width: "360px",
+                  maxHeight: "480px",
+                  background: "#fff",
+                  borderRadius: "12px",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                  border: "1px solid #e5e7eb",
+                  zIndex: 9999,
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  flexDirection: "column",
+                  overflow: "hidden",
                 }}
               >
+                {/* Header */}
                 <div
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                  style={{
+                    padding: "14px 16px",
+                    borderBottom: "1px solid #f3f4f6",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
                 >
-                  <span
-                    style={{
-                      fontWeight: "700",
-                      fontSize: "14px",
-                      color: "#111827",
-                    }}
-                  >
-                    Notifications
-                  </span>
-                  {unread > 0 && (
-                    <span
-                      style={{
-                        background: "#ef4444",
-                        color: "#fff",
-                        fontSize: "10px",
-                        fontWeight: "700",
-                        borderRadius: "999px",
-                        padding: "2px 6px",
-                      }}
-                    >
-                      {unread}
-                    </span>
-                  )}
-                </div>
-                {unread > 0 && (
-                  <button
-                    onClick={markAllRead}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      color: "#1e3a5f",
-                      fontWeight: "600",
-                    }}
-                  >
-                    Mark all as read
-                  </button>
-                )}
-              </div>
-
-              {/* List */}
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                {notifs.length === 0 ? (
                   <div
                     style={{
-                      padding: "40px 20px",
-                      textAlign: "center",
-                      color: "#9ca3af",
-                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
                     }}
                   >
-                    <div style={{ fontSize: "32px", marginBottom: "8px" }}>
-                      🔔
-                    </div>
-                    No notifications yet
-                  </div>
-                ) : (
-                  notifs.map((notif) => {
-                    const notifData = getNotifIcon(notif.type);
-                    const color = notifData.color;
-                    return (
-                      <div
-                        key={notif.id}
-                        onClick={() => handleNotifClick(notif)}
+                    <span
+                      style={{
+                        fontWeight: "700",
+                        fontSize: "14px",
+                        color: "#111827",
+                      }}
+                    >
+                      Notifications
+                    </span>
+                    {unread > 0 && (
+                      <span
                         style={{
-                          padding: "12px 16px",
-                          borderBottom: "1px solid #f9fafb",
-                          display: "flex",
-                          gap: "10px",
-                          alignItems: "flex-start",
-                          cursor: notif.link_to ? "pointer" : "default",
-                          background: notif.is_read ? "#fff" : "#f0f4ff",
-                          transition: "background 0.15s",
+                          background: "#ef4444",
+                          color: "#fff",
+                          fontSize: "10px",
+                          fontWeight: "700",
+                          borderRadius: "999px",
+                          padding: "2px 6px",
                         }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = notif.is_read
-                            ? "#f9fafb"
-                            : "#e8eeff")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = notif.is_read
-                            ? "#fff"
-                            : "#f0f4ff")
-                        }
                       >
-                        {/* Avatar / Icon */}
+                        {unread}
+                      </span>
+                    )}
+                  </div>
+                  {unread > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        color: "#1e3a5f",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+
+                {/* List */}
+                <div style={{ overflowY: "auto", flex: 1 }}>
+                  {notifs.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "40px 20px",
+                        textAlign: "center",
+                        color: "#9ca3af",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <div style={{ fontSize: "32px", marginBottom: "8px" }}>
+                        🔔
+                      </div>
+                      No notifications yet
+                    </div>
+                  ) : (
+                    notifs.map((notif) => {
+                      const notifData = getNotifIcon(notif.type);
+                      const color = notifData.color;
+                      return (
                         <div
+                          key={notif.id}
+                          onClick={() => handleNotifClick(notif)}
                           style={{
-                            width: "36px",
-                            height: "36px",
-                            borderRadius: "50%",
-                            background: color + "22",
-                            border: `2px solid ${color}44`,
+                            padding: "12px 16px",
+                            borderBottom: "1px solid #f9fafb",
                             display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "16px",
-                            flexShrink: 0,
+                            gap: "10px",
+                            alignItems: "flex-start",
+                            cursor: notif.link_to ? "pointer" : "default",
+                            background: notif.is_read ? "#fff" : "#f0f4ff",
+                            transition: "background 0.15s",
                           }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = notif.is_read
+                              ? "#f9fafb"
+                              : "#e8eeff")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = notif.is_read
+                              ? "#fff"
+                              : "#f0f4ff")
+                          }
                         >
-                          {notif.sender_avatar ? (
-                            <img
-                              src={notif.sender_avatar}
-                              alt=""
+                          <div
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              background: color + "22",
+                              border: `2px solid ${color}44`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "16px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {notif.sender_avatar ? (
+                              <img
+                                src={notif.sender_avatar}
+                                alt=""
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              notifData.svg
+                            )}
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
                               style={{
-                                width: "100%",
-                                height: "100%",
+                                fontSize: "13px",
+                                fontWeight: notif.is_read ? "500" : "700",
+                                color: "#111827",
+                                marginBottom: "2px",
+                              }}
+                            >
+                              {notif.title}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#6b7280",
+                                lineHeight: "1.4",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              {notif.message}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                              {notif.sender_name && (
+                                <span
+                                  style={{
+                                    fontWeight: "600",
+                                    color: "#6b7280",
+                                  }}
+                                >
+                                  {notif.sender_name} ·{" "}
+                                </span>
+                              )}
+                              {timeAgo(notif.created_at)}
+                            </div>
+                          </div>
+
+                          {!notif.is_read && (
+                            <div
+                              style={{
+                                width: "8px",
+                                height: "8px",
                                 borderRadius: "50%",
-                                objectFit: "cover",
+                                background: "#3b82f6",
+                                flexShrink: 0,
+                                marginTop: "4px",
                               }}
                             />
-                          ) : (
-                            notifData.svg
                           )}
                         </div>
-
-                        {/* Content */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: notif.is_read ? "500" : "700",
-                              color: "#111827",
-                              marginBottom: "2px",
-                            }}
-                          >
-                            {notif.title}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: "#6b7280",
-                              lineHeight: "1.4",
-                              marginBottom: "4px",
-                            }}
-                          >
-                            {notif.message}
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-                            {notif.sender_name && (
-                              <span
-                                style={{ fontWeight: "600", color: "#6b7280" }}
-                              >
-                                {notif.sender_name} ·{" "}
-                              </span>
-                            )}
-                            {timeAgo(notif.created_at)}
-                          </div>
-                        </div>
-
-                        {/* Unread dot */}
-                        {!notif.is_read && (
-                          <div
-                            style={{
-                              width: "8px",
-                              height: "8px",
-                              borderRadius: "50%",
-                              background: "#3b82f6",
-                              flexShrink: 0,
-                              marginTop: "4px",
-                            }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── EXISTING PROFILE ── */}
-        <div className="user-profile">
-          <div className="user-info">
-            <div className="user-name">{getDisplayName()}</div>
-            <div className="user-role">
-              {profileData?.role || user?.role || "role"}
-            </div>
-          </div>
-          <div className="user-avatar">
-            {profilePicture ? (
-              <img
-                src={profilePicture}
-                alt="Profile"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              getInitials()
             )}
           </div>
+
+          {/* ── PROFILE ── */}
+          <div className="user-profile">
+            <div className="user-info">
+              <div className="user-name">{getDisplayName()}</div>
+              <div className="user-role">
+                {profileData?.role || user?.role || "role"}
+              </div>
+            </div>
+            <div className="user-avatar">
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Profile"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                getInitials()
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 };
 

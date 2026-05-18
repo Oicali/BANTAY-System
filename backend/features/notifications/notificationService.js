@@ -1,3 +1,5 @@
+// backend\features\notifications\notificationService.js
+
 const pool = require("../../config/database");
 
 const createNotification = async ({
@@ -40,4 +42,71 @@ const notifyAllByRole = async (roles, payload, excludeUserId = null) => {
   }
 };
 
-module.exports = { createNotification, notifyAllByRole };
+const getResponderForReferral = async (blotterId) => {
+  try {
+    const result = await pool.query(
+      `SELECT sender_name, sender_user_id, created_at
+       FROM notifications
+       WHERE type = 'REFERRAL_RESPONDED' 
+         AND link_to = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [`/e-blotter?referral=${blotterId}`]
+    );
+    return result.rows[0] || null;
+  } catch {
+    return null;
+  }
+};
+
+// backend\features\notifications\notificationService.js
+
+const getRespondersForReferrals = async (blotterIds) => {
+  if (!blotterIds.length) return {};
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT ON (n.link_to) 
+         n.link_to, 
+         n.sender_name, 
+         n.sender_user_id, 
+         n.created_at,
+         u.first_name, 
+         u.last_name, 
+         u.profile_picture,
+         pr.abbreviation AS rank_abbreviation
+       FROM notifications n
+       LEFT JOIN users u ON n.sender_user_id = u.user_id
+       LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
+       WHERE n.type = 'REFERRAL_RESPONDED'
+         AND n.link_to = ANY($1::text[])
+       ORDER BY n.link_to, n.created_at DESC`,
+      [blotterIds.map((id) => `/e-blotter?referral=${id}`)]
+    );
+    
+    const map = {};
+    for (const row of result.rows) {
+      const match = row.link_to.match(/referral=(\d+)$/);
+      if (match) {
+        map[match[1]] = {
+          sender_name: row.sender_name,
+          sender_user_id: row.sender_user_id,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          profile_picture: row.profile_picture,
+          rank_abbreviation: row.rank_abbreviation,
+          created_at: row.created_at
+        };
+      }
+    }
+    return map;
+  } catch (err) {
+    console.error("getRespondersForReferrals error:", err.message);
+    return {};
+  }
+};
+
+module.exports = { 
+  createNotification, 
+  notifyAllByRole, 
+  getResponderForReferral,
+  getRespondersForReferrals,
+};

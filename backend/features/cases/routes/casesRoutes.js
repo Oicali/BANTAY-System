@@ -1,3 +1,4 @@
+// backend\features\cases\routes\casesRoutes.js
 const router = require("express").Router();
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 const { createCase, assignInvestigator, updateStatus, updatePriority, getCases, getCaseById, addNote, editNote, deleteNote, restoreNote, getStatistics } = require("../controllers/casesController");

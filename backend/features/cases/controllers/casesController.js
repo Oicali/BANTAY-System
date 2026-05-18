@@ -478,7 +478,7 @@ const getCaseById = async (req, res) => {
     }
 
     // Get notes
-    const isAdmin = req.user.role === "Administrator";
+    const isAdmin = req.user.role === "Administrator" || req.user.role === "Technical Administrator";
      const notes = await pool.query(
       `SELECT cn.id, cn.note, cn.note_date,
 to_char(cn.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
