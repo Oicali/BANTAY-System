@@ -6046,12 +6046,6 @@ function EBlotter() {
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (
-                                        !window.confirm(
-                                          "Remove this photo? This will delete it when you save.",
-                                        )
-                                      )
-                                        return;
                                       setModalAttachments((prev) =>
                                         prev.map((x) =>
                                           x.attachment_id === a.attachment_id
