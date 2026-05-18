@@ -225,7 +225,7 @@ function EBlotter() {
     );
   };
 
-    const [showRemindModal, setShowRemindModal] = useState(false);
+  const [showRemindModal, setShowRemindModal] = useState(false);
   const [remindBlotterId, setRemindBlotterId] = useState(null);
   const [remindBlotterNumber, setRemindBlotterNumber] = useState("");
 
@@ -2160,6 +2160,21 @@ function EBlotter() {
         });
         const data = await res.json();
         if (data.success) {
+          for (const a of modalAttachments.filter((x) => x._markedForDelete)) {
+            try {
+              await fetch(
+                `${API_URL}/${editingBlotterId}/attachments/${a.attachment_id}`,
+                {
+                  method: "DELETE",
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  },
+                },
+              );
+            } catch (e) {
+              console.error(e);
+            }
+          }
           for (const item of pendingModalFiles) {
             try {
               const formData = new FormData();
@@ -2360,7 +2375,10 @@ function EBlotter() {
         await fetchBlotters(activeReportTab, true);
         fetchReferredCount();
       } else {
-        showReactToast(data.message || "Could not respond to referral.", "error");
+        showReactToast(
+          data.message || "Could not respond to referral.",
+          "error",
+        );
       }
     } catch {
       showReactToast("Error responding to referral.", "error");
@@ -3179,16 +3197,26 @@ function EBlotter() {
                               <div
                                 style={{ fontSize: "11px", color: "#9ca3af" }}
                               >
-                                {new Date(a.uploaded_at).toLocaleDateString(
-                                  "en-PH",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )}
+                                {(() => {
+                                  const raw = String(a.uploaded_at);
+                                  // If no timezone info, treat as UTC by appending Z
+                                  const normalized = /Z$|\+\d{2}:\d{2}$/.test(
+                                    raw,
+                                  )
+                                    ? raw
+                                    : raw + "Z";
+                                  return new Date(normalized).toLocaleString(
+                                    "en-PH",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      timeZone: "Asia/Manila",
+                                    },
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -5986,79 +6014,75 @@ function EBlotter() {
                               marginBottom: "14px",
                             }}
                           >
-                            {modalAttachments.map((a) => (
-                              <div
-                                key={a.attachment_id}
-                                style={{
-                                  position: "relative",
-                                  borderRadius: "8px",
-                                  overflow: "hidden",
-                                  border: "1px solid #e5e7eb",
-                                  background: "#f9fafb",
-                                }}
-                              >
-                                <img
-                                  src={a.file_url}
-                                  alt={a.caption || "Evidence"}
+                            {modalAttachments
+                              .filter((a) => !a._markedForDelete)
+                              .map((a) => (
+                                <div
+                                  key={a.attachment_id}
                                   style={{
-                                    width: "100%",
-                                    height: "110px",
-                                    objectFit: "cover",
-                                    display: "block",
-                                    cursor: "zoom-in",
-                                  }}
-                                  onClick={() =>
-                                    setLightboxImage({
-                                      url: a.file_url,
-                                      caption: a.caption,
-                                    })
-                                  }
-                                />
-
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    try {
-                                      await fetch(
-                                        `${API_URL}/${editingBlotterId}/attachments/${a.attachment_id}`,
-                                        {
-                                          method: "DELETE",
-                                          headers: {
-                                            Authorization: `Bearer ${localStorage.getItem("token")}`,
-                                          },
-                                        },
-                                      );
-                                      setModalAttachments((prev) =>
-                                        prev.filter(
-                                          (x) =>
-                                            x.attachment_id !== a.attachment_id,
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      console.error(e);
-                                    }
-                                  }}
-                                  style={{
-                                    position: "absolute",
-                                    top: "5px",
-                                    right: "5px",
-                                    background: "rgba(0,0,0,0.6)",
-                                    border: "none",
-                                    borderRadius: "50%",
-                                    width: "22px",
-                                    height: "22px",
-                                    cursor: "pointer",
-                                    color: "white",
-                                    fontSize: "13px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
+                                    position: "relative",
+                                    borderRadius: "8px",
+                                    overflow: "hidden",
+                                    border: "1px solid #e5e7eb",
+                                    background: "#f9fafb",
                                   }}
                                 >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+                                  <img
+                                    src={a.file_url}
+                                    alt={a.caption || "Evidence"}
+                                    style={{
+                                      width: "100%",
+                                      height: "110px",
+                                      objectFit: "cover",
+                                      display: "block",
+                                      cursor: "zoom-in",
+                                    }}
+                                    onClick={() =>
+                                      setLightboxImage({
+                                        url: a.file_url,
+                                        caption: a.caption,
+                                      })
+                                    }
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          "Remove this photo? This will delete it when you save.",
+                                        )
+                                      )
+                                        return;
+                                      setModalAttachments((prev) =>
+                                        prev.map((x) =>
+                                          x.attachment_id === a.attachment_id
+                                            ? { ...x, _markedForDelete: true }
+                                            : x,
+                                        ),
+                                      );
+                                    }}
+                                    style={{
+                                      position: "absolute",
+                                      top: "5px",
+                                      right: "5px",
+                                      background: "rgba(0,0,0,0.6)",
+                                      border: "none",
+                                      borderRadius: "50%",
+                                      width: "22px",
+                                      height: "22px",
+                                      cursor: "pointer",
+                                      color: "white",
+                                      fontSize: "13px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
                           </div>
                         )}
 
@@ -7226,50 +7250,51 @@ function EBlotter() {
           Reports
         </button>
         {userRole !== "Investigator" && (
-        <button
-          className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
-          onClick={() => {
-            if (activeReportTab === "referred") return;
-            setBlotters([]);
-            setCurrentPage(1);
-            setActiveReportTab("referred");
-            fetchBlotters("referred");
-          }}
-        >
-          <span
-            style={{
-              position: "relative",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
+          <button
+            className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
+            onClick={() => {
+              if (activeReportTab === "referred") return;
+              setBlotters([]);
+              setCurrentPage(1);
+              setActiveReportTab("referred");
+              fetchBlotters("referred");
             }}
           >
-            Referred (Brgy)
-            {referredCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "-8px",
-                  right: "-18px",
-                  backgroundColor: "#dc2626",
-                  color: "white",
-                  borderRadius: "50%",
-                  minWidth: "18px",
-                  height: "18px",
-                  fontSize: "10px",
-                  fontWeight: "800",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 4px",
-                  lineHeight: 1,
-                }}
-              >
-                {referredCount}
-              </span>
-            )}
-          </span>
-        </button>)}
+            <span
+              style={{
+                position: "relative",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              Referred (Brgy)
+              {referredCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-8px",
+                    right: "-18px",
+                    backgroundColor: "#dc2626",
+                    color: "white",
+                    borderRadius: "50%",
+                    minWidth: "18px",
+                    height: "18px",
+                    fontSize: "10px",
+                    fontWeight: "800",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 4px",
+                    lineHeight: 1,
+                  }}
+                >
+                  {referredCount}
+                </span>
+              )}
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="eb-table-card">
@@ -7438,196 +7463,218 @@ function EBlotter() {
                     </td>
                     <td>
                       <div className="eb-table-actions">
-  {activeReportTab === "referred" ? (
-    <>
-      {/* PATROL role */}
-      {userRole === "Patrol" && !b.responder && (
-        <button
-          className="eb-action-btn"
-          style={{
-            background: "#2563eb",
-            color: "white",
-            whiteSpace: "nowrap",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px"
-          }}
-          onClick={() => handleRespond(b.blotter_id)}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 9 12 4 17 9" />
-            <line x1="12" y1="4" x2="12" y2="16" />
-          </svg>
-          Respond
-        </button>
-      )}
-      {userRole === "Patrol" &&
-        b.responder &&
-        b.responder.sender_user_id === currentUserId && (
-          <>
-            <button
-              className="eb-action-btn"
-              style={{
-                background: "#16a34a",
-                color: "white",
-              }}
-              onClick={() => handleAcceptReferral(b.blotter_id)}
-            >
-              ✓ Accept
-            </button>
-            <button
-              className="eb-action-btn eb-action-btn-danger"
-              onClick={(e) => {
-                e.preventDefault();
-                handleDelete(b.blotter_id);
-              }}
-            >
-              <DeleteIcon /> Delete
-            </button>
-          </>
-        )}
-      {userRole === "Patrol" &&
-        b.responder &&
-        b.responder.sender_user_id !== currentUserId && (
-          <span
-            style={{
-              fontSize: "12px",
-              color: "#9ca3af",
-              fontStyle: "italic",
-            }}
-          >
-            Responded
-          </span>
-        )}
+                        {activeReportTab === "referred" ? (
+                          <>
+                            {/* PATROL role */}
+                            {userRole === "Patrol" && !b.responder && (
+                              <button
+                                className="eb-action-btn"
+                                style={{
+                                  background: "#2563eb",
+                                  color: "white",
+                                  whiteSpace: "nowrap",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                                onClick={() => handleRespond(b.blotter_id)}
+                              >
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="7 9 12 4 17 9" />
+                                  <line x1="12" y1="4" x2="12" y2="16" />
+                                </svg>
+                                Respond
+                              </button>
+                            )}
+                            {userRole === "Patrol" &&
+                              b.responder &&
+                              b.responder.sender_user_id === currentUserId && (
+                                <>
+                                  <button
+                                    className="eb-action-btn"
+                                    style={{
+                                      background: "#16a34a",
+                                      color: "white",
+                                    }}
+                                    onClick={() =>
+                                      handleAcceptReferral(b.blotter_id)
+                                    }
+                                  >
+                                    ✓ Accept
+                                  </button>
+                                  <button
+                                    className="eb-action-btn eb-action-btn-danger"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleDelete(b.blotter_id);
+                                    }}
+                                  >
+                                    <DeleteIcon /> Delete
+                                  </button>
+                                </>
+                              )}
+                            {userRole === "Patrol" &&
+                              b.responder &&
+                              b.responder.sender_user_id !== currentUserId && (
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#9ca3af",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Responded
+                                </span>
+                              )}
 
-      {/* Non-Patrol, non-admin roles (e.g. Investigator, Desk Officer) */}
-      {userRole !== "Patrol" &&
-        userRole !== "Administrator" &&
-        userRole !== "Technical Administrator" && (
-          <>
-            {!b.responder ? (
-              <>
-                <button
-                  className="eb-action-btn"
-                  style={{
-                    background: "#16a34a",
-                    color: "white",
-                  }}
-                  onClick={() => handleAcceptReferral(b.blotter_id)}
-                >
-                  ✓ Accept
-                </button>
-                <button
-                  className="eb-action-btn eb-action-btn-danger"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDelete(b.blotter_id);
-                  }}
-                >
-                  <DeleteIcon /> Delete
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="eb-action-btn"
-                  style={{
-                    background: "#16a34a",
-                    color: "white",
-                  }}
-                  onClick={() => handleAcceptReferral(b.blotter_id)}
-                >
-                  ✓ Accept
-                </button>
-                <button
-                  className="eb-action-btn eb-action-btn-danger"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDelete(b.blotter_id);
-                  }}
-                >
-                  <DeleteIcon /> Delete
-                </button>
-              </>
-            )}
-          </>
-        )}
+                            {/* Non-Patrol, non-admin roles (e.g. Investigator, Desk Officer) */}
+                            {userRole !== "Patrol" &&
+                              userRole !== "Administrator" &&
+                              userRole !== "Technical Administrator" && (
+                                <>
+                                  {!b.responder ? (
+                                    <>
+                                      <button
+                                        className="eb-action-btn"
+                                        style={{
+                                          background: "#16a34a",
+                                          color: "white",
+                                        }}
+                                        onClick={() =>
+                                          handleAcceptReferral(b.blotter_id)
+                                        }
+                                      >
+                                        ✓ Accept
+                                      </button>
+                                      <button
+                                        className="eb-action-btn eb-action-btn-danger"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDelete(b.blotter_id);
+                                        }}
+                                      >
+                                        <DeleteIcon /> Delete
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        className="eb-action-btn"
+                                        style={{
+                                          background: "#16a34a",
+                                          color: "white",
+                                        }}
+                                        onClick={() =>
+                                          handleAcceptReferral(b.blotter_id)
+                                        }
+                                      >
+                                        ✓ Accept
+                                      </button>
+                                      <button
+                                        className="eb-action-btn eb-action-btn-danger"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDelete(b.blotter_id);
+                                        }}
+                                      >
+                                        <DeleteIcon /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              )}
 
-      {/* Admin / TechAdmin — show Remind button if no responder */}
-      {(userRole === "Administrator" ||
-        userRole === "Technical Administrator") && (
-        <>
-          {b.responder ? (
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#9ca3af",
-                fontStyle: "italic",
-              }}
-            >
-              Responded
-            </span>
-          ) : (
-            <button
-              className="eb-action-btn"
-              style={{ 
-                background: "#f59e0b", 
-                color: "white", 
-                whiteSpace: "nowrap",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px"
-              }}
-              onClick={() => {
-                setRemindBlotterId(b.blotter_id);
-                setRemindBlotterNumber(b.blotter_entry_number);
-                setShowRemindModal(true);
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 6v6l4 2" />
-              </svg>
-              Remind
-            </button>
-          )}
-        </>
-      )}
-    </>
-  ) : (
-    // Non-referred tab actions (View, Edit, Delete)
-    <>
-      <button
-        className="eb-action-btn eb-action-btn-view"
-        onClick={(e) => {
-          e.preventDefault();
-          handleView(b.blotter_id);
-        }}
-      >
-        <ViewIcon /> View
-      </button>
-      <button
-        className="eb-action-btn eb-action-btn-edit"
-        onClick={(e) => {
-          e.preventDefault();
-          handleEdit(b.blotter_id);
-        }}
-      >
-        <EditIcon /> Edit
-      </button>
-      <button
-        className="eb-action-btn eb-action-btn-danger"
-        onClick={(e) => {
-          e.preventDefault();
-          handleDelete(b.blotter_id);
-        }}
-      >
-        <DeleteIcon /> Delete
-      </button>
-    </>
-  )}
-</div>
+                            {/* Admin / TechAdmin — show Remind button if no responder */}
+                            {(userRole === "Administrator" ||
+                              userRole === "Technical Administrator") && (
+                              <>
+                                {b.responder ? (
+                                  <span
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "#9ca3af",
+                                      fontStyle: "italic",
+                                    }}
+                                  >
+                                    Responded
+                                  </span>
+                                ) : (
+                                  <button
+                                    className="eb-action-btn"
+                                    style={{
+                                      background: "#f59e0b",
+                                      color: "white",
+                                      whiteSpace: "nowrap",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                    onClick={() => {
+                                      setRemindBlotterId(b.blotter_id);
+                                      setRemindBlotterNumber(
+                                        b.blotter_entry_number,
+                                      );
+                                      setShowRemindModal(true);
+                                    }}
+                                  >
+                                    <svg
+                                      width="12"
+                                      height="12"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                    >
+                                      <circle cx="12" cy="12" r="10" />
+                                      <path d="M12 6v6l4 2" />
+                                    </svg>
+                                    Remind
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          // Non-referred tab actions (View, Edit, Delete)
+                          <>
+                            <button
+                              className="eb-action-btn eb-action-btn-view"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleView(b.blotter_id);
+                              }}
+                            >
+                              <ViewIcon /> View
+                            </button>
+                            <button
+                              className="eb-action-btn eb-action-btn-edit"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleEdit(b.blotter_id);
+                              }}
+                            >
+                              <EditIcon /> Edit
+                            </button>
+                            <button
+                              className="eb-action-btn eb-action-btn-danger"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDelete(b.blotter_id);
+                              }}
+                            >
+                              <DeleteIcon /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -7776,7 +7823,7 @@ function EBlotter() {
           </div>
         </div>
       )}
-            {/* Remind Patrol Modal */}
+      {/* Remind Patrol Modal */}
       {showRemindModal && (
         <RemindPatrolModal
           isOpen={showRemindModal}
