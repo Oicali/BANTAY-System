@@ -3199,13 +3199,11 @@ function EBlotter() {
                               >
                                 {(() => {
                                   const raw = String(a.uploaded_at);
-                                  // If no timezone info, treat as UTC by appending Z
-                                  const normalized = /Z$|\+\d{2}:\d{2}$/.test(
-                                    raw,
-                                  )
-                                    ? raw
-                                    : raw + "Z";
-                                  return new Date(normalized).toLocaleString(
+                                  // Strip timezone — treat as Manila local time already stored in PH time
+                                  const cleaned = raw
+                                    .replace("Z", "")
+                                    .replace(/\+\d{2}:\d{2}$/, "");
+                                  return new Date(cleaned).toLocaleString(
                                     "en-PH",
                                     {
                                       month: "short",

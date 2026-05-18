@@ -86,7 +86,9 @@ const getAttachments = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT * FROM blotter_attachments WHERE blotter_id = $1 ORDER BY uploaded_at ASC`,
+     `SELECT attachment_id, blotter_id, file_url, public_id, file_name, caption, uploaded_by,
+  TO_CHAR(uploaded_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') AS uploaded_at
+ FROM blotter_attachments WHERE blotter_id = $1 ORDER BY uploaded_at ASC`,
       [id]
     );
     res.json({ success: true, data: result.rows });
