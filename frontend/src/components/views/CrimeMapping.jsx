@@ -24,6 +24,151 @@ const INCIDENT_COLORS = {
   "SPECIAL COMPLEX CRIME": "#14b8a6",
 };
 
+const CRIME_ICONS = {
+  MURDER: ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14.5 2L19 6.5 8 17.5l-4.5.5.5-4.5z" />
+      <line x1="12" y1="6" x2="18" y2="12" />
+    </svg>
+  ),
+  HOMICIDE: ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3a7 7 0 0 1 7 7c0 3.5-2 5.5-2.5 7H7.5C7 17.5 5 15.5 5 10a7 7 0 0 1 7-7z" />
+      <line x1="9" y1="21" x2="9" y2="17" />
+      <line x1="15" y1="21" x2="15" y2="17" />
+      <line x1="9" y1="21" x2="15" y2="21" />
+      <circle cx="9.5" cy="11" r="1" fill={color} />
+      <circle cx="14.5" cy="11" r="1" fill={color} />
+    </svg>
+  ),
+  "PHYSICAL INJURY": ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <line x1="12" y1="8" x2="12" y2="16" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  ),
+  RAPE: ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3L4 6v6c0 5 4 8 8 9 4-1 8-4 8-9V6z" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+    </svg>
+  ),
+  ROBBERY: ({ color, size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 10 C2 7 5 5 8 7 C9.5 8 10.5 8 12 8 C13.5 8 14.5 8 16 7 C19 5 22 7 22 10 C22 13 19 14 16 13 C14.5 12.5 13.5 12 12 12 C10.5 12 9.5 12.5 8 13 C5 14 2 13 2 10 Z"/>
+    <circle cx="7.5" cy="10" r="1.5" fill={color}/>
+    <circle cx="16.5" cy="10" r="1.5" fill={color}/>
+  </svg>
+),
+  THEFT: ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 9V7a6 6 0 0 1 12 0v2" />
+      <rect x="3" y="9" width="18" height="12" rx="3" />
+      <path d="M9 14a3 3 0 0 0 6 0" />
+    </svg>
+  ),
+  "CARNAPPING - MC": ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="5.5" cy="17" r="2.5" />
+      <circle cx="18.5" cy="17" r="2.5" />
+      <path d="M8 17h7" />
+      <path d="M10 8h2l2 4H9l-1 2" />
+      <path d="M14 8h3l1 4" />
+      <path d="M7 10l-2 2" />
+    </svg>
+  ),
+  "CARNAPPING - MV": ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 17H3V9l2.5-5h11L19 9v8h-2" />
+      <circle cx="7.5" cy="17" r="2" />
+      <circle cx="16.5" cy="17" r="2" />
+      <path d="M3 13h18" />
+      <path d="M5.5 9h13" />
+    </svg>
+  ),
+  "SPECIAL COMPLEX CRIME": ({ color, size = 22 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+};
+
 const CRIME_WEIGHTS = {
   MURDER: 1.0,
   HOMICIDE: 1.0,
@@ -53,24 +198,37 @@ const HEATMAP_LAYER = {
   type: "heatmap",
   paint: {
     "heatmap-weight": [
-  "interpolate", ["linear"], ["get", "weight"],
-  0,   0,
-  0.1, 0.2,    // Theft — was 0.05, now more visible
-  0.2, 0.35,   // Physical Injury
-  0.3, 0.45,   // Carnapping
-  0.5, 0.60,   // Robbery
-  0.7, 0.80,   // Rape
-  1.0, 1.0,    // Murder/Homicide/SCC
-],
+      "interpolate",
+      ["linear"],
+      ["get", "weight"],
+      0,
+      0,
+      0.1,
+      0.2, // Theft — was 0.05, now more visible
+      0.2,
+      0.35, // Physical Injury
+      0.3,
+      0.45, // Carnapping
+      0.5,
+      0.6, // Robbery
+      0.7,
+      0.8, // Rape
+      1.0,
+      1.0, // Murder/Homicide/SCC
+    ],
     "heatmap-radius": [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  10, 10,
-  12, 18,
-  14, 30,
-  16, 45,
-],
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      10,
+      10,
+      12,
+      18,
+      14,
+      30,
+      16,
+      45,
+    ],
     "heatmap-intensity": [
       "interpolate",
       ["linear"],
@@ -83,27 +241,62 @@ const HEATMAP_LAYER = {
       1.8, // was 2.5 — too high, washes out weight differences
     ],
     "heatmap-color": [
-  "interpolate",
-  ["linear"],
-  ["heatmap-density"],
-  0,    "rgba(0,0,0,0)",
-  0.05, "rgba(255,255,180,0.7)",   // light yellow — even single low-weight crimes visible
-  0.2,  "rgba(255,210,80,0.80)",   // yellow-orange
-  0.4,  "rgba(255,140,30,0.88)",   // orange
-  0.6,  "rgba(220,50,20,0.92)",    // red-orange
-  0.8,  "rgba(160,10,10,0.95)",    // dark red
-  1.0,  "rgba(80,0,0,0.97)",       // near black-red for dense clusters
-],
+      "interpolate",
+      ["linear"],
+      ["heatmap-density"],
+      0,
+      "rgba(0,0,0,0)",
+      0.05,
+      "rgba(255,255,180,0.7)", // light yellow — even single low-weight crimes visible
+      0.2,
+      "rgba(255,210,80,0.80)", // yellow-orange
+      0.4,
+      "rgba(255,140,30,0.88)", // orange
+      0.6,
+      "rgba(220,50,20,0.92)", // red-orange
+      0.8,
+      "rgba(160,10,10,0.95)", // dark red
+      1.0,
+      "rgba(80,0,0,0.97)", // near black-red for dense clusters
+    ],
     "heatmap-opacity": [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  11, 0.9,
-  14, 0.85,
-  16, 0.8,    // was 0 — kept visible when zoomed in
-  18, 0.75,
-],
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      11,
+      0.9,
+      14,
+      0.85,
+      16,
+      0.8, // was 0 — kept visible when zoomed in
+      18,
+      0.75,
+    ],
   },
+};
+
+const WORLD_MASK_GEOJSON = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        // A large bounding box — Mapbox will fill everything outside Bacoor
+        // We rely on the barangay fill layer to paint over the Bacoor interior
+        coordinates: [
+          [
+            [-180, -90],
+            [180, -90],
+            [180, 90],
+            [-180, 90],
+            [-180, -90],
+          ],
+        ],
+      },
+      properties: {},
+    },
+  ],
 };
 const CLUSTER_CIRCLE_LAYER = {
   id: "cluster-circles",
@@ -280,7 +473,7 @@ const CrimeTypeMultiSelect = ({ selected, onChange }) => {
             {selected.length > 2 && (
               <span
                 className="crmap-multisel-pill"
-                style={{ background: "#adb5bd" }}
+                style={{ background: "#e5e7eb" }}
               >
                 +{selected.length - 2}
               </span>
@@ -371,6 +564,10 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
     b.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const filteredLegacy = LEGACY_BARANGAY_OPTIONS.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()),
+  );
+
   const toggle = (b) => {
     onChange(
       selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
@@ -438,7 +635,7 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
           {selected.length > 2 && (
             <span
               className="crmap-multisel-pill"
-              style={{ background: "#adb5bd", flexShrink: 0 }}
+              style={{ background: "#e5e7eb", flexShrink: 0 }}
             >
               +{selected.length - 2}
             </span>
@@ -521,6 +718,32 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
                   onChange={() => toggle(b)}
                 />
                 <span>{formatBarangayLabel(b)}</span>
+              </label>
+            ))}
+            {filteredLegacy.length > 0 && (
+              <div
+                style={{
+                  padding: "4px 12px 2px",
+                  fontSize: 11,
+                  color: "#9ca3af",
+                  fontWeight: 600,
+                }}
+              >
+                ── Pre-2023 Names (Auto-resolved) ──
+              </div>
+            )}
+            {filteredLegacy.map((o, idx) => (
+              <label
+                key={`legacy-${idx}`}
+                className="crmap-multisel-item"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(o.value)}
+                  onChange={() => toggle(o.value)}
+                />
+                <span>{o.label}</span>
               </label>
             ))}
             {filtered.length === 0 && (
@@ -636,14 +859,22 @@ function CrimeMapping() {
   const incidenceTooltipTimerRef = useRef(null);
 
   // Helper to avoid repetition — define once above your return()
-  const LegendPin = ({ color }) => (
-    <div className="crmap-legend-pin-wrap">
-      <div className="crmap-legend-pin-body" style={{ background: color }}>
-        <div className="crmap-legend-pin-inner" />
-      </div>
-      <div className="crmap-legend-pin-tip" style={{ borderTopColor: color }} />
-    </div>
-  );
+  const LegendPin = ({ color, incidentType }) => {
+    const IconComp = CRIME_ICONS[incidentType?.toUpperCase()];
+    if (!IconComp)
+      return (
+        <div className="crmap-legend-pin-wrap">
+          <div className="crmap-legend-pin-body" style={{ background: color }}>
+            <div className="crmap-legend-pin-inner" />
+          </div>
+          <div
+            className="crmap-legend-pin-tip"
+            style={{ borderTopColor: color }}
+          />
+        </div>
+      );
+    return <IconComp color={color} size={20} />;
+  };
 
   const totalBarangays = geoJSONData
     ? new Set(geoJSONData.features.map((f) => f.properties.name_db)).size
@@ -906,7 +1137,7 @@ function CrimeMapping() {
               ...f,
               properties: {
                 ...f.properties,
-                fillColor: boundary?.color || "#adb5bd",
+                fillColor: boundary?.color || "#ffffff",
                 isSelected: true,
                 isLocked: false,
               },
@@ -935,7 +1166,7 @@ function CrimeMapping() {
               ...ownFeature.properties,
               fillColor: heatmapMode
                 ? "rgba(255,255,255,0.0)"
-                : colorLookup[ownFeature.properties.name_kml] || "#adb5bd",
+                : colorLookup[ownFeature.properties.name_kml] || "#ffffff",
               isLocked: false,
             },
           },
@@ -981,8 +1212,8 @@ function CrimeMapping() {
           properties: {
             ...f.properties,
             fillColor: isSelected
-              ? colorLookup[f.properties.name_kml] || "#adb5bd"
-              : "rgba(0,0,0,0)", // ← transparent, not gray
+              ? colorLookup[f.properties.name_kml] || "#ffffff"
+              : "#e5e7eb",
             isSelected,
             isLocked: false,
           },
@@ -1151,7 +1382,7 @@ function CrimeMapping() {
       "fill-color": ["get", "fillColor"],
       "fill-opacity": heatmapMode
         ? ["case", ["==", ["get", "isLocked"], true], 0.35, 0]
-        : ["case", ["==", ["get", "isSelected"], false], 0.08, 0.5], // 0.4 → 0.5
+        : ["case", ["==", ["get", "isSelected"], false], 0, 0.5],
     },
   };
 
@@ -1636,6 +1867,33 @@ function CrimeMapping() {
                 setHoveredBarangay(null);
               }}
             >
+              <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
+  <Layer
+    id="world-mask-fill"
+    type="fill"
+    paint={{
+      "fill-color": heatmapMode ? "#000000" : "#e5e7eb",
+      "fill-opacity": heatmapMode ? 0.6 : 0.55,
+    }}
+  />
+</Source>
+
+
+{/* Use this if lighter mask for heatmap */}
+{/* from #e5e7eb to #e5e7eb */}
+{/* {!heatmapMode && (
+  <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
+    <Layer
+      id="world-mask-fill"
+      type="fill"
+      paint={{
+        "fill-color": "#e5e7eb",
+        "fill-opacity": 0.55,
+      }}
+    />
+  </Source>
+)} */}
+
               {geoJSON && (
                 <Source id="barangays" type="geojson" data={geoJSON}>
                   <Layer {...fillLayer} />
@@ -1670,16 +1928,52 @@ function CrimeMapping() {
                       setSelectedPin(pin);
                     }}
                   >
-                    <div className="crmap-pin-wrap" title={pin.incident_type}>
+                    <div
+                      className="crmap-pin-wrap"
+                      title={pin.incident_type}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                      }}
+                    >
                       <div
-                        className="crmap-pin-body"
                         style={{
                           background:
                             INCIDENT_COLORS[pin.incident_type?.toUpperCase()] ||
                             "#6b7280",
+                          borderRadius: "50% 50% 50% 0",
+                          transform: "rotate(-45deg)",
+                          width: 34, // was 28
+                          height: 34, // was 28
+                          border: "2.5px solid rgba(255,255,255,0.9)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
                         }}
                       >
-                        <div className="crmap-pin-inner" />
+                        <div
+                          style={{
+                            transform: "rotate(45deg)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {(() => {
+                            const IconComp =
+                              CRIME_ICONS[pin.incident_type?.toUpperCase()];
+                            return IconComp ? (
+                              <IconComp
+                                color="rgba(255,255,255,0.9)"
+                                size={16}
+                              />
+                            ) : (
+                              <div className="crmap-pin-inner" />
+                            );
+                          })()}
+                        </div>
                       </div>
                       <div
                         className="crmap-pin-tip"
@@ -2259,7 +2553,7 @@ function CrimeMapping() {
                         className="crmap-heat-sidebar-title"
                         style={{ marginTop: 16 }}
                       >
-                        Crime Types Points
+                        Crime Types Description
                       </div>
 
                       {LEGEND_ITEMS.map((item) => {
@@ -2297,9 +2591,27 @@ function CrimeMapping() {
                               }}
                             >
                               {/* just using css style  */}
-                              <span className="crmap-severity-weight">
-                                {weight.toFixed(1)}
-                              </span>
+                              {(() => {
+                                const tier =
+                                  weight >= 0.9
+                                    ? { label: "High", color: "#7c3aed" }
+                                    : weight >= 0.4
+                                      ? { label: "Medium", color: "#f97316" }
+                                      : { label: "Low", color: "#6b7280" };
+                                return (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 500,
+
+                                      padding: "1px 7px",
+                                      borderRadius: 8,
+                                    }}
+                                  >
+                                    {tier.label}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </div>
                         );
@@ -2333,7 +2645,7 @@ function CrimeMapping() {
 
                         const levels = [
                           {
-                            color: "#adb5bd",
+                            color: "#ffffff",
                             label: "No crimes",
                             range: "0",
                             opacity: 1,
@@ -2382,6 +2694,10 @@ function CrimeMapping() {
                                 background: lvl.color,
                                 opacity: lvl.opacity,
                                 flexShrink: 0,
+                                border:
+                                  lvl.color === "#ffffff"
+                                    ? "1px solid #ced4da"
+                                    : "none",
                               }}
                             />
                             <span
@@ -2429,7 +2745,10 @@ function CrimeMapping() {
                             <div className="crmap-legend-row" key={name}>
                               <div className="crmap-legend-top">
                                 <div className="crmap-legend-left">
-                                  <LegendPin color={color} />
+                                  <LegendPin
+                                    color={color}
+                                    incidentType={name}
+                                  />
                                   <span className="crmap-legend-name">
                                     {name}
                                   </span>
