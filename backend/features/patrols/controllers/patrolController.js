@@ -4,7 +4,7 @@
 
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
-const { getBarangayOptimized } = require("../../../shared/utils/geoUtils");
+const { getBarangayOrCityOptimized } = require("../../../shared/utils/geoUtils");
 const { createNotification, notifyAllByRole } = require("../../notifications/notificationService");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
 // ── Helper: generate date range ────────────────────────────
@@ -70,76 +70,78 @@ const getPatrolStats = async (req, res) => {
 // ─────────────────────────────────────────────
 // GET /patrol/active
 // ─────────────────────────────────────────────
-// REPLACE the existing getActivePatrollers function
 const getActivePatrollers = async (req, res) => {
   try {
     const result = await pool.query(`
-  SELECT DISTINCT ON (ap.active_patroller_id)
-    ap.active_patroller_id,
-    ap.officer_id,
-    u.last_login,
-    TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
-    u.profile_picture,
-    mu.mobile_unit_name AS mobile_unit_assigned,
-    ol.latitude,
-    ol.longitude,
-    ol.location_name  AS last_location_name,
-    ol.updated_at     AS last_location_at,
-    ol.is_on_duty,
-    EXTRACT(EPOCH FROM (NOW() - ol.updated_at))::int AS seconds_ago
-  FROM active_patroller ap
-  JOIN users u ON ap.officer_id = u.user_id
-  LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
-  LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
-  LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
-  LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
-  WHERE u.role_id = 3
-  ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
-`);
+      SELECT DISTINCT ON (ap.active_patroller_id)
+        ap.active_patroller_id,
+        ap.officer_id,
+        u.last_login,
+        TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS officer_name,
+        u.profile_picture,
+        mu.mobile_unit_name AS mobile_unit_assigned,
+        ol.latitude,
+        ol.longitude,
+        ol.location_name  AS last_location_name,
+        ol.updated_at     AS last_location_at,
+        ol.is_on_duty,
+        EXTRACT(EPOCH FROM (NOW() - ol.updated_at))::int AS seconds_ago
+      FROM active_patroller ap
+      JOIN users u ON ap.officer_id = u.user_id
+      LEFT JOIN patrol_assignment_patroller pap ON ap.active_patroller_id = pap.active_patroller_id
+      LEFT JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
+      LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+      LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
+      WHERE u.role_id = 3
+      ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
+    `);
 
-    const officersWithBarangay = result.rows.map((officer) => {
-      let barangay = officer.last_location_name;
+    const officersWithLocation = await Promise.all(
+      result.rows.map(async (officer) => {
+        let location = officer.last_location_name;
 
-      if (officer.latitude && officer.longitude) {
-        const resolved = getBarangayOptimized(
-          parseFloat(officer.longitude),
-          parseFloat(officer.latitude),
-        );
-        if (resolved) {
-          barangay = resolved;
-          if (resolved !== officer.last_location_name) {
-            pool
-              .query(
-                `UPDATE officer_locations SET location_name = $1 WHERE user_id = $2`,
-                [resolved, officer.officer_id],
-              )
-              .catch((err) =>
-                console.error("Failed to update barangay name:", err),
-              );
+        if (officer.latitude && officer.longitude) {
+          const resolved = await getBarangayOrCityOptimized(
+            parseFloat(officer.longitude),
+            parseFloat(officer.latitude)
+          );
+          if (resolved) {
+            location = resolved;
+            if (resolved !== officer.last_location_name) {
+              pool
+                .query(
+                  `UPDATE officer_locations SET location_name = $1 WHERE user_id = $2`,
+                  [resolved, officer.officer_id]
+                )
+                .catch((err) =>
+                  console.error("Failed to update location name:", err)
+                );
+            }
           }
         }
-      }
 
-      const lastSeen = officer.last_location_at
-        ? new Date(officer.last_location_at)
-        : null;
-      const isOnline = lastSeen && Date.now() - lastSeen.getTime() <= 30000;
+        const lastSeen = officer.last_location_at
+          ? new Date(officer.last_location_at)
+          : null;
+        const isOnline = lastSeen && Date.now() - lastSeen.getTime() <= 30000;
 
-      return {
-        ...officer,
-        current_barangay: barangay || null,
-        resolved_barangay: barangay || null,
-        last_location_name: barangay || null,
-        is_online: isOnline,
-      };
-    });
+        return {
+          ...officer,
+          current_barangay: location || null,
+          resolved_barangay: location || null,
+          last_location_name: location || null,
+          is_online: isOnline,
+        };
+      })
+    );
 
-    res.json({ success: true, data: officersWithBarangay });
+    res.json({ success: true, data: officersWithLocation });
   } catch (error) {
     console.error("Patroller fetch error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 // ─────────────────────────────────────────────
 // GET /patrol/available-patrollers
 // ─────────────────────────────────────────────
@@ -1660,6 +1662,8 @@ const deleteAfterPatrolPhoto = async (req, res) => {
       .json({ success: false, message: "Server error: " + error.message });
   }
 };
+
+
 
 module.exports = {
   getMyPatrols,

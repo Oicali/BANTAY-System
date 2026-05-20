@@ -1,3 +1,5 @@
+// backend\features\crime-map\controllers\crimeMapController.js
+
 const pool = require("../../../config/database");
 
 const fetch = (...args) =>
@@ -17,7 +19,8 @@ function getIncidenceThresholds(dateFrom, dateTo) {
 function getIncidenceColor(crimeCount, dateFrom, dateTo) {
   const { lowMax, medMax } = getIncidenceThresholds(dateFrom, dateTo);
 
-  if (crimeCount === 0) return { color: "#adb5bd", risk: "None" };
+  if (crimeCount === 0) return { color: "#ffffff", risk: "None" };
+
   if (crimeCount <= lowMax) return { color: "#eab308", risk: "Low Incidence" };
   if (crimeCount <= medMax)
     return { color: "#f97316", risk: "Moderate Incidence" };
