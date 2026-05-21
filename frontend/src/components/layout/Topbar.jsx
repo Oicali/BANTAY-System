@@ -180,7 +180,7 @@ const TopBar = ({ onMenuClick }) => {
     fetchProfileData();
     fetchNotifications();
 
-    pollRef.current = setInterval(fetchNotifications, 15000);
+    pollRef.current = setInterval(fetchNotifications, 8000);
 
     const handleProfileUpdated = () => {
       localStorage.removeItem("cachedProfile");
@@ -288,35 +288,33 @@ const TopBar = ({ onMenuClick }) => {
     }
   };
 
-  const markAllRead = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      await fetch(`${API_URL}/notifications/read-all`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      setUnread(0);
-    } catch (err) {
-      console.error("Mark all read error:", err);
-    }
+  const markAllRead = () => {
+    // Instant UI update
+    setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setUnread(0);
+    prevUnreadRef.current = 0;
+    // API in background
+    const token = localStorage.getItem("token");
+    fetch(`${API_URL}/notifications/read-all`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(console.error);
   };
 
-  const markOneRead = async (notif) => {
+  const markOneRead = (notif) => {
     if (notif.is_read) return;
-    try {
-      const token = localStorage.getItem("token");
-      await fetch(`${API_URL}/notifications/${notif.id}/read`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setNotifs((prev) =>
-        prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)),
-      );
-      setUnread((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error("Mark one read error:", err);
-    }
+    // Instant UI update
+    setNotifs((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)),
+    );
+    setUnread((prev) => Math.max(0, prev - 1));
+    prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
+    // API in background
+    const token = localStorage.getItem("token");
+    fetch(`${API_URL}/notifications/${notif.id}/read`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(console.error);
   };
 
   const handleNotifClick = (notif) => {
