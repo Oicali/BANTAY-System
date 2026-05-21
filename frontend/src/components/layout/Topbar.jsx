@@ -169,7 +169,7 @@ const TopBar = ({ onMenuClick }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef(null);
   const pollRef = useRef(null);
-
+  const prevUnreadRef = useRef(0);
   // ── Toast state ──
   const [toastNotif, setToastNotif] = useState(null);
   const prevNotifIdsRef = useRef(null); // null = first load, Set after first load
@@ -242,26 +242,46 @@ const TopBar = ({ onMenuClick }) => {
       });
       if (res.ok) {
         const data = await res.json();
-        const incoming = data.data || [];
+        const newUnread = data.unread || 0;
 
-        // ── Detect new notifications after first load ──
-        if (prevNotifIdsRef.current === null) {
-          // First fetch — just record what we have, no toast
-          prevNotifIdsRef.current = new Set(incoming.map((n) => n.id));
-        } else {
-          const newOnes = incoming.filter(
-            (n) => !prevNotifIdsRef.current.has(n.id),
-          );
-          if (newOnes.length > 0) {
-            // Show toast for the newest one
-            setToastNotif(newOnes[0]);
-            // Update the known set
-            prevNotifIdsRef.current = new Set(incoming.map((n) => n.id));
-          }
+        // Play sound only when unread count increases
+        if (newUnread > prevUnreadRef.current) {
+          try {
+            const ctx = new (
+              window.AudioContext || window.webkitAudioContext
+            )();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.frequency.setValueAtTime(880, ctx.currentTime);
+            o.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+            g.gain.setValueAtTime(0.3, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            o.start(ctx.currentTime);
+            o.stop(ctx.currentTime + 0.4);
+          } catch (_) {}
         }
 
-        setNotifs(incoming);
-        setUnread(data.unread || 0);
+        if (newUnread > prevUnreadRef.current && data.data?.length > 0) {
+          const newest = data.data[0];
+          if (
+            prevNotifIdsRef.current !== null &&
+            !prevNotifIdsRef.current.has(newest.id)
+          ) {
+            setToastNotif(newest);
+          }
+        }
+        // Track seen IDs
+        if (prevNotifIdsRef.current === null) {
+          prevNotifIdsRef.current = new Set((data.data || []).map((n) => n.id));
+        } else {
+          (data.data || []).forEach((n) => prevNotifIdsRef.current.add(n.id));
+        }
+
+        prevUnreadRef.current = newUnread;
+        setNotifs(data.data || []);
+        setUnread(newUnread);
       }
     } catch (err) {
       console.error("Fetch notifications error:", err);

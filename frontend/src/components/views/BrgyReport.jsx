@@ -770,20 +770,52 @@ function BrgyReport() {
                 {/* Entry header with role selector */}
                 <div className="br-person-entry-header">
                   <div className="br-person-role-row">
-                    <span className="br-person-num">Person #{i + 1}</span>
-                    <div className="br-role-btns">
-                      {["Victim", "Complainant", "Witness", "Respondent"].map(
-                        (r) => (
-                          <button
-                            key={r}
-                            type="button"
-                            className={`br-role-btn ${v.role === r ? "active" : ""}`}
-                            onClick={() => updateVictim(i, "role", r)}
-                          >
-                            {r}
-                          </button>
-                        ),
-                      )}
+                    <span className="br-person-num">
+                      {v.role || "Victim"} #{i + 1}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#f1f5f9",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "4px 10px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: "#64748b",
+                          fontWeight: 600,
+                          letterSpacing: "0.3px",
+                        }}
+                      >
+                        ROLE
+                      </span>
+                      <select
+                        value={v.role || "Victim"}
+                        onChange={(e) =>
+                          updateVictim(i, "role", e.target.value)
+                        }
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#0f172a",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          outline: "none",
+                          padding: "0",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <option value="Victim">Victim</option>
+                        <option value="Complainant">Complainant</option>
+                        <option value="Witness">Witness</option>
+                        <option value="Respondent">Respondent</option>
+                      </select>
                     </div>
                   </div>
                   <div
@@ -1347,66 +1379,78 @@ function BrgyReport() {
         ) : (
           <>
             {/* My Submitted Reports table - update the table headers */}
-<table className="br-table">
-  <thead>
-    <tr>
-      <th>Reference No.</th>
-      <th>Crime Type</th>
-      <th>Street / Location</th>
-      <th>Date Reported</th>
-      <th>Responder</th> {/* Add this column */}
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {paginated.map((r) => (
-      <tr key={r.blotter_id}>
-        <td>
-          <span className="br-ref-num">
-            {r.blotter_entry_number}
-          </span>
-        </td>
-        <td style={{ fontWeight: 500, color: "#374151" }}>
-          {r.incident_type}
-        </td>
-        <td style={{ color: "#6b7280" }}>{r.place_street}</td>
-        <td style={{ color: "#6b7280" }}>
-          {formatDate(r.date_time_reported)}
-        </td>
-        <td>
-  {r.responder ? (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-      <div className="br-responder-avatar">
-        {r.responder.profile_picture ? (
-          <img
-            src={r.responder.profile_picture}
-            alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          `${r.responder.first_name?.[0] || ""}${r.responder.last_name?.[0] || ""}`.toUpperCase()
-        )}
-      </div>
-      <span className="br-responder-name">
-        {`${r.responder.rank_abbreviation ? r.responder.rank_abbreviation + ". " : ""}${r.responder.first_name || ""} ${r.responder.last_name || ""}`}
-      </span>
-    </div>
-  ) : (
-    <span style={{ fontSize: "12px", color: "#9ca3af" }}>—</span>
-  )}
-</td>
-        <td>
-          <span
-            className={`br-status-badge ${getStatusClass(r.status)}`}
-          >
-            <span className="br-status-dot" />
-            {r.status}
-          </span>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
+            <table className="br-table">
+              <thead>
+                <tr>
+                  <th>Reference No.</th>
+                  <th>Crime Type</th>
+                  <th>Street / Location</th>
+                  <th>Date Reported</th>
+                  <th>Responder</th> {/* Add this column */}
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((r) => (
+                  <tr key={r.blotter_id}>
+                    <td>
+                      <span className="br-ref-num">
+                        {r.blotter_entry_number}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 500, color: "#374151" }}>
+                      {r.incident_type}
+                    </td>
+                    <td style={{ color: "#6b7280" }}>{r.place_street}</td>
+                    <td style={{ color: "#6b7280" }}>
+                      {formatDate(r.date_time_reported)}
+                    </td>
+                    <td>
+                      {r.responder ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <div className="br-responder-avatar">
+                            {r.responder.profile_picture ? (
+                              <img
+                                src={r.responder.profile_picture}
+                                alt=""
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              `${r.responder.first_name?.[0] || ""}${r.responder.last_name?.[0] || ""}`.toUpperCase()
+                            )}
+                          </div>
+                          <span className="br-responder-name">
+                            {`${r.responder.rank_abbreviation ? r.responder.rank_abbreviation + ". " : ""}${r.responder.first_name || ""} ${r.responder.last_name || ""}`}
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+                          —
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        className={`br-status-badge ${getStatusClass(r.status)}`}
+                      >
+                        <span className="br-status-dot" />
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
             {totalPages > 1 && (
               <div className="br-pagination">

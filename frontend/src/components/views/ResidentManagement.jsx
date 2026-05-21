@@ -256,10 +256,8 @@ function ResidentManagement() {
             <UserIcon />
           </div>
           <div>
-            <h1 className="rm-page-title">Residents</h1>
-            <p className="rm-page-subtitle">
-              Barangay citizen database — {barangayName}
-            </p>
+            <h1 className="rm-page-title">{barangayName} - Residents</h1>
+            <p className="rm-page-subtitle">Barangay citizen database</p>
           </div>
         </div>
         <div className="rm-page-header-right">

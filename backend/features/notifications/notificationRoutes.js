@@ -53,5 +53,16 @@ router.patch("/:id/read", authenticate, async (req, res) => {
   }
 });
 
-
+router.post("/push-token", authenticate, async (req, res) => {
+  try {
+    const { push_token } = req.body;
+    await pool.query(
+      `UPDATE users SET push_token = $1 WHERE user_id = $2`,
+      [push_token, req.user.user_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 module.exports = router;

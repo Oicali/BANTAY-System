@@ -2,16 +2,27 @@
 
 const pool = require("../../config/database");
 
-const createNotification = async ({
-  recipientId,
-  senderId = null,
-  senderName = null,
-  senderAvatar = null,
-  type,
-  title,
-  message,
-  linkTo = null,
-}) => {
+const sendPushNotification = async (pushToken, title, message) => {
+  if (!pushToken) return;
+  try {
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: pushToken,
+        title,
+        body: message,
+        sound: "default",
+        priority: "high",
+        channelId: "default",
+      }),
+    });
+  } catch (err) {
+    console.error("Push send error:", err.message);
+  }
+};
+
+const createNotification = async ({ recipientId, senderId = null, senderName = null, senderAvatar = null, type, title, message, linkTo = null }) => {
   try {
     await pool.query(
       `INSERT INTO notifications 
@@ -19,6 +30,16 @@ const createNotification = async ({
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [recipientId, senderId, senderName, senderAvatar, type, title, message, linkTo]
     );
+
+    // Send push notification if user has a token
+    const userResult = await pool.query(
+      `SELECT push_token FROM users WHERE user_id = $1`,
+      [recipientId]
+    );
+    const pushToken = userResult.rows[0]?.push_token;
+    if (pushToken) {
+      await sendPushNotification(pushToken, title, message);
+    }
   } catch (err) {
     console.error("createNotification error:", err.message);
   }

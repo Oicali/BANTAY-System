@@ -261,6 +261,24 @@ const blotterEntryNumber = blotterUpdate.rows[0]?.blotter_entry_number || result
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+
+// Notify barangay who submitted the referral (only if it's a brgy referral)
+    const referralInfo = await pool.query(
+      `SELECT submitted_by FROM blotter_entries 
+       WHERE blotter_id = $1 AND referred_by_barangay = true`,
+      [result.rows[0].blotter_id]
+    );
+    if (referralInfo.rows[0]?.submitted_by) {
+      await createNotification({
+        recipientId: referralInfo.rows[0].submitted_by,
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "REFERRAL_ACCEPTED",
+        title: "Referral Status Updated",
+        message: `Your referral ${blotterEntryNumber} has been updated to "${status}"`,
+        linkTo: "/brgy-report",
+      });
+    }
     // Notify the assigned investigator (only if someone is assigned)
 const assignedIoId = caseResult.rows[0].assigned_io_id;
 if (assignedIoId && assignedIoId !== req.user.user_id) {
