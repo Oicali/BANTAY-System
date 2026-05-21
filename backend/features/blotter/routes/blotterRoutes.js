@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/uploadMiddleware");
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
+const { exportBlotter } = require("../controllers/exportBlotterController");
 
 const {
   createBlotter,
@@ -31,6 +32,7 @@ router.get("/deleted/all", authenticate, getDeletedBlotters);
 router.get("/referred/count", authenticate, getReferredCount);
 router.get("/modus/:crime_type", authenticate, getModus);
 router.post("/import", authenticate, upload.single("file"), importBlotters);
+router.post("/export", authenticate, exportBlotter);
 router.post("/brgy-report", authenticate, createBrgyReport);
 router.get("/brgy-reports/mine", authenticate, getBrgyReports);
 router.post("/detect-crime-type", authenticate, detectCrimeType);

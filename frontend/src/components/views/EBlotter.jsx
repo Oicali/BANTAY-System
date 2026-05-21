@@ -12,6 +12,8 @@ import {
 import ImportBlotterModal from "../modals/ImportBlotterModal";
 import LoadingModal from "../modals/LoadingModal";
 import RemindPatrolModal from "../modals/RemindPatrolModal";
+import ExportBlotterModal from "../modals/ExportBlotterModal";
+import PdfPreviewModal from "../modals/PdfPreviewModal";
 
 const OFFENSE_TO_CRIME_TYPE = {
   Murder: "MURDER",
@@ -228,6 +230,9 @@ function EBlotter() {
   const [showRemindModal, setShowRemindModal] = useState(false);
   const [remindBlotterId, setRemindBlotterId] = useState(null);
   const [remindBlotterNumber, setRemindBlotterNumber] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExportLoading, setIsExportLoading] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState(null);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -396,6 +401,57 @@ function EBlotter() {
       setReferredCount(data.count);
     }
   }, []);
+
+  const handleExport = async (dateFrom, dateTo) => {
+    setShowExportModal(false);
+    setIsExportLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters?date_from=${dateFrom}&date_to=${dateTo}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const json = await res.json();
+      const records = json.data ?? [];
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters/export`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ records, meta: { dateFrom, dateTo } }),
+        },
+      );
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const dateStr = `${dateFrom}_to_${dateTo}`;
+      const filename = `blotter_${dateStr}.pdf`;
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      setPdfPreview({
+        blobUrl,
+        download: () => {
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        },
+        revoke: () => URL.revokeObjectURL(blobUrl),
+      });
+    } catch (err) {
+      showReactToast(err.message || "Export failed", "error");
+    } finally {
+      setIsExportLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchBlotters(activeReportTab);
 
@@ -2459,6 +2515,30 @@ function EBlotter() {
   );
   return (
     <div className="eb-content-area">
+      <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
+
+      {pdfPreview && (
+        <PdfPreviewModal
+          blobUrl={pdfPreview.blobUrl}
+          onDownload={() => {
+            pdfPreview.download();
+            pdfPreview.revoke();
+            setPdfPreview(null);
+          }}
+          onClose={() => {
+            pdfPreview.revoke();
+            setPdfPreview(null);
+          }}
+        />
+      )}
+
+      {showExportModal && (
+        <ExportBlotterModal
+          onClose={() => setShowExportModal(false)}
+          onExport={handleExport}
+          isExporting={isExportLoading}
+        />
+      )}
       <LoadingModal isOpen={loading} message="Loading records..." />
       <LoadingModal isOpen={fetchingEdit} message="Loading blotter data..." />
       <LoadingModal isOpen={fetchingView} message="Loading blotter data..." />
@@ -2507,6 +2587,29 @@ function EBlotter() {
             </svg>
             Deleted Records
           </button>
+          <button
+            className="eb-btn eb-btn-secondary"
+            onClick={() => setShowExportModal(true)}
+            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export PDF
+          </button>
+
           <button
             className="eb-btn eb-btn-secondary"
             onClick={() => setShowImport(true)}
