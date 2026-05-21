@@ -3254,29 +3254,61 @@ function EBlotter() {
                     {complainants.map((c, i) => (
                       <div className="eb-complainant-entry" key={i}>
                         <div className="eb-entry-header">
-                          <h4 className="eb-entry-title">
-                            {c.role || "Victim"} #{i + 1}
-                          </h4>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            {[
-                              "Victim",
-                              "Complainant",
-                              "Witness",
-                              "Respondent",
-                            ].map((r) => (
-                              <button
-                                key={r}
-                                type="button"
-                                className={`eb-gender-btn ${(c.role || "Victim") === r ? "active" : ""}`}
-                                onClick={() => updateComplainant(i, "role", r)}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                            }}
+                          >
+                            <h4 className="eb-entry-title">
+                              {c.role || "Victim"} #{i + 1}
+                            </h4>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                background: "#f1f5f9",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                                padding: "4px 10px",
+                              }}
+                            >
+                              <span
                                 style={{
-                                  fontSize: "12px",
-                                  padding: "4px 10px",
+                                  fontSize: "10px",
+                                  color: "#64748b",
+                                  fontWeight: 600,
+                                  letterSpacing: "0.3px",
+                                  whiteSpace: "nowrap",
                                 }}
                               >
-                                {r}
-                              </button>
-                            ))}
+                                ROLE
+                              </span>
+                              <select
+                                value={c.role || "Victim"}
+                                onChange={(e) =>
+                                  updateComplainant(i, "role", e.target.value)
+                                }
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#0f172a",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  outline: "none",
+                                  padding: "0",
+                                  fontFamily: "inherit",
+                                }}
+                              >
+                                <option value="Victim">Victim</option>
+                                <option value="Complainant">Complainant</option>
+                                <option value="Witness">Witness</option>
+                                <option value="Respondent">Respondent</option>
+                              </select>
+                            </div>
                           </div>
                           {complainants.length > 1 && (
                             <button
@@ -7260,7 +7292,7 @@ function EBlotter() {
                 gap: "6px",
               }}
             >
-              Referred (Brgy)
+              Referred by:
               {referredCount > 0 && (
                 <span
                   style={{
