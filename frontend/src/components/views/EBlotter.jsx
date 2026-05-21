@@ -408,7 +408,7 @@ function EBlotter() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/blotters?date_from=${dateFrom}&date_to=${dateTo}`,
+        `${import.meta.env.VITE_API_URL}/blotters?date_from=${dateFrom}&date_to=${dateTo}&referred=false`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const json = await res.json();
