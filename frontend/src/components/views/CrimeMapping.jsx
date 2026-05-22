@@ -26,20 +26,26 @@ const INCIDENT_COLORS = {
 
 const CRIME_ICONS = {
   MURDER: ({ color, size = 22 }) => (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14.5 2L19 6.5 8 17.5l-4.5.5.5-4.5z" />
-      <line x1="12" y1="6" x2="18" y2="12" />
-    </svg>
-  ),
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Blade */}
+    <path d="M12 2 L15 8 L12 22 L9 8 Z" fill={color} fillOpacity="0.25" />
+    {/* Center ridge */}
+    <line x1="12" y1="2" x2="12" y2="18" />
+    {/* Guard / crossguard */}
+    <line x1="7" y1="8" x2="17" y2="8" />
+    {/* Tip highlight */}
+    <path d="M10 5 L12 2 L14 5" />
+  </svg>
+),
   HOMICIDE: ({ color, size = 22 }) => (
     <svg
       width={size}
