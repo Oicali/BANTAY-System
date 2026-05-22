@@ -2,20 +2,21 @@
 
 const pool = require("../../config/database");
 
-const sendPushNotification = async (pushToken, title, message) => {
+const sendPushNotification = async (pushToken, title, message, linkTo = null) => {
   if (!pushToken) return;
   try {
     await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        to: pushToken,
-        title,
-        body: message,
-        sound: "default",
-        priority: "high",
-        channelId: "default",
-      }),
+  to: pushToken,
+  title,
+  body: message,
+  sound: "default",
+  priority: "high",
+  channelId: "default",
+  data: { linkTo: linkTo || null },
+}),
     });
   } catch (err) {
     console.error("Push send error:", err.message);
@@ -38,7 +39,7 @@ const createNotification = async ({ recipientId, senderId = null, senderName = n
     );
     const pushToken = userResult.rows[0]?.push_token;
     if (pushToken) {
-      await sendPushNotification(pushToken, title, message);
+      await sendPushNotification(pushToken, title, message, linkTo);
     }
   } catch (err) {
     console.error("createNotification error:", err.message);
