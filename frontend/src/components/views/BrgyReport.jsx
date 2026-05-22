@@ -76,6 +76,8 @@ function BrgyReport() {
   const [pendingFiles, setPendingFiles] = useState([]);
   const [pendingCaption, setPendingCaption] = useState("");
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [crimeNotIndexed, setCrimeNotIndexed] = useState(false);
+
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(
@@ -255,21 +257,34 @@ function BrgyReport() {
       );
 
       const data = await res.json();
-      if (data.success && data.crime_type) {
-        setForm((prev) => ({ ...prev, incident_type: data.crime_type }));
+
+      if (data.success) {
+        // ── NEW: explicit non-index-crime result ──
+        if (data.not_an_index_crime && data.confident) {
+          setCrimeAutoDetected(true);
+          setCrimeDetectFailed(false);
+          setCrimeNotIndexed(true); // ← new state, see below
+          return;
+        }
 
         if (data.rate_limited) {
           showToast(
             "⚠ AI detection unavailable — daily request limit reached. Please select the crime type manually.",
             "error",
           );
-          setCrimeAutoDetected(false);
-        } else if (data.fallback) {
-          setCrimeAutoDetected(true);
-          setCrimeDetectFailed(true);
-        } else {
-          setCrimeAutoDetected(true);
-          setCrimeDetectFailed(!data.confident);
+          return;
+        }
+
+        if (data.crime_type) {
+          setForm((prev) => ({ ...prev, incident_type: data.crime_type }));
+
+          if (data.fallback) {
+            setCrimeAutoDetected(true);
+            setCrimeDetectFailed(true);
+          } else {
+            setCrimeAutoDetected(true);
+            setCrimeDetectFailed(!data.confident);
+          }
         }
       }
     } catch (err) {
@@ -305,6 +320,9 @@ function BrgyReport() {
   const validate = () => {
     const e = {};
     // if (!form.incident_type) e.incident_type = "Required";
+    if (crimeNotIndexed) {
+      e.incident_type = "Please select a valid crime type — AI detected this narrative is not a valid index crime";
+    }
     if (!form.date_time_commission) {
       e.date_time_commission = "Required";
     } else {
@@ -360,6 +378,11 @@ function BrgyReport() {
         if (firstError) {
           firstError.scrollIntoView({ behavior: "smooth", block: "center" });
           firstError.focus();
+        } else {
+          const firstErrorSpan = document.querySelector(".br-error");
+          if (firstErrorSpan) {
+            firstErrorSpan.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
         }
       }, 100);
       return;
@@ -404,6 +427,7 @@ function BrgyReport() {
         });
         setCrimeAutoDetected(false);
         setCrimeDetectFailed(false);
+        setCrimeNotIndexed(false);
         setVictims([
           {
             first_name: "",
@@ -575,6 +599,21 @@ function BrgyReport() {
                         : "✓ Auto-detected by AI"}
                     </span>
                   )}
+                  {crimeNotIndexed && !detectingCrime && (
+                    <span
+                      style={{
+                        marginLeft: "8px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        background: "#fee2e2",
+                        color: "#991b1b",
+                        padding: "2px 8px",
+                        borderRadius: "20px",
+                      }}
+                    >
+                      ✗ Not a valid index crime — please review
+                    </span>
+                  )}
                 </label>
                 <select
                   className={`br-input ${errors.incident_type ? "error" : ""}`}
@@ -583,6 +622,7 @@ function BrgyReport() {
                     update("incident_type", e.target.value);
                     setCrimeAutoDetected(false);
                     setCrimeDetectFailed(false);
+                    setCrimeNotIndexed(false);
                   }}
                 >
                   <option value="">Auto-detect with AI</option>
@@ -697,7 +737,12 @@ function BrgyReport() {
                   value={form.narrative}
                   maxLength={3000}
                   placeholder="Describe what happened in detail — include time, location, persons involved, and sequence of events (minimum 20 characters)"
-                  onChange={(e) => update("narrative", e.target.value)}
+                  onChange={(e) => {
+                    update("narrative", e.target.value);
+                    setCrimeNotIndexed(false);
+                    setCrimeAutoDetected(false);
+                    setCrimeDetectFailed(false);
+                  }}
                   onBlur={(e) => detectCrimeFromNarrative(e.target.value)} // ← add this
                 />
                 {errors.narrative && (
@@ -712,6 +757,17 @@ function BrgyReport() {
                 >
                   {form.narrative.length}/3000 characters
                 </span>
+                {crimeNotIndexed && (
+                  <span style={{
+                    fontSize: "12px",
+                    color: "#b91c1c",
+                    fontWeight: 500,
+                    marginTop: "4px",
+                    display: "block",
+                  }}>
+                    ⚠ The narrative does not appear to describe a criminal offense against a human person. Please review before submitting.
+                  </span>
+                )}
               </div>
             </div>
           </div>

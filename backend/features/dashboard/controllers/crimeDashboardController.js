@@ -175,10 +175,12 @@ const queryTrends = async (
   dateTo,
 ) => {
   const dateTrunc =
-    granularity === "daily"
-      ? "day"
-      : granularity === "weekly"
-        ? "week"
+  granularity === "daily"
+    ? "day"
+    : granularity === "weekly"
+      ? "week"
+      : granularity === "quarterly"
+        ? "quarter"
         : "month";
 
   const result = await pool.query(
@@ -233,12 +235,12 @@ const queryTrends = async (
   // ── Build skeleton end — extend to include the period containing dateTo ────
   const end = new Date(dateTo + "T00:00:00");
   if (dateTrunc === "week") {
-    // Extend by 6 days so the week that contains dateTo is always generated
-    end.setDate(end.getDate() + 6);
-  } else if (dateTrunc === "month") {
-    // Extend by 31 days so the month that contains dateTo is always generated
-    end.setDate(end.getDate() + 31);
-  }
+  end.setDate(end.getDate() + 6);
+} else if (dateTrunc === "month") {
+  end.setDate(end.getDate() + 31);
+} else if (dateTrunc === "quarter") {
+  end.setMonth(end.getMonth() + 3);
+}
 
   // ── Walk cursor and build skeleton ─────────────────────────────────────────
   const skeleton = {};
@@ -254,8 +256,9 @@ const queryTrends = async (
     skeletonKeys.push(label);
 
     if (dateTrunc === "day") cursorClone.setDate(cursorClone.getDate() + 1);
-    else if (dateTrunc === "week") cursorClone.setDate(cursorClone.getDate() + 7);
-    else cursorClone.setMonth(cursorClone.getMonth() + 1);
+else if (dateTrunc === "week") cursorClone.setDate(cursorClone.getDate() + 7);
+else if (dateTrunc === "quarter") cursorClone.setMonth(cursorClone.getMonth() + 3);
+else cursorClone.setMonth(cursorClone.getMonth() + 1);
   }
 
   // ── Merge DB data into skeleton ────────────────────────────────────────────
@@ -294,13 +297,9 @@ const queryTrends = async (
   // contain data up to dateTo.
   const trimmed = Object.values(skeleton)
   .filter((row) => {
-    // For weekly: keep if the week START is on or before dateTo
-    // This naturally includes the partial week containing dateTo
-    // because we already extended 'end' by 6 days when building the skeleton
-    if (dateTrunc === "week") {
+    if (dateTrunc === "week" || dateTrunc === "quarter") {
       return row.label >= dateFrom && row.label <= dateTo;
     }
-    // For daily and monthly: keep if label is within range
     return row.label <= dateTo;
   })
   .sort((a, b) => a.label.localeCompare(b.label));
@@ -312,18 +311,21 @@ const queryHourly = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
       EXTRACT(HOUR FROM be.date_time_commission)::int AS hour,
+      UPPER(be.incident_type) AS crime,
       COUNT(*) AS count
      FROM blotter_analytics_view be
      ${where}
      ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
-     GROUP BY hour
+     GROUP BY hour, UPPER(be.incident_type)
      ORDER BY hour ASC`,
     [...params, INDEX_CRIMES],
   );
 
   const map = {};
   result.rows.forEach((r) => {
-    map[r.hour] = parseInt(r.count);
+    if (!map[r.hour]) map[r.hour] = { total: 0 };
+    map[r.hour][r.crime] = parseInt(r.count);
+    map[r.hour].total += parseInt(r.count);
   });
 
   return Array.from({ length: 24 }, (_, h) => {
@@ -331,7 +333,8 @@ const queryHourly = async (where, params, nextP) => {
     const displayH = h % 12 === 0 ? 12 : h % 12;
     return {
       hour: `${displayH}${period}`,
-      count: map[h] || 0,
+      count: map[h]?.total || 0,
+      ...INDEX_CRIMES.reduce((acc, c) => ({ ...acc, [c]: map[h]?.[c] || 0 }), {}),
     };
   });
 };
@@ -340,65 +343,83 @@ const queryByDay = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
       be.day_of_incident AS day,
+      UPPER(be.incident_type) AS crime,
       COUNT(*) AS count
      FROM blotter_analytics_view be
      ${where}
      ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.day_of_incident IS NOT NULL
-     GROUP BY be.day_of_incident
+     GROUP BY be.day_of_incident, UPPER(be.incident_type)
      ORDER BY count DESC`,
     [...params, INDEX_CRIMES],
   );
 
   const map = {};
   result.rows.forEach((r) => {
-    map[r.day] = parseInt(r.count);
+    if (!map[r.day]) map[r.day] = { total: 0 };
+    map[r.day][r.crime] = parseInt(r.count);
+    map[r.day].total += parseInt(r.count);
   });
 
-  return DAYS_OF_WEEK.map((day) => ({ day, count: map[day] || 0 }));
+  return DAYS_OF_WEEK.map((day) => ({
+    day,
+    count: map[day]?.total || 0,
+    ...INDEX_CRIMES.reduce((acc, c) => ({ ...acc, [c]: map[day]?.[c] || 0 }), {}),
+  }));
 };
 
 const queryPlace = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
       TRIM(be.type_of_place) AS place,
+      UPPER(be.incident_type) AS crime,
       COUNT(*) AS count
      FROM blotter_analytics_view be
      ${where}
      ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.type_of_place IS NOT NULL
        AND TRIM(be.type_of_place) <> ''
-     GROUP BY TRIM(be.type_of_place)
-     ORDER BY count DESC
-     LIMIT 50`,
+     GROUP BY TRIM(be.type_of_place), UPPER(be.incident_type)
+     ORDER BY count DESC`,
     [...params, INDEX_CRIMES],
   );
 
-  return result.rows.map((r) => ({
-    place: r.place,
-    count: parseInt(r.count),
-  }));
+  const map = {};
+  result.rows.forEach((r) => {
+    if (!map[r.place]) map[r.place] = { place: r.place, count: 0 };
+    map[r.place][r.crime] = parseInt(r.count);
+    map[r.place].count += parseInt(r.count);
+  });
+
+  return Object.values(map)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 50);
 };
 
 const queryBarangay = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
       TRIM(be.place_barangay) AS barangay,
+      UPPER(be.incident_type) AS crime,
       COUNT(*) AS count
      FROM blotter_analytics_view be
      ${where}
      ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
        AND be.place_barangay IS NOT NULL
        AND TRIM(be.place_barangay) <> ''
-     GROUP BY TRIM(be.place_barangay)
+     GROUP BY TRIM(be.place_barangay), UPPER(be.incident_type)
      ORDER BY count DESC`,
     [...params, INDEX_CRIMES],
   );
 
-  return result.rows.map((r) => ({
-    barangay: r.barangay,
-    count: parseInt(r.count),
-  }));
+  const map = {};
+  result.rows.forEach((r) => {
+    if (!map[r.barangay]) map[r.barangay] = { barangay: r.barangay, count: 0 };
+    map[r.barangay][r.crime] = parseInt(r.count);
+    map[r.barangay].count += parseInt(r.count);
+  });
+
+  return Object.values(map).sort((a, b) => b.count - a.count);
 };
 
 const queryModus = async (where, params, nextP) => {
@@ -487,7 +508,7 @@ const getPatrolUserBarangays = async (userId) => {
 const getOverview = async (req, res) => {
   try {
     let { where, params, nextP } = buildWhere(req.query);
-    const { granularity = "monthly", date_from, date_to } = req.query;
+    const { granularity = "monthly", date_from, date_to, preset } = req.query;
 
     // Patrol user barangay restriction
     const { role_name, user_id } = req.user || {};
@@ -511,36 +532,59 @@ const getOverview = async (req, res) => {
     }
 
     const [
-      summary,
-      trends,
-      hourly,
-      byDay,
-      place,
-      barangay,
-      modus,
-      completeData,
-    ] = await Promise.all([
-      querySummary(where, params, nextP),
-      queryTrends(where, params, nextP, granularity, date_from, date_to),
-      queryHourly(where, params, nextP),
-      queryByDay(where, params, nextP),
-      queryPlace(where, params, nextP),
-      queryBarangay(where, params, nextP),
-      queryModus(where, params, nextP),
-      queryCompleteData(where, params, nextP),
-    ]);
+  summary,
+  trends,
+  hourly,
+  byDay,
+  place,
+  barangay,
+  modus,
+  completeData,
+] = await Promise.all([
+  querySummary(where, params, nextP),
+  queryTrends(where, params, nextP, granularity, date_from, date_to),
+  queryHourly(where, params, nextP),
+  queryByDay(where, params, nextP),
+  queryPlace(where, params, nextP),
+  queryBarangay(where, params, nextP),
+  queryModus(where, params, nextP),
+  queryCompleteData(where, params, nextP),
+]);
 
-    res.json({
-      success: true,
-      summary,
-      trends,
-      hourly,
-      byDay,
-      place,
-      barangay,
-      modus,
-      completeData,
-    });
+// ── Previous month summary for "this_month" delta ─────────────────────────
+let prevSummary = null;
+if (preset === "this_month") {
+  const now = new Date();
+  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+  const pht = new Date(phtMs);
+
+  // Previous month: full month (1st to last day)
+  const prevMonthDate = new Date(pht.getFullYear(), pht.getMonth() - 1, 1);
+  const prevFrom = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const prevLastDay = new Date(pht.getFullYear(), pht.getMonth(), 0).getDate();
+  const prevTo = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`;
+
+  const { where: prevWhere, params: prevParams, nextP: prevNextP } = buildWhere({
+    ...req.query,
+    date_from: prevFrom,
+    date_to: prevTo,
+  });
+
+  prevSummary = await querySummary(prevWhere, prevParams, prevNextP);
+}
+
+res.json({
+  success: true,
+  summary,
+  trends,
+  hourly,
+  byDay,
+  place,
+  barangay,
+  modus,
+  completeData,
+  prevSummary,
+});
   } catch (err) {
     console.error("getOverview error:", err);
     res.status(500).json({ success: false, message: err.message });
