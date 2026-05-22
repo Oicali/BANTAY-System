@@ -31,6 +31,9 @@ import { useExportDashboard } from "../../hooks/useExportDashboard";
 import ShortRangeWarningModal from "../modals/ShortRangeWarningModal";
 import PdfPreviewModal from "../modals/PdfPreviewModal";
 
+// ─── FEATURE FLAGS ────────────────────────────────────────────────────────────
+const SHOW_MONTHLY_DELTAS = false; // Set to false to hide all "vs last month" deltas
+
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
 const getToken = () => localStorage.getItem("token");
@@ -152,59 +155,70 @@ const offsetDate = (days) => {
 };
 
 const PRESETS = [
-  { label: "Last 7 days", key: "7d" },
-  { label: "Last 30 days", key: "30d" },
-  { label: "Last 3 months", key: "3m" },
-  { label: "Last 1 year", key: "365d" },
+  { label: "This Month", key: "this_month" },
+  { label: "1 Week", key: "7d" },
+  { label: "3 Months", key: "3m" },
+  { label: "1 Year", key: "365d" },
   { label: "Custom", key: "custom" },
 ];
 
 const getPresetRange = (key) => {
-  const t = todayIso();
+  const now = new Date();
+  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+  const phtToday = new Date(phtMs);
+  const t = phtToday.toISOString().slice(0, 10);
+
+  if (key === "this_month") {
+    const from = `${phtToday.getFullYear()}-${String(phtToday.getMonth() + 1).padStart(2, "0")}-01`;
+    return { from, to: t };
+  }
   if (key === "7d") return { from: offsetDate(-6), to: t };
-  if (key === "30d") return { from: offsetDate(-29), to: t };
   if (key === "3m") {
-    const now = new Date();
-    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
-    const phtToday = new Date(phtMs);
-    const threeMonthsAgo = new Date(phtToday);
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    return { from: threeMonthsAgo.toISOString().slice(0, 10), to: t };
+    // 3-month range: start from 2 months ago (1st), so Mar 1 → today
+    const from = new Date(phtToday.getFullYear(), phtToday.getMonth() - 2, 1);
+    return {
+      from: `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-01`,
+      to: t,
+    };
   }
   if (key === "365d") {
-    const now = new Date();
-    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
-    const phtToday = new Date(phtMs);
-    const from = new Date(phtToday);
-    from.setFullYear(from.getFullYear() - 1);
-    from.setDate(from.getDate() + 1); // fix off-by-one
-    return { from: from.toISOString().slice(0, 10), to: t };
+    // Snap to 1 year ago, 1st of that month
+    const from = new Date(phtToday.getFullYear() - 1, phtToday.getMonth(), 1);
+    return {
+      from: `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-01`,
+      to: t,
+    };
   }
-  // if (key === "365d") return { from: offsetDate(-364), to: t };
   return null;
 };
 
 const getGranularity = (preset, dateFrom, dateTo) => {
+  if (preset === "this_month") return "daily";
   if (preset === "7d") return "daily";
-  if (preset === "30d") return "weekly";
-  if (preset === "3m") return "weekly";
+  if (preset === "3m") return "monthly";
   if (preset === "365d") return "monthly";
 
-  const days =
-    Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
+  if (!dateFrom || !dateTo) return "monthly";
 
-  if (days <= 16) return "daily";
-  if (days <= 112) return "weekly";
-  return "monthly";
+  // Count distinct calendar months touched
+  const from = new Date(dateFrom + "T00:00:00");
+  const to = new Date(dateTo + "T00:00:00");
+  const monthsFromYear = (to.getFullYear() - from.getFullYear()) * 12;
+  const distinctMonths = monthsFromYear + (to.getMonth() - from.getMonth()) + 1;
+
+  if (distinctMonths === 1) return "daily";
+  if (distinctMonths <= 4) return "weekly";
+  if (distinctMonths <= 13) return "monthly";
+  return "quarterly";
 };
 
 const granularityLabel = (g) =>
   g === "daily"
     ? "Daily"
-    : g === "bidaily"
-      ? "Every 2 Days"
-      : g === "weekly"
-        ? "Weekly"
+    : g === "weekly"
+      ? "Weekly"
+      : g === "quarterly"
+        ? "Quarterly"
         : "Monthly";
 
 // ─── MISC HELPERS ─────────────────────────────────────────────────────────────
@@ -232,14 +246,14 @@ const buildParams = (filters) => {
     p.set("barangays", filters.barangays.join(","));
   }
   p.set("granularity", granularity);
-  p.set("preset", filters.preset);
+  p.set("preset", filters.preset); // ← already exists, just confirm it's here
   return `?${p}`;
 };
 
 const BLANK_FILTERS = () => {
-  const range = getPresetRange("365d");
+  const range = getPresetRange("this_month");
   return {
-    preset: "365d",
+    preset: "this_month",
     dateFrom: range.from,
     dateTo: range.to,
     crimeTypes: [],
@@ -255,7 +269,8 @@ const EMPTY_DASHBOARD = () => ({
   place: [],
   barangay: [],
   modus: [],
-  completeData: [], // ← add this
+  completeData: [],
+  prevSummary: null,
 });
 
 // ─── SMALL LABEL COMPONENTS ───────────────────────────────────────────────────
@@ -630,7 +645,7 @@ const FilterBar = ({
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
   const isDefault =
-    draft.preset === "365d" &&
+    draft.preset === "this_month" &&
     !draft.crimeTypes.length &&
     !draft.barangays.length;
 
@@ -812,7 +827,25 @@ const CARD_ICONS = {
   amber: Search,
 };
 
-const SummaryCards = ({ data }) => {
+const Delta = ({ curr, prevVal, isPercent = false, goodWhenUp = false }) => {
+  if (prevVal === null || prevVal === undefined) return null;
+  const diff = isPercent
+    ? parseFloat(curr) - parseFloat(prevVal)
+    : curr - prevVal;
+  if (diff === 0) return <span className="cd-delta cd-delta-neutral">→ 0</span>;
+  const up = diff > 0;
+  const label = isPercent
+    ? `${up ? "↑" : "↓"} ${Math.abs(diff).toFixed(1)}%`
+    : `${up ? "↑" : "↓"} ${Math.abs(diff)}`;
+  const isGood = goodWhenUp ? up : !up;
+  return (
+    <span className={`cd-delta ${isGood ? "cd-delta-down" : "cd-delta-up"}`}>
+      {label}
+    </span>
+  );
+};
+
+const SummaryCards = ({ data, prevSummary, isThisMonth }) => {
   const t = {
     total: data.reduce((s, d) => s + d.total, 0),
     cleared: data.reduce((s, d) => s + d.cleared, 0),
@@ -820,30 +853,55 @@ const SummaryCards = ({ data }) => {
     ui: data.reduce((s, d) => s + d.underInvestigation, 0),
   };
 
+  const prev =
+    isThisMonth && prevSummary
+      ? {
+          total: prevSummary.reduce((s, d) => s + d.total, 0),
+          cleared: prevSummary.reduce((s, d) => s + d.cleared, 0),
+          solved: prevSummary.reduce((s, d) => s + d.solved, 0),
+          ui: prevSummary.reduce((s, d) => s + d.underInvestigation, 0),
+        }
+      : null;
+
+  const currCCE = parseFloat(pct(t.cleared + t.solved, t.total));
+  const prevCCE = prev
+    ? parseFloat(pct(prev.cleared + prev.solved, prev.total))
+    : null;
+  const currCSE = parseFloat(pct(t.solved, t.total));
+  const prevCSE = prev ? parseFloat(pct(prev.solved, prev.total)) : null;
+
   const cards = [
     {
       label: "Total Incidents",
       value: t.total,
       color: "blue",
       sub: "Index crimes",
+      delta: <Delta curr={t.total} prevVal={prev?.total} goodWhenUp={false} />,
     },
     {
       label: "CCE %",
-      value: `${pct(t.cleared + t.solved, t.total)}%`,
+      value: `${currCCE.toFixed(1)}%`,
       color: "indigo",
       sub: `${t.cleared} cleared`,
+      delta: (
+        <Delta curr={currCCE} prevVal={prevCCE} isPercent goodWhenUp={true} />
+      ),
     },
     {
       label: "CSE %",
-      value: `${pct(t.solved, t.total)}%`,
+      value: `${currCSE.toFixed(1)}%`,
       color: "green",
       sub: `${t.solved} solved`,
+      delta: (
+        <Delta curr={currCSE} prevVal={prevCSE} isPercent goodWhenUp={true} />
+      ),
     },
     {
       label: "Under Investigation",
       value: t.ui,
       color: "amber",
       sub: "Pending resolution",
+      delta: <Delta curr={t.ui} prevVal={prev?.ui} goodWhenUp={false} />,
     },
   ];
 
@@ -861,6 +919,14 @@ const SummaryCards = ({ data }) => {
             </div>
             <div className="cd-summary-value">{c.value}</div>
             <div className="cd-summary-label">{c.label}</div>
+            {isThisMonth && SHOW_MONTHLY_DELTAS && (
+              <div className="cd-delta-row">
+                {c.delta}
+                {prev !== null && (
+                  <span className="cd-delta-label">vs last month</span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -869,9 +935,23 @@ const SummaryCards = ({ data }) => {
 };
 
 // ─── INDEX CRIME TABLE ────────────────────────────────────────────────────────
-const IndexCrimeTable = ({ data, selectedCrimes }) => {
+const IndexCrimeTable = ({
+  data,
+  selectedCrimes,
+  prevSummary,
+  isThisMonth,
+}) => {
   const [sortCol, setSortCol] = useState("total");
   const [sortDir, setSortDir] = useState("desc");
+
+  const prevMap = useMemo(() => {
+    if (!isThisMonth || !prevSummary) return {};
+    const m = {};
+    prevSummary.forEach((r) => {
+      m[r.crime] = r;
+    });
+    return m;
+  }, [prevSummary, isThisMonth]);
 
   const visibleData = useMemo(
     () =>
@@ -901,6 +981,16 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
     { total: 0, cleared: 0, solved: 0, ui: 0 },
   );
 
+  const prevTot =
+    isThisMonth && prevSummary
+      ? prevSummary
+          .filter(
+            (r) =>
+              selectedCrimes.length === 0 || selectedCrimes.includes(r.crime),
+          )
+          .reduce((acc, d) => ({ total: acc.total + d.total }), { total: 0 })
+      : null;
+
   const handleSort = (col) => {
     if (sortCol === col) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     else {
@@ -925,7 +1015,10 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
         <span className="cd-chart-subtitle">
           {selectedCrimes.length > 0
             ? `${rows.length} crimes shown`
-            : "All index crimes"}{" "}
+            : "All index crimes"}
+          {isThisMonth && prevSummary && SHOW_MONTHLY_DELTAS && (
+            <span className="cd-table-delta-hint"> · ↕ vs last month</span>
+          )}
         </span>
       </div>
 
@@ -935,6 +1028,9 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
             <tr>
               <th>Index Crime</th>
               <SortTh col="total">Total</SortTh>
+              {isThisMonth && prevSummary && SHOW_MONTHLY_DELTAS && (
+                <th className="cd-num-cell">vs Last Month</th>
+              )}
               <SortTh col="cleared">Cleared</SortTh>
               <SortTh col="solved">Solved</SortTh>
               <SortTh col="underInvestigation">Under Inv.</SortTh>
@@ -975,12 +1071,33 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
                 pct(row.cleared + row.solved, row.total),
               );
               const cseVal = parseFloat(pct(row.solved, row.total));
+              const prevRow = prevMap[row.crime];
+              const diff =
+                isThisMonth && prevRow !== undefined
+                  ? row.total - prevRow.total
+                  : null;
+
               return (
                 <tr key={i}>
                   <td className="cd-crime-name">
                     {CRIME_DISPLAY[row.crime] || row.crime}
                   </td>
                   <td className="cd-num-cell">{row.total}</td>
+                  {isThisMonth && prevSummary && SHOW_MONTHLY_DELTAS && (
+                    <td className="cd-num-cell">
+                      {diff === null ? (
+                        <span className="cd-delta cd-delta-neutral">—</span>
+                      ) : diff === 0 ? (
+                        <span className="cd-delta cd-delta-neutral">→ 0</span>
+                      ) : (
+                        <span
+                          className={`cd-delta ${diff > 0 ? "cd-delta-up" : "cd-delta-down"}`}
+                        >
+                          {diff > 0 ? "↑" : "↓"} {Math.abs(diff)}
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="cd-num-cell cd-cleared">{row.cleared}</td>
                   <td className="cd-num-cell cd-solved">{row.solved}</td>
                   <td className="cd-num-cell cd-ui">
@@ -1013,6 +1130,27 @@ const IndexCrimeTable = ({ data, selectedCrimes }) => {
               <td className="cd-num-cell">
                 <strong>{tot.total}</strong>
               </td>
+              {isThisMonth &&
+                prevSummary &&
+                SHOW_MONTHLY_DELTAS &&
+                (() => {
+                  const totalDiff = tot.total - (prevTot?.total ?? 0);
+                  return (
+                    <td className="cd-num-cell">
+                      {totalDiff === 0 ? (
+                        <span className="cd-delta cd-delta-neutral">→ 0</span>
+                      ) : (
+                        <span
+                          className={`cd-delta ${totalDiff > 0 ? "cd-delta-up" : "cd-delta-down"}`}
+                        >
+                          <strong>
+                            {totalDiff > 0 ? "↑" : "↓"} {Math.abs(totalDiff)}
+                          </strong>
+                        </span>
+                      )}
+                    </td>
+                  );
+                })()}
               <td className="cd-num-cell cd-cleared">
                 <strong>{tot.cleared}</strong>
               </td>
@@ -1180,8 +1318,12 @@ const TrendsTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
 
   const visible = [...payload]
-    .filter((p) => p.value !== undefined)
-    .sort((a, b) => b.value - a.value);
+  .filter((p) => p.name === "Total" || (p.value !== undefined && p.value !== 0))
+  .sort((a, b) => {
+    if (a.name === "Total") return -1;
+    if (b.name === "Total") return 1;
+    return b.value - a.value;
+  });
 
   return (
     <div
@@ -1207,44 +1349,15 @@ const TrendsTooltip = ({ active, payload, label }) => {
         {label}
       </div>
       {visible.map((p, i) => (
-        <div
-          key={i}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            marginBottom: 2,
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span
-              style={{
-                width: p.name === "Total" ? 10 : 8,
-                height: p.name === "Total" ? 10 : 8,
-                borderRadius: "50%",
-                background: p.color,
-                display: "inline-block",
-                flexShrink: 0,
-              }}
-            />
-            <span
-              style={{
-                color: "#374151",
-                fontWeight: p.name === "Total" ? 700 : 400,
-              }}
-            >
-              {CRIME_LABEL[p.name] || p.name}
-            </span>
-          </span>
-          <strong
-            style={{
-              color: p.name === "Total" ? "#0a1628" : "#1e3a5f",
-            }}
-          >
-            {p.value}
-          </strong>
-        </div>
-      ))}
+  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 2 }}>
+    <span style={{ color: "#374151", fontWeight: p.name === "Total" ? 700 : 400 }}>
+      {CRIME_LABEL[p.name] || p.name}
+    </span>
+    <span style={{ color: "#0a1628", fontWeight: p.name === "Total" ? 700 : 400 }}>
+      {p.value}
+    </span>
+  </div>
+))}
     </div>
   );
 };
@@ -1264,26 +1377,6 @@ const CrimeTrends = ({ appliedFilters, data }) => {
     appliedFilters.crimeTypes.length > 0
       ? appliedFilters.crimeTypes
       : INDEX_CRIMES;
-
-  const [mode, setMode] = useState("total");
-  const [hiddenCrimes, setHiddenCrimes] = useState(new Set());
-
-  const handleModeSwitch = (m) => {
-    setMode(m);
-    setHiddenCrimes(new Set());
-  };
-
-  const toggleCrime = (key) =>
-    setHiddenCrimes((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-
-  const allCrimesVisible = activeCrimes.every((c) => !hiddenCrimes.has(c));
-  const toggleAllCrimes = () =>
-    setHiddenCrimes(allCrimesVisible ? new Set(activeCrimes) : new Set());
 
   const dayCount =
     Math.round(
@@ -1322,6 +1415,12 @@ const CrimeTrends = ({ appliedFilters, data }) => {
       const monthStr = MONTHS[parseInt(m, 10) - 1];
       return multiYear ? `${monthStr} ${y}` : monthStr;
     }
+    if (granularity === "quarterly") {
+      const [y, m] = iso.split("-");
+      const month = parseInt(m, 10);
+      const quarter = Math.ceil(month / 3);
+      return `Q${quarter} ${y}`;
+    }
     const [y, m, d] = iso.split("-");
     return multiYear ? `${m}/${d}/${y.slice(2)}` : `${m}/${d}`;
   };
@@ -1336,49 +1435,6 @@ const CrimeTrends = ({ appliedFilters, data }) => {
           {granularityLabel(granularity)} · {data.length} points · {dayCount}{" "}
           day{dayCount !== 1 ? "s" : ""}
         </span>
-      </div>
-
-      <div className="cd-trends-modebar">
-        <div className="cd-trends-segment">
-          <button
-            className={`cd-trends-seg-btn ${mode === "total" ? "cd-trends-seg-btn-active" : ""}`}
-            onClick={() => handleModeSwitch("total")}
-          >
-            Total
-          </button>
-          <button
-            className={`cd-trends-seg-btn ${mode === "crime" ? "cd-trends-seg-btn-active" : ""}`}
-            onClick={() => handleModeSwitch("crime")}
-          >
-            By Crime
-          </button>
-        </div>
-
-        {mode === "crime" && (
-          <div className="cd-trends-crime-pills">
-            <button className="cd-trends-showall-btn" onClick={toggleAllCrimes}>
-              {allCrimesVisible ? "Hide All" : "Show All"}
-            </button>
-            {activeCrimes.map((key) => {
-              const hidden = hiddenCrimes.has(key);
-              return (
-                <button
-                  key={key}
-                  className={`cd-trends-crime-pill ${hidden ? "cd-trends-crime-pill-off" : ""}`}
-                  onClick={() => toggleCrime(key)}
-                >
-                  <span
-                    className="cd-trends-pill-dot"
-                    style={{
-                      background: hidden ? "#d1d5db" : CRIME_COLORS[key],
-                    }}
-                  />
-                  {CRIME_LABEL[key]}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div style={{ overflowX: "auto", overflowY: "hidden" }}>
@@ -1421,7 +1477,6 @@ const CrimeTrends = ({ appliedFilters, data }) => {
                   : false
               }
               activeDot={{ r: 5, fill: CRIME_COLORS.Total }}
-              hide={mode !== "total"}
             />
 
             {activeCrimes.map((key) => (
@@ -1430,14 +1485,11 @@ const CrimeTrends = ({ appliedFilters, data }) => {
                 type="linear"
                 dataKey={key}
                 stroke={CRIME_COLORS[key]}
-                strokeWidth={1.8}
-                dot={
-                  data.length <= 24
-                    ? { r: 3, fill: CRIME_COLORS[key], strokeWidth: 0 }
-                    : false
-                }
-                activeDot={{ r: 4, fill: CRIME_COLORS[key] }}
-                hide={mode !== "crime" || hiddenCrimes.has(key)}
+                strokeWidth={0}
+                dot={false}
+                activeDot={false}
+                hide={false}
+                legendType="none"
               />
             ))}
           </LineChart>
@@ -1450,29 +1502,60 @@ const CrimeTrends = ({ appliedFilters, data }) => {
 // ─── CRIME CLOCK ──────────────────────────────────────────────────────────────
 const ClockTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
+  const data = payload[0].payload;
+  const crimes = INDEX_CRIMES.filter((c) => data[c] > 0).sort(
+    (a, b) => data[b] - data[a],
+  );
 
   return (
     <div
       style={{
         background: "#fff",
         border: "1px solid #e5e7eb",
-        borderRadius: 6,
-        padding: "7px 12px",
+        borderRadius: 8,
+        padding: "10px 14px",
         fontSize: 12,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
       }}
     >
       <div
         style={{
-          fontWeight: 600,
-          marginBottom: 2,
+          fontWeight: 700,
+          marginBottom: 6,
           color: "#1e3a5f",
+          borderBottom: "1px solid #e5e7eb",
+          paddingBottom: 4,
         }}
       >
         {label}
       </div>
-      <div>
-        Reported: <strong>{payload[0].value}</strong>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          marginBottom: crimes.length ? 4 : 0,
+        }}
+      >
+        <span style={{ fontWeight: 700, color: "#374151" }}>Total</span>
+        <span style={{ fontWeight: 700, color: "#0a1628" }}>{data.count}</span>
       </div>
+      {crimes.map((c) => (
+        <div
+          key={c}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 2,
+          }}
+        >
+          <span style={{ color: "#374151", fontWeight: 400 }}>
+            {CRIME_LABEL[c]}
+          </span>
+          <span style={{ color: "#0a1628", fontWeight: 400 }}>{data[c]}</span>
+        </div>
+      ))}
     </div>
   );
 };
@@ -1562,8 +1645,70 @@ const CrimeByDay = ({ data }) => {
             allowDecimals={false}
           />
           <Tooltip
-            contentStyle={{ fontSize: 12, borderRadius: 6 }}
-            formatter={(v) => [v, "Reported"]}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const data = payload[0].payload;
+              const crimes = INDEX_CRIMES.filter((c) => data[c] > 0).sort(
+                (a, b) => data[b] - data[a],
+              );
+              return (
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    fontSize: 12,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: 6,
+                      color: "#1e3a5f",
+                      borderBottom: "1px solid #e5e7eb",
+                      paddingBottom: 4,
+                    }}
+                  >
+                    {label}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      marginBottom: crimes.length ? 4 : 0,
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: "#374151" }}>
+                      Total
+                    </span>
+                    <span style={{ fontWeight: 700, color: "#0a1628" }}>
+                      {data.count}
+                    </span>
+                  </div>
+                  {crimes.map((c) => (
+                    <div
+                      key={c}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 16,
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span style={{ color: "#374151", fontWeight: 400 }}>
+                        {CRIME_LABEL[c]}
+                      </span>
+                      <span style={{ color: "#0a1628", fontWeight: 400 }}>
+                        {data[c]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            }}
           />
           <Bar
             dataKey="count"
@@ -1656,8 +1801,34 @@ const ModusChart = ({ data, crimeTypes }) => {
               width={yWidth}
             />
             <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 6 }}
-              formatter={(v) => [v, "Incidents"]}
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length || payload[0].value === 0)
+                  return null;
+                return (
+                  <div
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      padding: "7px 12px",
+                      fontSize: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        marginBottom: 2,
+                        color: "#1e3a5f",
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div>
+                      Incidents: <strong>{payload[0].value}</strong>
+                    </div>
+                  </div>
+                );
+              }}
             />
             <Bar
               dataKey="count"
@@ -1715,10 +1886,81 @@ const ModusChart = ({ data, crimeTypes }) => {
   );
 };
 
+// ─── CRIME BREAKDOWN TOOLTIP ──────────────────────────────────────────────────
+const CrimeBreakdownTooltip = ({ row, nameKey }) => {
+  if (!row) return null;
+  const crimes = INDEX_CRIMES.filter((c) => row[c] > 0).sort(
+    (a, b) => row[b] - row[a],
+  );
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        zIndex: 500,
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        padding: "10px 14px",
+        fontSize: 12,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+        minWidth: 180,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          marginBottom: 6,
+          color: "#1e3a5f",
+          borderBottom: "1px solid #e5e7eb",
+          paddingBottom: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: 220,
+        }}
+      >
+        {row[nameKey]}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          marginBottom: crimes.length ? 4 : 0,
+        }}
+      >
+        <span style={{ fontWeight: 700, color: "#374151" }}>Total</span>
+        <span style={{ fontWeight: 700, color: "#0a1628" }}>{row.count}</span>
+      </div>
+      {crimes.map((c) => (
+        <div
+          key={c}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 2,
+          }}
+        >
+          <span style={{ color: "#374151", fontWeight: 400 }}>
+            {CRIME_LABEL[c]}
+          </span>
+          <span style={{ color: "#0a1628", fontWeight: 400 }}>{row[c]}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ─── PLACE OF COMMISSION ──────────────────────────────────────────────────────
 const PlaceOfCommission = ({ data }) => {
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(0);
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
 
   const sorted = useMemo(
     () =>
@@ -1738,12 +1980,39 @@ const PlaceOfCommission = ({ data }) => {
     (page + 1) * PLACE_PAGE_SIZE,
   );
 
+  const handleMouseEnter = (row, e) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const rowRect = e.currentTarget.getBoundingClientRect();
+    setHoveredRow(row);
+    setTooltipPos({
+      x: rowRect.left - (rect?.left || 0) ,
+      y: rowRect.top - (rect?.top || 0),
+    });
+  };
   return (
-    <div className="cd-chart-card cd-flex-col cd-table-fixed-height">
+    <div
+      ref={containerRef}
+      className="cd-chart-card cd-flex-col cd-table-fixed-height"
+      style={{ position: "relative" }}
+    >
       <div className="cd-chart-card-header">
         <h3>Place of Commission</h3>
-        <span className="cd-chart-subtitle">Click count to sort</span>
+        <span className="cd-chart-subtitle">
+          Click count to sort · Hover row for breakdown
+        </span>
       </div>
+
+      {hoveredRow && (
+        <div
+          style={{
+            position: "absolute",
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+          }}
+        >
+          <CrimeBreakdownTooltip row={hoveredRow} nameKey="place" />
+        </div>
+      )}
 
       <table className="cd-brgy-table">
         <thead>
@@ -1764,10 +2033,14 @@ const PlaceOfCommission = ({ data }) => {
             </th>
           </tr>
         </thead>
-
         <tbody>
           {pageData.map((row, i) => (
-            <tr key={i}>
+            <tr
+              key={i}
+              onMouseEnter={(e) => handleMouseEnter(row, e)}
+              onMouseLeave={() => setHoveredRow(null)}
+              style={{ cursor: "default" }}
+            >
               <td className="cd-brgy-rank">{row.rank}</td>
               <td className="cd-brgy-name">{row.place}</td>
               <td className="cd-num-cell cd-brgy-primary">{row.count}</td>
@@ -1782,7 +2055,6 @@ const PlaceOfCommission = ({ data }) => {
           {Math.min((page + 1) * PLACE_PAGE_SIZE, sorted.length)} of{" "}
           {sorted.length}
         </span>
-
         <div className="cd-brgy-page-btns">
           <button
             className="cd-page-btn"
@@ -1791,7 +2063,6 @@ const PlaceOfCommission = ({ data }) => {
           >
             <ChevronLeft size={14} />
           </button>
-
           {Array.from({ length: totalPages }, (_, i) => (
             <button
               key={i}
@@ -1801,7 +2072,6 @@ const PlaceOfCommission = ({ data }) => {
               {i + 1}
             </button>
           ))}
-
           <button
             className="cd-page-btn"
             disabled={page === totalPages - 1}
@@ -1820,6 +2090,9 @@ const BarangayTable = ({ data }) => {
   const [sortCol, setSortCol] = useState("count");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(0);
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef(null);
 
   const sorted = useMemo(
     () =>
@@ -1851,6 +2124,16 @@ const BarangayTable = ({ data }) => {
     }
   };
 
+  const handleMouseEnter = (row, e) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const rowRect = e.currentTarget.getBoundingClientRect();
+    setHoveredRow(row);
+    setTooltipPos({
+      x: rowRect.left - (rect?.left || 0), // show LEFT of the row, 210px wide
+      y: rowRect.top - (rect?.top || 0),
+    });
+  };
+
   const SortIcon = ({ col }) => (
     <span
       className="cd-sort-icon"
@@ -1861,14 +2144,30 @@ const BarangayTable = ({ data }) => {
   );
 
   return (
-    <div className="cd-chart-card cd-flex-col cd-table-fixed-height">
+    <div
+      ref={containerRef}
+      className="cd-chart-card cd-flex-col cd-table-fixed-height"
+      style={{ position: "relative" }}
+    >
       <div className="cd-chart-card-header">
         <h3>Barangay Incidents</h3>
         <span className="cd-chart-subtitle">
           {data.length} barangay{data.length !== 1 ? "s" : ""} with incidents ·
-          Click column to sort
+          Hover row for breakdown
         </span>
       </div>
+
+      {hoveredRow && (
+        <div
+          style={{
+            position: "absolute",
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+          }}
+        >
+          <CrimeBreakdownTooltip row={hoveredRow} nameKey="barangay" />
+        </div>
+      )}
 
       <table className="cd-brgy-table">
         <thead>
@@ -1889,10 +2188,14 @@ const BarangayTable = ({ data }) => {
             </th>
           </tr>
         </thead>
-
         <tbody>
           {pageData.map((row, i) => (
-            <tr key={i}>
+            <tr
+              key={i}
+              onMouseEnter={(e) => handleMouseEnter(row, e)}
+              onMouseLeave={() => setHoveredRow(null)}
+              style={{ cursor: "default" }}
+            >
               <td className="cd-brgy-rank">{row.rank}</td>
               <td className="cd-brgy-name">
                 {formatBarangayLabel(row.barangay)}
@@ -1909,7 +2212,6 @@ const BarangayTable = ({ data }) => {
           {Math.min((page + 1) * BRGY_PAGE_SIZE, sorted.length)} of{" "}
           {sorted.length}
         </span>
-
         <div className="cd-brgy-page-btns">
           <button
             className="cd-page-btn"
@@ -1918,7 +2220,6 @@ const BarangayTable = ({ data }) => {
           >
             <ChevronLeft size={14} />
           </button>
-
           {Array.from({ length: totalPages }, (_, i) => (
             <button
               key={i}
@@ -1928,7 +2229,6 @@ const BarangayTable = ({ data }) => {
               {i + 1}
             </button>
           ))}
-
           <button
             className="cd-page-btn"
             disabled={page === totalPages - 1}
@@ -2209,7 +2509,8 @@ const CrimeDashboard = () => {
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
   const role = localStorage.getItem("role");
-  const isAdmin = role === "Administrator" || role === "Technical Administrator";
+  const isAdmin =
+    role === "Administrator" || role === "Technical Administrator";
 
   const [hasPatrolAssignment, setHasPatrolAssignment] = useState(false);
   const [patrolAssignedBarangays, setPatrolAssignedBarangays] = useState([]);
@@ -2372,7 +2673,8 @@ const CrimeDashboard = () => {
             place: json.place ?? [],
             barangay: json.barangay ?? [],
             modus: json.modus ?? [],
-            completeData: json.completeData ?? [], // ← add this
+            completeData: json.completeData ?? [],
+            prevSummary: json.prevSummary ?? null,
           };
 
           _cache = {
@@ -2628,11 +2930,17 @@ const CrimeDashboard = () => {
         patrolAssignedBarangays={patrolAssignedBarangays}
       />
 
-      <SummaryCards data={dashData.summary} />
+      <SummaryCards
+        data={dashData.summary}
+        prevSummary={dashData.prevSummary}
+        isThisMonth={appliedFilters.preset === "this_month"}
+      />
 
       <IndexCrimeTable
         data={dashData.summary}
         selectedCrimes={appliedFilters.crimeTypes}
+        prevSummary={dashData.prevSummary}
+        isThisMonth={appliedFilters.preset === "this_month"}
       />
 
       <div ref={chartRefs.caseStatus}>
@@ -2689,14 +2997,19 @@ const CrimeDashboard = () => {
                   Generate Assessment
                 </button>
                 <p className="cd-ai-helper-text">
-  Generates an AI-powered EMPO QUAD assessment based on current filters.{" "}
-  <b>More historical data improves forecast confidence and trend accuracy.</b>
-  <br />
-  <span className="cd-ai-forecast-note">
-    ⓘ Trend sparklines and forecasts use all available historical weekly data — not just
-    the selected date range — to ensure reliable Croston forecast predictions.
-  </span>
-</p>
+                  Generates an AI-powered EMPO QUAD assessment based on current
+                  filters.{" "}
+                  <b>
+                    More historical data improves forecast confidence and trend
+                    accuracy.
+                  </b>
+                  <br />
+                  <span className="cd-ai-forecast-note">
+                    ⓘ Trend sparklines and forecasts use all available
+                    historical weekly data — not just the selected date range —
+                    to ensure reliable Croston forecast predictions.
+                  </span>
+                </p>
               </>
             ) : (
               <div className="cd-ai-loading-wrap">

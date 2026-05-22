@@ -1718,35 +1718,44 @@ const detectCrimeType = async (req, res) => {
   }
 
   const VALID_CRIME_TYPES = [
-    "Carnapping - MC",
-    "Carnapping - MV",
-    "Homicide",
-    "Murder",
-    "Physical Injury",
-    "Rape",
-    "Robbery",
-    "Special Complex Crime",
-    "Theft",
-  ];
+  "Carnapping - MC",
+  "Carnapping - MV",
+  "Homicide",
+  "Murder",
+  "Physical Injury",
+  "Rape",
+  "Robbery",
+  "Special Complex Crime",
+  "Theft",
+];
 
-  const prompt = `You are a PNP crime classifier. Given an incident narrative, classify it into exactly one of these crime types:
+const prompt = `You are a PNP crime classifier. Given an incident narrative, classify it into exactly one of these crime types, OR respond with NOT_AN_INDEX_CRIME if it does not describe a valid criminal offense against a human person.
 
+Valid crime types:
 ${VALID_CRIME_TYPES.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
 Crime type definitions:
 - Carnapping - MC: theft or taking of a motorcycle without owner's consent
 - Carnapping - MV: theft or taking of a motor vehicle (car, truck, jeep) without owner's consent
-- Homicide: unlawful killing without premeditation or deliberate intent; often from fights or reckless acts
-- Murder: intentional, premeditated killing; may involve ambush, treachery, or evident premeditation
-- Physical Injury: bodily harm inflicted on a person; mauling, hitting, stabbing without intent to kill
-- Rape: sexual assault or carnal knowledge against a person's will
-- Robbery: taking property from a person using force, violence, or intimidation
-- Special Complex Crime: a single act constituting two or more grave felonies (e.g. robbery with homicide, rape with homicide, kidnapping with murder)
+- Homicide: unlawful killing of a human person without premeditation
+- Murder: intentional, premeditated killing of a human person; ambush, treachery, or evident premeditation
+- Physical Injury: bodily harm inflicted on a HUMAN person; mauling, hitting, stabbing without intent to kill
+- Rape: sexual assault against a human person
+- Robbery: taking property from a HUMAN person using force, violence, or intimidation
+- Special Complex Crime: a single act constituting two or more grave felonies against a human person
 - Theft: taking property without owner's consent but without violence or intimidation
+
+CRITICAL RULES — respond NOT_AN_INDEX_CRIME when ANY of these apply:
+1. The victim or subject of harm is a non-human animal (aso, pusa, ibon, ipis, daga, manok, baboy, hayop, cockroach, dog, cat, rat, pig, bird, insect, etc.)
+2. The narrative describes harming or destroying an object or property with no human victim (upuan, mesa, bato, tabla, etc.)
+3. The narrative is incoherent, fictional, clearly a test, or does not describe any real criminal incident
+4. The narrative describes an accident with no criminal act (e.g. fell down stairs, slipped)
+5. There is no identifiable human victim or human suspect in the narrative
+6. The act described is trivial or not punishable under Philippine criminal law
 
 Narrative: "${narrative.trim()}"
 
-Reply with ONLY the exact crime type name from the list above. No explanation. No punctuation. Just the name.`;
+Reply with ONLY the exact crime type name from the list above, OR the exact text NOT_AN_INDEX_CRIME. No explanation. No punctuation. Nothing else.`;
 
   try {
     const axios = require("axios");
@@ -1769,17 +1778,36 @@ Reply with ONLY the exact crime type name from the list above. No explanation. N
 
     const raw = response.data?.choices?.[0]?.message?.content?.trim() || "";
 
+    // Check for explicit non-crime response
+    if (raw.toUpperCase() === "NOT_AN_INDEX_CRIME") {
+      return res.json({
+        success: true,
+        crime_type: null,
+        not_an_index_crime: true,
+        confident: true,
+        raw,
+      });
+    }
+
     const matched = VALID_CRIME_TYPES.find(
       (c) => c.toLowerCase() === raw.toLowerCase(),
     );
 
-    const detected = matched || "Special Complex Crime";
-    const confident = !!matched;
+    if (!matched) {
+      return res.json({
+        success: true,
+        crime_type: null,
+        not_an_index_crime: true,
+        confident: false,
+        raw,
+      });
+    }
 
     return res.json({
       success: true,
-      crime_type: detected,
-      confident,
+      crime_type: matched,
+      not_an_index_crime: false,
+      confident: true,
       raw,
     });
   } catch (error) {
@@ -1789,7 +1817,8 @@ Reply with ONLY the exact crime type name from the list above. No explanation. N
       (error.message || "").toLowerCase().includes("rate limit");
     return res.json({
       success: true,
-      crime_type: "Special Complex Crime",
+      crime_type: null,
+      not_an_index_crime: false,
       confident: false,
       fallback: true,
       rate_limited: isRateLimit,
