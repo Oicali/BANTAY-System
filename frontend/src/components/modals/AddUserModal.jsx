@@ -1330,47 +1330,59 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
           )}
 
           {/* BARANGAY USER FORM */}
-          {step === "barangay" && (
-            <>
-              <div className="aum-modal-header">
-                <div className="aum-header-with-back">
-                  <button
-                    type="button"
-                    className="aum-back-button"
-                    onClick={handleBack}
-                  >
-                    ← Back
-                  </button>
-                  <h2>Add Barangay User</h2>
-                  <button
-                    type="button"
-                    className="aum-modal-close"
-                    onClick={handleClose}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
+          {/* BARANGAY USER FORM */}
+{step === "barangay" && (
+  <>
+    <div className="aum-modal-header">
+      <div className="aum-header-with-back">
+        <button type="button" className="aum-back-button" onClick={handleBack}>
+          ← Back
+        </button>
+        <h2>Add Barangay User</h2>
+        <button type="button" className="aum-modal-close" onClick={handleClose}>
+          ×
+        </button>
+      </div>
+    </div>
 
-              <form onSubmit={handleSubmit} className="aum-modal-form">
-                {renderInfoBox()}
-                {renderProfilePicture("profilePictureBarangay")}
-                {renderPersonalInfo()}
-                {renderContactInfo()}
-                {renderBarangayAddressInfo()}
+    <form onSubmit={handleSubmit} className="aum-modal-form">
+      {renderInfoBox()}
+      {renderProfilePicture("profilePictureBarangay")}
+      {renderPersonalInfo()}
+      {renderContactInfo()}
+      {renderBarangayAddressInfo()}
 
-                <div className="aum-modal-actions">
-                  <button
-                    type="submit"
-                    className="aum-btn aum-btn-primary"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Adding User..." : "Add Barangay User"}
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
+      {/* ADD THIS SECTION */}
+      <div className="aum-form-section">
+        <h3 className="aum-form-section-title">Official Information</h3>
+        <div className="aum-form-row">
+          <div className="aum-form-group">
+            <label className="aum-form-label">Role *</label>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="aum-form-input"
+            >
+              <option value="Brgy. Councilor">Brgy. Councilor</option>
+              <option value="Brgy. Tanod">Brgy. Tanod</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="aum-modal-actions">
+        <button
+          type="submit"
+          className="aum-btn aum-btn-primary"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Adding User..." : "Add Barangay User"}
+        </button>
+      </div>
+    </form>
+  </>
+)}
         </div>
       </div>
     </>

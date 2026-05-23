@@ -49,12 +49,13 @@ const getAllUsers = async (req, res) => {
       paramIdx++;
     }
 
-    if (role && role !== "all" && userType === "police") {
+    if (role && role !== "all") {
       conditions.push(`r.role_name = $${paramIdx++}`);
       params.push(role);
     }
 
-    if (barangayCode && barangayCode !== "all" && userType === "barangay") {
+    // CHANGE THIS — was: if (barangayCode && barangayCode !== "all" && userType === "barangay")
+    if (barangayCode && barangayCode !== "all") {
       conditions.push(`bd.barangay_code = $${paramIdx++}`);
       params.push(barangayCode);
     }
@@ -126,9 +127,18 @@ const getFilterOptions = async (req, res) => {
        ORDER BY r.role_name`,
     );
 
+    // ADD THIS
+    const barangayRolesResult = await pool.query(
+      `SELECT DISTINCT r.role_name
+       FROM roles r
+       WHERE r.user_type = 'barangay'
+       ORDER BY r.role_name`,
+    );
+
     res.json({
       success: true,
       roles: rolesResult.rows.map((r) => r.role_name),
+      barangayRoles: barangayRolesResult.rows.map((r) => r.role_name), // ADD THIS
     });
   } catch (err) {
     console.error("Fetch filter options error:", err);
@@ -657,7 +667,7 @@ const resendVerificationEmail = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Verification Email Resent",
-      description: `Resent verification email to user "${username}" (${trimmedEmail})`,
+      description: `Resent verification email to user "${username}" (${user.email})`,
       action: "CREATE",
       status: "success",
       source: "Web Portal",

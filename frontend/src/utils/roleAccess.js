@@ -34,6 +34,7 @@ export const roleAccess = {
     "patrol-dashboard",
     "patrol-scheduling",
     "after-patrol",
+    "audit-log",
     "profile-settings",
   ],
 
@@ -44,6 +45,7 @@ export const roleAccess = {
     "case-management",
     "modus-management",
     "crime-mapping",
+    "audit-log",
     "profile-settings",
   ],
 
@@ -53,6 +55,7 @@ export const roleAccess = {
     "e-blotter",
     "patrol-scheduling",
     "profile-settings",
+    "audit-log",
     "after-patrol"
   ],
 
@@ -60,5 +63,6 @@ export const roleAccess = {
   // BARANGAY ROLES
   // ============================================
   
-  "Barangay": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "profile-settings"],
+  "Brgy. Councilor": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
+  "Brgy. Tanod": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
 };

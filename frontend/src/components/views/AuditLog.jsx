@@ -1,35 +1,52 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./AuditLog.css";
+import LoadingModal from "../modals/LoadingModal";
 
 const ITEMS_PER_PAGE = 15;
 const API_URL = import.meta.env.VITE_API_URL;
 
 const DEFAULT_FILTERS = {
-  searchTerm:   "",
+  searchTerm: "",
   statusFilter: "all",
-  dateFrom:     "",
-  dateTo:       "",
+  dateFrom: "",
+  dateTo: "",
 };
 
 // =====================================================
 // ICON COMPONENTS
 // =====================================================
 const ExportIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2"
-    strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
 const RefreshIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2.2"
-    strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="1 4 1 10 7 10"/>
-    <path d="M3.51 15a9 9 0 1 0 .49-3.24"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-3.24" />
   </svg>
 );
 
@@ -37,65 +54,88 @@ const RefreshIcon = () => (
 // MAIN COMPONENT
 // =====================================================
 const AuditLog = () => {
-  const [logs, setLogs]             = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState("");
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [pagination, setPagination] = useState({
-    total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1,
+    total: 0,
+    page: 1,
+    limit: ITEMS_PER_PAGE,
+    totalPages: 1,
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [stats, setStats]             = useState({ total: 0, today: 0, uniqueUsers: 0, failed: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    today: 0,
+    uniqueUsers: 0,
+    failed: 0,
+  });
 
-  const [draft, setDraft]                   = useState({ ...DEFAULT_FILTERS });
+  const [draft, setDraft] = useState({ ...DEFAULT_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
 
+  // Near the top of the AuditLog component, after the state declarations
+  const rawUser = localStorage.getItem("user");
+  const currentUser = rawUser ? JSON.parse(rawUser) : null;
+  const RESTRICTED_ROLES = ["Brgy. Councilor", , "Brgy. Tanod", "Investigator", "Patrol"];
+  const isRestricted = RESTRICTED_ROLES.includes(currentUser?.role);
+
   // ===================================================
   // FETCH LOGS
   // ===================================================
-  const fetchLogs = useCallback(async (page = 1) => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("token");
-      const params = new URLSearchParams();
-      params.set("page", page);
-      params.set("limit", ITEMS_PER_PAGE);
+  const fetchLogs = useCallback(
+    async (page = 1) => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const params = new URLSearchParams();
+        params.set("page", page);
+        params.set("limit", ITEMS_PER_PAGE);
 
-      if (appliedFilters.searchTerm.trim())
-        params.set("search", appliedFilters.searchTerm.trim());
-      if (appliedFilters.statusFilter !== "all")
-        params.set("status", appliedFilters.statusFilter);
-      if (appliedFilters.dateFrom)
-        params.set("dateFrom", appliedFilters.dateFrom);
-      if (appliedFilters.dateTo)
-        params.set("dateTo", appliedFilters.dateTo);
+        if (appliedFilters.searchTerm.trim())
+          params.set("search", appliedFilters.searchTerm.trim());
+        if (appliedFilters.statusFilter !== "all")
+          params.set("status", appliedFilters.statusFilter);
+        if (appliedFilters.dateFrom)
+          params.set("dateFrom", appliedFilters.dateFrom);
+        if (appliedFilters.dateTo) params.set("dateTo", appliedFilters.dateTo);
 
-      const res = await fetch(`${API_URL}/audit-log?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs || []);
-        setPagination(data.pagination || {
-          total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 1,
+        const res = await fetch(`${API_URL}/audit-log?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         });
-        setStats(data.stats || { total: 0, today: 0, uniqueUsers: 0, failed: 0 });
-        setError("");
-      } else {
-        setError("Failed to fetch audit logs.");
+
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data.logs || []);
+          setPagination(
+            data.pagination || {
+              total: 0,
+              page: 1,
+              limit: ITEMS_PER_PAGE,
+              totalPages: 1,
+            },
+          );
+          setStats(
+            data.stats || { total: 0, today: 0, uniqueUsers: 0, failed: 0 },
+          );
+          setError("");
+        } else {
+          setError("Failed to fetch audit logs.");
+        }
+      } catch (err) {
+        console.error("Error fetching audit logs:", err);
+        setError("Error connecting to server.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching audit logs:", err);
-      setError("Error connecting to server.");
-    } finally {
-      setLoading(false);
-    }
-  }, [appliedFilters]);
+    },
+    [appliedFilters],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -125,19 +165,29 @@ const AuditLog = () => {
   // EXPORT CSV
   // ===================================================
   const handleExportCSV = () => {
-    const cols = ["log_id", "username", "email", "event_name", "description", "status", "source", "ip_address", "created_at"];
-    const rows = logs.map(r =>
+    const cols = [
+      "log_id",
+      "username",
+      "email",
+      "event_name",
+      "description",
+      "status",
+      "source",
+      "ip_address",
+      "created_at",
+    ];
+    const rows = logs.map((r) =>
       [
         r.log_id,
-        r.username   || "",
-        r.email      || "",
+        r.username || "",
+        r.email || "",
         r.event_name,
         `"${(r.description || "").replace(/"/g, '""')}"`,
         r.status,
-        r.source     || "",
+        r.source || "",
         r.ip_address || "",
         r.created_at,
-      ].join(",")
+      ].join(","),
     );
     const csv = [cols.join(","), ...rows].join("\n");
     const a = document.createElement("a");
@@ -151,12 +201,12 @@ const AuditLog = () => {
   // ===================================================
   const formatDate = (dateString) => {
     if (!dateString) return "—";
-    const d     = new Date(dateString);
-    const day   = String(d.getDate()).padStart(2, "0");
+    const d = new Date(dateString);
+    const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year  = d.getFullYear();
+    const year = d.getFullYear();
     const hours = String(d.getHours()).padStart(2, "0");
-    const mins  = String(d.getMinutes()).padStart(2, "0");
+    const mins = String(d.getMinutes()).padStart(2, "0");
     return `${day}/${month}/${year} ${hours}:${mins}`;
   };
 
@@ -165,7 +215,6 @@ const AuditLog = () => {
   // ===================================================
   return (
     <div className="al-content-area">
-
       {/* Page header */}
       <div className="al-page-header">
         <div className="al-page-header-left">
@@ -173,7 +222,10 @@ const AuditLog = () => {
           <p>Track all system activity — who did what, and when</p>
         </div>
         <div className="al-header-actions">
-          <button className="al-btn al-btn-secondary" onClick={() => fetchLogs(currentPage)}>
+          <button
+            className="al-btn al-btn-secondary"
+            onClick={() => fetchLogs(currentPage)}
+          >
             <RefreshIcon /> Refresh
           </button>
           <button className="al-btn al-btn-primary" onClick={handleExportCSV}>
@@ -196,12 +248,16 @@ const AuditLog = () => {
         </div>
         <div className="al-stat-card">
           <div className="al-stat-label">Active users</div>
-          <div className="al-stat-value">{stats.uniqueUsers.toLocaleString()}</div>
+          <div className="al-stat-value">
+            {stats.uniqueUsers.toLocaleString()}
+          </div>
           <div className="al-stat-sub">unique users logged</div>
         </div>
         <div className="al-stat-card">
           <div className="al-stat-label">Failed attempts</div>
-          <div className="al-stat-value al-stat-danger">{stats.failed.toLocaleString()}</div>
+          <div className="al-stat-value al-stat-danger">
+            {stats.failed.toLocaleString()}
+          </div>
           <div className="al-stat-sub">failed events total</div>
         </div>
       </div>
@@ -209,16 +265,19 @@ const AuditLog = () => {
       {/* Filter bar */}
       <div className="al-filter-bar">
         <div className="al-filter-fields">
-
           <div className="al-filter-group">
             <label className="al-filter-label">Search</label>
             <input
               type="text"
               className="al-filter-input"
-              placeholder="Username, description, IP..."
+              placeholder="Event, Description, IP..."
               value={draft.searchTerm}
-              onChange={(e) => setDraft(f => ({ ...f, searchTerm: e.target.value }))}
-              onKeyDown={(e) => { if (e.key === "Enter") handleApplyFilters(); }}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, searchTerm: e.target.value }))
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleApplyFilters();
+              }}
             />
           </div>
 
@@ -227,7 +286,9 @@ const AuditLog = () => {
             <select
               className="al-filter-input"
               value={draft.statusFilter}
-              onChange={(e) => setDraft(f => ({ ...f, statusFilter: e.target.value }))}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, statusFilter: e.target.value }))
+              }
             >
               <option value="all">All Status</option>
               <option value="success">Success</option>
@@ -241,7 +302,9 @@ const AuditLog = () => {
               type="date"
               className="al-filter-input"
               value={draft.dateFrom}
-              onChange={(e) => setDraft(f => ({ ...f, dateFrom: e.target.value }))}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, dateFrom: e.target.value }))
+              }
             />
           </div>
 
@@ -251,10 +314,11 @@ const AuditLog = () => {
               type="date"
               className="al-filter-input"
               value={draft.dateTo}
-              onChange={(e) => setDraft(f => ({ ...f, dateTo: e.target.value }))}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, dateTo: e.target.value }))
+              }
             />
           </div>
-
         </div>
 
         <div className="al-filter-actions">
@@ -264,7 +328,11 @@ const AuditLog = () => {
           >
             Apply Filters
           </button>
-          <button className="al-reset-btn" onClick={handleResetFilters} title="Reset to defaults">
+          <button
+            className="al-reset-btn"
+            onClick={handleResetFilters}
+            title="Reset to defaults"
+          >
             ↺
           </button>
         </div>
@@ -275,7 +343,7 @@ const AuditLog = () => {
         {error && <div className="al-error-message">{error}</div>}
 
         {loading ? (
-          <div className="al-loading-message">Loading audit logs...</div>
+          <LoadingModal isOpen={true} message={"Loading audit logs..."} />
         ) : (
           <>
             <div className="al-table-container">
@@ -283,11 +351,11 @@ const AuditLog = () => {
                 <thead>
                   <tr>
                     <th className="al-col-id">Log ID</th>
-                    <th className="al-col-user">User</th>
+                    {!isRestricted && <th className="al-col-user">User</th>}
+                    {/* ← */}
                     <th className="al-col-event">Event</th>
                     <th className="al-col-desc">Description</th>
                     <th className="al-col-status">Status</th>
-                    {/* <th className="al-col-source">Source</th> */}
                     <th className="al-col-ip">IP Address</th>
                     <th className="al-col-time">Timestamp</th>
                   </tr>
@@ -295,40 +363,49 @@ const AuditLog = () => {
                 <tbody>
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "#6c757d" }}>
+                      <td
+  colSpan={isRestricted ? 6 : 7}
+  style={{ textAlign: "center", padding: "40px", color: "#6c757d" }}
+>
                         No audit log entries match your filters.
                       </td>
                     </tr>
                   ) : (
                     logs.map((log) => (
                       <tr key={log.log_id}>
+  <td className="al-col-id">
+    <span className="al-log-id">#{log.log_id.slice(0, 8)}</span>
+  </td>
 
-                        {/* Log ID */}
-                        <td className="al-col-id">
-                          <span className="al-log-id">#{log.log_id.slice(0, 8)}</span>
-                        </td>
 
                         {/* User — plain text, no avatar */}
-                        <td className="al-col-user">
-                          <div className="al-user-name">{log.username || "—"}</div>
-                          {log.email && (
-                            <div className="al-user-email">{log.email}</div>
-                          )}
-                        </td>
+                        {/* User — rank + full name, role underneath */}
+                        {!isRestricted && (
+  <td className="al-col-user">
+    <div className="al-user-name">{log.display_name || log.username || "—"}</div>
+    <div className="al-user-email">{log.role_name || "—"}</div>
+  </td>
+)}
 
                         {/* Event name */}
                         <td className="al-col-event">
-                          <span className="al-event-badge">{log.event_name}</span>
+                          <span className="al-event-badge">
+                            {log.event_name}
+                          </span>
                         </td>
 
                         {/* Description */}
                         <td className="al-col-desc">
-                          <span className="al-description">{log.description}</span>
+                          <span className="al-description">
+                            {log.description}
+                          </span>
                         </td>
 
                         {/* Status */}
                         <td className="al-col-status">
-                          <span className={`al-status-badge ${log.status === "success" ? "al-status-success" : "al-status-failed"}`}>
+                          <span
+                            className={`al-status-badge ${log.status === "success" ? "al-status-success" : "al-status-failed"}`}
+                          >
                             {log.status}
                           </span>
                         </td>
@@ -340,14 +417,17 @@ const AuditLog = () => {
 
                         {/* IP */}
                         <td className="al-col-ip">
-                          <span className="al-ip-address">{log.ip_address || "—"}</span>
+                          <span className="al-ip-address">
+                            {log.ip_address || "—"}
+                          </span>
                         </td>
 
                         {/* Timestamp — DD/MM/YYYY HH:MM */}
                         <td className="al-col-time">
-                          <span className="al-timestamp">{formatDate(log.created_at)}</span>
+                          <span className="al-timestamp">
+                            {formatDate(log.created_at)}
+                          </span>
                         </td>
-
                       </tr>
                     ))
                   )}
@@ -360,7 +440,10 @@ const AuditLog = () => {
               <div className="al-pagination">
                 <div className="al-pagination-info">
                   Showing {(pagination.page - 1) * pagination.limit + 1}–
-                  {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
+                  {Math.min(
+                    pagination.page * pagination.limit,
+                    pagination.total,
+                  )}{" "}
                   of {pagination.total} entries
                 </div>
                 <div className="al-pagination-controls">

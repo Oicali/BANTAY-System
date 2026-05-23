@@ -1484,102 +1484,88 @@ const EditUserModal = ({
             )}
 
             {/* ── Official Information — Barangay ── */}
-            {isBarangay && (
-              <div className="eum-form-section">
-                <h3 className="eum-form-section-title">
-                  Official Information (Barangay)
-                </h3>
-                <div className="eum-form-row">
-                  <div className="eum-form-group">
-                    <label className="eum-form-label">Role</label>
-                    <input
-                      type="text"
-                      value={formData.role || "Barangay"}
-                      className="eum-form-input"
-                      disabled
-                      style={{ background: "#f8f9fa", cursor: "not-allowed" }}
-                    />
-                  </div>
-                  <div
-                    className="eum-form-group"
-                    ref={(el) =>
-                      (errorRefs.current["assigned_barangay_code"] = el)
-                    }
-                  >
-                    <label className="eum-form-label">
-                      Assigned Barangay *
-                    </label>
-                    <select
-                      name="assigned_barangay_code"
-                      value={formData.assigned_barangay_code}
-                      onChange={(e) => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          assigned_barangay_code: e.target.value,
-                        }));
-                        clearError("assigned_barangay_code");
-                      }}
-                      disabled={isSubmitting}
-                      className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
-                    >
-                      {!formData.assigned_barangay_code && (
-                        <option value="">
-                          {loadingBacoorBarangays
-                            ? "Loading barangays..."
-                            : "Select Barangay"}
-                        </option>
-                      )}
-                      {loadingBacoorBarangays &&
-                        formData.assigned_barangay_code && (
-                          <option value={formData.assigned_barangay_code}>
-                            Loading barangays...
-                          </option>
-                        )}
-                      {CURRENT_BARANGAYS.map((b) => (
-                        <option key={b} value={b}>
-                          {b}
-                        </option>
-                      ))}
-                      <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
-                        {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
-                          <option key={i} value={b.value}>
-                            {b.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                    {errors.assigned_barangay_code && (
-                      <span className="eum-error-text">
-                        {errors.assigned_barangay_code}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="eum-form-row">
-                  <div
-                    className="eum-form-group eum-full-width"
-                    ref={(el) => (errorRefs.current["address_line"] = el)}
-                  >
-                    <label className="eum-form-label">
-                      House No. / Blk / Lot / Street / Subdivision
-                    </label>
-                    <input
-                      type="text"
-                      name="address_line"
-                      value={formData.address_line}
-                      onChange={handleChange}
-                      disabled={isSubmitting}
-                      maxLength="255"
-                      className="eum-form-input"
-                      placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
-                    />
-                    <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                      {formData.address_line.length}/255 characters
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+{isBarangay && (
+  <div className="eum-form-section">
+    <h3 className="eum-form-section-title">
+      Official Information (Barangay)
+    </h3>
+    <div className="eum-form-row">
+      {/* REPLACE the disabled role input with a real select */}
+      <div className="eum-form-group">
+        <label className="eum-form-label">Role *</label>
+        <select
+          name="role"
+          value={formData.role}
+          onChange={handleChange}
+          disabled={isSubmitting}
+          className="eum-form-input"
+        >
+          <option value="Brgy. Councilor">Brgy. Councilor</option>
+          <option value="Brgy. Tanod">Brgy. Tanod</option>
+        </select>
+      </div>
+      <div
+        className="eum-form-group"
+        ref={(el) => (errorRefs.current["assigned_barangay_code"] = el)}
+      >
+        <label className="eum-form-label">Assigned Barangay *</label>
+        <select
+          name="assigned_barangay_code"
+          value={formData.assigned_barangay_code}
+          onChange={(e) => {
+            setFormData((prev) => ({
+              ...prev,
+              assigned_barangay_code: e.target.value,
+            }));
+            clearError("assigned_barangay_code");
+          }}
+          disabled={isSubmitting}
+          className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
+        >
+          {!formData.assigned_barangay_code && (
+            <option value="">Select Barangay</option>
+          )}
+          {CURRENT_BARANGAYS.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+          <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+            {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+              <option key={i} value={b.value}>{b.label}</option>
+            ))}
+          </optgroup>
+        </select>
+        {errors.assigned_barangay_code && (
+          <span className="eum-error-text">
+            {errors.assigned_barangay_code}
+          </span>
+        )}
+      </div>
+    </div>
+    <div className="eum-form-row">
+      <div
+        className="eum-form-group eum-full-width"
+        ref={(el) => (errorRefs.current["address_line"] = el)}
+      >
+        <label className="eum-form-label">
+          House No. / Blk / Lot / Street / Subdivision
+        </label>
+        <input
+          type="text"
+          name="address_line"
+          value={formData.address_line}
+          onChange={handleChange}
+          disabled={isSubmitting}
+          maxLength="255"
+          className="eum-form-input"
+          placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
+        />
+        <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+          {formData.address_line.length}/255 characters
+        </span>
+      </div>
+    </div>
+  </div>
+)}
 
             {/* Server error banner */}
             {serverError && (

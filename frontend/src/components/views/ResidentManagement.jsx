@@ -3,6 +3,7 @@ import "./ResidentManagement.css";
 import ImportResidentModal from "../modals/ImportResidentModal";
 import LoadingModal from "../modals/LoadingModal";
 import EditResidentModal from "../modals/EditResidentModal";
+import ViewResidentModal from "../modals/ViewResidentModal";
 const API_URL = `${import.meta.env.VITE_API_URL}/residents`;
 const ITEMS_PER_PAGE = 15;
 
@@ -92,6 +93,12 @@ const getAvatarColor = (name) => {
 };
 
 function ResidentManagement() {
+  const rawUser = localStorage.getItem("user");
+  const currentUser = rawUser ? JSON.parse(rawUser) : null;
+  const roleName = currentUser?.role_name || currentUser?.role || "";
+  const isCouncilor = roleName === "Brgy. Councilor";
+  const isTanod = roleName === "Brgy. Tanod";
+  const [viewResident, setViewResident] = useState(null);
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -261,51 +268,58 @@ function ResidentManagement() {
           </div>
         </div>
         <div className="rm-page-header-right">
-          <button
-            className="rm-btn rm-btn-secondary"
-            style={
-              showRemoved
-                ? { background: "rgba(220,38,38,0.2)", borderColor: "#dc2626" }
-                : {}
-            }
-            onClick={() => setShowRemoved((v) => !v)}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {isCouncilor && (
+            <button
+              className="rm-btn rm-btn-secondary"
+              style={
+                showRemoved
+                  ? {
+                      background: "rgba(220,38,38,0.2)",
+                      borderColor: "#dc2626",
+                    }
+                  : {}
+              }
+              onClick={() => setShowRemoved((v) => !v)}
             >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6M14 11v6" />
-            </svg>
-            {showRemoved ? "Hide Removed" : "Show Removed"}
-          </button>
-          <button
-            className="rm-btn rm-btn-secondary"
-            onClick={() => setShowImport(true)}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
+              {showRemoved ? "Hide Removed" : "Show Removed"}
+            </button>
+          )}
+          {isCouncilor && (
+            <button
+              className="rm-btn rm-btn-secondary"
+              onClick={() => setShowImport(true)}
             >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Import Residents
-          </button>
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Import Residents
+            </button>
+          )}
         </div>
       </div>
 
@@ -659,38 +673,62 @@ function ResidentManagement() {
                         )}
                       </td>
                       <td style={{ display: "flex", gap: 6 }}>
-                        <button
-                          className="rm-action-btn rm-action-edit"
-                          onClick={() => setEditResident(r)}
-                        >
-                          <svg
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                          Edit
-                        </button>
-                        <button
-                          className="rm-action-btn rm-action-danger"
-                          onClick={() =>
-                            setConfirmDelete({
-                              show: true,
-                              id: r.resident_id,
-                              name: `${r.first_name} ${r.last_name}`,
-                            })
-                          }
-                        >
-                          <DeleteIcon /> Remove
-                        </button>
-                      </td>
+  {isCouncilor ? (
+    <>
+      <button
+        className="rm-action-btn rm-action-edit"
+        onClick={() => setEditResident(r)}
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+        Edit
+      </button>
+      <button
+        className="rm-action-btn rm-action-danger"
+        onClick={() =>
+          setConfirmDelete({
+            show: true,
+            id: r.resident_id,
+            name: `${r.first_name} ${r.last_name}`,
+          })
+        }
+      >
+        <DeleteIcon /> Remove
+      </button>
+    </>
+  ) : (
+    <button
+      className="rm-action-btn rm-action-view"
+      onClick={() => setViewResident(r)}
+    >
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      View
+    </button>
+  )}
+</td>
                     </tr>
                   );
                 })
@@ -788,6 +826,7 @@ function ResidentManagement() {
                 ) : (
                   removedResidents.map((r) => {
                     const fullName = `${r.first_name} ${r.last_name}`;
+                    const avatarColor = getAvatarColor(fullName); // ← ADD THIS
                     return (
                       <tr key={r.resident_id} style={{ opacity: 0.75 }}>
                         <td>
@@ -933,6 +972,13 @@ function ResidentManagement() {
             setEditResident(null);
             showToast("Resident updated successfully!");
           }}
+        />
+      )}
+
+      {viewResident && (
+        <ViewResidentModal
+          resident={viewResident}
+          onClose={() => setViewResident(null)}
         />
       )}
       {/* ── TOAST ── */}

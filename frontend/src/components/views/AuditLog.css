@@ -273,14 +273,15 @@
 }
 
 /* ── Column widths ── */
-.al-col-id     { width: 90px; }
-.al-col-user   { width: 160px; }
-.al-col-event  { width: 140px; }
-.al-col-desc   { min-width: 240px; }
+/* ── Column widths ── */
+.al-col-id     { width: 110px; }
+.al-col-user   { width: 200px; }
+.al-col-event  { width: 160px; }
+.al-col-desc   { min-width: 160px; max-width: 320px; }
 .al-col-status { width: 90px; }
 .al-col-source { width: 110px; }
-.al-col-ip     { width: 130px; }
-.al-col-time   { width: 145px; }
+.al-col-ip     { width: 140px; }
+.al-col-time   { width: 150px; }
 
 /* ── Log ID ── */
 .al-log-id {
@@ -355,7 +356,7 @@
 
 /* ── Timestamp ── */
 .al-timestamp {
-  font-family: "DM Mono", monospace;
+  font-family: "DM Sans", monospace;
   font-size: 12px;
   color: var(--gray-700, #495057);
   white-space: nowrap;

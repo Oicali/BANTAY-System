@@ -48,33 +48,33 @@ class UserValidator {
   // VALIDATE REQUIRED FIELDS FOR REGISTRATION
   // =====================================================
   static validateRequiredFields(data) {
-  const baseRequired = [
-    "userType",
-    "email",
-    "firstName",
-    "lastName",
-    "phone",
-    "role",
-    "gender",
-    "dateOfBirth",
-    "regionCode",
-    "provinceCode",
-    "municipalityCode",
-  ];
+    const baseRequired = [
+      "userType",
+      "email",
+      "firstName",
+      "lastName",
+      "phone",
+      "role",
+      "gender",
+      "dateOfBirth",
+      "regionCode",
+      "provinceCode",
+      "municipalityCode",
+    ];
 
-  const missing = baseRequired.filter((field) => !data[field]);
+    const missing = baseRequired.filter((field) => !data[field]);
 
-  // Accept either 'barangayCode' or 'barangay' for the barangay field
-  const hasBarangay = data.barangayCode || data.barangay;
-  if (!hasBarangay) {
-    missing.push("barangayCode");
+    // Accept either 'barangayCode' or 'barangay' for the barangay field
+    const hasBarangay = data.barangayCode || data.barangay;
+    if (!hasBarangay) {
+      missing.push("barangayCode");
+    }
+
+    if (missing.length > 0) {
+      return `Missing required fields: ${missing.join(", ")}`;
+    }
+    return null;
   }
-
-  if (missing.length > 0) {
-    return `Missing required fields: ${missing.join(", ")}`;
-  }
-  return null;
-}
 
   // =====================================================
   // VALIDATE PHONE AND ALTERNATE PHONE DIFFERENCE
@@ -138,6 +138,7 @@ class UserValidator {
   // =====================================================
   // VALIDATE ROLE (DB Check)
   // =====================================================
+  // In validateRole — this already handles it correctly:
   static async validateRole(role, userType, client) {
     if (!role) return "Role is required";
     const result = await client.query(
@@ -145,7 +146,7 @@ class UserValidator {
       [role, userType],
     );
     if (result.rows.length === 0) {
-      return `Invalid role '${role}' for ${userType} user. Valid roles: ${userType === "police" ? "Administrator, Investigator, Patrol" : "Barangay"}`;
+      return `Invalid role '${role}' for ${userType} user.`;
     }
     return null;
   }
