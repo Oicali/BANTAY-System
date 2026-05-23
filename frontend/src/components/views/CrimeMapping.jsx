@@ -2562,7 +2562,10 @@ function CrimeMapping() {
                         Crime Types Description
                       </div>
 
-                      {LEGEND_ITEMS.map((item) => {
+                      {LEGEND_ITEMS.filter(item =>
+  !appliedFilters.incident_types.length ||
+  appliedFilters.incident_types.includes(item.label.toUpperCase())
+).map((item) => {
                         const name = item.label;
                         const color =
                           INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
@@ -2734,7 +2737,10 @@ function CrimeMapping() {
                         </div>
 
                         {/* Not heatmap mode */}
-                        {LEGEND_ITEMS.map((item) => {
+                        {LEGEND_ITEMS.filter(item =>
+  !appliedFilters.incident_types.length ||
+  appliedFilters.incident_types.includes(item.label.toUpperCase())
+).map((item) => {
                           const name = item.label;
                           const color =
                             INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";

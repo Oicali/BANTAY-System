@@ -147,6 +147,30 @@ const NotifToast = ({ notif, onDone }) => {
   );
 };
 
+const formatBarangayLabel = (name) => {
+  if (!name) return "";
+  const ROMAN = new Set([
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+  ]);
+  return name.toLowerCase().replace(/\b\w+/g, (word) => {
+    const upper = word.toUpperCase();
+    if (ROMAN.has(upper)) return upper;
+    if (upper === "P" || upper === "F") return upper;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  });
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 
 const TopBar = ({ onMenuClick }) => {
@@ -813,7 +837,10 @@ const TopBar = ({ onMenuClick }) => {
             <div className="user-info">
               <div className="user-name">{getDisplayName()}</div>
               <div className="user-role">
-                {profileData?.role || user?.role || "role"}
+                {profileData?.user_type === "barangay" &&
+                profileData?.barangay_code
+                  ? `${profileData?.role || user?.role } - ${formatBarangayLabel(profileData.barangay_code)}`
+                  : profileData?.role || user?.role}
               </div>
             </div>
             <div className="user-avatar">

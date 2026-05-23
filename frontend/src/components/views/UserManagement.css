@@ -379,9 +379,14 @@ body {
   border-color: #475569;
 }
 
-.um-role-chairman {
-  color: #6b21a8;
-  border-color: #9333ea;
+.um-role-councilor {
+  color: #0369a1;
+  border-color: #0ea5e9;
+}
+
+.um-role-tanod {
+  color: #b45309;
+  border-color: #f59e0b;
 }
 
 /* === STATUS BADGES === */
