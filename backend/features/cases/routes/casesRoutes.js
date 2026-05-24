@@ -3,12 +3,14 @@ const router = require("express").Router();
 const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 const { createCase, assignInvestigator, updateStatus, updatePriority, getCases, getCaseById, addNote, editNote, deleteNote, restoreNote, getStatistics } = require("../controllers/casesController");
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== "Administrator") return res.status(403).json({ success: false, message: "Access denied" });
+  if (!["Administrator", "Technical Administrator"].includes(req.user.role))
+    return res.status(403).json({ success: false, message: "Access denied" });
   next();
 };
 
 const requireAdminOrInvestigator = (req, res, next) => {
-  if (!["Administrator", "Investigator"].includes(req.user.role)) return res.status(403).json({ success: false, message: "Access denied" });
+  if (!["Administrator", "Technical Administrator", "Investigator"].includes(req.user.role))
+    return res.status(403).json({ success: false, message: "Access denied" });
   next();
 };
 
