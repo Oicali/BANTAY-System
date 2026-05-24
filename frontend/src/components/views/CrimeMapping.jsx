@@ -26,26 +26,22 @@ const INCIDENT_COLORS = {
 
 const CRIME_ICONS = {
   MURDER: ({ color, size = 22 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke={color}
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    {/* Blade */}
-    <path d="M12 2 L15 8 L12 22 L9 8 Z" fill={color} fillOpacity="0.25" />
-    {/* Center ridge */}
-    <line x1="12" y1="2" x2="12" y2="18" />
-    {/* Guard / crossguard */}
-    <line x1="7" y1="8" x2="17" y2="8" />
-    {/* Tip highlight */}
-    <path d="M10 5 L12 2 L14 5" />
-  </svg>
-),
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 2 L15 8 L12 22 L9 8 Z" fill={color} fillOpacity="0.25" />
+      <line x1="12" y1="2" x2="12" y2="18" />
+      <line x1="7" y1="8" x2="17" y2="8" />
+      <path d="M10 5 L12 2 L14 5" />
+    </svg>
+  ),
   HOMICIDE: ({ color, size = 22 }) => (
     <svg
       width={size}
@@ -98,12 +94,20 @@ const CRIME_ICONS = {
     </svg>
   ),
   ROBBERY: ({ color, size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 10 C2 7 5 5 8 7 C9.5 8 10.5 8 12 8 C13.5 8 14.5 8 16 7 C19 5 22 7 22 10 C22 13 19 14 16 13 C14.5 12.5 13.5 12 12 12 C10.5 12 9.5 12.5 8 13 C5 14 2 13 2 10 Z"/>
-    <circle cx="7.5" cy="10" r="1.5" fill={color}/>
-    <circle cx="16.5" cy="10" r="1.5" fill={color}/>
-  </svg>
-),
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="2" x2="12" y2="22" />
+      <path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
   THEFT: ({ color, size = 22 }) => (
     <svg
       width={size}
@@ -117,7 +121,7 @@ const CRIME_ICONS = {
     >
       <path d="M6 9V7a6 6 0 0 1 12 0v2" />
       <rect x="3" y="9" width="18" height="12" rx="3" />
-      <path d="M9 14a3 3 0 0 0 6 0" />
+      <circle cx="12" cy="15" r="2" />
     </svg>
   ),
   "CARNAPPING - MC": ({ color, size = 22 }) => (
@@ -131,12 +135,16 @@ const CRIME_ICONS = {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
+      {/* Motorcycle side view */}
       <circle cx="5.5" cy="17" r="2.5" />
       <circle cx="18.5" cy="17" r="2.5" />
+      {/* Body */}
       <path d="M8 17h7" />
-      <path d="M10 8h2l2 4H9l-1 2" />
-      <path d="M14 8h3l1 4" />
-      <path d="M7 10l-2 2" />
+      <path d="M5.5 14.5L8 10h5l3 4.5" />
+      {/* Handlebars */}
+      <path d="M13 10l1-3h3" />
+      {/* Seat */}
+      <path d="M9 10h4" />
     </svg>
   ),
   "CARNAPPING - MV": ({ color, size = 22 }) => (
@@ -150,11 +158,14 @@ const CRIME_ICONS = {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M5 17H3V9l2.5-5h11L19 9v8h-2" />
-      <circle cx="7.5" cy="17" r="2" />
-      <circle cx="16.5" cy="17" r="2" />
-      <path d="M3 13h18" />
-      <path d="M5.5 9h13" />
+      {/* Car side view */}
+      <path d="M3 11l2-5h14l2 5" />
+      <rect x="2" y="11" width="20" height="5" rx="1" />
+      <circle cx="6.5" cy="16" r="2" />
+      <circle cx="17.5" cy="16" r="2" />
+      {/* Windows */}
+      <path d="M5.5 11l1.5-3h10l1.5 3" />
+      <line x1="12" y1="8" x2="12" y2="11" />
     </svg>
   ),
   "SPECIAL COMPLEX CRIME": ({ color, size = 22 }) => (
@@ -852,6 +863,7 @@ function CrimeMapping() {
   const [showBrgyTooltip, setShowBrgyTooltip] = useState(true);
   const [showMapOptions, setShowMapOptions] = useState(false);
   const [showPins, setShowPins] = useState(true);
+  const [showPinIcons, setShowPinIcons] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [incidenceTooltip, setIncidenceTooltip] = useState({
     visible: false,
@@ -866,20 +878,19 @@ function CrimeMapping() {
 
   // Helper to avoid repetition — define once above your return()
   const LegendPin = ({ color, incidentType }) => {
-    const IconComp = CRIME_ICONS[incidentType?.toUpperCase()];
-    if (!IconComp)
-      return (
-        <div className="crmap-legend-pin-wrap">
-          <div className="crmap-legend-pin-body" style={{ background: color }}>
-            <div className="crmap-legend-pin-inner" />
-          </div>
-          <div
-            className="crmap-legend-pin-tip"
-            style={{ borderTopColor: color }}
-          />
+    const IconComp = showPinIcons && CRIME_ICONS[incidentType?.toUpperCase()];
+    if (IconComp) return <IconComp color={color} size={16} />;
+    return (
+      <div className="crmap-legend-pin-wrap">
+        <div className="crmap-legend-pin-body" style={{ background: color }}>
+          <div className="crmap-legend-pin-inner" />
         </div>
-      );
-    return <IconComp color={color} size={20} />;
+        <div
+          className="crmap-legend-pin-tip"
+          style={{ borderTopColor: color }}
+        />
+      </div>
+    );
   };
 
   const totalBarangays = geoJSONData
@@ -1874,20 +1885,19 @@ function CrimeMapping() {
               }}
             >
               <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
-  <Layer
-    id="world-mask-fill"
-    type="fill"
-    paint={{
-      "fill-color": heatmapMode ? "#000000" : "#e5e7eb",
-      "fill-opacity": heatmapMode ? 0.6 : 0.55,
-    }}
-  />
-</Source>
+                <Layer
+                  id="world-mask-fill"
+                  type="fill"
+                  paint={{
+                    "fill-color": heatmapMode ? "#000000" : "#e5e7eb",
+                    "fill-opacity": heatmapMode ? 0.6 : 0.55,
+                  }}
+                />
+              </Source>
 
-
-{/* Use this if lighter mask for heatmap */}
-{/* from #e5e7eb to #e5e7eb */}
-{/* {!heatmapMode && (
+              {/* Use this if lighter mask for heatmap */}
+              {/* from #e5e7eb to #e5e7eb */}
+              {/* {!heatmapMode && (
   <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
     <Layer
       id="world-mask-fill"
@@ -1950,8 +1960,8 @@ function CrimeMapping() {
                             "#6b7280",
                           borderRadius: "50% 50% 50% 0",
                           transform: "rotate(-45deg)",
-                          width: 34, // was 28
-                          height: 34, // was 28
+                          width: 27, // was 28
+                          height: 27, // was 28
                           border: "2.5px solid rgba(255,255,255,0.9)",
                           display: "flex",
                           alignItems: "center",
@@ -1969,6 +1979,7 @@ function CrimeMapping() {
                         >
                           {(() => {
                             const IconComp =
+                              showPinIcons &&
                               CRIME_ICONS[pin.incident_type?.toUpperCase()];
                             return IconComp ? (
                               <IconComp
@@ -2426,6 +2437,11 @@ function CrimeMapping() {
                         toggle: () => setShowPins((v) => !v),
                       },
                       {
+                        label: "Pin Icons",
+                        state: showPinIcons,
+                        toggle: () => setShowPinIcons((v) => !v),
+                      },
+                      {
                         label: "Barangay Labels",
                         state: showLabels,
                         toggle: () => setShowLabels((v) => !v),
@@ -2562,10 +2578,13 @@ function CrimeMapping() {
                         Crime Types Description
                       </div>
 
-                      {LEGEND_ITEMS.filter(item =>
-  !appliedFilters.incident_types.length ||
-  appliedFilters.incident_types.includes(item.label.toUpperCase())
-).map((item) => {
+                      {LEGEND_ITEMS.filter(
+                        (item) =>
+                          !appliedFilters.incident_types.length ||
+                          appliedFilters.incident_types.includes(
+                            item.label.toUpperCase(),
+                          ),
+                      ).map((item) => {
                         const name = item.label;
                         const color =
                           INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
@@ -2737,10 +2756,13 @@ function CrimeMapping() {
                         </div>
 
                         {/* Not heatmap mode */}
-                        {LEGEND_ITEMS.filter(item =>
-  !appliedFilters.incident_types.length ||
-  appliedFilters.incident_types.includes(item.label.toUpperCase())
-).map((item) => {
+                        {LEGEND_ITEMS.filter(
+                          (item) =>
+                            !appliedFilters.incident_types.length ||
+                            appliedFilters.incident_types.includes(
+                              item.label.toUpperCase(),
+                            ),
+                        ).map((item) => {
                           const name = item.label;
                           const color =
                             INCIDENT_COLORS[name?.toUpperCase()] || "#6b7280";
