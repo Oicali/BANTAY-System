@@ -13,6 +13,7 @@ export default function Sidebar({
   onClose,
 }) {
   const role = localStorage.getItem("role");
+  const isAdmin = role === "Administrator" || role === "Technical Administrator";
   const allowedTabs = roleAccess[role] || [];
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -66,7 +67,7 @@ export default function Sidebar({
                     strokeWidth="2"
                     dangerouslySetInnerHTML={{ __html: item.icon }}
                   />
-                  {item.label}
+                  {(!isAdmin && item.nonAdminLabel) ? item.nonAdminLabel : item.label}
                 </NavLink>
               ));
             }
@@ -103,7 +104,7 @@ export default function Sidebar({
                         strokeWidth="2"
                         dangerouslySetInnerHTML={{ __html: item.icon }}
                       />
-                      {item.label}
+                      {(!isAdmin && item.nonAdminLabel) ? item.nonAdminLabel : item.label}
                     </NavLink>
                   ))}
               </div>
