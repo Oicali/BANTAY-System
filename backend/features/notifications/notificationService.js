@@ -26,7 +26,7 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
   token: fcmToken,
   notification: { title, body: message }, // ← FCM handles display when backgrounded
   data: { title, body: message, linkTo: linkTo || "" },
-  android: { priority: "high" },
+  
   apns: {
     payload: { aps: { sound: "default", badge: 1 } },
   },
