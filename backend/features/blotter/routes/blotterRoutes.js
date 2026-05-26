@@ -24,7 +24,7 @@ const {
   deleteAttachment,
 } = require("../controllers/attachmentController");
 
-const imageUpload = require("../middleware/imageUploadMiddleware");
+const attachmentUpload = require("../middleware/attachmentUpload");
 
 router.post("/", authenticate, createBlotter);
 router.get("/", authenticate, getAllBlotters);
@@ -49,9 +49,36 @@ router.put("/:id", authenticate, updateBlotter);
 router.delete("/:id", authenticate, deleteBlotter);
 router.put("/:id/restore", authenticate, restoreBlotter);
 router.get("/:id/attachments", authenticate, getAttachments);
-router.post("/:id/attachments", authenticate, imageUpload.single("file"), uploadAttachment);
-router.delete("/:id/attachments/:attachmentId", authenticate, deleteAttachment);
 
+router.post(
+  "/:id/attachments",
+  authenticate,
+  (req, res, next) => {
+    attachmentUpload.single("file")(req, res, (err) => {
+      if (err) {
+        // Multer errors (file too large, wrong type, etc.)
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({
+            success: false,
+            message: "File too large. Photos must be under 5MB and videos under 50MB.",
+          });
+        }
+        return res.status(400).json({
+          success: false,
+          message: err.message || "File upload failed.",
+        });
+      }
+      next();
+    });
+  },
+  uploadAttachment
+);
+
+router.delete(
+  "/:id/attachments/:attachmentId",
+  authenticate,
+  deleteAttachment
+);
 // ✅ This one is fine where it is since /:id/remind won't conflict
 router.post("/:id/remind", authenticate, remindPatrols);
 
