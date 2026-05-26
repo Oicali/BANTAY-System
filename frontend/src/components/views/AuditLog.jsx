@@ -79,7 +79,7 @@ const AuditLog = () => {
   // Near the top of the AuditLog component, after the state declarations
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
-  const RESTRICTED_ROLES = ["Brgy. Councilor", , "Brgy. Tanod", "Investigator", "Patrol"];
+  const RESTRICTED_ROLES = ["Brgy. Captain", "Brgy. Official", "Brgy. Tanod", "Investigator", "Patrol"];
   const isRestricted = RESTRICTED_ROLES.includes(currentUser?.role);
 
   // ===================================================

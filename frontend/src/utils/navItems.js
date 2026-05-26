@@ -65,6 +65,24 @@ export const navItems = [
       },
     ],
   },
+
+  {
+    section: "Barangay",
+    items: [
+      {
+        key: "brgy-report",
+        label: "Submit Report",
+        path: "/brgy-report",
+        icon: `<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>`,
+      },
+      {
+        key: "resident-management",
+        label: "Residents",
+        path: "/resident-management",
+        icon: `<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="21" x2="23" y2="19"/><line x1="19" y1="21" x2="19" y2="17"/><path d="M16 3.13a4 4 0 010 7.75"/>`,
+      },
+    ],
+  },
   {
     section: "Users",
     items: [
@@ -89,21 +107,5 @@ export const navItems = [
     ],
   },
   // Add after the "Users" section:
-  {
-    section: "Barangay",
-    items: [
-      {
-        key: "brgy-report",
-        label: "Submit Report",
-        path: "/brgy-report",
-        icon: `<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>`,
-      },
-      {
-        key: "resident-management",
-        label: "Residents",
-        path: "/resident-management",
-        icon: `<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="21" x2="23" y2="19"/><line x1="19" y1="21" x2="19" y2="17"/><path d="M16 3.13a4 4 0 010 7.75"/>`,
-      },
-    ],
-  },
+  
 ];
