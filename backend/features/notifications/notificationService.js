@@ -24,7 +24,7 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
   try {
     const result = await admin.messaging().send({
   token: fcmToken,
-  notification: { title, body: message }, // ← FCM handles display when backgrounded
+  // notification: { title, body: message }, // ← FCM handles display when backgrounded
   data: { title, body: message, linkTo: linkTo || "" },
   
   apns: {
