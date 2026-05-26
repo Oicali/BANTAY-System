@@ -24,11 +24,13 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
   try {
     const result = await admin.messaging().send({
       token: fcmToken,
-      notification: {
+      // ❌ Remove this:
+      // notification: { title, body: message },
+
+      // ✅ Data only:
+      data: {
         title,
         body: message,
-      },
-      data: {
         linkTo: linkTo || '',
       },
       android: {
