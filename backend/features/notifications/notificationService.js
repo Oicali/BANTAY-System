@@ -4,22 +4,27 @@ const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.log('✅ Firebase init from environment variable');
+    console.log("✅ Firebase init from environment variable");
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
   } else {
-    console.log('⚠️ Firebase init from local file');
+    console.log("⚠️ Firebase init from local file");
     admin.initializeApp({
       credential: admin.credential.cert(
-        require("../../firebase-service-account.json")
+        require("../../firebase-service-account.json"),
       ),
     });
   }
 }
 
-const sendPushNotification = async (fcmToken, title, message, linkTo = null) => {
+const sendPushNotification = async (
+  fcmToken,
+  title,
+  message,
+  linkTo = null,
+) => {
   if (!fcmToken) return;
   try {
     const result = await admin.messaging().send({
@@ -31,52 +36,64 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
       data: {
         title,
         body: message,
-        linkTo: linkTo || '',
+        linkTo: linkTo || "",
       },
       android: {
-        priority: 'high',
+        priority: "high",
         ttl: 60 * 60 * 24,
-        notification: {
-          channelId: 'default',
-          sound: 'default',
-          notificationPriority: 'PRIORITY_HIGH',
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
+        // nothing else
       },
       apns: {
         headers: {
-          'apns-priority': '10',
-          'apns-push-type': 'alert',
+          "apns-priority": "10",
+          "apns-push-type": "alert",
         },
         payload: {
           aps: {
-            sound: 'default',
+            sound: "default",
             badge: 1,
-            'content-available': 1,
+            "content-available": 1,
           },
         },
       },
     });
-    console.log('FCM send result:', result);
+    console.log("FCM send result:", result);
   } catch (err) {
     console.error("FCM send error:", err.message);
   }
 };
 
-const createNotification = async ({ recipientId, senderId = null, senderName = null, senderAvatar = null, type, title, message, linkTo = null }) => {
+const createNotification = async ({
+  recipientId,
+  senderId = null,
+  senderName = null,
+  senderAvatar = null,
+  type,
+  title,
+  message,
+  linkTo = null,
+}) => {
   try {
     await pool.query(
       `INSERT INTO notifications 
         (recipient_user_id, sender_user_id, sender_name, sender_avatar, type, title, message, link_to)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [recipientId, senderId, senderName, senderAvatar, type, title, message, linkTo]
+      [
+        recipientId,
+        senderId,
+        senderName,
+        senderAvatar,
+        type,
+        title,
+        message,
+        linkTo,
+      ],
     );
 
     // Send push notification if user has a token
     const userResult = await pool.query(
       `SELECT push_token FROM users WHERE user_id = $1`,
-      [recipientId]
+      [recipientId],
     );
     const pushToken = userResult.rows[0]?.push_token;
     if (pushToken) {
@@ -93,12 +110,14 @@ const notifyAllByRole = async (roles, payload, excludeUserId = null) => {
       `SELECT u.user_id FROM users u
        JOIN roles r ON u.role_id = r.role_id
        WHERE r.role_name = ANY($1) AND u.status = 'verified'`,
-      [roles]
+      [roles],
     );
     await Promise.all(
       result.rows
         .filter((row) => !excludeUserId || row.user_id !== excludeUserId)
-        .map((row) => createNotification({ ...payload, recipientId: row.user_id }))
+        .map((row) =>
+          createNotification({ ...payload, recipientId: row.user_id }),
+        ),
     );
   } catch (err) {
     console.error("notifyAllByRole error:", err.message);
@@ -113,7 +132,7 @@ const getResponderForReferral = async (blotterId) => {
        WHERE type = 'REFERRAL_RESPONDED' 
          AND link_to = $1
        ORDER BY created_at DESC LIMIT 1`,
-      [`/e-blotter?referral=${blotterId}`]
+      [`/e-blotter?referral=${blotterId}`],
     );
     return result.rows[0] || null;
   } catch {
@@ -142,9 +161,9 @@ const getRespondersForReferrals = async (blotterIds) => {
        WHERE n.type = 'REFERRAL_RESPONDED'
          AND n.link_to = ANY($1::text[])
        ORDER BY n.link_to, n.created_at DESC`,
-      [blotterIds.map((id) => `/e-blotter?referral=${id}`)]
+      [blotterIds.map((id) => `/e-blotter?referral=${id}`)],
     );
-    
+
     const map = {};
     for (const row of result.rows) {
       const match = row.link_to.match(/referral=(\d+)$/);
@@ -156,7 +175,7 @@ const getRespondersForReferrals = async (blotterIds) => {
           last_name: row.last_name,
           profile_picture: row.profile_picture,
           rank_abbreviation: row.rank_abbreviation,
-          created_at: row.created_at
+          created_at: row.created_at,
         };
       }
     }
@@ -167,9 +186,9 @@ const getRespondersForReferrals = async (blotterIds) => {
   }
 };
 
-module.exports = { 
-  createNotification, 
-  notifyAllByRole, 
+module.exports = {
+  createNotification,
+  notifyAllByRole,
   getResponderForReferral,
   getRespondersForReferrals,
 };
