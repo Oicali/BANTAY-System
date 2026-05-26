@@ -32,13 +32,20 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
         linkTo: linkTo || '',
       },
       android: {
-        priority: 'high',
+        priority: 'high',          // ← this is critical
+        ttl: 60 * 60 * 24,        // ← 24 hour TTL
         notification: {
           channelId: 'default',
           sound: 'default',
+          priority: 'high',        // ← also set here
+          defaultSound: true,
+          notificationPriority: 'PRIORITY_HIGH',
         },
       },
       apns: {
+        headers: {
+          'apns-priority': '10',   // ← high priority for iOS
+        },
         payload: {
           aps: {
             sound: 'default',
