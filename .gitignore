@@ -29,3 +29,6 @@ Thumbs.db
 
 #ca.pem
 ca.pem
+
+# Firebase
+firebase-service-account.json

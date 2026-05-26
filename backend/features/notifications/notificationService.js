@@ -1,25 +1,55 @@
 // backend\features\notifications\notificationService.js
-
 const pool = require("../../config/database");
+const admin = require("firebase-admin");
 
-const sendPushNotification = async (pushToken, title, message, linkTo = null) => {
-  if (!pushToken) return;
-  try {
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-  to: pushToken,
-  title,
-  body: message,
-  sound: "default",
-  priority: "high",
-  channelId: "default",
-  data: { linkTo: linkTo || null },
-}),
+if (!admin.apps.length) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Production — from environment variable
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
     });
+  } else {
+    // Local development — from file (gitignored)
+    admin.initializeApp({
+      credential: admin.credential.cert(
+        require("../../firebase-service-account.json")
+      ),
+    });
+  }
+}
+
+const sendPushNotification = async (fcmToken, title, message, linkTo = null) => {
+  if (!fcmToken) return;
+  try {
+    const result = await admin.messaging().send({
+      token: fcmToken,
+      notification: {
+        title,
+        body: message,
+      },
+      data: {
+        linkTo: linkTo || '',
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'default',
+          sound: 'default',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    });
+    console.log('FCM send result:', result);
   } catch (err) {
-    console.error("Push send error:", err.message);
+    console.error("FCM send error:", err.message);
   }
 };
 
