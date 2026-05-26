@@ -1500,8 +1500,8 @@ const EditUserModal = ({
           disabled={isSubmitting}
           className="eum-form-input"
         >
-          <option value="Brgy. Councilor">Brgy. Councilor</option>
-          <option value="Brgy. Tanod">Brgy. Tanod</option>
+          <option value="Brgy. Captain">Brgy. Captain</option>
+          <option value="Brgy. Official">Brgy. Official</option>
         </select>
       </div>
       <div

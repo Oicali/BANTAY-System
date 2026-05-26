@@ -63,6 +63,6 @@ export const roleAccess = {
   // BARANGAY ROLES
   // ============================================
   
-  "Brgy. Councilor": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
-  "Brgy. Tanod": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
+  "Brgy. Captain": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
+  "Brgy. Official": ["dashboard", "crime-mapping", "brgy-report", "resident-management", "audit-log", "profile-settings"],
 };

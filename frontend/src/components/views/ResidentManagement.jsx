@@ -96,8 +96,8 @@ function ResidentManagement() {
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const roleName = currentUser?.role_name || currentUser?.role || "";
-  const isCouncilor = roleName === "Brgy. Councilor";
-  const isTanod = roleName === "Brgy. Tanod";
+  const isCaptain = roleName === "Brgy. Captain";
+  const isTanod = roleName === "Brgy. Official";
   const [viewResident, setViewResident] = useState(null);
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -268,7 +268,7 @@ function ResidentManagement() {
           </div>
         </div>
         <div className="rm-page-header-right">
-          {isCouncilor && (
+          {isCaptain && (
             <button
               className="rm-btn rm-btn-secondary"
               style={
@@ -298,7 +298,7 @@ function ResidentManagement() {
               {showRemoved ? "Hide Removed" : "Show Removed"}
             </button>
           )}
-          {isCouncilor && (
+          {isCaptain && (
             <button
               className="rm-btn rm-btn-secondary"
               onClick={() => setShowImport(true)}
@@ -673,7 +673,7 @@ function ResidentManagement() {
                         )}
                       </td>
                       <td style={{ display: "flex", gap: 6 }}>
-  {isCouncilor ? (
+  {isCaptain ? (
     <>
       <button
         className="rm-action-btn rm-action-edit"

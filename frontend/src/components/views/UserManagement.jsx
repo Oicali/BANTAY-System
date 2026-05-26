@@ -436,8 +436,8 @@ const UserManagement = () => {
     if (r.includes("administrator")) return "um-role-admin";
     if (r.includes("investigator")) return "um-role-investigator";
     if (r.includes("patrol")) return "um-role-patrol";
-    if (r.includes("councilor")) return "um-role-councilor"; // ← new
-    if (r.includes("tanod")) return "um-role-tanod"; // ← new
+    if (r.includes("captain")) return "um-role-captain"; // ← new
+    if (r.includes("official")) return "um-role-official"; // ← new
     if (r.includes("barangay")) return "um-role-chairman";
     return "um-role-default";
   };
