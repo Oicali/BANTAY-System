@@ -204,6 +204,8 @@ function EBlotter() {
   const [offenseModus, setOffenseModus] = useState({});
   const [offenseSelectedModus, setOffenseSelectedModus] = useState({});
   const [typeOfPlace, setTypeOfPlace] = useState("");
+  const [streetSuggestions, setStreetSuggestions] = useState([]);
+const [showStreetDropdown, setShowStreetDropdown] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [deletedPage, setDeletedPage] = useState(1);
   const DELETED_PER_PAGE = 15;
@@ -213,10 +215,13 @@ function EBlotter() {
     type: "success",
   });
   const [viewAttachments, setViewAttachments] = useState([]);
+  
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
   const [modalAttachments, setModalAttachments] = useState([]);
   const [pendingModalFiles, setPendingModalFiles] = useState([]);
+  const [attachMediaTab, setAttachMediaTab] = useState("image"); // "image" | "video"
+  const [viewMediaTab, setViewMediaTab] = useState("image"); // "image" | "video"
   const [modalCaption, setModalCaption] = useState("");
   const [lightboxImage, setLightboxImage] = useState(null);
   const showReactToast = (message, type = "success") => {
@@ -698,6 +703,51 @@ function EBlotter() {
       console.error("Modus fetch error:", err);
     }
   };
+const fetchStreetSuggestions = async (query) => {
+  if (!query || query.trim().length < 2) {
+    setStreetSuggestions([]);
+    setShowStreetDropdown(false);
+    return;
+  }
+
+  try {
+    const centroid_lat = selectedBrgyFeature?.properties?.centroid_lat ?? 14.4341;
+    const centroid_lng = selectedBrgyFeature?.properties?.centroid_lng ?? 120.9647;
+
+    // Compute tight bbox from the selected barangay polygon
+    let bbox = "120.9200,14.3900,121.0100,14.5000";
+    if (selectedBrgyFeature) {
+      const coords =
+        selectedBrgyFeature.geometry.type === "Polygon"
+          ? selectedBrgyFeature.geometry.coordinates[0]
+          : selectedBrgyFeature.geometry.coordinates.flat(2);
+      const lngs = coords.map((c) => c[0]);
+      const lats = coords.map((c) => c[1]);
+      bbox = `${Math.min(...lngs) - 0.003},${Math.min(...lats) - 0.003},${Math.max(...lngs) + 0.003},${Math.max(...lats) + 0.003}`;
+    }
+
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+      query
+    )}.json?access_token=${
+      import.meta.env.VITE_MAPBOX_TOKEN
+    }&country=PH&proximity=${centroid_lng},${centroid_lat}&bbox=${bbox}&types=address,poi&limit=5&language=en`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.features && data.features.length > 0) {
+      setStreetSuggestions(data.features);
+      setShowStreetDropdown(true);
+    } else {
+      setStreetSuggestions([]);
+      setShowStreetDropdown(false);
+    }
+  } catch (err) {
+    console.error("Street geocoding error:", err);
+    setStreetSuggestions([]);
+    setShowStreetDropdown(false);
+  }
+};
 
   useEffect(() => {
     if (currentStep === 3) {
@@ -2063,6 +2113,8 @@ function EBlotter() {
     setPendingModalFiles([]);
     setModalCaption("");
     setLightboxImage(null);
+    setAttachMediaTab("image");
+    setViewMediaTab("image");
   };
 
   const cancelClose = () => {
@@ -2379,6 +2431,18 @@ function EBlotter() {
         const targetBlotterId = editMode
           ? editingBlotterId
           : data.data?.blotter_id;
+          if (editMode) {
+    for (const a of modalAttachments.filter((x) => x._markedForDelete)) {
+      try {
+        await fetch(`${API_URL}/${targetBlotterId}/attachments/${a.attachment_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
         for (const item of pendingModalFiles) {
           try {
             const formData = new FormData();
@@ -2513,6 +2577,32 @@ function EBlotter() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
+
+  const validateVideoFile = (file) =>
+  new Promise((resolve, reject) => {
+    if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
+      return reject("Only MP4, WebM, or MOV files are allowed.");
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      return reject("Video must be under 50MB.");
+    }
+    const url = URL.createObjectURL(file);
+    const vid = document.createElement("video");
+    vid.preload = "metadata";
+    vid.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (vid.duration > 60) {
+        return reject("Video must be 60 seconds or less.");
+      }
+      resolve();
+    };
+    vid.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject("Could not read video file.");
+    };
+    vid.src = url;
+  });
+
   return (
     <div className="eb-content-area">
       <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
@@ -3224,108 +3314,139 @@ function EBlotter() {
                   </div>
                 </div>
                 {/* ── EVIDENCE ATTACHMENTS ── */}
-                {viewAttachments.length > 0 && (
-                  <div className="eb-view-section">
-                    <h3 className="eb-view-section-title">
-                      Evidence & CCTV Attachments
-                      <span
-                        style={{
-                          marginLeft: "8px",
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          background: "#fef3c7",
-                          color: "#92400e",
-                          padding: "2px 8px",
-                          borderRadius: "20px",
-                        }}
+{viewAttachments.length > 0 && (
+  <div className="eb-view-section">
+    <h3 className="eb-view-section-title">
+      Evidence & CCTV Attachments
+      <span style={{ marginLeft: "8px", fontSize: "11px", fontWeight: 600, background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "20px" }}>
+        {viewAttachments.length} file{viewAttachments.length > 1 ? "s" : ""}
+      </span>
+    </h3>
+    <div className="eb-view-section-body">
+      {/* Image / Video tabs */}
+      {(() => {
+        const images = viewAttachments.filter(a => !a.file_type?.startsWith("video"));
+        const videos = viewAttachments.filter(a => a.file_type?.startsWith("video"));
+        const hasImages = images.length > 0;
+        const hasVideos = videos.length > 0;
+        // auto-switch tab if one type is missing
+        const effectiveTab = (viewMediaTab === "image" && !hasImages && hasVideos)
+          ? "video"
+          : (viewMediaTab === "video" && !hasVideos && hasImages)
+            ? "image"
+            : viewMediaTab;
+        const displayed = effectiveTab === "image" ? images : videos;
+        return (
+          <>
+            {/* Tabs — only show if both types exist */}
+            {hasImages && hasVideos && (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+                {[
+                  { key: "image", label: `Photos (${images.length})`, icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                  )},
+                  { key: "video", label: `Videos (${videos.length})`, icon: (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="23 7 16 12 23 17 23 7"/>
+                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                  )},
+                ].map(tab => (
+                  <button key={tab.key} type="button"
+                    onClick={() => setViewMediaTab(tab.key)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "6px",
+                      padding: "7px 16px", borderRadius: "7px", border: "1.5px solid",
+                      fontWeight: 700, fontSize: "12px", cursor: "pointer",
+                      fontFamily: "DM Sans, sans-serif", transition: "all 0.15s",
+                      borderColor: effectiveTab === tab.key ? "var(--navy-primary)" : "#d1d5db",
+                      background: effectiveTab === tab.key ? "var(--navy-primary)" : "white",
+                      color: effectiveTab === tab.key ? "white" : "#6b7280",
+                    }}
+                  >
+                    {tab.icon} {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "14px" }}>
+              {displayed.map((a) => (
+                <div key={a.attachment_id} style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                  {a.file_type?.startsWith("video") ? (
+                    /* ── VIDEO CARD ── */
+                    <div style={{ position: "relative", cursor: "pointer" }}
+                      onClick={() => setLightboxImage({ url: a.file_url, caption: a.caption, isVideo: true })}
+                    >
+                      <video
+                        src={a.file_url}
+                        style={{ width: "100%", height: "140px", objectFit: "cover", display: "block" }}
+                        muted
+                        preload="metadata"
+                      />
+                      {/* Play overlay */}
+                      <div style={{
+                        position: "absolute", inset: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: "rgba(0,0,0,0.25)",
+                        transition: "background 0.15s",
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "rgba(0,0,0,0.25)"}
                       >
-                        {viewAttachments.length} photo
-                        {viewAttachments.length > 1 ? "s" : ""}
-                      </span>
-                    </h3>
-                    <div className="eb-view-section-body">
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fill, minmax(180px, 1fr))",
-                          gap: "14px",
-                        }}
-                      >
-                        {viewAttachments.map((a) => (
-                          <div
-                            key={a.attachment_id}
-                            style={{
-                              borderRadius: "8px",
-                              overflow: "hidden",
-                              border: "1px solid #e5e7eb",
-                              background: "#f9fafb",
-                            }}
-                          >
-                            <img
-                              src={a.file_url}
-                              alt={a.caption || "Evidence"}
-                              style={{
-                                width: "100%",
-                                height: "140px",
-                                objectFit: "cover",
-                                display: "block",
-                                transition: "opacity 0.2s",
-                                cursor: "zoom-in",
-                              }}
-                              onClick={() =>
-                                setLightboxImage({
-                                  url: a.file_url,
-                                  caption: a.caption,
-                                })
-                              }
-                              onMouseOver={(e) =>
-                                (e.target.style.opacity = "0.85")
-                              }
-                              onMouseOut={(e) => (e.target.style.opacity = "1")}
-                            />
-                            <div style={{ padding: "8px 10px" }}>
-                              {a.caption && (
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "#374151",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {a.caption}
-                                </div>
-                              )}
-                              <div
-                                style={{ fontSize: "11px", color: "#9ca3af" }}
-                              >
-                                {(() => {
-                                  const raw = String(a.uploaded_at);
-                                  // Strip timezone — treat as Manila local time already stored in PH time
-                                  const cleaned = raw
-                                    .replace("Z", "")
-                                    .replace(/\+\d{2}:\d{2}$/, "");
-                                  return new Date(cleaned).toLocaleString(
-                                    "en-PH",
-                                    {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      timeZone: "Asia/Manila",
-                                    },
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                        <div style={{
+                          width: "42px", height: "42px", borderRadius: "50%",
+                          background: "rgba(255,255,255,0.9)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="#1e3a5f">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                          </svg>
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    /* ── IMAGE CARD ── */
+                    <img
+                      src={a.file_url}
+                      alt={a.caption || "Evidence"}
+                      style={{ width: "100%", height: "140px", objectFit: "cover", display: "block", transition: "opacity 0.2s", cursor: "zoom-in" }}
+                      onClick={() => setLightboxImage({ url: a.file_url, caption: a.caption, isVideo: false })}
+                      onMouseOver={e => e.target.style.opacity = "0.85"}
+                      onMouseOut={e => e.target.style.opacity = "1"}
+                    />
+                  )}
+                  <div style={{ padding: "8px 10px" }}>
+                    {a.caption && (
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#374151", marginBottom: "4px" }}>
+                        {a.caption}
+                      </div>
+                    )}
+                    <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                      {(() => {
+                        const raw = String(a.uploaded_at);
+                        const cleaned = raw.replace("Z", "").replace(/\+\d{2}:\d{2}$/, "");
+                        return new Date(cleaned).toLocaleString("en-PH", {
+                          month: "short", day: "numeric", year: "numeric",
+                          hour: "2-digit", minute: "2-digit", timeZone: "Asia/Manila",
+                        });
+                      })()}
+                    </div>
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
+    </div>
+  </div>
+)}
               </div>
             ) : (
               // ========== EDIT/CREATE MODE - ORIGINAL FORM ==========
@@ -5436,11 +5557,13 @@ function EBlotter() {
                           className={`eb-modal-input ${fieldErrors.place_barangay ? "error" : ""}`}
                           value={caseDetail.place_barangay}
                           disabled={loadingBacoorBrgy}
-                          onChange={(e) => {
-                            const selectedName = e.target.value;
-                            updateCaseDetail("place_barangay", selectedName);
-                            updateCaseDetail("lat", "");
-                            updateCaseDetail("lng", "");
+                         onChange={(e) => {
+  const selectedName = e.target.value;
+  updateCaseDetail("place_barangay", selectedName);
+  updateCaseDetail("lat", "");
+  updateCaseDetail("lng", "");
+  updateCaseDetail("place_street", "");
+  setStreetSuggestions([]);
                             if (selectedName && fieldErrors.place_barangay) {
                               const newErrors = { ...fieldErrors };
                               delete newErrors.place_barangay;
@@ -5498,34 +5621,213 @@ function EBlotter() {
                       </div>
 
                       {/* ── ROW 4: ADDRESS DETAILS ── */}
-                      <div className="eb-modal-form-group">
-                        <label className="eb-modal-label">
-                          House No./Street *
-                        </label>
-                        <input
-                          type="text"
-                          className={`eb-modal-input ${fieldErrors.place_street ? "error" : ""}`}
-                          placeholder="Street Name"
-                          value={caseDetail.place_street}
-                          maxLength="200"
-                          onChange={(e) => {
-                            const value = e.target.value.replace(
-                              /[^A-Za-z0-9ÑñĆ.,\s-]/g,
-                              "",
-                            );
-                            updateCaseDetail("place_street", value);
-                            if (
-                              value.trim().length > 0 &&
-                              fieldErrors.place_street
-                            ) {
-                              const newErrors = { ...fieldErrors };
-                              delete newErrors.place_street;
-                              setFieldErrors(newErrors);
-                            }
-                          }}
-                        />
-                        <FieldError error={fieldErrors.place_street} />
-                      </div>
+                     <div className="eb-modal-form-group" style={{ position: "relative" }}>
+  <label className="eb-modal-label">
+    House No./Street *
+  </label>
+  <input
+  type="text"
+  className={`eb-modal-input ${fieldErrors.place_street ? "error" : ""}`}
+  placeholder={
+    caseDetail.place_barangay
+      ? "Type street name to search..."
+      : "Select a barangay first"
+  }
+  value={caseDetail.place_street}
+  maxLength="200"
+  autoComplete="off"
+  disabled={!caseDetail.place_barangay}
+  style={
+    !caseDetail.place_barangay
+      ? { background: "#f3f4f6", cursor: "not-allowed", color: "#9ca3af" }
+      : {}
+  }
+  onChange={(e) => {
+    const value = e.target.value.replace(/[^A-Za-z0-9ÑñĆ.,\s-]/g, "");
+    updateCaseDetail("place_street", value);
+    if (value.trim().length > 0 && fieldErrors.place_street) {
+      const newErrors = { ...fieldErrors };
+      delete newErrors.place_street;
+      setFieldErrors(newErrors);
+    }
+    fetchStreetSuggestions(value);
+  }}
+  onBlur={() => {
+    setTimeout(() => setShowStreetDropdown(false), 180);
+  }}
+  onFocus={() => {
+    if (streetSuggestions.length > 0) setShowStreetDropdown(true);
+  }}
+/>
+  <FieldError error={fieldErrors.place_street} />
+
+  {/* Street autocomplete dropdown */}
+  {showStreetDropdown && streetSuggestions.length > 0 && (
+    <div
+      style={{
+        position: "absolute",
+        top: "100%",
+        left: 0,
+        right: 0,
+        background: "white",
+        border: "1px solid #d1d5db",
+        borderRadius: "6px",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.13)",
+        zIndex: 9999,
+        marginTop: "2px",
+        overflow: "hidden",
+      }}
+    >
+      {streetSuggestions.map((feature) => {
+        // Extract just the street portion (before first comma)
+        const streetName = feature.place_name.split(",")[0];
+
+        return (
+          <div
+            key={feature.id}
+            onMouseDown={(e) => {
+  e.preventDefault();
+  const [lng, lat] = feature.center;
+  const streetName = feature.place_text || feature.place_name.split(",")[0];
+
+  if (selectedBrgyFeature) {
+    const rings =
+      selectedBrgyFeature.geometry.type === "Polygon"
+        ? selectedBrgyFeature.geometry.coordinates
+        : selectedBrgyFeature.geometry.coordinates.flat(1);
+
+    let inside = false;
+    for (const ring of rings) {
+      const n = ring.length;
+      let j = n - 1;
+      for (let i = 0; i < n; i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        const intersect =
+          yi > lat !== yj > lat &&
+          lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+        j = i;
+      }
+    }
+
+    if (!inside) {
+      showWarningToast(
+        `"${streetName}" appears to be outside ${caseDetail.place_barangay}. Please verify or pin manually.`
+      );
+      updateCaseDetail("place_street", streetName);
+      setShowStreetDropdown(false);
+      setStreetSuggestions([]);
+      return;
+    }
+  }
+
+  updateCaseDetail("place_street", streetName);
+updateCaseDetail("lat", lat.toFixed(6));
+updateCaseDetail("lng", lng.toFixed(6));
+if (fieldErrors.pin_location) {
+  const newErrors = { ...fieldErrors };
+  delete newErrors.pin_location;
+  setFieldErrors(newErrors);
+}
+
+// Reverse geocode the pinned location and auto-fill street
+(async () => {
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng.toFixed(6)},${lat.toFixed(6)}.json?access_token=${
+      import.meta.env.VITE_MAPBOX_TOKEN
+    }&country=PH&types=address,poi&language=en&limit=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const streetName = feature.place_text || feature.place_name.split(",")[0];
+      if (streetName) {
+        updateCaseDetail("place_street", streetName);
+        const newErrors = { ...fieldErrors };
+        delete newErrors.place_street;
+        setFieldErrors(newErrors);
+      }
+    }
+  } catch (err) {
+    console.error("Reverse geocode error:", err);
+  }
+})();
+
+  if (mapRef.current) {
+    mapRef.current.flyTo({
+      center: [lng, lat],
+      zoom: 17,
+      duration: 800,
+    });
+  }
+
+  setShowStreetDropdown(false);
+  setStreetSuggestions([]);
+}}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              padding: "10px 14px",
+              cursor: "pointer",
+              borderBottom: "1px solid #f3f4f6",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "#f0f3f8")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "white")
+            }
+          >
+            {/* Pin icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#c1272d"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0, marginTop: "2px" }}
+            >
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+
+            <div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#1e3a5f",
+                }}
+              >
+                {streetName}
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#9ca3af",
+                  marginTop: "2px",
+                }}
+              >
+                {feature.place_name
+                  .split(",")
+                  .slice(1)
+                  .join(",")
+                  .trim()}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</div>
 
                       <div className="eb-modal-form-group">
                         <label className="eb-modal-label">
@@ -5905,12 +6207,36 @@ function EBlotter() {
                                 }
                               }
                               updateCaseDetail("lat", lat.toFixed(6));
-                              updateCaseDetail("lng", lng.toFixed(6));
-                              if (fieldErrors.pin_location) {
-                                const newErrors = { ...fieldErrors };
-                                delete newErrors.pin_location;
-                                setFieldErrors(newErrors);
-                              }
+updateCaseDetail("lng", lng.toFixed(6));
+if (fieldErrors.pin_location) {
+  const newErrors = { ...fieldErrors };
+  delete newErrors.pin_location;
+  setFieldErrors(newErrors);
+}
+
+// Reverse geocode → auto-fill street field
+fetch(
+  `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng.toFixed(6)},${lat.toFixed(6)}.json?access_token=${
+    import.meta.env.VITE_MAPBOX_TOKEN
+  }&country=PH&types=address,poi&language=en&limit=1`
+)
+  .then((r) => r.json())
+  .then((data) => {
+    if (data.features && data.features.length > 0) {
+      const street =
+        data.features[0].place_text ||
+        data.features[0].place_name.split(",")[0];
+      if (street) {
+        updateCaseDetail("place_street", street);
+        setFieldErrors((prev) => {
+          const n = { ...prev };
+          delete n.place_street;
+          return n;
+        });
+      }
+    }
+  })
+  .catch((err) => console.error("Reverse geocode error:", err));
                             }}
                             cursor={
                               !caseDetail.place_barangay || viewMode
@@ -6098,407 +6424,252 @@ function EBlotter() {
                     </div>
                     {/* ── ATTACHMENTS PANEL (accept + edit mode) ── */}
                     {(acceptMode || editMode) && (
-                      <div
-                        className="eb-modal-form-group"
-                        style={{ gridColumn: "span 4" }}
-                      >
-                        <div
-                          style={{
-                            background:
-                              "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
-                            padding: "10px 16px",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "white",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.8px",
-                            }}
-                          >
-                            Evidence & CCTV Attachments
-                          </span>
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.6)",
-                              fontSize: "11px",
-                            }}
-                          >
-                            {modalAttachments.length + pendingModalFiles.length}
-                            /5 photos
-                          </span>
-                        </div>
+  <div className="eb-modal-form-group" style={{ gridColumn: "span 4" }}>
+    {/* Header */}
+    <div style={{
+      background: "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
+      padding: "10px 16px", borderRadius: "6px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      marginBottom: "12px",
+    }}>
+      <span style={{ color: "white", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+        Evidence & CCTV Attachments
+      </span>
+      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>
+        {(() => {
+          const savedImages = modalAttachments.filter(a => !a._markedForDelete && !a.file_type?.startsWith("video")).length;
+          const savedVideos = modalAttachments.filter(a => !a._markedForDelete && a.file_type?.startsWith("video")).length;
+          const pendingImages = pendingModalFiles.filter(f => !f.file.type.startsWith("video")).length;
+          const pendingVideos = pendingModalFiles.filter(f => f.file.type.startsWith("video")).length;
+          return `Photos: ${savedImages + pendingImages}/5 · Videos: ${savedVideos + pendingVideos}/3`;
+        })()}
+      </span>
+    </div>
 
-                        {/* Existing saved attachments */}
-                        {modalAttachments.length > 0 && (
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fill, minmax(140px, 1fr))",
-                              gap: "10px",
-                              marginBottom: "14px",
-                            }}
-                          >
-                            {modalAttachments
-                              .filter((a) => !a._markedForDelete)
-                              .map((a) => (
-                                <div
-                                  key={a.attachment_id}
-                                  style={{
-                                    position: "relative",
-                                    borderRadius: "8px",
-                                    overflow: "hidden",
-                                    border: "1px solid #e5e7eb",
-                                    background: "#f9fafb",
-                                  }}
-                                >
-                                  <img
-                                    src={a.file_url}
-                                    alt={a.caption || "Evidence"}
-                                    style={{
-                                      width: "100%",
-                                      height: "110px",
-                                      objectFit: "cover",
-                                      display: "block",
-                                      cursor: "zoom-in",
-                                    }}
-                                    onClick={() =>
-                                      setLightboxImage({
-                                        url: a.file_url,
-                                        caption: a.caption,
-                                      })
-                                    }
-                                  />
+    {/* Media Type Tabs */}
+    <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+      {[
+        { key: "image", label: "Photo", icon: (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        )},
+        { key: "video", label: "Video", icon: (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="23 7 16 12 23 17 23 7"/>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        )},
+      ].map(tab => (
+        <button key={tab.key} type="button"
+          onClick={() => setAttachMediaTab(tab.key)}
+          style={{
+            display: "flex", alignItems: "center", gap: "6px",
+            padding: "8px 18px", borderRadius: "7px", border: "1.5px solid",
+            fontWeight: 700, fontSize: "13px", cursor: "pointer",
+            fontFamily: "DM Sans, sans-serif", transition: "all 0.15s",
+            borderColor: attachMediaTab === tab.key ? "var(--navy-primary)" : "#d1d5db",
+            background: attachMediaTab === tab.key ? "var(--navy-primary)" : "white",
+            color: attachMediaTab === tab.key ? "white" : "#6b7280",
+          }}
+        >
+          {tab.icon} {tab.label}
+        </button>
+      ))}
+    </div>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setModalAttachments((prev) =>
-                                        prev.map((x) =>
-                                          x.attachment_id === a.attachment_id
-                                            ? { ...x, _markedForDelete: true }
-                                            : x,
-                                        ),
-                                      );
-                                    }}
-                                    style={{
-                                      position: "absolute",
-                                      top: "5px",
-                                      right: "5px",
-                                      background: "rgba(0,0,0,0.6)",
-                                      border: "none",
-                                      borderRadius: "50%",
-                                      width: "22px",
-                                      height: "22px",
-                                      cursor: "pointer",
-                                      color: "white",
-                                      fontSize: "13px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                          </div>
-                        )}
+    {/* Existing saved attachments — filtered by active tab */}
+    {(() => {
+      const filtered = modalAttachments.filter(a =>
+        !a._markedForDelete &&
+        (attachMediaTab === "video"
+          ? a.file_type?.startsWith("video")
+          : !a.file_type?.startsWith("video"))
+      );
+      return filtered.length > 0 ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
+          {filtered.map(a => (
+            <div key={a.attachment_id} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+              {a.file_type?.startsWith("video") ? (
+                <video src={a.file_url} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block" }} muted />
+              ) : (
+                <img src={a.file_url} alt={a.caption || "Evidence"} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
+                  onClick={() => setLightboxImage({ url: a.file_url, caption: a.caption })} />
+              )}
+              <button type="button"
+                onClick={() => setModalAttachments(prev =>
+                  prev.map(x => x.attachment_id === a.attachment_id ? { ...x, _markedForDelete: true } : x)
+                )}
+                style={{ position: "absolute", top: "5px", right: "5px", background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer", color: "white", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null;
+    })()}
 
-                        {/* Pending new files */}
-                        {pendingModalFiles.length > 0 && (
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fill, minmax(140px, 1fr))",
-                              gap: "10px",
-                              marginBottom: "14px",
-                            }}
-                          >
-                            {pendingModalFiles.map((item, index) => (
-                              <div
-                                key={index}
-                                style={{
-                                  position: "relative",
-                                  borderRadius: "8px",
-                                  overflow: "hidden",
-                                  border: "2px dashed #f59e0b",
-                                  background: "#fffbeb",
-                                }}
-                              >
-                                <img
-                                  src={item.preview}
-                                  alt={item.caption || "New"}
-                                  style={{
-                                    width: "100%",
-                                    height: "110px",
-                                    objectFit: "cover",
-                                    display: "block",
-                                    cursor: "zoom-in",
-                                  }}
-                                  onClick={() =>
-                                    setLightboxImage({
-                                      url: item.preview,
-                                      caption: item.caption,
-                                    })
-                                  }
-                                />
+    {/* Pending new files — filtered by active tab */}
+    {(() => {
+      const filtered = pendingModalFiles
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) =>
+          attachMediaTab === "video"
+            ? item.file.type.startsWith("video")
+            : !item.file.type.startsWith("video")
+        );
+      return filtered.length > 0 ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
+          {filtered.map(({ item, index }) => (
+            <div key={index} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "2px dashed #f59e0b", background: "#fffbeb" }}>
+              {item.file.type.startsWith("video") ? (
+                <video src={item.preview} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block" }} muted controls />
+              ) : (
+                <img src={item.preview} alt="New" style={{ width: "100%", height: "110px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
+                  onClick={() => setLightboxImage({ url: item.preview, caption: item.caption })} />
+              )}
+              <div style={{ position: "absolute", top: "5px", left: "5px", background: "#f59e0b", color: "white", fontSize: "9px", fontWeight: 700, padding: "2px 5px", borderRadius: "4px" }}>NEW</div>
+              <button type="button"
+                onClick={() => { URL.revokeObjectURL(item.preview); setPendingModalFiles(prev => prev.filter((_, i) => i !== index)); }}
+                style={{ position: "absolute", top: "5px", right: "5px", background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer", color: "white", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null;
+    })()}
 
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: "5px",
-                                    left: "5px",
-                                    background: "#f59e0b",
-                                    color: "white",
-                                    fontSize: "9px",
-                                    fontWeight: 700,
-                                    padding: "2px 5px",
-                                    borderRadius: "4px",
-                                  }}
-                                >
-                                  NEW
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    URL.revokeObjectURL(item.preview);
-                                    setPendingModalFiles((prev) =>
-                                      prev.filter((_, i) => i !== index),
-                                    );
-                                  }}
-                                  style={{
-                                    position: "absolute",
-                                    top: "5px",
-                                    right: "5px",
-                                    background: "rgba(0,0,0,0.6)",
-                                    border: "none",
-                                    borderRadius: "50%",
-                                    width: "22px",
-                                    height: "22px",
-                                    cursor: "pointer",
-                                    color: "white",
-                                    fontSize: "13px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Upload input */}
-                        {modalAttachments.length + pendingModalFiles.length <
-                          5 && (
-                          <div>
-                            <label
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "10px",
-                                border: "2px dashed #d1d5db",
-                                borderRadius: "8px",
-                                padding: "20px",
-                                cursor: "pointer",
-                                background: "white",
-                                fontSize: "13px",
-                                color: "#6b7280",
-                              }}
-                              onDragOver={(e) => e.preventDefault()}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                const file = e.dataTransfer.files[0];
-                                if (!file) return;
-                                const preview = URL.createObjectURL(file);
-                                setPendingModalFiles((prev) => [
-                                  ...prev,
-                                  { file, caption: modalCaption, preview },
-                                ]);
-                                setModalCaption("");
-                              }}
-                            >
-                              Click to add photo or drag & drop — JPG/PNG, max
-                              5MB
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                style={{ display: "none" }}
-                                onChange={(e) => {
-                                  const file = e.target.files[0];
-                                  if (!file) return;
-                                  const preview = URL.createObjectURL(file);
-                                  setPendingModalFiles((prev) => [
-                                    ...prev,
-                                    { file, caption: modalCaption, preview },
-                                  ]);
-                                  setModalCaption("");
-                                  e.target.value = "";
-                                }}
-                              />
-                            </label>
-                          </div>
-                        )}
-                      </div>
-                    )}
+    {/* Upload area — separate limits: images 5, videos 3 */}
+    {(() => {
+      const savedImages = modalAttachments.filter(a => !a._markedForDelete && !a.file_type?.startsWith("video")).length;
+      const savedVideos = modalAttachments.filter(a => !a._markedForDelete && a.file_type?.startsWith("video")).length;
+      const pendingImages = pendingModalFiles.filter(f => !f.file.type.startsWith("video")).length;
+      const pendingVideos = pendingModalFiles.filter(f => f.file.type.startsWith("video")).length;
+      const imagesFull = (savedImages + pendingImages) >= 5;
+      const videosFull = (savedVideos + pendingVideos) >= 3;
+      const currentTabFull = attachMediaTab === "video" ? videosFull : imagesFull;
+      if (currentTabFull) return null;
+      return (
+        <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", border: "2px dashed #d1d5db", borderRadius: "8px", padding: "20px", cursor: "pointer", background: "white", textAlign: "center" }}
+          onDragOver={e => e.preventDefault()}
+          onDrop={async e => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            if (attachMediaTab === "video") {
+              try { await validateVideoFile(file); } catch (err) { showReactToast(err, "error"); return; }
+            }
+            const preview = URL.createObjectURL(file);
+            setPendingModalFiles(prev => [...prev, { file, caption: "", preview }]);
+          }}
+        >
+          {attachMediaTab === "image" ? (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>Click or drag to upload photo</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>JPG, PNG, WebP · Max 5MB · Up to 5 photos</div>
+            </>
+          ) : (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              </svg>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>Click or drag to upload video</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>MP4, WebM, MOV · Max 50MB · 60s max · Up to 3 videos</div>
+            </>
+          )}
+          <input type="file"
+            accept={attachMediaTab === "image" ? "image/jpeg,image/png,image/webp" : "video/mp4,video/webm,video/quicktime"}
+            style={{ display: "none" }}
+            onChange={async e => {
+              const file = e.target.files[0];
+              if (!file) return;
+              if (attachMediaTab === "video") {
+                try { await validateVideoFile(file); } catch (err) { showReactToast(err, "error"); e.target.value = ""; return; }
+              }
+              const preview = URL.createObjectURL(file);
+              setPendingModalFiles(prev => [...prev, { file, caption: "", preview }]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      );
+    })()}
+  </div>
+)}
                     {/* Attachments for NEW report */}
                     {!editMode && !acceptMode && (
-                      <div
-                        className="eb-modal-form-group"
-                        style={{ gridColumn: "span 4" }}
-                      >
-                        <div
-                          style={{
-                            background:
-                              "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))",
-                            padding: "10px 16px",
-                            borderRadius: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginBottom: "12px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "white",
-                              fontWeight: 700,
-                              fontSize: "12px",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.8px",
-                            }}
-                          >
-                            Evidence & CCTV Attachments
-                          </span>
-                          <span
-                            style={{
-                              color: "rgba(255,255,255,0.6)",
-                              fontSize: "11px",
-                            }}
-                          >
-                            {pendingModalFiles.length}/5 photos
-                          </span>
-                        </div>
+  <div className="eb-modal-form-group" style={{ gridColumn: "span 4" }}>
+    {/* Header */}
+    <div style={{ background: "linear-gradient(135deg, var(--navy-dark), var(--navy-primary))", padding: "10px 16px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+      <span style={{ color: "white", fontWeight: 700, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Evidence & CCTV Attachments</span>
+      <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "11px" }}>{pendingModalFiles.length}/5 files</span>
+    </div>
 
-                        {pendingModalFiles.length > 0 && (
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fill, minmax(140px, 1fr))",
-                              gap: "10px",
-                              marginBottom: "14px",
-                            }}
-                          >
-                            {pendingModalFiles.map((item, index) => (
-                              <div
-                                key={index}
-                                style={{
-                                  position: "relative",
-                                  borderRadius: "8px",
-                                  overflow: "hidden",
-                                  border: "2px dashed #f59e0b",
-                                  background: "#fffbeb",
-                                }}
-                              >
-                                <img
-                                  src={item.preview}
-                                  alt="Evidence"
-                                  style={{
-                                    width: "100%",
-                                    height: "110px",
-                                    objectFit: "cover",
-                                    display: "block",
-                                    cursor: "zoom-in",
-                                  }}
-                                  onClick={() =>
-                                    setLightboxImage({
-                                      url: item.preview,
-                                      caption: item.caption,
-                                    })
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    URL.revokeObjectURL(item.preview);
-                                    setPendingModalFiles((prev) =>
-                                      prev.filter((_, i) => i !== index),
-                                    );
-                                  }}
-                                  style={{
-                                    position: "absolute",
-                                    top: "5px",
-                                    right: "5px",
-                                    background: "rgba(0,0,0,0.6)",
-                                    border: "none",
-                                    borderRadius: "50%",
-                                    width: "22px",
-                                    height: "22px",
-                                    cursor: "pointer",
-                                    color: "white",
-                                    fontSize: "13px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+    {/* Tabs */}
+    <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+      {[
+        { key: "image", label: "Photo", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> },
+        { key: "video", label: "Video", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> },
+      ].map(tab => (
+        <button key={tab.key} type="button" onClick={() => setAttachMediaTab(tab.key)}
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", borderRadius: "7px", border: "1.5px solid", fontWeight: 700, fontSize: "13px", cursor: "pointer", fontFamily: "DM Sans, sans-serif", transition: "all 0.15s", borderColor: attachMediaTab === tab.key ? "var(--navy-primary)" : "#d1d5db", background: attachMediaTab === tab.key ? "var(--navy-primary)" : "white", color: attachMediaTab === tab.key ? "white" : "#6b7280" }}>
+          {tab.icon} {tab.label}
+        </button>
+      ))}
+    </div>
 
-                        {pendingModalFiles.length < 5 && (
-                          <label
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "10px",
-                              border: "2px dashed #d1d5db",
-                              borderRadius: "8px",
-                              padding: "20px",
-                              cursor: "pointer",
-                              background: "white",
-                              fontSize: "13px",
-                              color: "#6b7280",
-                            }}
-                          >
-                            Click to add photo or drag & drop — JPG/PNG, max 5MB
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp"
-                              style={{ display: "none" }}
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (!file) return;
-                                const preview = URL.createObjectURL(file);
-                                setPendingModalFiles((prev) => [
-                                  ...prev,
-                                  { file, caption: "", preview },
-                                ]);
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
-                        )}
-                      </div>
-                    )}
+    {/* Previews */}
+    {pendingModalFiles.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
+        {pendingModalFiles.map((item, index) => (
+          <div key={index} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "2px dashed #f59e0b", background: "#fffbeb" }}>
+            {item.file.type.startsWith("video") ? (
+              <video src={item.preview} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block" }} muted controls />
+            ) : (
+              <img src={item.preview} alt="Evidence" style={{ width: "100%", height: "110px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
+                onClick={() => setLightboxImage({ url: item.preview, caption: "" })} />
+            )}
+            <button type="button"
+              onClick={() => { URL.revokeObjectURL(item.preview); setPendingModalFiles(prev => prev.filter((_, i) => i !== index)); }}
+              style={{ position: "absolute", top: "5px", right: "5px", background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer", color: "white", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Upload */}
+    {pendingModalFiles.length < 5 && (
+      <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", border: "2px dashed #d1d5db", borderRadius: "8px", padding: "20px", cursor: "pointer", background: "white", textAlign: "center" }}>
+        {attachMediaTab === "image" ? (
+          <><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><div style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>Click or drag to upload photo</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>JPG, PNG, WebP · Max 5MB</div></>
+        ) : (
+          <><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg><div style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>Click or drag to upload video</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>MP4, WebM, MOV · Max 50MB · 60s max</div></>
+        )}
+        <input type="file"
+          accept={attachMediaTab === "image" ? "image/jpeg,image/png,image/webp" : "video/mp4,video/webm,video/quicktime"}
+          style={{ display: "none" }}
+          onChange={async e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (attachMediaTab === "video") {
+              try { await validateVideoFile(file); } catch (err) { showReactToast(err, "error"); e.target.value = ""; return; }
+            }
+            const preview = URL.createObjectURL(file);
+            setPendingModalFiles(prev => [...prev, { file, caption: "", preview }]);
+            e.target.value = "";
+          }}
+        />
+      </label>
+    )}
+  </div>
+)}
                   </div>
                 )}
 
@@ -7880,76 +8051,50 @@ function EBlotter() {
       )}
       {/* ── LIGHTBOX ── */}
       {lightboxImage && (
-        <div
-          onClick={() => setLightboxImage(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 99999,
-            background: "rgba(0,0,0,0.85)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "relative",
-              maxWidth: "90vw",
-              maxHeight: "90vh",
-            }}
-          >
-            <img
-              src={lightboxImage.url}
-              alt={lightboxImage.caption || "Evidence"}
-              style={{
-                maxWidth: "90vw",
-                maxHeight: "80vh",
-                objectFit: "contain",
-                borderRadius: "8px",
-                display: "block",
-              }}
-            />
-            {lightboxImage.caption && (
-              <div
-                style={{
-                  textAlign: "center",
-                  color: "white",
-                  marginTop: "10px",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-              >
-                {lightboxImage.caption}
-              </div>
-            )}
-            <button
-              onClick={() => setLightboxImage(null)}
-              style={{
-                position: "absolute",
-                top: "-12px",
-                right: "-12px",
-                background: "#dc2626",
-                border: "none",
-                borderRadius: "50%",
-                width: "32px",
-                height: "32px",
-                cursor: "pointer",
-                color: "white",
-                fontSize: "18px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-              }}
-            >
-              ×
-            </button>
-          </div>
+  <div
+    onClick={() => { if (!lightboxImage.isVideo) setLightboxImage(null); }}
+    style={{
+      position: "fixed", inset: 0, zIndex: 99999,
+      background: "rgba(0,0,0,0.92)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "20px",
+    }}
+  >
+    <div onClick={e => e.stopPropagation()}
+      style={{ position: "relative", maxWidth: "92vw", maxHeight: "92vh", display: "flex", flexDirection: "column", alignItems: "center" }}
+    >
+      {lightboxImage.isVideo ? (
+        <video
+          src={lightboxImage.url}
+          controls
+          autoPlay
+          style={{ maxWidth: "88vw", maxHeight: "78vh", borderRadius: "8px", display: "block", background: "#000", outline: "none" }}
+        />
+      ) : (
+        <img
+          src={lightboxImage.url}
+          alt={lightboxImage.caption || "Evidence"}
+          style={{ maxWidth: "88vw", maxHeight: "78vh", objectFit: "contain", borderRadius: "8px", display: "block" }}
+        />
+      )}
+      {lightboxImage.caption && (
+        <div style={{ textAlign: "center", color: "white", marginTop: "12px", fontSize: "14px", fontWeight: 600 }}>
+          {lightboxImage.caption}
         </div>
       )}
+      <button
+        onClick={() => setLightboxImage(null)}
+        style={{
+          position: "absolute", top: "-14px", right: "-14px",
+          background: "#dc2626", border: "none", borderRadius: "50%",
+          width: "34px", height: "34px", cursor: "pointer",
+          color: "white", fontSize: "20px",
+          display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700,
+        }}
+      >×</button>
+    </div>
+  </div>
+)}
       {/* Remind Patrol Modal */}
       {showRemindModal && (
         <RemindPatrolModal

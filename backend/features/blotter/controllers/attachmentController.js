@@ -3,14 +3,17 @@ const cloudinary = require("../../../config/cloudinary");
 const streamifier = require("streamifier");
 
 // Upload to Cloudinary via stream
-const uploadToCloudinary = (buffer, folder, publicId) => {
+const uploadToCloudinary = (buffer, folder, publicId, resourceType = "image") => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
         public_id: publicId,
-        resource_type: "image",
-        transformation: [{ quality: "auto", fetch_format: "auto" }],
+        resource_type: resourceType,  // ← was hardcoded "image"
+        // Only apply image transformations for images
+        ...(resourceType === "image" && {
+          transformation: [{ quality: "auto", fetch_format: "auto" }],
+        }),
       },
       (error, result) => {
         if (error) reject(error);
@@ -26,12 +29,11 @@ const uploadAttachment = async (req, res) => {
   try {
     const { id } = req.params;
     const { caption } = req.body;
-console.log("Caption received:", caption); 
+
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "No image uploaded" });
+      return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    // Verify blotter exists
     const blotter = await pool.query(
       `SELECT blotter_id FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
       [id]
@@ -40,7 +42,6 @@ console.log("Caption received:", caption);
       return res.status(404).json({ success: false, message: "Blotter not found" });
     }
 
-    // Check max 5 attachments per blotter
     const count = await pool.query(
       `SELECT COUNT(*) FROM blotter_attachments WHERE blotter_id = $1`,
       [id]
@@ -52,23 +53,29 @@ console.log("Caption received:", caption);
       });
     }
 
+    // ← Detect resource type from mimetype
+    const isVideo = req.file.mimetype.startsWith("video/");
+    const resourceType = isVideo ? "video" : "image";
+
     const publicId = `bantay_evidence_${id}_${Date.now()}`;
     const result = await uploadToCloudinary(
       req.file.buffer,
       "bantay/evidence",
-      publicId
+      publicId,
+      resourceType  // ← pass it through
     );
 
     const attachment = await pool.query(
       `INSERT INTO blotter_attachments 
-        (blotter_id, file_url, public_id, file_name, caption, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6)
+        (blotter_id, file_url, public_id, file_name, file_type, caption, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         id,
         result.secure_url,
         result.public_id,
         req.file.originalname,
+        req.file.mimetype,  // ← store mimetype so the frontend can distinguish
         caption || null,
         req.user.user_id,
       ]
@@ -86,7 +93,7 @@ const getAttachments = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-     `SELECT attachment_id, blotter_id, file_url, public_id, file_name, caption, uploaded_by,
+      `SELECT attachment_id, blotter_id, file_url, public_id, file_name, file_type, caption, uploaded_by,
   TO_CHAR(uploaded_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI:SS') AS uploaded_at
  FROM blotter_attachments WHERE blotter_id = $1 ORDER BY uploaded_at ASC`,
       [id]
