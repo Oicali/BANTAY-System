@@ -3,6 +3,7 @@
 const Blotter = require("../models/Blotter");
 const pool = require("../../../config/database");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
+const { scheduleReferralReminders } = require("../../../jobs/referralReminderJob");
 const {
   createNotification,
   notifyAllByRole,
@@ -1660,6 +1661,7 @@ const createBrgyReport = async (req, res) => {
       );
 
       await client.query("COMMIT");
+      scheduleReferralReminders(blotterId, blotterNumber, place_barangay);
       await logAudit({
         userId: req.user?.user_id,
         username: req.user?.username,
@@ -2112,6 +2114,29 @@ const getPatrolUsers = async (req, res) => {
   } catch (error) {
     console.error("Error fetching patrol users:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getReminderBlotterIds = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT link_to FROM notifications
+       WHERE recipient_user_id = $1
+         AND type = 'REFERRAL_REMINDER'
+       ORDER BY created_at DESC`,
+      [req.user.user_id]
+    );
+
+    const ids = result.rows
+      .map(r => {
+        const match = r.link_to?.match(/referral=(\d+)$/);
+        return match ? parseInt(match[1]) : null;
+      })
+      .filter(Boolean);
+
+    res.json({ success: true, data: ids });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
