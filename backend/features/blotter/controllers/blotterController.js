@@ -469,6 +469,44 @@ const getAllBlotters = async (req, res) => {
       results = blotters.filter((b) => b.referred_by_barangay === true);
     }
 
+    // Reminder-access: inject out-of-barangay referrals the patrol was reminded about
+    if (req.query.barangay && req.user?.role === "Patrol") {
+      const reminderResult = await pool.query(
+        `SELECT link_to FROM notifications
+         WHERE recipient_user_id = $1
+           AND type = 'REFERRAL_REMINDER'
+         ORDER BY created_at DESC`,
+        [req.user.user_id]
+      );
+
+      const reminderIds = reminderResult.rows
+        .map(r => {
+          const match = r.link_to?.match(/referral=(\d+)$/);
+          return match ? parseInt(match[1]) : null;
+        })
+        .filter(Boolean);
+
+      if (reminderIds.length > 0) {
+        const alreadyIncluded = new Set(results.map(b => b.blotter_id));
+        const missingIds = reminderIds.filter(id => !alreadyIncluded.has(id));
+
+        if (missingIds.length > 0) {
+          const extraBlotters = await pool.query(
+            `SELECT * FROM blotter_entries
+             WHERE blotter_id = ANY($1::int[])
+               AND is_deleted = false
+               AND referred_by_barangay = true`,
+            [missingIds]
+          );
+          const tagged = extraBlotters.rows.map(b => ({
+            ...b,
+            _reminder_access: true,
+          }));
+          results = [...results, ...tagged];
+        }
+      }
+    }
+
     res.status(200).json({
       success: true,
       count: results.length,
@@ -486,7 +524,11 @@ const getAllBlotters = async (req, res) => {
 const getBlotterById = async (req, res) => {
   try {
     const { id } = req.params;
-    const blotter = await Blotter.getByIdRaw(id); // Use the new method
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ success: false, message: "Invalid blotter ID" });
+    }
+    const blotter = await Blotter.getByIdRaw(parsedId);
 
     if (!blotter) {
       return res.status(404).json({
@@ -1907,6 +1949,29 @@ Reply with ONLY the exact crime type name from the list above, OR the exact text
   }
 };
 
+const checkReminderAccess = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ success: false, message: "Invalid blotter ID" });
+    }
+
+    const result = await pool.query(
+      `SELECT 1 FROM notifications
+       WHERE recipient_user_id = $1
+         AND type = 'REFERRAL_REMINDER'
+         AND link_to LIKE $2
+       LIMIT 1`,
+      [req.user.user_id, `%referral=${parsedId}`]
+    );
+
+    res.json({ success: true, has_access: result.rows.length > 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 const respondToReferral = async (req, res) => {
   try {
     const { id } = req.params;
@@ -2157,6 +2222,8 @@ module.exports = {
   getBrgyReports,
   detectCrimeType,
   respondToReferral,
-  remindPatrols, // ← add this
-  getPatrolUsers, // ← add this
+  remindPatrols,
+  getPatrolUsers,
+  checkReminderAccess,
+  getReminderBlotterIds,
 };
