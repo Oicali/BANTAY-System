@@ -75,6 +75,7 @@ function BrgyReport() {
   const [crimeDetectFailed, setCrimeDetectFailed] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [pendingCaption, setPendingCaption] = useState("");
+  const [attachMediaTab, setAttachMediaTab] = useState("image"); // "image" | "video"
   const [lightboxImage, setLightboxImage] = useState(null);
   const [crimeNotIndexed, setCrimeNotIndexed] = useState(false);
 
@@ -177,8 +178,17 @@ function BrgyReport() {
     );
     setShowResidentSearch(false);
   };
-  const addPendingFile = (file, caption) => {
-    if (pendingFiles.length >= 5) return;
+ const addPendingFile = async (file, caption, isVideo = false) => {
+  if (pendingFiles.length >= 5) return;
+
+  if (isVideo) {
+    try {
+      await validateVideoFile(file);
+    } catch (err) {
+      showToast(err, "error");
+      return;
+    }
+  } else {
     const allowed = ["image/jpeg", "image/png", "image/webp"];
     if (!allowed.includes(file.type)) {
       showToast("Only JPG, PNG, WEBP allowed", "error");
@@ -188,10 +198,12 @@ function BrgyReport() {
       showToast("Max 5MB per photo", "error");
       return;
     }
-    const preview = URL.createObjectURL(file);
-    setPendingFiles((prev) => [...prev, { file, caption, preview }]);
-    setPendingCaption("");
-  };
+  }
+
+  const preview = URL.createObjectURL(file);
+  setPendingFiles((prev) => [...prev, { file, caption, preview, isVideo }]);
+  setPendingCaption("");
+};
 
   const removePendingFile = (index) => {
     setPendingFiles((prev) => {
@@ -416,6 +428,7 @@ function BrgyReport() {
           `Report submitted! Reference No.: ${data.data.blotter_entry_number}`,
         );
         setPendingFiles([]);
+        setAttachMediaTab("image");
         setPendingCaption("");
         setForm({
           incident_type: "",
@@ -463,6 +476,31 @@ function BrgyReport() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
+
+const validateVideoFile = (file) =>
+  new Promise((resolve, reject) => {
+    if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
+      return reject("Only MP4, WebM, or MOV files are allowed.");
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      return reject("Video must be under 50MB.");
+    }
+    const url = URL.createObjectURL(file);
+    const vid = document.createElement("video");
+    vid.preload = "metadata";
+    vid.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (vid.duration > 60) {
+        return reject("Video must be 60 seconds or less.");
+      }
+      resolve();
+    };
+    vid.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject("Could not read video file.");
+    };
+    vid.src = url;
+  });
 
   return (
     <div className="br-wrapper">
@@ -1160,115 +1198,99 @@ function BrgyReport() {
                   className="br-card-header-icon"
                   style={{ background: "#d97706" }}
                 >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
                   </svg>
                 </div>
-                <h2 className="br-card-title">Attach CCTV / Evidence Photos</h2>
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    background: "#f3f4f6",
-                    padding: "3px 10px",
-                    borderRadius: "20px",
-                  }}
-                >
-                  Optional · Max 5 photos
+                <h2 className="br-card-title">Attach CCTV / Evidence</h2>
+                <span style={{ marginLeft: "auto", fontSize: "12px", color: "#6b7280", background: "#f3f4f6", padding: "3px 10px", borderRadius: "20px" }}>
+                  Optional · Max 5 files
                 </span>
               </div>
+
               <div className="br-card-body">
-                <div
-                  style={{
-                    background: "#fffbeb",
-                    border: "1px solid #fde68a",
-                    borderRadius: "8px",
-                    padding: "12px 16px",
-                    marginBottom: "20px",
-                    display: "flex",
-                    gap: "10px",
-                    alignItems: "flex-start",
-                    fontSize: "13px",
-                    color: "#92400e",
-                  }}
-                >
-                  <span>
-                    Attach CCTV snapshots or scene photos. These will be
-                    submitted with your report.{" "}
-                    <strong>JPG, PNG only · Max 5MB per photo.</strong>
-                  </span>
+                {/* Info banner */}
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#92400e" }}>
+                  Attach CCTV snapshots or footage. These will be submitted with your report.{" "}
+                  <strong>Photos: JPG/PNG · Max 5MB. Videos: MP4/WebM/MOV · Max 50MB · 60s max.</strong>
+                </div>
+
+                {/* Media Type Tabs */}
+                <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                  {[
+                    {
+                      key: "image",
+                      label: "Photo",
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                          <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                      ),
+                    },
+                    {
+                      key: "video",
+                      label: "Video",
+                      icon: (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="23 7 16 12 23 17 23 7"/>
+                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                      ),
+                    },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setAttachMediaTab(tab.key)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "6px",
+                        padding: "8px 18px", borderRadius: "7px", border: "1.5px solid",
+                        fontWeight: 700, fontSize: "13px", cursor: "pointer",
+                        fontFamily: "DM Sans, sans-serif", transition: "all 0.15s",
+                        borderColor: attachMediaTab === tab.key ? "#1e3a5f" : "#d1d5db",
+                        background: attachMediaTab === tab.key ? "#1e3a5f" : "white",
+                        color: attachMediaTab === tab.key ? "white" : "#6b7280",
+                      }}
+                    >
+                      {tab.icon} {tab.label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Preview grid */}
                 {pendingFiles.length > 0 && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(150px, 1fr))",
-                      gap: "12px",
-                      marginBottom: "20px",
-                    }}
-                  >
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
                     {pendingFiles.map((item, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          position: "relative",
-                          borderRadius: "8px",
-                          overflow: "hidden",
-                          border: "1px solid #e5e7eb",
-                          background: "#f9fafb",
-                        }}
-                      >
-                        <img
-                          src={item.preview}
-                          alt={item.caption || "Evidence"}
-                          style={{
-                            width: "100%",
-                            height: "120px",
-                            objectFit: "cover",
-                            display: "block",
-                            cursor: "zoom-in",
-                          }}
-                          onClick={() =>
-                            setLightboxImage({
-                              url: item.preview,
-                              caption: item.caption,
-                            })
-                          }
-                        />
-
+                      <div key={index} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                        {item.isVideo ? (
+                          <video
+                            src={item.preview}
+                            style={{ width: "100%", height: "120px", objectFit: "cover", display: "block" }}
+                            muted
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={item.preview}
+                            alt={item.caption || "Evidence"}
+                            style={{ width: "100%", height: "120px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
+                            onClick={() => setLightboxImage({ url: item.preview, caption: item.caption })}
+                          />
+                        )}
+                        <div style={{
+                          position: "absolute", top: "6px", left: "6px",
+                          background: item.isVideo ? "rgba(99,102,241,0.85)" : "rgba(16,185,129,0.85)",
+                          color: "white", fontSize: "9px", fontWeight: 700,
+                          padding: "2px 6px", borderRadius: "4px",
+                        }}>
+                          {item.isVideo ? "VIDEO" : "PHOTO"}
+                        </div>
                         <button
                           onClick={() => removePendingFile(index)}
                           type="button"
-                          style={{
-                            position: "absolute",
-                            top: "6px",
-                            right: "6px",
-                            background: "rgba(0,0,0,0.6)",
-                            border: "none",
-                            borderRadius: "50%",
-                            width: "24px",
-                            height: "24px",
-                            cursor: "pointer",
-                            color: "white",
-                            fontSize: "14px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
+                          style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer", color: "white", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}
                         >
                           ×
                         </button>
@@ -1282,86 +1304,72 @@ function BrgyReport() {
                   <div>
                     <label
                       htmlFor="evidence-upload"
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "10px",
-                        border: "2px dashed #d1d5db",
-                        borderRadius: "10px",
-                        padding: "32px 20px",
-                        cursor: "pointer",
-                        background: "white",
-                        transition: "all 0.2s",
-                        textAlign: "center",
-                      }}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", border: "2px dashed #d1d5db", borderRadius: "10px", padding: "32px 20px", cursor: "pointer", background: "white", transition: "all 0.2s", textAlign: "center" }}
                       onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
+                      onDrop={async (e) => {
                         e.preventDefault();
                         const file = e.dataTransfer.files[0];
-                        if (file) addPendingFile(file, pendingCaption);
+                        if (file) {
+                          const isVideo = attachMediaTab === "video";
+                          await addPendingFile(file, pendingCaption, isVideo);
+                        }
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#374151",
-                        }}
-                      >
-                        Click to upload or drag & drop
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#9ca3af" }}>
-                        CCTV snapshot, scene photo — JPG or PNG, max 5MB
-                      </div>
+                      {attachMediaTab === "image" ? (
+                        <>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                          </svg>
+                          <div style={{ fontSize: "14px", fontWeight: 600, color: "#374151" }}>Click to upload or drag & drop</div>
+                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>CCTV snapshot or scene photo — JPG / PNG · Max 5MB</div>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                          </svg>
+                          <div style={{ fontSize: "14px", fontWeight: 600, color: "#374151" }}>Click to upload or drag & drop</div>
+                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>CCTV footage — MP4 / WebM / MOV · Max 50MB · 60s</div>
+                        </>
+                      )}
                       <input
                         id="evidence-upload"
                         type="file"
-                        accept="image/jpeg,image/png,image/webp"
+                        accept={
+                          attachMediaTab === "image"
+                            ? "image/jpeg,image/png,image/webp"
+                            : "video/mp4,video/webm,video/quicktime"
+                        }
                         style={{ display: "none" }}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files[0];
                           if (file) {
-                            addPendingFile(file, pendingCaption);
+                            const isVideo = attachMediaTab === "video";
+                            await addPendingFile(file, pendingCaption, isVideo);
                             e.target.value = "";
                           }
                         }}
                       />
                     </label>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginTop: "8px",
-                        fontSize: "12px",
-                        color: "#9ca3af",
-                      }}
-                    >
-                      <span>{pendingFiles.length}/5 photos added</span>
-                      <span>Photos will upload when you submit the report</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", fontSize: "12px", color: "#9ca3af" }}>
+                      <span>{pendingFiles.length}/5 files added</span>
+                      <span>Files will upload when you submit the report</span>
                     </div>
                   </div>
                 )}
 
                 {pendingFiles.length >= 5 && (
-                  <div
-                    style={{
-                      textAlign: "center",
-                      padding: "16px",
-                      background: "#f0fdf4",
-                      borderRadius: "8px",
-                      border: "1px solid #bbf7d0",
-                      color: "#065f46",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ✓ Maximum 5 photos added. They will upload with your report.
+                  <div style={{ textAlign: "center", padding: "16px", background: "#f0fdf4", borderRadius: "8px", border: "1px solid #bbf7d0", color: "#065f46", fontSize: "13px", fontWeight: 600 }}>
+                    ✓ Maximum 5 files added. They will upload with your report.
                   </div>
                 )}
               </div>
+              {/* closes evidence br-card-body */}
             </div>
+            {/* closes evidence br-card */}
+
             <button
               type="submit"
               className="br-submit-btn"
@@ -1382,8 +1390,11 @@ function BrgyReport() {
               </svg>
               {submitting ? "Submitting..." : "Submit Incident Report"}
             </button>
+
           </div>
+          {/* closes persons br-card-body */}
         </div>
+        {/* closes persons br-card */}
       </form>
 
       {/* ── MY SUBMITTED REPORTS ── */}

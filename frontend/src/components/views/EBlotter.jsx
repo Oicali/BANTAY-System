@@ -3410,15 +3410,27 @@ const fetchStreetSuggestions = async (query) => {
                         </div>
                       </div>
                     </div>
-                  ) : (
+                    ) : (
                     /* ── IMAGE CARD ── */
                     <img
                       src={a.file_url}
                       alt={a.caption || "Evidence"}
-                      style={{ width: "100%", height: "140px", objectFit: "cover", display: "block", transition: "opacity 0.2s", cursor: "zoom-in" }}
-                      onClick={() => setLightboxImage({ url: a.file_url, caption: a.caption, isVideo: false })}
-                      onMouseOver={e => e.target.style.opacity = "0.85"}
-                      onMouseOut={e => e.target.style.opacity = "1"}
+                      style={{
+                        width: "100%",
+                        height: "140px",
+                        objectFit: "cover",
+                        display: "block",
+                        transition: "opacity 0.2s",
+                        cursor: "zoom-in",
+                      }}
+                      onClick={() =>
+                        setLightboxImage({
+                          url: a.file_url,
+                          caption: a.caption,
+                        })
+                      }
+                      onMouseOver={(e) => (e.target.style.opacity = "0.85")}
+                      onMouseOut={(e) => (e.target.style.opacity = "1")}
                     />
                   )}
                   <div style={{ padding: "8px 10px" }}>
@@ -6491,9 +6503,20 @@ fetch(
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
           {filtered.map(a => (
             <div key={a.attachment_id} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", background: "#f9fafb" }}>
-              {a.file_type?.startsWith("video") ? (
-                <video src={a.file_url} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block" }} muted />
-              ) : (
+             {a.file_type?.startsWith("video") ||
+                            /\.(mp4|webm|mov)(\?|$)/i.test(a.file_url || "") ? (
+                              <video
+                                src={a.file_url}
+                                controls
+                                style={{
+                                  width: "100%",
+                                  height: "110px",
+                                  objectFit: "cover",
+                                  display: "block",
+                                  background: "#000",
+                                }}
+                              />
+                            ) : (
                 <img src={a.file_url} alt={a.caption || "Evidence"} style={{ width: "100%", height: "110px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
                   onClick={() => setLightboxImage({ url: a.file_url, caption: a.caption })} />
               )}
