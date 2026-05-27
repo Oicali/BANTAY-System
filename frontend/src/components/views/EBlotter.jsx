@@ -218,6 +218,7 @@ function EBlotter() {
 
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
+  const activeReportTabRef = useRef("reports"); // ADD THIS
   const [modalAttachments, setModalAttachments] = useState([]);
   const [pendingModalFiles, setPendingModalFiles] = useState([]);
   const [attachMediaTab, setAttachMediaTab] = useState("image"); // "image" | "video"
@@ -381,6 +382,10 @@ function EBlotter() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
 
+  const patrolBarangaysRef = useRef([]);
+  const reminderBlotterIdsRef = useRef([]);
+  const hasPatrolTodayRef = useRef(false);
+
   useEffect(() => {
     try {
       const token = localStorage.getItem("token");
@@ -395,6 +400,9 @@ function EBlotter() {
   const totalSteps = 3;
   const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
   const fetchReferredCount = useCallback(async () => {
+    // Patrol users: count is derived from filtered blotters in fetchBlotters
+    if (userRole === "Patrol") return;
+
     const res = await fetch(
       `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
       {
@@ -405,7 +413,7 @@ function EBlotter() {
     if (data.success) {
       setReferredCount(data.count);
     }
-  }, []);
+  }, [userRole]);
 
   const handleExport = async (dateFrom, dateTo) => {
     setShowExportModal(false);
@@ -458,6 +466,7 @@ function EBlotter() {
   };
 
   useEffect(() => {
+    activeReportTabRef.current = activeReportTab;
     fetchBlotters(activeReportTab);
 
     const targetId = sessionStorage.getItem("openBlotterId");
@@ -469,11 +478,50 @@ function EBlotter() {
     const CALABARZON_CODE = "040000000";
     const CAVITE_CODE = "042100000";
 
-    fetchReferredCount();
-    // AFTER
+    const skipCount = (() => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return false;
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        return payload.role === "Patrol";
+      } catch {
+        return false;
+      }
+    })();
+    if (!skipCount) fetchReferredCount();
+
     const interval = setInterval(() => {
-      fetchReferredCount();
-      if (activeReportTab === "referred") {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const role = payload.role;
+
+        if (role !== "Patrol") {
+          fetchReferredCount();
+        } else {
+          // Refresh reminder IDs so admin-sent reminders show up within 30s
+          fetch(`${import.meta.env.VITE_API_URL}/blotters/reminder-ids`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          })
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.success) {
+                const prevCount = reminderBlotterIdsRef.current.length;
+                reminderBlotterIdsRef.current = d.data;
+                // If new reminders arrived, re-fetch referred tab silently to update badge
+                if (d.data.length !== prevCount) {
+                  fetchBlotters("referred", true);
+                }
+              }
+            })
+            .catch(() => {});
+        }
+      } catch {}
+
+      if (activeReportTabRef.current === "referred") {
         fetchBlotters("referred", true);
       }
     }, 30000);
@@ -494,29 +542,29 @@ function EBlotter() {
       })
       .catch((err) => console.error("Failed to load barangay GeoJSON:", err));
 
-    return () => clearInterval(interval); // ← cleanup at the END
+    return () => clearInterval(interval);
   }, [activeReportTab]);
 
   // AFTER
   const fetchBlotters = async (tabOverride, silent = false) => {
     const currentTab =
-      tabOverride !== undefined ? tabOverride : activeReportTab;
+      tabOverride !== undefined ? tabOverride : activeReportTabRef.current;
+
     try {
       if (fetchControllerRef.current) {
         fetchControllerRef.current.abort();
       }
       const controller = new AbortController();
       fetchControllerRef.current = controller;
+
       if (!silent) {
         setLoading(true);
         setBlotters([]);
-        await new Promise((resolve) => setTimeout(resolve, 300));
       }
+
       const queryParams = new URLSearchParams();
       if (filters.search) queryParams.append("search", filters.search);
       if (filters.status) queryParams.append("status", filters.status);
-      // if (filters.incident_type)
-      //   queryParams.append("incident_type", filters.incident_type);
       if (filters.date_from) queryParams.append("date_from", filters.date_from);
       if (filters.date_to) queryParams.append("date_to", filters.date_to);
       if (filters.barangay) queryParams.append("barangay", filters.barangay);
@@ -533,17 +581,26 @@ function EBlotter() {
         },
         signal: controller.signal,
       });
+
       const response = handleApiResponse(rawResponse);
       if (!response) {
         setLoading(false);
         return;
       }
+
       const data = await response.json();
+
       if (data.success) {
         let results = data.data;
 
-        // Search filter — apply client-side for referred tab since backend
-        // may not filter by search when referred=true
+        // Safety net: enforce tab separation client-side regardless of backend filter
+        if (currentTab === "reports") {
+          results = results.filter((b) => !b.referred_by_barangay);
+        } else if (currentTab === "referred") {
+          results = results.filter((b) => b.referred_by_barangay === true);
+        }
+
+        // Search filter for referred tab
         if (filters.search && currentTab === "referred") {
           const q = filters.search.toLowerCase();
           results = results.filter(
@@ -556,7 +613,6 @@ function EBlotter() {
           );
         }
 
-        // Crime type filter
         if (filters.incident_type) {
           results = results.filter(
             (b) =>
@@ -565,7 +621,6 @@ function EBlotter() {
           );
         }
 
-        // Barangay filter — apply client-side for referred tab
         if (filters.barangay && currentTab === "referred") {
           results = results.filter(
             (b) =>
@@ -574,7 +629,6 @@ function EBlotter() {
           );
         }
 
-        // Data source filter
         if (filters.data_source === "brgy_referral") {
           results = results.filter((b) =>
             (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
@@ -589,13 +643,38 @@ function EBlotter() {
           );
         }
 
+        if (
+          currentTab === "referred" &&
+          userRole === "Patrol" &&
+          hasPatrolTodayRef.current &&
+          patrolBarangaysRef.current.length > 0
+        ) {
+          results = results.filter(
+            (b) =>
+              patrolBarangaysRef.current.includes(
+                (b.place_barangay || "").toUpperCase(),
+              ) ||
+              (b.responder && b.responder.sender_user_id === currentUserId) ||
+              reminderBlotterIdsRef.current.includes(b.blotter_id), // ← new
+          );
+        }
+
         setBlotters(results);
         setCurrentPage(1);
         setLoading(false);
+
+        if (
+          currentTab === "referred" &&
+          userRole === "Patrol" &&
+          hasPatrolTodayRef.current
+        ) {
+          setReferredCount(results.length);
+        }
       }
     } catch (error) {
       if (error.name === "AbortError") return;
       console.error("Error:", error);
+      setLoading(false);
     }
   };
   const fetchDeletedBlotters = async () => {
@@ -738,8 +817,40 @@ function EBlotter() {
       const data = await res.json();
 
       if (data.features && data.features.length > 0) {
-        setStreetSuggestions(data.features);
-        setShowStreetDropdown(true);
+        // Filter suggestions to only those whose coordinates fall inside the selected barangay polygon
+        const filtered = data.features.filter((feature) => {
+          if (!selectedBrgyFeature) return true;
+          const [lng, lat] = feature.center;
+          const rings =
+            selectedBrgyFeature.geometry.type === "Polygon"
+              ? selectedBrgyFeature.geometry.coordinates
+              : selectedBrgyFeature.geometry.coordinates.flat(1);
+          let inside = false;
+          for (const ring of rings) {
+            const n = ring.length;
+            let j = n - 1;
+            for (let i = 0; i < n; i++) {
+              const xi = ring[i][0],
+                yi = ring[i][1];
+              const xj = ring[j][0],
+                yj = ring[j][1];
+              const intersect =
+                yi > lat !== yj > lat &&
+                lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
+              if (intersect) inside = !inside;
+              j = i;
+            }
+          }
+          return inside;
+        });
+
+        if (filtered.length > 0) {
+          setStreetSuggestions(filtered);
+          setShowStreetDropdown(true);
+        } else {
+          setStreetSuggestions([]);
+          setShowStreetDropdown(false);
+        }
       } else {
         setStreetSuggestions([]);
         setShowStreetDropdown(false);
@@ -772,6 +883,102 @@ function EBlotter() {
       }
     }
   }, [currentStep, caseDetail.incident_type]);
+
+  useEffect(() => {
+    if (userRole !== "Patrol") return;
+    const checkAssignment = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          },
+        );
+        const data = await res.json();
+        if (!data.success) return;
+        const today = new Date().toISOString().split("T")[0];
+        const ongoing = data.data.find(
+          (p) => p.start_date <= today && p.end_date >= today,
+        );
+        if (ongoing) {
+          const brgys = [
+            ...new Set(
+              (ongoing.routes || [])
+                .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+                .map((r) => r.barangay.toUpperCase()),
+            ),
+          ];
+          patrolBarangaysRef.current = brgys;
+          hasPatrolTodayRef.current = true;
+
+          // After setting patrolBarangaysRef.current / hasPatrolTodayRef.current:
+          try {
+            const rRes = await fetch(
+              `${import.meta.env.VITE_API_URL}/blotters/reminder-ids`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                },
+              },
+            );
+            const rData = await rRes.json();
+            if (rData.success) reminderBlotterIdsRef.current = rData.data;
+          } catch {
+            reminderBlotterIdsRef.current = [];
+          }
+        } else {
+          patrolBarangaysRef.current = [];
+          hasPatrolTodayRef.current = false;
+        }
+      } catch (err) {
+        console.warn("Failed to check patrol assignment:", err);
+        patrolBarangaysRef.current = [];
+        hasPatrolTodayRef.current = false;
+      } finally {
+        // Always re-fetch current tab
+        fetchBlotters(activeReportTabRef.current, true);
+
+        // Also fetch referred tab silently to populate the badge counter
+        if (
+          activeReportTabRef.current !== "referred" &&
+          hasPatrolTodayRef.current
+        ) {
+          const queryParams = new URLSearchParams({ referred: "true" });
+          fetch(`${import.meta.env.VITE_API_URL}/blotters?${queryParams}`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          })
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.success) {
+                const results = data.data.filter(
+                  (b) => b.referred_by_barangay === true,
+                );
+                const filtered = results.filter(
+                  (b) =>
+                    patrolBarangaysRef.current.includes(
+                      (b.place_barangay || "").toUpperCase(),
+                    ) ||
+                    (b.responder &&
+                      b.responder.sender_user_id === currentUserId) ||
+                    reminderBlotterIdsRef.current.includes(b.blotter_id),
+                );
+                setReferredCount(filtered.length);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    };
+    checkAssignment();
+  }, [userRole]);
+
+  useEffect(() => {
+    activeReportTabRef.current = activeReportTab;
+  }, [activeReportTab]);
 
   const handleEdit = async (blotterId) => {
     setFetchingEdit(true);
@@ -8371,6 +8578,7 @@ function EBlotter() {
           className={`eb-report-tab ${activeReportTab === "reports" ? "active" : ""}`}
           onClick={() => {
             if (activeReportTab === "reports") return;
+            activeReportTabRef.current = "reports"; // ADD THIS
             setBlotters([]);
             setCurrentPage(1);
             setActiveReportTab("reports");
@@ -8384,6 +8592,7 @@ function EBlotter() {
             className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
             onClick={() => {
               if (activeReportTab === "referred") return;
+              activeReportTabRef.current = "referred"; // ADD THIS
               setBlotters([]);
               setCurrentPage(1);
               setActiveReportTab("referred");

@@ -140,9 +140,68 @@ const getRespondersForReferrals = async (blotterIds) => {
   }
 };
 
+// Add this helper to notificationService.js
+const getPatrolUsersForBarangay = async (barangay) => {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const result = await pool.query(
+      `SELECT DISTINCT u.user_id
+       FROM users u
+       JOIN roles r ON u.role_id = r.role_id
+       JOIN active_patroller ap ON ap.officer_id = u.user_id
+       JOIN patrol_assignment_patroller pap ON pap.active_patroller_id = ap.active_patroller_id
+       JOIN patrol_assignment pa ON pa.patrol_id = pap.patrol_id
+       JOIN patrol_assignment_route par ON par.patrol_id = pa.patrol_id
+       WHERE r.role_name = 'Patrol'
+         AND u.status = 'verified'
+         AND pa.start_date <= $1
+         AND pa.end_date >= $1
+         AND par.stop_order <= 0
+         AND UPPER(par.barangay) = UPPER($2)`,
+      [today, barangay]
+    );
+    return result.rows.map((r) => r.user_id);
+  } catch (err) {
+    console.error("getPatrolUsersForBarangay error:", err.message);
+    return [];
+  }
+};
+
+const notifyPatrolsForReferral = async (barangay, payload, excludeUserId = null) => {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+
+    // Get patrol users assigned to this barangay today
+    const assignedUserIds = await getPatrolUsersForBarangay(barangay);
+
+    // If no one is assigned to this barangay today, notify ALL patrol users
+    // (so referrals don't get silently dropped when no schedule exists)
+    let targetUserIds;
+    if (assignedUserIds.length === 0) {
+      const allPatrols = await pool.query(
+        `SELECT u.user_id FROM users u
+         JOIN roles r ON u.role_id = r.role_id
+         WHERE r.role_name = 'Patrol' AND u.status = 'verified'`
+      );
+      targetUserIds = allPatrols.rows.map((r) => r.user_id);
+    } else {
+      targetUserIds = assignedUserIds;
+    }
+
+    await Promise.all(
+      targetUserIds
+        .filter((id) => !excludeUserId || id !== excludeUserId)
+        .map((id) => createNotification({ ...payload, recipientId: id }))
+    );
+  } catch (err) {
+    console.error("notifyPatrolsForReferral error:", err.message);
+  }
+};
+
 module.exports = { 
   createNotification, 
   notifyAllByRole, 
   getResponderForReferral,
   getRespondersForReferrals,
+  notifyPatrolsForReferral,
 };

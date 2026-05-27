@@ -17,6 +17,8 @@ const {
   restoreBlotter,
   importBlotters,
   acceptReferral, createBrgyReport, getBrgyReports, getReferredCount, detectCrimeType, respondToReferral, getPatrolUsers, remindPatrols,
+  checkReminderAccess,
+  getReminderBlotterIds,
 } = require("../controllers/blotterController");
 const {
   uploadAttachment,
@@ -38,7 +40,10 @@ router.get("/brgy-reports/mine", authenticate, getBrgyReports);
 router.post("/detect-crime-type", authenticate, detectCrimeType);
 
 // ✅ Static routes BEFORE /:id
+// ✅ Static routes BEFORE /:id
 router.get("/patrols", authenticate, getPatrolUsers);
+router.get("/reminder-ids", authenticate, getReminderBlotterIds);
+router.get("/reminder-access/:id", authenticate, checkReminderAccess);
 
 // ── all /:id routes together ──
 router.patch("/:id/respond", authenticate, respondToReferral);
