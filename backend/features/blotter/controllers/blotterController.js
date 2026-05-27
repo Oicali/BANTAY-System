@@ -2132,7 +2132,7 @@ const remindPatrols = async (req, res) => {
         senderId: req.user.user_id,
         senderName: req.user.username,
         type: "REFERRAL_REMINDER",
-        title: "⚠️ Referral Reminder",
+        title: "Referral Reminder",
         message: `${req.user.username} is reminding you to respond to referral #${blotterNumber}`,
         linkTo: linkTo,
       });
