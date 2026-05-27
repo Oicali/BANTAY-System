@@ -3,7 +3,12 @@
 const Blotter = require("../models/Blotter");
 const pool = require("../../../config/database");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-const { createNotification, notifyAllByRole, getResponderForReferral } = require("../../notifications/notificationService");
+const {
+  createNotification,
+  notifyAllByRole,
+  getResponderForReferral,
+  notifyPatrolsForReferral,
+} = require("../../notifications/notificationService");
 const autoCreateCase = async (client, blotterId, createdBy) => {
   const existing = await client.query(
     "SELECT id FROM cases WHERE blotter_id = $1",
@@ -455,10 +460,18 @@ const getAllBlotters = async (req, res) => {
 
     const blotters = await Blotter.getAll(filters);
 
+    // Backend safety net: enforce referred flag strictly
+    let results = blotters;
+    if (req.query.referred === "false") {
+      results = blotters.filter((b) => !b.referred_by_barangay);
+    } else if (req.query.referred === "true") {
+      results = blotters.filter((b) => b.referred_by_barangay === true);
+    }
+
     res.status(200).json({
       success: true,
-      count: blotters.length,
-      data: blotters,
+      count: results.length,
+      data: results,
     });
   } catch (error) {
     console.error("Get blotters error:", error);
@@ -469,7 +482,6 @@ const getAllBlotters = async (req, res) => {
     });
   }
 };
-
 const getBlotterById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -577,9 +589,10 @@ const deleteBlotter = async (req, res) => {
       ipAddress: getClientIp(req),
     });
     const deleted = await pool.query(
-  `SELECT submitted_by, incident_type FROM blotter_entries WHERE blotter_id = $1`,
+  `SELECT submitted_by, incident_type, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
   [id]
 );
+
 if (deleted.rows[0]?.submitted_by) {
   await createNotification({
     recipientId: deleted.rows[0].submitted_by,
@@ -591,10 +604,31 @@ if (deleted.rows[0]?.submitted_by) {
     linkTo: "/brgy-report",
   });
 }
-    res.status(200).json({
-      success: true,
-      message: "Blotter deleted successfully",
-    });
+
+await notifyAllByRole(["Administrator", "Technical Administrator"], {
+  senderId: req.user.user_id,
+  senderName: req.user.username,
+  type: "REFERRAL_DELETED",
+  title: "Referral Removed",
+  message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} has been deleted by ${req.user.username}.`,
+  linkTo: "/e-blotter",
+}, req.user.user_id);
+
+if (deleted.rows[0]?.place_barangay) {
+  await notifyPatrolsForReferral(deleted.rows[0].place_barangay, {
+    senderId: req.user.user_id,
+    senderName: req.user.username,
+    type: "REFERRAL_DELETED",
+    title: "Referral Removed",
+    message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} in Brgy. ${deleted.rows[0].place_barangay} has been removed.`,
+    linkTo: "/e-blotter",
+  }, req.user.user_id);
+}
+
+res.status(200).json({
+  success: true,
+  message: "Blotter deleted successfully",
+});
   } catch (error) {
     console.error("Delete blotter error:", error);
     res.status(500).json({
@@ -1365,14 +1399,20 @@ const importBlotters = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "NEW_REFERRAL",
-  title: "Blotters Imported",
-  message: `${req.user.username} imported ${actualInserted} blotter(s)`,
-  linkTo: "/e-blotter",
-}, req.user.user_id);
+
+    await notifyAllByRole(
+      ["Administrator", "Technical Administrator"],
+      {
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "NEW_REFERRAL",
+        title: "Blotters Imported",
+        message: `${req.user.username} imported ${actualInserted} blotter(s)`,
+        linkTo: "/e-blotter",
+      },
+      req.user.user_id,
+    );
+
     return res.status(200).json({
       success: true,
       summary: {
@@ -1430,6 +1470,7 @@ const acceptReferral = async (req, res) => {
       await autoCreateCase(client, parseInt(id), req.user.user_id);
 
       await client.query("COMMIT");
+
       await logAudit({
         userId: req.user?.user_id,
         username: req.user?.username,
@@ -1440,30 +1481,47 @@ const acceptReferral = async (req, res) => {
         source: "Web Portal",
         ipAddress: getClientIp(req),
       });
+
       const referralRow = await pool.query(
-  `SELECT submitted_by, place_barangay FROM blotter_entries WHERE blotter_id = $1`,
-  [id]
-);
-if (referralRow.rows[0]?.submitted_by) {
-  await createNotification({
-    recipientId: referralRow.rows[0].submitted_by,
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "REFERRAL_ACCEPTED",
-    title: "Referral Accepted",
-    message: `Your referral has been accepted and is now under investigation.`,
-    linkTo: "/brgy-report",
-  });
-}
-// Notify admins
-await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "REFERRAL_ACCEPTED",
-  title: "Referral Accepted",
-  message: `${req.user.username} accepted a barangay referral (${blotter.rows[0].blotter_entry_number})`,
-  linkTo: "/e-blotter",
-}, req.user.user_id); // ← exclude self
+        `SELECT submitted_by, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
+        [id]
+      );
+
+      // Notify barangay submitter
+      if (referralRow.rows[0]?.submitted_by) {
+        await createNotification({
+          recipientId: referralRow.rows[0].submitted_by,
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "REFERRAL_ACCEPTED",
+          title: "Referral Accepted",
+          message: `Your referral has been accepted and is now under investigation.`,
+          linkTo: "/brgy-report",
+        });
+      }
+
+      // Notify admins
+      await notifyAllByRole(["Administrator", "Technical Administrator"], {
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "REFERRAL_ACCEPTED",
+        title: "Referral Accepted",
+        message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} (Brgy. ${referralRow.rows[0]?.place_barangay}).`,
+        linkTo: "/e-blotter",
+      }, req.user.user_id);
+
+      // Notify patrols assigned to the referral's barangay
+      if (referralRow.rows[0]?.place_barangay) {
+        await notifyPatrolsForReferral(referralRow.rows[0].place_barangay, {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "REFERRAL_ACCEPTED",
+          title: "Referral Accepted",
+          message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} in Brgy. ${referralRow.rows[0].place_barangay}.`,
+          linkTo: "/e-blotter",
+        }, req.user.user_id);
+      }
+
       return res
         .status(200)
         .json({ success: true, message: "Referral accepted successfully" });
@@ -1480,6 +1538,8 @@ await notifyAllByRole(["Administrator", "Technical Administrator"], {
       .json({ success: false, message: "Error accepting referral" });
   }
 };
+
+
 const createBrgyReport = async (req, res) => {
   try {
     const {
@@ -1610,19 +1670,36 @@ const createBrgyReport = async (req, res) => {
         source: "Web Portal",
         ipAddress: getClientIp(req),
       });
-      await notifyAllByRole(["Administrator", "Technical Administrator", "Patrol"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "NEW_REFERRAL",
-  title: "New Barangay Referral",
-  message: `New referral submitted: ${resolvedIncidentType} in Brgy. ${place_barangay}`,
-  linkTo: "/e-blotter",
-}, req.user.user_id); 
+      await notifyAllByRole(
+        ["Administrator", "Technical Administrator"],
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "NEW_REFERRAL",
+          title: "New Barangay Referral",
+          message: `New referral submitted: ${resolvedIncidentType} in Brgy. ${place_barangay}`,
+          linkTo: "/e-blotter",
+        },
+        req.user.user_id,
+      );
+
+      await notifyPatrolsForReferral(
+        place_barangay,
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "NEW_REFERRAL",
+          title: "New Barangay Referral",
+          message: `New referral submitted: ${resolvedIncidentType} in Brgy. ${place_barangay}`,
+          linkTo: "/e-blotter",
+        },
+        req.user.user_id,
+      );
       return res.status(201).json({
-  success: true,
-  message: "Report submitted successfully! Awaiting police review.",
-  data: { blotter_entry_number: blotterNumber, blotter_id: blotterId }
-});
+        success: true,
+        message: "Report submitted successfully! Awaiting police review.",
+        data: { blotter_entry_number: blotterNumber, blotter_id: blotterId },
+      });
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -1658,23 +1735,25 @@ const getBrgyReports = async (req, res) => {
       ORDER BY b.created_at DESC`,
       [req.user.user_id],
     );
-    
+
     // Get responder info for each blotter from notifications
-    const blotterIds = result.rows.map(row => row.blotter_id);
-    
+    const blotterIds = result.rows.map((row) => row.blotter_id);
+
     let respondersMap = {};
     if (blotterIds.length > 0) {
       // Import the notification service function
-      const { getRespondersForReferrals } = require("../../notifications/notificationService");
+      const {
+        getRespondersForReferrals,
+      } = require("../../notifications/notificationService");
       respondersMap = await getRespondersForReferrals(blotterIds);
     }
-    
+
     // Merge responder data into each report
-    const reportsWithResponders = result.rows.map(row => ({
+    const reportsWithResponders = result.rows.map((row) => ({
       ...row,
-      responder: respondersMap[row.blotter_id] || null
+      responder: respondersMap[row.blotter_id] || null,
     }));
-    
+
     return res.status(200).json({ success: true, data: reportsWithResponders });
   } catch (error) {
     console.error("Get brgy reports error:", error);
@@ -1718,18 +1797,18 @@ const detectCrimeType = async (req, res) => {
   }
 
   const VALID_CRIME_TYPES = [
-  "Carnapping - MC",
-  "Carnapping - MV",
-  "Homicide",
-  "Murder",
-  "Physical Injury",
-  "Rape",
-  "Robbery",
-  "Special Complex Crime",
-  "Theft",
-];
+    "Carnapping - MC",
+    "Carnapping - MV",
+    "Homicide",
+    "Murder",
+    "Physical Injury",
+    "Rape",
+    "Robbery",
+    "Special Complex Crime",
+    "Theft",
+  ];
 
-const prompt = `You are a PNP crime classifier. Given an incident narrative, classify it into exactly one of these crime types, OR respond with NOT_AN_INDEX_CRIME if it does not describe a valid criminal offense against a human person.
+  const prompt = `You are a PNP crime classifier. Given an incident narrative, classify it into exactly one of these crime types, OR respond with NOT_AN_INDEX_CRIME if it does not describe a valid criminal offense against a human person.
 
 Valid crime types:
 ${VALID_CRIME_TYPES.map((c, i) => `${i + 1}. ${c}`).join("\n")}
@@ -1832,14 +1911,20 @@ const respondToReferral = async (req, res) => {
 
     const blotter = await pool.query(
       `SELECT * FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
-      [id]
+      [id],
     );
     if (blotter.rows.length === 0)
-      return res.status(404).json({ success: false, message: "Blotter not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Blotter not found" });
     if (!blotter.rows[0].referred_by_barangay)
-      return res.status(400).json({ success: false, message: "Not a barangay referral" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Not a barangay referral" });
     if (blotter.rows[0].status !== "Pending")
-      return res.status(400).json({ success: false, message: "Already accepted" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Already accepted" });
 
     // Check if someone already claimed this via notifications
     const existing = await getResponderForReferral(id);
@@ -1865,12 +1950,11 @@ const respondToReferral = async (req, res) => {
         message: `${responderName} will respond to referral ${blotterNumber}`,
         linkTo,
       },
-      req.user.user_id
+      req.user.user_id,
     );
-
-    // Notify other patrols so they know not to go
-    await notifyAllByRole(
-      ["Patrol"],
+    // Notify other patrols assigned to this barangay so they know not to go
+    await notifyPatrolsForReferral(
+      blotter.rows[0].place_barangay,
       {
         senderId: req.user.user_id,
         senderName: responderName,
@@ -1879,7 +1963,7 @@ const respondToReferral = async (req, res) => {
         message: `${responderName} is responding to ${blotterNumber}. No need to respond.`,
         linkTo,
       },
-      req.user.user_id
+      req.user.user_id,
     );
 
     // Notify the barangay submitter
@@ -1913,58 +1997,66 @@ const respondToReferral = async (req, res) => {
     });
   } catch (error) {
     console.error("Respond to referral error:", error);
-    res.status(500).json({ success: false, message: "Error responding to referral" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error responding to referral" });
   }
 };
-
 
 const remindPatrols = async (req, res) => {
   try {
     // Role check - only Administrators and Technical Administrators can send reminders
     const userRole = req.user?.role;
-    if (userRole !== "Administrator" && userRole !== "Technical Administrator") {
+    if (
+      userRole !== "Administrator" &&
+      userRole !== "Technical Administrator"
+    ) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only Administrators can send reminders."
+        message: "Access denied. Only Administrators can send reminders.",
       });
     }
-    
+
     const { id } = req.params;
     const { patrol_ids } = req.body;
-    
+
     if (!patrol_ids || patrol_ids.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "No patrol officers selected" 
+      return res.status(400).json({
+        success: false,
+        message: "No patrol officers selected",
       });
     }
-    
+
     // Check blotter exists and is a brgy referral without responder
     const blotter = await pool.query(
       `SELECT * FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
-      [id]
+      [id],
     );
-    
+
     if (blotter.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Blotter not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Blotter not found" });
     }
-    
+
     if (!blotter.rows[0].referred_by_barangay) {
-      return res.status(400).json({ success: false, message: "Not a barangay referral" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Not a barangay referral" });
     }
-    
+
     // Check if someone already responded
     const existing = await getResponderForReferral(id);
     if (existing) {
-      return res.status(409).json({ 
-        success: false, 
-        message: `Already responded by ${existing.sender_name}` 
+      return res.status(409).json({
+        success: false,
+        message: `Already responded by ${existing.sender_name}`,
       });
     }
-    
+
     const blotterNumber = blotter.rows[0].blotter_entry_number;
     const linkTo = `/e-blotter?referral=${id}`;
-    
+
     // Send reminders to selected patrols
     let successCount = 0;
     for (const patrolId of patrol_ids) {
@@ -1979,7 +2071,7 @@ const remindPatrols = async (req, res) => {
       });
       successCount++;
     }
-    
+
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
@@ -1990,15 +2082,17 @@ const remindPatrols = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    
+
     return res.status(200).json({
       success: true,
       message: `Reminders sent to ${successCount} patrol officer(s)`,
-      count: successCount
+      count: successCount,
     });
   } catch (error) {
     console.error("Remind patrols error:", error);
-    res.status(500).json({ success: false, message: "Error sending reminders" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error sending reminders" });
   }
 };
 
@@ -2012,7 +2106,7 @@ const getPatrolUsers = async (req, res) => {
        LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
        JOIN roles r ON u.role_id = r.role_id
        WHERE r.role_name = 'Patrol' AND u.status = 'verified'
-       ORDER BY u.first_name ASC`
+       ORDER BY u.first_name ASC`,
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -2038,6 +2132,6 @@ module.exports = {
   getBrgyReports,
   detectCrimeType,
   respondToReferral,
-  remindPatrols,      // ← add this
-  getPatrolUsers,     // ← add this
+  remindPatrols, // ← add this
+  getPatrolUsers, // ← add this
 };

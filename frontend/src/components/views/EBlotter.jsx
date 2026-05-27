@@ -218,6 +218,7 @@ function EBlotter() {
 
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
+  const activeReportTabRef = useRef("reports"); // ADD THIS
   const [modalAttachments, setModalAttachments] = useState([]);
   const [pendingModalFiles, setPendingModalFiles] = useState([]);
   const [attachMediaTab, setAttachMediaTab] = useState("image"); // "image" | "video"
@@ -381,6 +382,10 @@ function EBlotter() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
 
+  const patrolBarangaysRef = useRef([]);
+const hasPatrolTodayRef = useRef(false);
+
+
   useEffect(() => {
     try {
       const token = localStorage.getItem("token");
@@ -395,17 +400,20 @@ function EBlotter() {
   const totalSteps = 3;
   const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
   const fetchReferredCount = useCallback(async () => {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      },
-    );
-    const data = await res.json();
-    if (data.success) {
-      setReferredCount(data.count);
-    }
-  }, []);
+  // Patrol users: count is derived from filtered blotters in fetchBlotters
+  if (userRole === "Patrol") return;
+
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
+    {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    },
+  );
+  const data = await res.json();
+  if (data.success) {
+    setReferredCount(data.count);
+  }
+}, [userRole]);
 
   const handleExport = async (dateFrom, dateTo) => {
     setShowExportModal(false);
@@ -458,146 +466,204 @@ function EBlotter() {
   };
 
   useEffect(() => {
-    fetchBlotters(activeReportTab);
+  activeReportTabRef.current = activeReportTab;
+  fetchBlotters(activeReportTab);
 
-    const targetId = sessionStorage.getItem("openBlotterId");
-    if (targetId) {
-      sessionStorage.removeItem("openBlotterId");
-      setTimeout(() => handleView(targetId), 800);
+  const targetId = sessionStorage.getItem("openBlotterId");
+  if (targetId) {
+    sessionStorage.removeItem("openBlotterId");
+    setTimeout(() => handleView(targetId), 800);
+  }
+
+  const CALABARZON_CODE = "040000000";
+  const CAVITE_CODE = "042100000";
+
+  const skipCount = (() => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.role === "Patrol";
+  } catch {
+    return false;
+  }
+})();
+if (!skipCount) fetchReferredCount();
+
+ const interval = setInterval(() => {
+  const skipCount = (() => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return false;
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.role === "Patrol";
+    } catch {
+      return false;
     }
+  })();
+  if (!skipCount) fetchReferredCount();
 
-    const CALABARZON_CODE = "040000000";
-    const CAVITE_CODE = "042100000";
+  if (activeReportTabRef.current === "referred") {
+    fetchBlotters("referred", true);
+  }
+}, 30000);
 
-    fetchReferredCount();
-    // AFTER
-    const interval = setInterval(() => {
-      fetchReferredCount();
-      if (activeReportTab === "referred") {
-        fetchBlotters("referred", true);
-      }
-    }, 30000);
+  fetchProvinces(CALABARZON_CODE).then((data) => setCaseProvinces(data));
+  fetchCities(CAVITE_CODE).then((data) => setCaseCities(data));
 
-    fetchProvinces(CALABARZON_CODE).then((data) => setCaseProvinces(data));
-    fetchCities(CAVITE_CODE).then((data) => setCaseCities(data));
+  fetch("/bacoor_barangays.geojson")
+    .then((r) => r.json())
+    .then((data) => {
+      setBarangayGeoJSON(data);
+      const brgyList = data.features
+        .map((f) => f.properties.name_db)
+        .filter(Boolean)
+        .filter((name, index, self) => self.indexOf(name) === index)
+        .sort();
+      setBacoorBarangays(brgyList);
+    })
+    .catch((err) => console.error("Failed to load barangay GeoJSON:", err));
 
-    fetch("/bacoor_barangays.geojson")
-      .then((r) => r.json())
-      .then((data) => {
-        setBarangayGeoJSON(data);
-        const brgyList = data.features
-          .map((f) => f.properties.name_db)
-          .filter(Boolean)
-          .filter((name, index, self) => self.indexOf(name) === index)
-          .sort();
-        setBacoorBarangays(brgyList);
-      })
-      .catch((err) => console.error("Failed to load barangay GeoJSON:", err));
-
-    return () => clearInterval(interval); // ← cleanup at the END
-  }, [activeReportTab]);
+  return () => clearInterval(interval);
+}, [activeReportTab]);
 
   // AFTER
-  const fetchBlotters = async (tabOverride, silent = false) => {
-    const currentTab =
-      tabOverride !== undefined ? tabOverride : activeReportTab;
-    try {
-      if (fetchControllerRef.current) {
-        fetchControllerRef.current.abort();
-      }
-      const controller = new AbortController();
-      fetchControllerRef.current = controller;
-      if (!silent) {
-        setLoading(true);
-        setBlotters([]);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
-      const queryParams = new URLSearchParams();
-      if (filters.search) queryParams.append("search", filters.search);
-      if (filters.status) queryParams.append("status", filters.status);
-      // if (filters.incident_type)
-      //   queryParams.append("incident_type", filters.incident_type);
-      if (filters.date_from) queryParams.append("date_from", filters.date_from);
-      if (filters.date_to) queryParams.append("date_to", filters.date_to);
-      if (filters.barangay) queryParams.append("barangay", filters.barangay);
+ const fetchBlotters = async (tabOverride, silent = false) => {
+  const currentTab =
+    tabOverride !== undefined ? tabOverride : activeReportTabRef.current;
 
-      if (currentTab === "referred") {
-        queryParams.append("referred", "true");
-      } else if (filters.data_source !== "brgy_referral") {
-        queryParams.append("referred", "false");
-      }
-
-      const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        signal: controller.signal,
-      });
-      const response = handleApiResponse(rawResponse);
-      if (!response) {
-        setLoading(false);
-        return;
-      }
-      const data = await response.json();
-      if (data.success) {
-        let results = data.data;
-
-        // Search filter — apply client-side for referred tab since backend
-        // may not filter by search when referred=true
-        if (filters.search && currentTab === "referred") {
-          const q = filters.search.toLowerCase();
-          results = results.filter(
-            (b) =>
-              (b.blotter_entry_number || "").toLowerCase().includes(q) ||
-              (b.incident_type || "").toLowerCase().includes(q) ||
-              (b.place_barangay || "").toLowerCase().includes(q) ||
-              (b.place_street || "").toLowerCase().includes(q) ||
-              (b.victim || "").toLowerCase().includes(q),
-          );
-        }
-
-        // Crime type filter
-        if (filters.incident_type) {
-          results = results.filter(
-            (b) =>
-              b.incident_type.toLowerCase() ===
-              filters.incident_type.toLowerCase(),
-          );
-        }
-
-        // Barangay filter — apply client-side for referred tab
-        if (filters.barangay && currentTab === "referred") {
-          results = results.filter(
-            (b) =>
-              (b.place_barangay || "").toUpperCase() ===
-              filters.barangay.toUpperCase(),
-          );
-        }
-
-        // Data source filter
-        if (filters.data_source === "brgy_referral") {
-          results = results.filter((b) =>
-            (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
-          );
-        } else if (filters.data_source === "bantay_import") {
-          results = results.filter((b) =>
-            (b.blotter_entry_number || "").toUpperCase().startsWith("BLT"),
-          );
-        } else if (filters.data_source === "manual") {
-          results = results.filter((b) =>
-            /^\d{4}/.test(b.blotter_entry_number || ""),
-          );
-        }
-
-        setBlotters(results);
-        setCurrentPage(1);
-        setLoading(false);
-      }
-    } catch (error) {
-      if (error.name === "AbortError") return;
-      console.error("Error:", error);
+  try {
+    if (fetchControllerRef.current) {
+      fetchControllerRef.current.abort();
     }
-  };
+    const controller = new AbortController();
+    fetchControllerRef.current = controller;
+
+    if (!silent) {
+      setLoading(true);
+      setBlotters([]);
+    }
+
+    const queryParams = new URLSearchParams();
+    if (filters.search) queryParams.append("search", filters.search);
+    if (filters.status) queryParams.append("status", filters.status);
+    if (filters.date_from) queryParams.append("date_from", filters.date_from);
+    if (filters.date_to) queryParams.append("date_to", filters.date_to);
+    if (filters.barangay) queryParams.append("barangay", filters.barangay);
+
+    if (currentTab === "referred") {
+      queryParams.append("referred", "true");
+    } else if (filters.data_source !== "brgy_referral") {
+      queryParams.append("referred", "false");
+    }
+
+    const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      signal: controller.signal,
+    });
+
+    const response = handleApiResponse(rawResponse);
+    if (!response) {
+      setLoading(false);
+      return;
+    }
+
+    const data = await response.json();
+
+    
+
+    if (data.success) {
+      let results = data.data;
+
+      // Safety net: enforce tab separation client-side regardless of backend filter
+      if (currentTab === "reports") {
+        results = results.filter(
+          (b) => !b.referred_by_barangay
+        );
+      } else if (currentTab === "referred") {
+        results = results.filter(
+          (b) => b.referred_by_barangay === true
+        );
+      }
+
+      // Search filter for referred tab
+      if (filters.search && currentTab === "referred") {
+        const q = filters.search.toLowerCase();
+        results = results.filter(
+          (b) =>
+            (b.blotter_entry_number || "").toLowerCase().includes(q) ||
+            (b.incident_type || "").toLowerCase().includes(q) ||
+            (b.place_barangay || "").toLowerCase().includes(q) ||
+            (b.place_street || "").toLowerCase().includes(q) ||
+            (b.victim || "").toLowerCase().includes(q),
+        );
+      }
+
+      if (filters.incident_type) {
+        results = results.filter(
+          (b) =>
+            b.incident_type.toLowerCase() ===
+            filters.incident_type.toLowerCase(),
+        );
+      }
+
+      if (filters.barangay && currentTab === "referred") {
+        results = results.filter(
+          (b) =>
+            (b.place_barangay || "").toUpperCase() ===
+            filters.barangay.toUpperCase(),
+        );
+      }
+
+      if (filters.data_source === "brgy_referral") {
+        results = results.filter((b) =>
+          (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
+        );
+      } else if (filters.data_source === "bantay_import") {
+        results = results.filter((b) =>
+          (b.blotter_entry_number || "").toUpperCase().startsWith("BLT"),
+        );
+      } else if (filters.data_source === "manual") {
+        results = results.filter((b) =>
+          /^\d{4}/.test(b.blotter_entry_number || ""),
+        );
+      }
+
+      if (
+        currentTab === "referred" &&
+        userRole === "Patrol" &&
+        hasPatrolTodayRef.current &&
+        patrolBarangaysRef.current.length > 0
+      ) {
+        results = results.filter(
+          (b) =>
+            patrolBarangaysRef.current.includes(
+              (b.place_barangay || "").toUpperCase(),
+            ) ||
+            (b.responder && b.responder.sender_user_id === currentUserId),
+        );
+      }
+
+      setBlotters(results);
+      setCurrentPage(1);
+      setLoading(false);
+
+      if (
+        currentTab === "referred" &&
+        userRole === "Patrol" &&
+        hasPatrolTodayRef.current
+      ) {
+        setReferredCount(results.length);
+      }
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.error("Error:", error);
+    setLoading(false);
+  }
+};
   const fetchDeletedBlotters = async () => {
     try {
       setTrashLoading(true);
@@ -772,6 +838,54 @@ function EBlotter() {
       }
     }
   }, [currentStep, caseDetail.incident_type]);
+
+  useEffect(() => {
+  if (userRole !== "Patrol") return;
+  const checkAssignment = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      const data = await res.json();
+      if (!data.success) return;
+      const today = new Date().toISOString().split("T")[0];
+      const ongoing = data.data.find(
+        (p) => p.start_date <= today && p.end_date >= today
+      );
+      if (ongoing) {
+        const brgys = [
+          ...new Set(
+            (ongoing.routes || [])
+              .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
+              .map((r) => r.barangay.toUpperCase())
+          ),
+        ];
+        patrolBarangaysRef.current = brgys;
+        hasPatrolTodayRef.current = true;
+      } else {
+        patrolBarangaysRef.current = [];
+        hasPatrolTodayRef.current = false;
+      }
+    } catch (err) {
+      console.warn("Failed to check patrol assignment:", err);
+      patrolBarangaysRef.current = [];
+      hasPatrolTodayRef.current = false;
+    } finally {
+  if (activeReportTabRef.current === "referred") {
+    fetchBlotters("referred", true);
+  } else {
+    // Still need to re-fetch the Reports tab with updated patrol data
+    fetchBlotters(activeReportTabRef.current, true);
+  }
+}
+  };
+  checkAssignment();
+}, [userRole]);
+
+useEffect(() => {
+  activeReportTabRef.current = activeReportTab;
+}, [activeReportTab]);
 
   const handleEdit = async (blotterId) => {
     setFetchingEdit(true);
@@ -8366,66 +8480,68 @@ function EBlotter() {
         </div>
       </div>
 
-      <div className="eb-report-tabs">
-        <button
-          className={`eb-report-tab ${activeReportTab === "reports" ? "active" : ""}`}
-          onClick={() => {
-            if (activeReportTab === "reports") return;
-            setBlotters([]);
-            setCurrentPage(1);
-            setActiveReportTab("reports");
-            fetchBlotters("reports");
-          }}
-        >
-          Reports
-        </button>
-        {userRole !== "Investigator" && (
-          <button
-            className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
-            onClick={() => {
-              if (activeReportTab === "referred") return;
-              setBlotters([]);
-              setCurrentPage(1);
-              setActiveReportTab("referred");
-              fetchBlotters("referred");
+     <div className="eb-report-tabs">
+  <button
+    className={`eb-report-tab ${activeReportTab === "reports" ? "active" : ""}`}
+    onClick={() => {
+      if (activeReportTab === "reports") return;
+      activeReportTabRef.current = "reports"; // ADD THIS
+      setBlotters([]);
+      setCurrentPage(1);
+      setActiveReportTab("reports");
+      fetchBlotters("reports");
+    }}
+  >
+    Reports
+  </button>
+  {userRole !== "Investigator" && (
+    <button
+      className={`eb-report-tab ${activeReportTab === "referred" ? "active" : ""}`}
+      onClick={() => {
+        if (activeReportTab === "referred") return;
+        activeReportTabRef.current = "referred"; // ADD THIS
+        setBlotters([]);
+        setCurrentPage(1);
+        setActiveReportTab("referred");
+        fetchBlotters("referred");
+      }}
+    >
+      <span
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+        }}
+      >
+        Referred by:
+        {referredCount > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: "-8px",
+              right: "-18px",
+              backgroundColor: "#dc2626",
+              color: "white",
+              borderRadius: "50%",
+              minWidth: "18px",
+              height: "18px",
+              fontSize: "10px",
+              fontWeight: "800",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 4px",
+              lineHeight: 1,
             }}
           >
-            <span
-              style={{
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              Referred by:
-              {referredCount > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-8px",
-                    right: "-18px",
-                    backgroundColor: "#dc2626",
-                    color: "white",
-                    borderRadius: "50%",
-                    minWidth: "18px",
-                    height: "18px",
-                    fontSize: "10px",
-                    fontWeight: "800",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "0 4px",
-                    lineHeight: 1,
-                  }}
-                >
-                  {referredCount}
-                </span>
-              )}
-            </span>
-          </button>
+            {referredCount}
+          </span>
         )}
-      </div>
+      </span>
+    </button>
+  )}
+</div>
 
       <div className="eb-table-card">
         <div className="eb-table-container">
