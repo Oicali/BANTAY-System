@@ -218,7 +218,7 @@ const AuditLog = () => {
       {/* Page header */}
       <div className="al-page-header">
         <div className="al-page-header-left">
-          <h1>Audit Log</h1>
+          <h1>Audit Trail</h1>
           <p>Track all system activity — who did what, and when</p>
         </div>
         <div className="al-header-actions">
