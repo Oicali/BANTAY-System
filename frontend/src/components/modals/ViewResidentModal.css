@@ -176,9 +176,55 @@
 .vrm-btn-close:hover { background: #f3f4f6; }
 
 @media (max-width: 640px) {
-  .vrm-grid { grid-template-columns: 1fr 1fr; }
-  .vrm-modal { max-width: 98vw; }
-  .vrm-body { padding: 16px; }
-  .vrm-header { padding: 16px; }
-  .vrm-footer { padding: 12px 16px; }
+  .vrm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .vrm-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .vrm-header {
+    padding: 16px 18px;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .vrm-title { font-size: 16px; }
+
+  .vrm-body { padding: 16px 18px; }
+
+  .vrm-profile-row {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .vrm-avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .vrm-avatar-initials { font-size: 18px; }
+
+  .vrm-full-name { font-size: 14px; }
+
+  .vrm-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .vrm-footer {
+    padding: 12px 18px 20px;
+    border-radius: 0;
+  }
+
+  .vrm-btn-close {
+    width: 100%;
+    padding: 13px;
+    font-size: 14px;
+    text-align: center;
+  }
 }

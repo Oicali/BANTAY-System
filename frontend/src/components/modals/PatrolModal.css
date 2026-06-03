@@ -1486,31 +1486,172 @@
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  /* Full-screen modals */
   .apm-modal,
   .epm-modal,
   .bc-modal {
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     border-radius: 0;
+    max-width: 100%;
   }
+
+  /* Stack map on top, info panel below */
   .apm-body,
   .epm-body,
   .bc-body {
     grid-template-columns: 1fr;
-    grid-template-rows: 50% 50%;
+    grid-template-rows: 40% 60%;
   }
+
   .apm-map-panel,
   .epm-map-panel,
   .bc-map-panel {
     border-right: none;
     border-bottom: 1px solid var(--pm-border);
   }
+
+  /* Top bar — stack fields in 2-col grid */
   .apm-topbar,
   .epm-topbar {
-    padding: 12px 16px;
+    padding: 10px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
+
+  .apm-topbar-fields,
+  .epm-topbar-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .apm-field input,
+  .apm-field select,
+  .epm-field input,
+  .epm-field select {
+    font-size: 16px; /* prevents iOS auto-zoom */
+    min-width: unset;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .apm-field input[type="date"],
+  .epm-field input[type="date"] {
+    min-width: unset;
+  }
+
+  .apm-topbar-actions,
+  .epm-topbar-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .apm-btn-cancel,
+  .epm-btn-cancel {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .apm-btn-save,
+  .epm-btn-save {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* BeatCard header */
   .bc-header {
-    padding: 14px 16px;
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .bc-patrol-name { font-size: 16px; }
+
+  /* Date tabs — horizontal scroll strip */
+  .apm-date-tabs,
+  .epm-date-tabs,
+  .bc-date-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .apm-date-tabs::-webkit-scrollbar,
+  .epm-date-tabs::-webkit-scrollbar,
+  .bc-date-tabs::-webkit-scrollbar { display: none; }
+
+  .apm-date-tab,
+  .epm-date-tab,
+  .bc-date-tab {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 11.5px;
+  }
+
+  /* Section padding tighter */
+  .apm-section,
+  .epm-section,
+  .bc-section,
+  .apm-section-grow,
+  .epm-section-grow,
+  .bc-section-grow {
+    padding: 10px 12px;
+  }
+
+  /* Timetable — horizontal scroll */
+  .apm-timetable-wrap,
+  .epm-timetable-wrap,
+  .bc-timetable-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .apm-timetable,
+  .epm-timetable,
+  .bc-timetable {
+    min-width: 380px;
+  }
+
+  /* Time inputs slightly smaller */
+  .apm-time-inputs input[type="time"],
+  .epm-time-inputs input[type="time"] {
+    width: 82px;
+    font-size: 12px;
+  }
+
+  /* Search input */
+  .apm-search,
+  .epm-search {
+    font-size: 16px; /* prevents iOS auto-zoom */
+  }
+
+  /* Checklist touch targets */
+  .apm-check-item,
+  .epm-check-item {
+    padding: 10px;
+  }
+
+  /* Apply dates dialog */
+  .apd-dialog {
+    width: calc(100vw - 32px);
+    padding: 18px;
   }
 }
-/* f59e0b */
+
+@media (max-width: 480px) {
+  .apm-topbar-fields,
+  .epm-topbar-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .apm-body,
+  .epm-body,
+  .bc-body {
+    grid-template-rows: 35% 65%;
+  }
+}

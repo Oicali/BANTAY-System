@@ -1773,3 +1773,117 @@ input:focus-visible {
     width: 270px;
   }
 }
+/* === ADDITIONAL MOBILE FIXES === */
+@media (max-width: 768px) {
+  /* Multi-select triggers — full width */
+  .crmap-multisel-trigger {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Date range — stack on mobile */
+  .crmap-date-range {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .crmap-date-arrow { display: none; }
+  .crmap-fsel-date {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Apply + clear buttons row */
+  .crmap-apply-btn,
+  .crmap-clear-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Map height — tighter on mobile */
+  .crmap-map-wrap {
+    height: calc(100vh - 480px);
+    min-height: 360px;
+  }
+
+  /* Sidebar — narrower, slides over map */
+  .crmap-sidebar {
+    width: 260px;
+  }
+
+  /* Sidebar toggle — adjust position */
+  .crmap-sidebar-toggle {
+    transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Heatmap toggle — smaller on mobile */
+  .crmap-heatmap-toggle {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  /* Map controls — smaller buttons */
+  .crmap-ctrl-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Options popover — open upward on mobile */
+  .crmap-options-popover {
+    bottom: 0;
+    left: 40px;
+    width: 180px;
+  }
+
+  /* Zoom hint — smaller text */
+  .crmap-zoom-hint {
+    font-size: 11px;
+    padding: 6px 14px;
+  }
+
+  /* Error banner — allow wrap */
+  .crmap-error-banner {
+    white-space: normal;
+    max-width: 90vw;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Header — tighten */
+  .crmap-title { font-size: 20px; }
+  .crmap-subtitle { font-size: 12px; }
+
+  /* Map even shorter on tiny screens */
+  .crmap-map-wrap {
+    height: calc(100vh - 560px);
+    min-height: 280px;
+  }
+
+  /* Sidebar — full width overlay on very small screens */
+  .crmap-sidebar {
+    width: calc(100% - 24px);
+    left: 12px;
+    right: 12px;
+  }
+
+  /* Sidebar toggle hides when sidebar is full width */
+  .crmap-sidebar-toggle {
+    right: 14px !important;
+  }
+
+  /* Popup — full width */
+  .crmap-popup { min-width: 180px; }
+
+  /* Brgy tooltip — keep within screen */
+  .crmap-brgy-tooltip {
+    font-size: 11px;
+    padding: 5px 10px;
+    max-width: 180px;
+    white-space: normal;
+  }
+
+  /* Controls — move up slightly so they don't overlap zoom hint */
+  .crmap-controls { bottom: 48px; }
+}

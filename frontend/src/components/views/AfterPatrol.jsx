@@ -1294,9 +1294,10 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
         </div>
 
         <div style={{
-          display: "flex", borderBottom: "2px solid #e5e7eb",
-          background: "#f9fafb", overflowX: "auto",
-          flexShrink: 0, padding: "0 20px",
+  display: "flex", borderBottom: "2px solid #e5e7eb",
+  background: "#f9fafb", overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
+  flexShrink: 0, padding: "0 20px",
         }}>
           {patrolDates.map((d) => {
             const count    = (reportsByDate[d] || []).length;
@@ -1419,7 +1420,7 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
                       {[
                         { label: "Sector / Beat",     value: r.sector_beat },
                         { label: "Officials Visited", value: r.num_officials != null ? String(r.num_officials) : null },
@@ -1532,7 +1533,7 @@ const ViewPatrolModal = ({ patrol, onClose }) => {
           <SectionHeader>Patrol Information</SectionHeader>
           <div style={{ padding: "20px 32px 28px", background: "var(--gray-50)" }}>
             <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
                 {[
                   { label: "Patrol Name",      value: patrol.patrol_name },
                   { label: "Status",           value: <StatusBadge status={getPatrolStatus(patrol)} /> },

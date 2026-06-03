@@ -250,11 +250,16 @@ const OngoingShiftCard = ({ patrol, geoJSONData, myShifts, isUpcoming }) => {
           </div>
         </div>
 
-        {/* Status pill — UPCOMING or nothing (no LIVE pill) */}
-        {isUpcoming && (
+        {/* Status pill */}
+        {isUpcoming ? (
           <div className="pdv-upcoming-pill">
             <span className="pdv-upcoming-dot" />
             UPCOMING
+          </div>
+        ) : (
+          <div className="pdv-ongoing-live-pill">
+            <span className="pdv-live-dot" />
+            LIVE
           </div>
         )}
       </div>
@@ -694,7 +699,7 @@ const PatrollerDashboardView = () => {
           )}
         </div>
 
-        {/* Table — AfterPatrol style */}
+        {/* Table */}
         <div className="pdv-table-card">
           <div className="pdv-table-container">
             <table className="pdv-table">

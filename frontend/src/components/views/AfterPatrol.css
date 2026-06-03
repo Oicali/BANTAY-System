@@ -659,9 +659,72 @@ textarea.pd-modal-input {
 
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
+  .ap-wrap.pd-content-area { padding: 16px; }
+
   .ap-wrap .pd-page-header { flex-direction: column; gap: 16px; }
-  .pd-form-grid { grid-template-columns: 1fr; }
+  .ap-wrap .pd-page-header-left h1 { font-size: 22px; }
+
+  /* Filter bar — stack vertically */
+  .ap-filterbar { padding: 12px 16px; }
+  .ap-filterbar-inner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .ap-fsel { width: 100%; box-sizing: border-box; }
+  .ap-date-range { flex-direction: column; gap: 6px; }
+  .ap-date-arrow { display: none; }
+  .ap-fsel-date { width: 100%; }
+  .ap-apply-btn, .ap-clear-btn { width: 100%; text-align: center; }
+
+  /* Table — tighter padding, allow scroll */
+  .ap-wrap .pd-data-table th,
+  .ap-wrap .pd-data-table td { padding: 10px 12px; font-size: 13px; }
+
+  /* Action buttons — allow wrapping */
+  .ap-wrap .pd-action-links { flex-wrap: wrap; gap: 4px; }
+  .ap-wrap .pd-action-btn { padding: 5px 8px; font-size: 11px; }
+
+  /* Stats */
   .ap-wrap .pd-stat-row { flex-wrap: wrap; }
-  .ap-wrap .pd-stat-card { min-width: calc(50% - 8px); }
-  .ap-wrap .pd-pagination { flex-direction: column; gap: 16px; }
+  .ap-wrap .pd-stat-card { flex: 1 1 calc(50% - 8px); }
+
+  /* Modal — full screen on mobile */
+  .pd-modal { padding: 0; align-items: flex-end; }
+  .pd-modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .pd-modal-header { padding: 16px 20px; }
+  .pd-modal-header h2 { font-size: 16px; }
+  .pd-modal-body { padding: 20px 16px; }
+  .pd-modal-footer { padding: 12px 16px; }
+
+  /* Form grid — single column */
+  .pd-form-grid { grid-template-columns: 1fr !important; gap: 12px; }
+
+  /* History modal report grid */
+  .pd-modal-content div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Date pills */
+  .ap-filterbar-icon { display: none; }
+}
+
+@media (max-width: 480px) {
+  /* Hide Duration column on very small screens */
+  .ap-wrap .pd-data-table th:nth-child(3),
+  .ap-wrap .pd-data-table td:nth-child(3) { display: none; }
+
+  /* Photo grid — smaller tiles */
+  .ap-wrap .pd-modal-body [style*="minmax(120px"] {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
+  }
+
+  /* Stat cards full width on tiny screens */
+  .ap-wrap .pd-stat-card { flex: 1 1 100%; }
+
+  /* Modal header smaller */
+  .pd-modal-header { padding: 14px 16px; }
+  .pd-modal-header h2 { font-size: 15px; }
 }

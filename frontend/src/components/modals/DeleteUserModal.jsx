@@ -166,9 +166,10 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
               <label className="dum-form-label">Administrator Password *</label>
               <div className="dum-password-input-wrapper">
                 <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  className={`dum-form-input ${error ? "dum-error" : ""}`}
+  type={showPassword ? "text" : "password"}
+  name="password"
+  style={{ fontSize: '16px' }}
+  className={`dum-form-input ${error ? "dum-error" : ""}`}
                   value={password}
                   onChange={handlePasswordChange}
                   onPaste={handlePasswordPaste}

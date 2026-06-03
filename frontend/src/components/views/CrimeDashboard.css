@@ -2678,3 +2678,91 @@ body {
     justify-content: center;
   }
 }
+
+/* === MOBILE — additional fixes === */
+@media (max-width: 768px) {
+  /* Page header — stack title and export button */
+  .cd-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .cd-export-btn { width: 100%; justify-content: center; }
+
+  /* Filter bar */
+  .cd-filter-bar-header { padding: 12px 16px; }
+  .cd-filter-body { padding: 14px 16px 16px; }
+
+  /* Summary cards — 2 columns */
+  .cd-summary-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cd-summary-value { font-size: 26px; }
+  .cd-summary-card { padding: 14px; }
+
+  /* Chart cards */
+  .cd-chart-card { padding: 14px 16px; }
+  .cd-chart-card-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+  /* Preset row — already handled but tighten further */
+  .cd-preset-btn { font-size: 11px; padding: 0 10px; height: 30px; }
+
+  /* Two-col and three-col — already collapse to 1, confirm */
+  .cd-charts-two-col,
+  .cd-charts-three-col { grid-template-columns: 1fr; gap: 14px; }
+
+  /* Fixed-height tables — relax the fixed height on mobile */
+  .cd-table-fixed-height {
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Barangay pagination — stack */
+  .cd-brgy-pagination { flex-direction: column; gap: 8px; align-items: center; }
+
+  /* AI section */
+  .cd-ai-card { padding: 16px; }
+  .cd-ai-card-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .cd-ai-scope { grid-template-columns: 1fr; }
+  .cd-ai-stat-row { grid-template-columns: 1fr 1fr; }
+  .cd-generate-btn { width: 100%; }
+
+  /* AI crime blocks */
+  .cd-ai-crime-block { padding: 12px; }
+
+  /* Tooltip — prevent off-screen */
+  .cd-th-tooltip { right: auto; left: 0; min-width: 160px; }
+
+  /* Filter actions — stack apply + reset */
+  .cd-filter-group-actions { flex-direction: row; width: 100%; }
+  .cd-apply-btn { flex: 1; }
+}
+
+@media (max-width: 480px) {
+  .cd-summary-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cd-summary-value { font-size: 22px; }
+  .cd-summary-card { padding: 12px; }
+  .cd-summary-card::after { display: none; }
+
+  .cd-ai-stat-row { grid-template-columns: 1fr 1fr; }
+
+  /* Crime table — allow horizontal scroll */
+  .cd-crime-table { min-width: 500px; }
+
+  /* Preset buttons wrap tighter */
+  .cd-preset-btn { font-size: 10px; padding: 0 8px; height: 28px; }
+
+  /* Page header text */
+  .cd-page-header-left h1 { font-size: 20px; }
+
+  /* Modus chart label width — shrink on tiny screens */
+  .cd-chart-card .recharts-yAxis { font-size: 10px; }
+
+  /* AI error modal */
+  .cd-ai-error-modal { padding: 24px 16px; }
+  .cd-ai-error-modal h3 { font-size: 16px; }
+
+  /* Barangay multi-select pills — wrap */
+  .cd-brgy-ms-pills { flex-wrap: wrap; }
+
+  /* Page btns — smaller */
+  .cd-page-btn { min-width: 24px; height: 24px; font-size: 11px; }
+}

@@ -170,3 +170,47 @@
   border-color: #1e3a5f;
 }
 .tp-period-active:hover { background: #0a1628 !important; border-color: #0a1628; color: #ffffff !important; }
+
+@media (max-width: 600px) {
+  .tp-trigger {
+    min-width: 88px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .tp-dropdown {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: unset;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+    justify-content: center;
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+  }
+
+  .tp-dropdown-up {
+    bottom: 0;
+    top: auto;
+    margin-bottom: 0;
+  }
+
+  .tp-col { flex: 0 0 80px; }
+
+  .tp-col-period { flex: 0 0 64px; }
+
+  .tp-list { height: 200px; }
+
+  .tp-period-list { height: 200px; }
+
+  .tp-item {
+    height: 44px; /* larger tap target */
+    font-size: 15px;
+  }
+
+  .tp-period-item { height: 52px; }
+}

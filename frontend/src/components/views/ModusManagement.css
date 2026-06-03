@@ -427,5 +427,49 @@
   .mm-toast { top: 16px; right: 16px; left: 16px; min-width: unset; }
 }
 
+/* === ADDITIONAL MOBILE FIXES === */
+@media (max-width: 600px) {
+  /* Filter bar — stack vertically */
+  .mm-filter-bar { flex-direction: column; align-items: stretch; }
+  .mm-filter-select { min-width: 0; width: 100%; }
+  .mm-apply-btn { width: 100%; }
+  .mm-reset-btn { width: 100%; }
+  .mm-count { margin-left: 0; }
 
+  /* Header button — full width */
+  .mm-header { align-items: flex-start; }
+  .mm-btn-primary { width: 100%; text-align: center; }
 
+  /* Modal — full screen bottom sheet */
+  .mm-modal-overlay { align-items: flex-end; padding: 0; }
+  .mm-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+  }
+  .mm-modal-header { border-radius: 16px 16px 0 0; padding: 16px 20px; }
+  .mm-modal-body { padding: 20px !important; gap: 16px !important; }
+  .mm-modal-footer { padding: 14px 20px; flex-direction: column-reverse; }
+  .mm-btn-secondary,
+  .mm-btn-primary,
+  .mm-btn-danger,
+  .mm-btn-success { width: 100%; text-align: center; }
+
+  /* Pagination — stack */
+  .mm-pagination { flex-direction: column; align-items: center; gap: 10px; }
+
+  /* Toast — full width */
+  .mm-toast { top: 16px; right: 16px; left: 16px; min-width: unset; }
+}
+
+@media (max-width: 480px) {
+  /* Hide Crime Type column — keep Modus Name + Actions only */
+  .mm-table th:nth-child(1),
+  .mm-table td:nth-child(1) { display: none; }
+  .mm-table th:nth-child(2) { width: 55%; padding-left: 16px; }
+  .mm-table td:nth-child(2) { padding-left: 16px; }
+  .mm-table th:nth-child(6) { width: 45%; }
+
+  .mm-action-btn { padding: 5px 7px; font-size: 11px; }
+}

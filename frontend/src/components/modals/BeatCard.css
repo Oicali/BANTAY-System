@@ -70,10 +70,57 @@
 
 /* ── EMPTY ── */
 .bc-empty { font-size: 13px; color: #adb5bd; font-style: italic; margin: 4px 0; }
-
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .bc-modal { width: 100vw; height: 100vh; border-radius: 0; }
-  .bc-body  { grid-template-columns: 1fr; grid-template-rows: 50% 50%; }
-  .bc-map-panel { border-right: none; border-bottom: 1px solid #dee2e6; }
+
+  /* Stack map above info panel */
+  .bc-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 40vh 1fr;
+    overflow-y: auto;
+  }
+  .bc-map-panel {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+    height: 40vh;
+  }
+
+  /* Header stacks */
+  .bc-header {
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .bc-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .bc-btn { flex: 1; text-align: center; justify-content: center; font-size: 12px; padding: 7px 10px; }
+
+  /* Date tabs scroll horizontally */
+  .bc-date-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .bc-date-tabs::-webkit-scrollbar { display: none; }
+  .bc-date-tab { white-space: nowrap; }
+
+  /* Section padding tighter */
+  .bc-section { padding: 10px 14px; }
+  .bc-section-grow { padding: 10px 14px; }
+}
+
+@media (max-width: 480px) {
+  .bc-patrol-name { font-size: 17px; }
+  .bc-header-meta { gap: 8px; }
+  .bc-duration, .bc-unit { font-size: 12px; }
+  .bc-btn { font-size: 11px; padding: 6px 8px; }
+
+  /* Timetable font smaller */
+  .bc-timetable { font-size: 12px; }
+  .bc-timetable th, .bc-timetable td { padding: 7px 8px; }
+  .bc-tt-time { font-size: 11px; min-width: 90px; }
+
+  /* Patroller table */
+  .bc-patroller-table { font-size: 11px; }
+  .bc-patroller-table th, .bc-patroller-table td { padding: 6px 8px; }
 }

@@ -269,8 +269,74 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
-  .apm-modal { width: 100vw; height: 100vh; border-radius: 0; }
-  .apm-body  { grid-template-columns: 1fr; grid-template-rows: 50% 50%; }
-  .apm-map-panel { border-right: none; border-bottom: 1px solid #dee2e6; }
-  .apm-topbar-fields { gap: 8px; }
+  .apm-modal {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  /* Stack map above info panel */
+  .apm-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 45vh 1fr;
+    overflow-y: auto;
+  }
+
+  .apm-map-panel {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+    height: 45vh;
+  }
+
+  /* Top bar wraps and stacks */
+  .apm-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 10px;
+  }
+  .apm-topbar-fields {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .apm-field input,
+  .apm-field select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  .apm-topbar-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .apm-btn-cancel,
+  .apm-btn-save {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Info panel sections tighter */
+  .apm-section { padding: 10px 12px; }
+
+  /* Time inputs wrap on very small screens */
+  .apm-time-inputs { flex-wrap: wrap; gap: 6px; }
+  .apm-time-inputs input[type="time"] { width: 90px; }
+
+  /* Timetable font smaller */
+  .apm-timetable { font-size: 12px; }
+  .apm-timetable th,
+  .apm-timetable td { padding: 7px 6px; }
+
+  /* Checklist items */
+  .apm-check-item { padding: 6px 8px; }
+  .apm-officer-name { font-size: 12px; }
+
+  /* Action buttons in topbar */
+  .apm-topbar-actions { flex-wrap: wrap; }
+  .apm-btn-cancel,
+  .apm-btn-save { padding: 8px 12px; font-size: 12px; }
 }

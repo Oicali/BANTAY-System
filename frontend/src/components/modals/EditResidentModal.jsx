@@ -290,6 +290,7 @@ function EditResidentModal({ resident, onClose, onSuccess }) {
                   onChange={handleChange}
                   className={`erm-input${errors.date_of_birth ? " erm-input-err" : ""}`}
                   max={new Date().toISOString().split("T")[0]}
+                  style={{ fontSize: '16px' }}
                 />
                 {errors.date_of_birth && (
                   <span className="erm-err">{errors.date_of_birth}</span>

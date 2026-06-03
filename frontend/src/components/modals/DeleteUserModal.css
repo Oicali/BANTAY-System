@@ -307,26 +307,61 @@
 }
 
 /* === RESPONSIVE === */
-@media (max-width: 768px) {
+@media (max-width: 600px) {
+  .dum-modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
   .dum-modal-container {
-    width: 95%;
-    margin: 20px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 18px 18px 0 0;
+    max-height: 92vh;
   }
 
   .dum-modal-header {
-    padding: 20px 24px;
+    padding: 16px 20px;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .dum-modal-header h2 {
+    font-size: 18px;
   }
 
   .dum-modal-form {
-    padding: 24px;
+    padding: 20px 20px 8px;
   }
 
   .dum-warning-box {
     flex-direction: column;
-    align-items: flex-start;
+    gap: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
   }
 
   .dum-warning-icon {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  .dum-form-input {
+    font-size: 16px; /* prevents iOS auto-zoom */
+    padding: 12px 48px 12px 14px;
+  }
+
+  .dum-modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding-top: 20px;
+    margin-top: 20px;
+    padding-bottom: 12px;
+  }
+
+  .dum-btn {
+    width: 100%;
+    padding: 13px 16px;
+    font-size: 14.5px;
+    text-align: center;
   }
 }
