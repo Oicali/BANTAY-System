@@ -454,13 +454,6 @@
   margin-top: 2px;
   display: block;
 }
-@media (max-width: 640px) {
-  .br-wrapper { padding: 16px; }
-  .br-form-grid { grid-template-columns: 1fr; }
-  .br-form-grid-full { grid-column: span 1; }
-  .br-page-header { flex-wrap: wrap; }
-  .br-brgy-pill { margin-left: 0; }
-}
 .br-status-cleared { background: #ede9fe; color: #5b21b6; }
 .br-wrapper input:-webkit-autofill,
 .br-wrapper input:-webkit-autofill:hover,
@@ -816,4 +809,65 @@
   background: #d1fae5;
   padding: 3px 10px;
   border-radius: 20px;
+}
+@media (max-width: 640px) {
+  .br-wrapper { padding: 16px; }
+
+  /* Page header — stack vertically */
+  .br-page-header { flex-wrap: wrap; gap: 12px; padding: 16px; }
+  .br-page-header-icon { width: 40px; height: 40px; }
+  .br-page-title { font-size: 17px; }
+  .br-page-subtitle { font-size: 12px; }
+  .br-brgy-pill { margin-left: 0; width: 100%; justify-content: center; }
+
+  /* Cards */
+  .br-card-body { padding: 16px; }
+  .br-card-header { padding: 12px 16px; }
+
+  /* Form grid — single column */
+  .br-form-grid { grid-template-columns: 1fr; }
+  .br-form-grid-full { grid-column: span 1; }
+
+  /* Person entry header — stack */
+  .br-person-entry-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .br-person-entry-header > div:last-child { width: 100%; justify-content: space-between; }
+  .br-resident-search-btn { flex: 1; text-align: center; padding: 6px 12px; font-size: 12px; }
+
+  /* Add person buttons — wrap */
+  .br-add-person-row { gap: 6px; }
+  .br-add-person-btn { flex: 1 1 calc(50% - 6px); text-align: center; }
+
+  /* Gender buttons */
+  .br-gender-btn { font-size: 12px; padding: 8px; }
+
+  /* Reports table — allow horizontal scroll */
+  .br-card { overflow: hidden; }
+  .br-table { font-size: 12px; }
+  .br-table th,
+  .br-table td { padding: 10px 10px; }
+
+  /* Pagination — stack */
+  .br-pagination { flex-direction: column; gap: 10px; align-items: center; padding: 12px 16px; }
+  .br-pagination-controls { flex-wrap: wrap; justify-content: center; }
+
+  /* Submit button */
+  .br-submit-btn { font-size: 14px; padding: 12px; }
+
+  /* Alert */
+  .br-alert { font-size: 12px; padding: 12px 14px; }
+
+  /* Resident modal — full screen */
+  .br-resident-modal { width: 100%; max-width: 100%; max-height: 100vh; border-radius: 0; }
+
+  /* Media tab buttons */
+  .br-card-body > div[style*="display: flex"][style*="gap: 8px"] button { flex: 1; justify-content: center; }
+}
+
+@media (max-width: 400px) {
+  .br-page-title { font-size: 15px; }
+  .br-add-person-btn { flex: 1 1 100%; }
+  .br-table th:nth-child(3),
+  .br-table td:nth-child(3) { display: none; }
+  .br-table th:nth-child(5),
+  .br-table td:nth-child(5) { display: none; }
 }

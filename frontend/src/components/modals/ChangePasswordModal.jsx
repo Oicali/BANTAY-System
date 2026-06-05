@@ -569,7 +569,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         borderRadius: 8,
         padding: "8px 20px",
         margin: "12px 0",
-        fontSize: 20,
+        fontSize: 'clamp(15px, 4vw, 20px)',
         fontWeight: 700,
         color: "#92400e",
         letterSpacing: 1,
@@ -1126,12 +1126,12 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
             )}
             <div className="cpm-otp-boxes">
               {otpBoxes.map((v, i) => (
-                <input
-                  key={i}
-                  ref={otpRefs[i]}
-                  className={`cpm-otp-box ${otpInputDisabled ? "cpm-otp-box-locked" : ""}`}
-                  type="text"
-                  inputMode="numeric"
+                <input            
+  key={i}
+  ref={otpRefs[i]}
+  className={`cpm-otp-box ...`}
+  type="text"
+  inputMode="numeric"
                   maxLength={6}
                   value={v}
                   autoComplete="one-time-code"

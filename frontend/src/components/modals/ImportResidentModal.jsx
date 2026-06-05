@@ -292,9 +292,10 @@ function ImportResidentModal({ onClose, onSuccess }) {
         <div
           style={{
             position: "fixed",
-            bottom: "32px",
-            left: "50%",
-            transform: "translateX(-50%)",
+            bottom: "24px",
+left: "16px",
+right: "16px",
+transform: "none",
             background: "#1e3a5f",
             color: "white",
             padding: "12px 24px",
@@ -304,7 +305,7 @@ function ImportResidentModal({ onClose, onSuccess }) {
             boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
             zIndex: 99999,
             borderLeft: "4px solid #c1272d",
-            whiteSpace: "nowrap",
+            whiteSpace: "normal",
           }}
         >
           ⚠️ Invalid template. Columns FIRST_NAME and LAST_NAME are required.

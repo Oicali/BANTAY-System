@@ -682,9 +682,9 @@ const [loadingMobileUnits, setLoadingMobileUnits]     = useState(false);
             </div>
           </div>
           <div className="epm-topbar-actions">
-            <button className="epm-btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="epm-btn-save"   onClick={handleSave}>Save Changes</button>
-            <button className="epm-btn-x"      onClick={onClose}>✕</button>
+           <button className="epm-btn-cancel epm-btn-cancel-desktop" onClick={onClose}>Cancel</button>
+<button className="epm-btn-save"   onClick={handleSave}>Save Changes</button>
+<button className="epm-btn-x"      onClick={onClose}>✕</button>
           </div>
         </div>
 
@@ -871,9 +871,10 @@ const [loadingMobileUnits, setLoadingMobileUnits]     = useState(false);
                     const paged    = filteredPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
                     return (
                       <>
-                        <input className="epm-search" type="text" placeholder="Search patroller..."
-                          value={patrollerSearch}
-                          onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
+                       <input className="epm-search" type="text" placeholder="Search patroller..."
+                        style={{ fontSize: '16px' }}
+                        value={patrollerSearch}
+                         onChange={(e) => { setPatrollerSearch(e.target.value); setPatrollerPage(1); }} />
                         <div className="epm-checklist">
                           {filteredPatrollers.length === 0 ? (
                             <div className="epm-empty">No patrollers available.</div>

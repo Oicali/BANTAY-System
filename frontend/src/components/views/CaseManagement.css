@@ -320,21 +320,7 @@ body {
   color: #6b7280;
 }
 
-/* === RESPONSIVE === */
-@media (max-width: 768px) {
-  .cm-page-header {
-    flex-direction: column;
-    gap: 16px;
-  }
 
-  .cm-status-cards-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .cm-tab-navigation {
-    overflow-x: auto;
-  }
-}
 
 /* === FILTER BAR === */
 .cm-filter-bar {
@@ -815,4 +801,100 @@ input[type="date"].cm-filter-input::-webkit-calendar-picker-indicator {
   filter: invert(40%) sepia(0%) saturate(0%) brightness(60%);
   cursor: pointer;
   opacity: 1;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .cm-page-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .cm-status-cards-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cm-tab-navigation {
+    overflow-x: auto;
+  }
+}
+/* === RESPONSIVE — full mobile === */
+@media (max-width: 768px) {
+  .cm-content-area { padding: 16px; }
+
+  .cm-page-header { flex-direction: column; gap: 12px; }
+  .cm-page-header-left h1 { font-size: 22px; }
+
+  /* Stats grid — 2 columns */
+  .cm-status-cards-grid { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .cm-status-card { padding: 16px; }
+  .cm-status-card-value { font-size: 28px; }
+
+  /* Filter bar — stack vertically */
+  .cm-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+  .cm-filter-bar .cm-filter-input { max-width: 100% !important; width: 100%; }
+  .cm-filter-bar > div:first-child { margin-right: 0; }
+  .cm-filter-bar .cm-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* Tabs — scrollable */
+  .cm-tab-navigation { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cm-tab-btn { padding: 10px 16px; font-size: 13px; white-space: nowrap; }
+
+  /* Case cards */
+  .cm-case-card { padding: 16px; }
+  .cm-case-header { flex-direction: column; gap: 10px; align-items: flex-start; }
+  .cm-case-footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .cm-case-actions { flex-wrap: wrap; gap: 8px; }
+  .cm-action-btn { font-size: 12px; padding: 6px 10px; }
+
+  /* Pagination */
+  .cm-pagination { flex-direction: column; gap: 10px; align-items: center; }
+  .cm-pagination-controls { justify-content: center; }
+
+  /* Modals — full screen bottom sheet */
+  .cm-modal { align-items: flex-end; padding: 0; }
+  .cm-modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .cm-modal-header { border-radius: 16px 16px 0 0; padding: 16px 20px; }
+  .cm-modal-body { padding: 16px; }
+  .cm-modal-footer { padding: 12px 16px; }
+
+  /* Detail grid — single column on mobile */
+  .cm-detail-grid { grid-template-columns: 1fr !important; }
+
+  /* IO assign list */
+  .cm-io-list { max-height: 240px; }
+  .cm-io-card { padding: 10px 12px; }
+  .cm-io-avatar { width: 38px; height: 38px; font-size: 13px; }
+
+  /* Notes header — stack */
+  .cm-modal-body > div > div[style*="justifyContent: space-between"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cm-status-cards-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cm-status-card-value { font-size: 24px; }
+  .cm-status-card { padding: 12px; }
+  .cm-case-meta { gap: 10px; }
+  .cm-case-meta-item { font-size: 12px; }
+  .cm-priority-badge,
+  .cm-status-badge { font-size: 11px; padding: 4px 10px; }
 }

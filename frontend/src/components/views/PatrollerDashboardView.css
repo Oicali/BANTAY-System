@@ -119,11 +119,13 @@
   padding: 18px 24px 16px;
   border-bottom: 1px solid var(--gray-200);
   background: linear-gradient(to right, rgba(30,58,95,0.04), transparent);
+  gap: 12px;
 }
 .pdv-ongoing-header-left {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 .pdv-ongoing-name {
   font-family: "Inter", sans-serif;
@@ -167,6 +169,7 @@
   color: #16a34a;
   letter-spacing: 1px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .pdv-live-dot {
   width: 7px;
@@ -179,6 +182,23 @@
 @keyframes pdvPulse {
   0%, 100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.3); }
   50%       { box-shadow: 0 0 0 5px rgba(34,197,94,0.08); }
+}
+
+/* Upcoming pill */
+.pdv-upcoming-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid #fcd34d;
+  font-size: 11px;
+  font-weight: 800;
+  color: #f59e0b;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Card body: map + schedule */
@@ -611,6 +631,13 @@
   border: 1px solid #93afc9;
 }
 
+/* My shifts cell */
+.pdv-my-shifts-cell {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 /* Barangay pills */
 .pdv-brgy-pills {
   display: flex;
@@ -719,10 +746,141 @@
 .pdv-timetable-wrap::-webkit-scrollbar-thumb,
 .pdv-date-tabs::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
 
-/* === RESPONSIVE === */
+/* ═══════════════════════════════════════════
+   RESPONSIVE — TABLET (≤900px)
+═══════════════════════════════════════════ */
 @media (max-width: 900px) {
   .pdv-wrap { padding: 20px; gap: 24px; }
-  .pdv-ongoing-body { grid-template-columns: 1fr; grid-template-rows: 300px 1fr; height: auto; }
-  .pdv-ongoing-map { border-right: none; border-bottom: 1px solid var(--gray-200); }
-  .pdv-filterbar { flex-wrap: wrap; }
+
+  /* Page header */
+  .pdv-page-title { font-size: 22px; }
+
+  /* Ongoing card body — stack map above schedule */
+  .pdv-ongoing-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 280px auto;
+    height: auto;
+  }
+  .pdv-ongoing-map {
+    border-right: none;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .pdv-schedule-panel {
+    /* Give a fixed height so it scrolls internally on tablet */
+    max-height: 320px;
+  }
+
+  /* Filter bar — allow wrapping nicely */
+  .pdv-filterbar {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .pdv-filter-date-group {
+    flex: 1 1 100%;
+  }
+  .pdv-filter-date {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .pdv-filter-apply {
+    flex: 1;
+  }
+
+  /* Table — reduce padding */
+  .pdv-table th,
+  .pdv-table td {
+    padding: 10px 14px;
+  }
+
+  /* Pagination — stack on small space */
+  .pdv-table-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .pdv-pagination {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — MOBILE (≤600px)
+═══════════════════════════════════════════ */
+@media (max-width: 600px) {
+  .pdv-wrap { padding: 16px; gap: 20px; }
+
+  /* Page header */
+  .pdv-page-title { font-size: 20px; }
+  .pdv-page-sub   { font-size: 13px; }
+
+  /* Ongoing card header — tighter */
+  .pdv-ongoing-header {
+    padding: 14px 16px 12px;
+    flex-wrap: wrap;
+  }
+  .pdv-ongoing-name { font-size: 16px; }
+  .pdv-ongoing-dates,
+  .pdv-ongoing-unit { font-size: 12px; }
+
+  /* Map shorter on phones */
+  .pdv-ongoing-body {
+    grid-template-rows: 220px auto;
+  }
+  .pdv-schedule-panel {
+    max-height: 280px;
+  }
+
+  /* Date tab font smaller */
+  .pdv-date-tab { padding: 8px 10px; font-size: 12px; }
+
+  /* Filter bar — everything full width */
+  .pdv-filterbar {
+    padding: 12px;
+    border-left-width: 3px;
+  }
+  .pdv-filterbar-icon { display: none; } /* hide icon to save space */
+  .pdv-filter-input,
+  .pdv-filter-select,
+  .pdv-filter-barangay {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .pdv-filter-date-group {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pdv-filter-date {
+    flex: 1 1 calc(50% - 14px);
+    min-width: 0;
+  }
+  .pdv-filter-arrow { display: none; }
+  .pdv-filter-apply,
+  .pdv-filter-reset {
+    flex: 1 1 calc(50% - 4px);
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Table — compact cells; hide less important columns handled by horizontal scroll */
+  .pdv-table th,
+  .pdv-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .pdv-patrol-name { font-size: 12px; }
+  .pdv-duration-text { font-size: 11px; white-space: normal; }
+
+  /* Pagination */
+  .pdv-pg-btn { padding: 6px 10px; font-size: 12px; }
+  .pdv-pg-current { padding: 6px 8px; font-size: 12px; }
+  .pdv-footer-info { font-size: 12px; }
+
+  /* No-ongoing card */
+  .pdv-no-ongoing { padding: 20px 16px; gap: 14px; }
+  .pdv-no-ongoing-title { font-size: 14px; }
 }

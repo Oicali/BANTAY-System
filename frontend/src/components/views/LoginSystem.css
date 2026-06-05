@@ -854,3 +854,78 @@ input:-webkit-autofill:active {
     width: 360px;
   }
 }
+/* === ADDITIONAL MOBILE FIXES === */
+@media (max-width: 768px) {
+  /* Branding side — tighter spacing */
+  .branding-side { padding: 40px 24px; }
+
+  .logo-container { margin-bottom: 24px; }
+  .logo-image { margin-right: -30px; }
+
+  .title-section { margin-bottom: 20px; }
+
+  /* BANTAY logo box — full width */
+  .bantay-logo-box { padding: 16px; width: 100%; }
+  .bantay-logo-image { width: 100%; max-width: 320px; }
+
+  /* Tagline */
+  .tagline { font-size: 13px; margin-bottom: 20px; }
+
+  /* Forms side */
+  .forms-side { padding: 40px 24px; }
+
+  .form-title { font-size: 28px; }
+  .form-subtitle { font-size: 13px; margin-bottom: 24px; }
+
+  /* Inputs */
+  .form-input { padding: 12px 14px; padding-right: 44px; font-size: 14px; }
+  .form-group { margin-bottom: 20px; }
+
+  /* Primary button */
+  .primary-button { padding: 14px; font-size: 13px; }
+
+  /* Security notice */
+  .security-notice { margin-top: 20px; padding: 14px 16px; }
+  .security-notice p { font-size: 12px; }
+
+  /* Code inputs */
+  .code-inputs { gap: 6px; }
+  .code-input { width: 44px; height: 54px; font-size: 22px; }
+
+  /* Password requirements */
+  .password-requirements { padding: 12px 14px; }
+  .password-requirements ul { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .branding-side { padding: 32px 16px; }
+  .forms-side { padding: 32px 16px; }
+
+  .logo-image,
+  .logo-image2 { width: 72px; height: 72px; }
+  .logo-image { margin-right: -24px; }
+
+  .main-title { font-size: 18px; }
+  .subtitle { font-size: 13px; }
+
+  .bantay-logo-image { max-width: 260px; }
+
+  .form-title { font-size: 24px; }
+
+  /* Code inputs — fit 6 on small screens */
+  .code-inputs { gap: 5px; justify-content: center; }
+  .code-input { width: 38px; height: 48px; font-size: 18px; border-radius: 8px; }
+
+  /* Bottom line shorter */
+  .bottom-line { width: 220px; }
+
+  /* Form container full width */
+  .form-container { max-width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .code-input { width: 34px; height: 44px; font-size: 16px; }
+  .code-inputs { gap: 4px; }
+  .bantay-logo-image { max-width: 220px; }
+  .main-title { font-size: 16px; }
+}

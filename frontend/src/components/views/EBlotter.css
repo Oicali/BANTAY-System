@@ -1284,3 +1284,90 @@ select.eb-modal-input {
   display: flex;
   align-items: center;
 }
+/* === ADDITIONAL MOBILE FIXES === */
+@media (max-width: 768px) {
+  .eb-content-area { padding: 16px; }
+
+  /* Page header — stack */
+  .eb-page-header { flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .eb-page-header-left h1 { font-size: 22px; }
+  .eb-page-header-right {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  .eb-page-header-right .eb-btn { justify-content: center; font-size: 13px; padding: 10px 12px; }
+
+  /* Filter bar — stack */
+  .eb-filter-bar { padding: 14px 16px; }
+  .eb-filter-single-row { flex-direction: column; gap: 10px; }
+  .eb-filter-single-row .eb-filter-group { width: 100%; }
+  .eb-filter-single-row .eb-filter-input { width: 100%; box-sizing: border-box; }
+  .eb-filter-single-row > div:last-child .eb-btn { width: 100%; justify-content: center; }
+
+  /* Report tabs — scrollable */
+  .eb-report-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .eb-report-tab { white-space: nowrap; padding: 10px 16px; font-size: 13px; }
+
+  /* Table — horizontal scroll */
+  .eb-table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .eb-data-table { table-layout: auto; min-width: 600px; }
+
+  /* Action buttons — smaller */
+  .eb-action-btn { font-size: 11px; padding: 5px 8px; }
+  .eb-table-actions { gap: 6px; flex-wrap: wrap; }
+
+  /* Pagination — stack */
+  .eb-pagination { flex-direction: column; gap: 10px; padding: 14px 16px; align-items: center; }
+
+  /* Modal — full screen bottom sheet */
+  .eb-modal { padding: 0; align-items: flex-end; }
+  .eb-modal-content {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .eb-modal-header { padding: 16px 20px; border-radius: 16px 16px 0 0; }
+  .eb-modal-header h2 { font-size: 16px; }
+  .eb-step-content { padding: 20px 16px; }
+  .eb-modal-footer { padding: 12px 16px; }
+
+  /* Step indicator — compress */
+  .eb-step-indicator { padding: 14px 20px; }
+  .eb-step-indicator::before { left: 40px; right: 40px; }
+  .eb-step-label { font-size: 10px; }
+
+  /* Form grid — single column */
+  .eb-modal-form-grid { grid-template-columns: 1fr !important; gap: 12px; }
+  .eb-modal-form-group.eb-full-width,
+  .eb-modal-form-group.eb-narrative-full { grid-column: span 1 !important; }
+
+  /* View grid — single column */
+  .eb-view-grid { grid-template-columns: 1fr !important; }
+  .eb-view-item { grid-column: span 1 !important; }
+  .eb-view-section-body { padding: 14px 16px 20px; }
+  .eb-view-section-title { padding: 8px 16px; }
+
+  /* Map inside modal */
+  .eb-modal-form-group [style*="height: 600px"] { height: 300px !important; }
+
+  /* Gender buttons */
+  .eb-gender-buttons { gap: 6px; }
+  .eb-gender-btn { padding: 8px; font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+  .eb-page-header-right { grid-template-columns: 1fr; }
+  .eb-data-table { min-width: 520px; }
+  .eb-modal-header h2 { font-size: 14px; }
+  .eb-step-number { width: 30px; height: 30px; font-size: 13px; }
+  .eb-step-label { font-size: 9px; }
+
+  /* Attachment grid — 2 columns */
+  .eb-view-section-body [style*="minmax(180px"] {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+}

@@ -628,9 +628,9 @@ const PatrolScheduling = () => {
           </div>
 
           <div
-            className="psch-brgy-dropdown-wrap"
-            style={{ position: "relative" }}
-          >
+  className="psch-brgy-dropdown-wrap"
+  style={{ position: "relative", flex: "1 1 100%", minWidth: 0 }}
+>
             {/* Search input */}
             <input
               className="psch-filter-select"

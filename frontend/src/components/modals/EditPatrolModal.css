@@ -85,7 +85,113 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
-  .epm-modal { width: 100vw; height: 100vh; border-radius: 0; }
-  .epm-body  { grid-template-columns: 1fr; grid-template-rows: 50% 50%; }
-  .epm-map-panel { border-right: none; border-bottom: 1px solid #dee2e6; }
+  .epm-modal {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    max-width: 100%;
+  }
+
+  /* Stack top bar fields vertically */
+  .epm-topbar {
+    padding: 10px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .epm-topbar-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .epm-field input,
+  .epm-field select {
+    font-size: 16px; /* prevents iOS auto-zoom */
+    min-width: unset;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .epm-field input[type="date"] {
+    min-width: unset;
+  }
+
+  .epm-topbar-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .epm-btn-cancel-desktop { display: none; }
+
+  .epm-btn-cancel,
+  .epm-btn-save {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* Body: map on top, panel below, each takes half */
+  .epm-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 40% 60%;
+  }
+
+  .epm-map-panel {
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  /* Date tabs — scrollable row instead of wrapping */
+  .epm-date-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .epm-date-tabs::-webkit-scrollbar { display: none; }
+
+  .epm-date-tab {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 11.5px;
+  }
+
+  /* Timetable — allow horizontal scroll on small screens */
+  .epm-timetable-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .epm-timetable {
+    min-width: 420px;
+  }
+
+  /* Time inputs slightly smaller */
+  .epm-time-inputs input[type="time"] {
+    width: 85px;
+    font-size: 12px;
+  }
+
+  /* Checklist touch targets */
+  .epm-check-item {
+    padding: 10px 10px;
+  }
+
+  /* Section padding tighter */
+  .epm-section,
+  .epm-section-grow {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .epm-topbar-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .epm-body {
+    grid-template-rows: 35% 65%;
+  }
 }

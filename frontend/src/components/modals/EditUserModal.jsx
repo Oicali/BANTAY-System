@@ -1176,6 +1176,7 @@ const EditUserModal = ({
                     onChange={handleChange}
                     disabled={isSubmitting}
                     className="eum-form-input"
+                    style={{ fontSize: '16px' }}
                     max={(() => {
                       const d = new Date();
                       return new Date(
@@ -1226,6 +1227,7 @@ const EditUserModal = ({
                       maxLength="10"
                       placeholder="9XXXXXXXXX"
                       className="eum-form-input eum-phone-input"
+                      style={{ fontSize: '16px' }}
                     />
                   </div>
                   {errors.phone && (
@@ -1250,6 +1252,7 @@ const EditUserModal = ({
                       maxLength="10"
                       placeholder="9XXXXXXXXX (optional)"
                       className="eum-form-input eum-phone-input"
+                      style={{ fontSize: '16px' }}
                     />
                   </div>
                   {errors.alternate_phone && (

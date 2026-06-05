@@ -114,3 +114,69 @@
 .im-progress-pct {
   font-size: 13px; font-weight: 600; color: #374151;
 }
+@media (max-width: 600px) {
+  .im-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .im-modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .im-progress-overlay {
+    border-radius: 18px 18px 0 0;
+  }
+
+  .im-header {
+    padding: 16px 18px;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .im-title { font-size: 16px; }
+  .im-subtitle { font-size: 12px; }
+
+  .im-body { padding: 16px 18px; }
+
+  .im-dropzone {
+    padding: 28px 14px;
+  }
+
+  .im-result-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .im-result-card { padding: 14px; }
+
+  .im-result-num { font-size: 22px; }
+
+  .im-error-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .im-footer {
+    padding: 12px 18px 20px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .im-btn-primary,
+  .im-btn-secondary {
+    width: 100%;
+    padding: 13px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .im-progress-box {
+    padding: 24px 20px;
+    min-width: unset;
+    width: 100%;
+  }
+}
