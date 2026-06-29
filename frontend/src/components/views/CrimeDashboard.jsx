@@ -200,16 +200,12 @@ const getGranularity = (preset, dateFrom, dateTo) => {
 
   if (!dateFrom || !dateTo) return "monthly";
 
-  // Count distinct calendar months touched
   const from = new Date(dateFrom + "T00:00:00");
   const to = new Date(dateTo + "T00:00:00");
-  const monthsFromYear = (to.getFullYear() - from.getFullYear()) * 12;
-  const distinctMonths = monthsFromYear + (to.getMonth() - from.getMonth()) + 1;
+  const diffDays = Math.round((to - from) / 86400000) + 1;
 
-  if (distinctMonths === 1) return "daily";
-  if (distinctMonths <= 4) return "weekly";
-  if (distinctMonths <= 13) return "monthly";
-  return "quarterly";
+  if (diffDays <= 31) return "daily";
+  return "monthly";
 };
 
 const granularityLabel = (g) =>
