@@ -1,3 +1,5 @@
+// frontend\src\components\views\AuditLog.jsx
+
 import React, { useState, useEffect, useCallback } from "react";
 import "./AuditLog.css";
 import LoadingModal from "../modals/LoadingModal";
@@ -79,7 +81,7 @@ const AuditLog = () => {
   // Near the top of the AuditLog component, after the state declarations
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
-  const RESTRICTED_ROLES = ["Brgy. Captain", "Brgy. Official", "Brgy. Tanod", "Investigator", "Patrol"];
+  const RESTRICTED_ROLES = ["Brgy. Captain", "Brgy. Official", "Investigator", "Patrol"];
   const isRestricted = RESTRICTED_ROLES.includes(currentUser?.role);
 
   // ===================================================

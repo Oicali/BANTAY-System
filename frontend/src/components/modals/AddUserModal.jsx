@@ -552,7 +552,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
       setFormData((prev) => ({ ...prev, role: "Patrol" }));
     } else {
       setStep("barangay");
-      setFormData((prev) => ({ ...prev, role: "Barangay" }));
+      setFormData((prev) => ({ ...prev, role: "Brgy. Captain" }));
     }
   };
 
@@ -1287,6 +1287,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                         onChange={handleChange}
                         className="aum-form-input"
                       >
+                        <option value="Technical Administrator">Technical Administrator</option>
                         <option value="Administrator">Administrator</option>
                         <option value="Investigator">Investigator</option>
                         <option value="Patrol">Patrol</option>
@@ -1364,8 +1365,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
               onChange={handleChange}
               className="aum-form-input"
             >
-              <option value="Brgy. Councilor">Brgy. Councilor</option>
-              <option value="Brgy. Tanod">Brgy. Tanod</option>
+              <option value="Brgy. Captain">Brgy. Captain</option>
+              <option value="Brgy. Official">Brgy. Official</option>
             </select>
           </div>
         </div>

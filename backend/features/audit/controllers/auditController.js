@@ -12,7 +12,7 @@ const getAuditLogs = async (req, res) => {
 
     const { search, action, status, dateFrom, dateTo } = req.query;
 
-    const RESTRICTED_ROLES = ["Brgy. Councilor", "Brgy. Tanod","Investigator", "Patrol"];
+    const RESTRICTED_ROLES = ["Brgy. Captain", "Brgy. Official","Investigator", "Patrol"];
     const isRestricted = RESTRICTED_ROLES.includes(req.user.role);
 
     // ── Build WHERE clauses dynamically ──
