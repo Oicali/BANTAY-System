@@ -1,0 +1,598 @@
+/* frontend/src/components/modals/ViewReferralModal.css */
+
+/* Restyled to match EBlotter.css's "View Blotter Entry" modal design
+   (same navy/red BANTAY palette, same modal chrome, same view-section /
+   view-card / view-grid treatment). Class names are unchanged (vrm-*) so
+   no JSX edits are required. */
+:root {
+  --vrm-navy-dark: #0a1628;
+  --vrm-navy-primary: #1e3a5f;
+  --vrm-navy-light: #2d4a6f;
+  --vrm-red-primary: #c1272d;
+  --vrm-red-dark: #8b1a1f;
+  --vrm-gray-50: #f8f9fa;
+  --vrm-gray-100: #e9ecef;
+  --vrm-gray-200: #dee2e6;
+  --vrm-gray-300: #ced4da;
+  --vrm-gray-400: #adb5bd;
+  --vrm-gray-600: #6c757d;
+  --vrm-gray-700: #495057;
+  --vrm-gray-900: #212529;
+}
+
+/* ===== OVERLAY / SHELL (mirrors .eb-modal / .eb-modal-content) ===== */
+.vrm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.vrm-modal {
+  background-color: #ffffff;
+  width: 90%;
+  max-width: 1100px;
+  margin: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  overflow: hidden;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ===== HEADER (mirrors .eb-modal-header) ===== */
+.vrm-header {
+  padding: 20px 32px;
+  background: linear-gradient(135deg, var(--vrm-navy-dark) 0%, var(--vrm-navy-primary) 100%);
+  border-bottom: 3px solid var(--vrm-red-primary);
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vrm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.vrm-header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vrm-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.vrm-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+/* Mirrors the description line under .eb-modal-header h2 */
+.vrm-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.vrm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.vrm-modal-close {
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrm-modal-close:hover {
+  color: #ffffff;
+}
+
+/* ===== STATUS + PRIORITY PILLS ===== */
+.vrm-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.vrm-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.vrm-status-pending { color: #fde68a; }
+.vrm-status-accepted { color: #86efac; }
+.vrm-status-declined { color: #fca5a5; }
+.vrm-status-escalated { color: #fdba74; }
+
+.vrm-priority-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vrm-priority-high {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.vrm-priority-medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.vrm-priority-low {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+/* ===== BODY (mirrors .eb-view-content) ===== */
+.vrm-body {
+  padding: 0;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.vrm-section {
+  margin-bottom: 0;
+}
+
+/* Sticky section header — same gradient treatment as .eb-view-section-title */
+.vrm-section-title {
+  margin: 0;
+  padding: 10px 32px;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--vrm-navy-dark) 0%, var(--vrm-navy-primary) 100%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vrm-count-chip {
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Mirrors .eb-view-section-body */
+.vrm-section-body {
+  padding: 20px 32px 28px 32px;
+  background: var(--vrm-gray-50);
+}
+
+.vrm-section-last .vrm-section-body {
+  padding-bottom: 28px;
+}
+
+/* ===== CARDS (mirrors .eb-view-card / .eb-view-card-title) ===== */
+.vrm-card {
+  background: #ffffff;
+  border: 1px solid var(--vrm-gray-200);
+  border-radius: 8px;
+  padding: 0;
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.vrm-card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(30, 58, 95, 0.05);
+  border-bottom: 1px solid var(--vrm-gray-200);
+}
+
+.vrm-mono-badge {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--vrm-navy-primary);
+  font-size: 13px;
+  background: rgba(30, 58, 95, 0.07);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.vrm-incident-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--vrm-red-primary);
+  background: rgba(193, 39, 45, 0.08);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* Row of context badges (data source, referral flags) above the grid */
+.vrm-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px 0;
+}
+
+/* ===== FIELD GRID (mirrors .eb-view-grid / .eb-view-item) ===== */
+.vrm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+
+.vrm-grid-2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.vrm-grid-2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.vrm-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 20px;
+  border-right: 1px solid var(--vrm-gray-100);
+  border-bottom: 1px solid var(--vrm-gray-100);
+  background: transparent;
+  border-radius: 0;
+  min-width: 0;
+}
+
+.vrm-item:last-child {
+  border-right: none;
+}
+
+.vrm-item-full {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+
+.vrm-item-span2 {
+  grid-column: span 2;
+}
+
+.vrm-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--vrm-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.vrm-sublabel {
+  font-size: 12px;
+  color: var(--vrm-gray-600);
+}
+
+.vrm-value {
+  font-size: 14px;
+  color: var(--vrm-gray-900);
+  font-weight: 500;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.vrm-narrative {
+  font-weight: 400;
+  color: var(--vrm-gray-700);
+}
+
+/* ===== PERSON CARDS (mirrors EBlotter's "Victim #1" view-mode cards) =====
+   Each person renders as its own .vrm-card, stacked with a bottom margin
+   (vrm-card already carries margin-bottom: 12px) — same pattern as
+   .eb-view-card in EBlotter's Persons Involved section. */
+.vrm-person-card-title {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--vrm-navy-primary);
+  padding: 12px 20px;
+  background: rgba(30, 58, 95, 0.05);
+  border-bottom: 1px solid var(--vrm-gray-200);
+  letter-spacing: 0.3px;
+}
+
+/* ===== ATTACHMENTS (styled like EBlotter's evidence grid) ===== */
+.vrm-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.vrm-attachment-card {
+  background: #f9fafb;
+  border: 1px solid var(--vrm-gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: none;
+  display: block;
+  text-decoration: none;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.vrm-attachment-card:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-color: var(--vrm-navy-primary);
+  transform: translateY(-1px);
+}
+
+.vrm-attachment-thumb {
+  height: 90px;
+  background: linear-gradient(135deg, var(--vrm-navy-light), var(--vrm-navy-primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrm-attachment-caption {
+  display: block;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vrm-gray-700);
+}
+
+/* ===== TIMELINE ===== */
+.vrm-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.vrm-timeline-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 22px;
+}
+
+.vrm-timeline-step:last-child {
+  padding-bottom: 0;
+}
+
+.vrm-timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--vrm-gray-300);
+  border: 3px solid var(--vrm-gray-50);
+  box-shadow: 0 0 0 2px var(--vrm-gray-300);
+  flex-shrink: 0;
+  margin-top: 1px;
+  z-index: 1;
+}
+
+.vrm-timeline-step.done .vrm-timeline-dot {
+  background: var(--vrm-navy-primary);
+  box-shadow: 0 0 0 2px var(--vrm-navy-primary);
+}
+
+.vrm-timeline-line {
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--vrm-gray-200);
+}
+
+.vrm-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vrm-timeline-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vrm-gray-900);
+}
+
+.vrm-timeline-time {
+  font-size: 12px;
+  color: var(--vrm-gray-600);
+}
+
+/* ===== FOOTER (mirrors .eb-modal-footer) ===== */
+.vrm-footer {
+  padding: 16px 32px;
+  border-top: 2px solid var(--vrm-gray-200);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  background: #f0f3f8;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* Buttons mirror .eb-btn / .eb-btn-primary / .eb-btn-secondary */
+.vrm-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vrm-btn:focus {
+  outline: none;
+}
+
+.vrm-btn-primary {
+  background: var(--vrm-red-primary);
+  color: #ffffff;
+}
+
+.vrm-btn-primary:hover {
+  background: var(--vrm-red-dark);
+}
+
+.vrm-btn-secondary {
+  background: #ffffff;
+  color: var(--vrm-gray-700);
+  border: 1px solid var(--vrm-gray-300);
+}
+
+.vrm-btn-secondary:hover {
+  background: var(--vrm-gray-50);
+}
+
+/* ===== SCROLLBAR (matches EBlotter's thin gray scrollbar) ===== */
+.vrm-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vrm-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vrm-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+
+.vrm-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ===== RESPONSIVE (mirrors EBlotter's mobile bottom-sheet modal) ===== */
+@media (max-width: 768px) {
+  .vrm-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .vrm-modal {
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .vrm-header {
+    padding: 16px 20px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .vrm-header-right {
+    gap: 10px;
+  }
+
+  .vrm-title {
+    font-size: 16px;
+  }
+
+  .vrm-section-title,
+  .vrm-section-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .vrm-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .vrm-item,
+  .vrm-item-full,
+  .vrm-item-span2 {
+    grid-column: span 1 !important;
+    border-right: none !important;
+  }
+
+  .vrm-footer {
+    padding: 12px 16px;
+    flex-direction: column-reverse;
+  }
+
+  .vrm-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .vrm-title {
+    font-size: 14px;
+  }
+
+  .vrm-attachment-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}

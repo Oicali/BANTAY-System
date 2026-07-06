@@ -14,6 +14,7 @@ import LoadingModal from "../modals/LoadingModal";
 import RemindPatrolModal from "../modals/RemindPatrolModal";
 import ExportBlotterModal from "../modals/ExportBlotterModal";
 import PdfPreviewModal from "../modals/PdfPreviewModal";
+import ViewReferralModal from "../modals/ViewReferralModal";
 
 const OFFENSE_TO_CRIME_TYPE = {
   Murder: "MURDER",
@@ -236,6 +237,9 @@ function EBlotter() {
   const [showRemindModal, setShowRemindModal] = useState(false);
   const [remindBlotterId, setRemindBlotterId] = useState(null);
   const [remindBlotterNumber, setRemindBlotterNumber] = useState("");
+
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const [selectedReferral, setSelectedReferral] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExportLoading, setIsExportLoading] = useState(false);
   const [pdfPreview, setPdfPreview] = useState(null);
@@ -8804,6 +8808,19 @@ function EBlotter() {
                       <div className="eb-table-actions">
                         {activeReportTab === "referred" ? (
                           <>
+                            {/* View — always visible regardless of role */}
+                            <button
+                              className="eb-action-btn eb-action-btn-view"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                console.log("selected referral row:", b);
+                                setSelectedReferral(b);
+                                setShowReferralModal(true);
+                              }}
+                            >
+                              <ViewIcon /> View
+                            </button>
+
                             {/* PATROL role */}
                             {userRole === "Patrol" && !b.responder && (
                               <button
@@ -9245,6 +9262,23 @@ function EBlotter() {
           onRemind={(count) => {
             showReactToast(`Reminders sent to ${count} patrol officer(s)`);
             fetchBlotters("referred", true);
+          }}
+        />
+      )}
+
+      {/* ADD THIS */}
+      {showReferralModal && (
+        <ViewReferralModal
+          blotterId={selectedReferral?.blotter_id} // ← must be blotterId, not referral
+          summary={selectedReferral}
+          onClose={() => {
+            setShowReferralModal(false);
+            setSelectedReferral(null);
+          }}
+          onViewFull={(id) => {
+            setShowReferralModal(false);
+            setSelectedReferral(null);
+            handleView(id);
           }}
         />
       )}
