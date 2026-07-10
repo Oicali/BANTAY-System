@@ -1016,14 +1016,14 @@ const lockUser = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "ACCOUNT_LOCKED",
-  title: "Account Locked",
-  message: `${req.user.username} locked account ID ${id}`,
-  linkTo: "/user-management",
-}, req.user.user_id);
+// await notifyAllByRole(["Administrator", "Technical Administrator"], {
+//   senderId: req.user.user_id,
+//   senderName: req.user.username,
+//   type: "ACCOUNT_LOCKED",
+//   title: "Account Locked",
+//   message: `${req.user.username} locked account ID ${id}`,
+//   linkTo: "/user-management",
+// }, req.user.user_id);
     res.json({ success: true, message: "Account locked successfully" });
   } catch (err) {
     console.error("Lock account error:", err);
@@ -1073,14 +1073,14 @@ const unlockUser = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "ACCOUNT_LOCKED",
-  title: "Account Unlocked",
-  message: `${req.user.username} unlocked account ID ${id}`,
-  linkTo: "/user-management",
-}, req.user.user_id);
+//     await notifyAllByRole(["Administrator", "Technical Administrator"], {
+//   senderId: req.user.user_id,
+//   senderName: req.user.username,
+//   type: "ACCOUNT_LOCKED",
+//   title: "Account Unlocked",
+//   message: `${req.user.username} unlocked account ID ${id}`,
+//   linkTo: "/user-management",
+// }, req.user.user_id);
     res.json({ success: true, message: "Account unlocked successfully" });
   } catch (err) {
     console.error("Unlock account error:", err);

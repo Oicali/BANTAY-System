@@ -65,4 +65,18 @@ router.post("/push-token", authenticate, async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+// DELETE /notifications/push-token — clear on logout
+router.delete("/push-token", authenticate, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE users SET push_token = NULL WHERE user_id = $1`,
+      [req.user.user_id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

@@ -231,7 +231,7 @@ const AuditLog = () => {
             <RefreshIcon /> Refresh
           </button>
           <button className="al-btn al-btn-primary" onClick={handleExportCSV}>
-            <ExportIcon /> Export CSV
+            <ExportIcon /> Export
           </button>
         </div>
       </div>
