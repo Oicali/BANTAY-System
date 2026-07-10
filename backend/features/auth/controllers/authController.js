@@ -597,7 +597,7 @@ const changePassword = async (req, res) => {
 // MOBILE LOGIN (Admin + Patrol only — 30d token)
 // ============================================================
 const mobileLogin = async (req, res) => {
-  const ALLOWED_ROLES    = ["Administrator", "Patrol"];
+  const ALLOWED_ROLES    = ["Administrator", "Patrol", "Technical Administrator"];
   const MOBILE_TOKEN_EXPIRY = "30d";
 
   try {
