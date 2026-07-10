@@ -1,27 +1,25 @@
 /* frontend/src/components/modals/ViewReferralModal.css */
 
-/* Restyled to match EBlotter.css's "View Blotter Entry" modal design
-   (same navy/red BANTAY palette, same modal chrome, same view-section /
-   view-card / view-grid treatment). Class names are unchanged (vrm-*) so
-   no JSX edits are required. */
+/* Reuses the same navy/red BANTAY palette as EBlotter.css.
+   If :root vars are already declared globally, these fallbacks are ignored. */
 :root {
-  --vrm-navy-dark: #0a1628;
-  --vrm-navy-primary: #1e3a5f;
-  --vrm-navy-light: #2d4a6f;
-  --vrm-red-primary: #c1272d;
-  --vrm-red-dark: #8b1a1f;
-  --vrm-gray-50: #f8f9fa;
-  --vrm-gray-100: #e9ecef;
-  --vrm-gray-200: #dee2e6;
-  --vrm-gray-300: #ced4da;
-  --vrm-gray-400: #adb5bd;
-  --vrm-gray-600: #6c757d;
-  --vrm-gray-700: #495057;
-  --vrm-gray-900: #212529;
+  --vrfm-navy-dark: #0a1628;
+  --vrfm-navy-primary: #1e3a5f;
+  --vrfm-navy-light: #2d4a6f;
+  --vrfm-red-primary: #c1272d;
+  --vrfm-red-dark: #8b1a1f;
+  --vrfm-gray-50: #f8f9fa;
+  --vrfm-gray-100: #e9ecef;
+  --vrfm-gray-200: #dee2e6;
+  --vrfm-gray-300: #ced4da;
+  --vrfm-gray-400: #adb5bd;
+  --vrfm-gray-600: #6c757d;
+  --vrfm-gray-700: #495057;
+  --vrfm-gray-900: #212529;
 }
 
-/* ===== OVERLAY / SHELL (mirrors .eb-modal / .eb-modal-content) ===== */
-.vrm-overlay {
+/* ===== OVERLAY / SHELL ===== */
+.vrfm-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -33,10 +31,10 @@
   padding: 20px 0;
 }
 
-.vrm-modal {
-  background-color: #ffffff;
+.vrfm-modal {
+  background: #ffffff;
   width: 90%;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 20px;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -47,26 +45,25 @@
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* ===== HEADER (mirrors .eb-modal-header) ===== */
-.vrm-header {
+/* ===== HEADER (matches eb-modal-header exactly) ===== */
+.vrfm-header {
   padding: 20px 32px;
-  background: linear-gradient(135deg, var(--vrm-navy-dark) 0%, var(--vrm-navy-primary) 100%);
-  border-bottom: 3px solid var(--vrm-red-primary);
-  border-radius: 8px 8px 0 0;
+  background: linear-gradient(135deg, var(--vrfm-navy-dark) 0%, var(--vrfm-navy-primary) 100%);
+  border-bottom: 3px solid var(--vrfm-red-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.vrm-header-left {
+.vrfm-header-left {
   display: flex;
   align-items: center;
   gap: 14px;
   min-width: 0;
 }
 
-.vrm-header-icon {
+.vrfm-header-icon {
   width: 42px;
   height: 42px;
   border-radius: 10px;
@@ -78,23 +75,24 @@
   flex-shrink: 0;
 }
 
-.vrm-title {
-  margin: 0;
-  font-family: "Inter", sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
+h2.vrfm-title,
+.vrfm-title {
+  margin: 0 !important;
+  font-family: "Inter", sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
 }
 
-.vrm-ref-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.vrfm-ref-badge {
+  display: inline-block;
   margin-top: 4px;
   font-family: monospace;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   color: rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -102,21 +100,14 @@
   padding: 2px 8px;
 }
 
-/* Mirrors the description line under .eb-modal-header h2 */
-.vrm-subtitle {
-  margin: 3px 0 0 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.vrm-header-right {
+.vrfm-header-right {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-shrink: 0;
 }
 
-.vrm-modal-close {
+.vrfm-modal-close {
   font-size: 28px;
   font-weight: 300;
   line-height: 1;
@@ -129,12 +120,12 @@
   justify-content: center;
 }
 
-.vrm-modal-close:hover {
+.vrfm-modal-close:hover {
   color: #ffffff;
 }
 
 /* ===== STATUS + PRIORITY PILLS ===== */
-.vrm-status-pill {
+.vrfm-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -148,19 +139,19 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.vrm-status-dot {
+.vrfm-status-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.vrm-status-pending { color: #fde68a; }
-.vrm-status-accepted { color: #86efac; }
-.vrm-status-declined { color: #fca5a5; }
-.vrm-status-escalated { color: #fdba74; }
+.vrfm-status-pending { color: #fde68a; }
+.vrfm-status-accepted { color: #86efac; }
+.vrfm-status-declined { color: #fca5a5; }
+.vrfm-status-escalated { color: #fdba74; }
 
-.vrm-priority-tag {
+.vrfm-priority-tag {
   display: inline-flex;
   align-items: center;
   width: fit-content;
@@ -170,246 +161,268 @@
   font-weight: 700;
 }
 
-.vrm-priority-high {
+.vrfm-priority-high {
   background: rgba(220, 38, 38, 0.1);
   color: #dc2626;
 }
 
-.vrm-priority-medium {
+.vrfm-priority-medium {
   background: rgba(245, 158, 11, 0.1);
   color: #d97706;
 }
 
-.vrm-priority-low {
+.vrfm-priority-low {
   background: rgba(34, 197, 94, 0.1);
   color: #16a34a;
 }
 
-/* ===== BODY (mirrors .eb-view-content) ===== */
-.vrm-body {
-  padding: 0;
-  max-height: 72vh;
+/* ===== BODY / SECTIONS ===== */
+.vrfm-body {
   overflow-y: auto;
+  flex: 1;
 }
 
-.vrm-section {
+.vrfm-section {
   margin-bottom: 0;
 }
 
-/* Sticky section header — same gradient treatment as .eb-view-section-title */
-.vrm-section-title {
-  margin: 0;
-  padding: 10px 32px;
-  font-family: "Inter", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--vrm-navy-dark) 0%, var(--vrm-navy-primary) 100%);
+/* ===== SECTION TITLE (matches eb-view-section-title exactly) =====
+   !important guards used here because host apps that ship a Tailwind
+   (or similar) base/preflight stylesheet reset h3 { font-weight: inherit;
+   font-size: inherit; color: inherit } — that reset can win the cascade
+   over a plain class selector depending on stylesheet load order and
+   washes this bar out to a dim, thin, inherited color/weight. */
+h3.vrfm-section-title,
+.vrfm-section-title {
+  margin: 0 !important;
+  padding: 10px 32px !important;
+  font-family: "Inter", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0.8px !important;
+  text-transform: uppercase !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  background: linear-gradient(135deg, var(--vrfm-navy-dark) 0%, var(--vrfm-navy-primary) 100%) !important;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.vrm-count-chip {
+.vrfm-count-chip {
   font-size: 11px;
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
   padding: 2px 8px;
   border-radius: 20px;
   text-transform: none;
   letter-spacing: 0;
 }
 
-/* Mirrors .eb-view-section-body */
-.vrm-section-body {
-  padding: 20px 32px 28px 32px;
-  background: var(--vrm-gray-50);
+/* ===== SECTION BODY (matches eb-view-section-body exactly) ===== */
+.vrfm-section-body {
+  padding: 20px 32px 28px;
+  background: var(--vrfm-gray-50);
 }
 
-.vrm-section-last .vrm-section-body {
+.vrfm-section-last .vrfm-section-body {
   padding-bottom: 28px;
 }
 
-/* ===== CARDS (mirrors .eb-view-card / .eb-view-card-title) ===== */
-.vrm-card {
+/* ===== CARDS / GRID ===== */
+.vrfm-card {
   background: #ffffff;
-  border: 1px solid var(--vrm-gray-200);
+  border: 1px solid var(--vrfm-gray-200);
   border-radius: 8px;
-  padding: 0;
-  margin-bottom: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.vrm-card-header-row {
+.vrfm-card-header-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 20px;
   background: rgba(30, 58, 95, 0.05);
-  border-bottom: 1px solid var(--vrm-gray-200);
+  border-bottom: 1px solid var(--vrfm-gray-200);
 }
 
-.vrm-mono-badge {
+.vrfm-mono-badge {
   font-family: monospace;
-  font-weight: 600;
-  color: var(--vrm-navy-primary);
-  font-size: 13px;
-  background: rgba(30, 58, 95, 0.07);
-  padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.vrm-incident-tag {
   font-size: 12px;
   font-weight: 700;
-  color: var(--vrm-red-primary);
+  color: var(--vrfm-navy-primary);
+  background: rgba(30, 58, 95, 0.08);
+  border-radius: 6px;
+  padding: 3px 9px;
+  letter-spacing: 0.4px;
+}
+
+.vrfm-incident-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--vrfm-red-primary);
   background: rgba(193, 39, 45, 0.08);
   border-radius: 20px;
   padding: 3px 10px;
-  white-space: nowrap;
 }
 
-/* Row of context badges (data source, referral flags) above the grid */
-.vrm-badge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 14px 20px 0;
-}
-
-/* ===== FIELD GRID (mirrors .eb-view-grid / .eb-view-item) ===== */
-.vrm-grid {
+.vrfm-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0;
 }
 
-.vrm-grid-2col {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.vrm-grid-2col {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.vrm-item {
+.vrfm-item {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 14px 20px;
-  border-right: 1px solid var(--vrm-gray-100);
-  border-bottom: 1px solid var(--vrm-gray-100);
-  background: transparent;
-  border-radius: 0;
-  min-width: 0;
+  border-right: 1px solid var(--vrfm-gray-100);
+  border-bottom: 1px solid var(--vrfm-gray-100);
 }
 
-.vrm-item:last-child {
+.vrfm-item:last-child {
   border-right: none;
 }
 
-.vrm-item-full {
+.vrfm-item-full {
   grid-column: 1 / -1;
   border-right: none;
 }
 
-.vrm-item-span2 {
+.vrfm-item-span2 {
   grid-column: span 2;
 }
 
-.vrm-label {
+.vrfm-label {
   font-size: 11px;
   font-weight: 700;
-  color: var(--vrm-gray-400);
+  color: var(--vrfm-gray-400);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 
-.vrm-sublabel {
+.vrfm-sublabel {
   font-size: 12px;
-  color: var(--vrm-gray-600);
+  color: var(--vrfm-gray-600);
 }
 
-.vrm-value {
+.vrfm-value {
   font-size: 14px;
-  color: var(--vrm-gray-900);
   font-weight: 500;
-  word-break: break-word;
+  color: var(--vrfm-gray-900);
   line-height: 1.5;
+  word-break: break-word;
 }
 
-.vrm-narrative {
+.vrfm-narrative {
   font-weight: 400;
-  color: var(--vrm-gray-700);
+  color: var(--vrfm-gray-700);
 }
 
-/* ===== PERSON CARDS (mirrors EBlotter's "Victim #1" view-mode cards) =====
-   Each person renders as its own .vrm-card, stacked with a bottom margin
-   (vrm-card already carries margin-bottom: 12px) — same pattern as
-   .eb-view-card in EBlotter's Persons Involved section. */
-.vrm-person-card-title {
-  margin: 0;
-  font-family: "Inter", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--vrm-navy-primary);
-  padding: 12px 20px;
-  background: rgba(30, 58, 95, 0.05);
-  border-bottom: 1px solid var(--vrm-gray-200);
-  letter-spacing: 0.3px;
+/* ===== PERSONS LIST ===== */
+.vrfm-persons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* ===== ATTACHMENTS (styled like EBlotter's evidence grid) ===== */
-.vrm-attachment-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+.vrfm-person-row {
+  display: flex;
+  align-items: center;
   gap: 14px;
-}
-
-.vrm-attachment-card {
-  background: #f9fafb;
-  border: 1px solid var(--vrm-gray-200);
+  background: #ffffff;
+  border: 1px solid var(--vrfm-gray-200);
   border-radius: 8px;
-  overflow: hidden;
-  box-shadow: none;
-  display: block;
-  text-decoration: none;
-  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.vrm-attachment-card:hover {
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  border-color: var(--vrm-navy-primary);
-  transform: translateY(-1px);
-}
-
-.vrm-attachment-thumb {
-  height: 90px;
-  background: linear-gradient(135deg, var(--vrm-navy-light), var(--vrm-navy-primary));
+.vrfm-person-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--vrfm-navy-primary);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.vrm-attachment-caption {
+.vrfm-person-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vrfm-person-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vrfm-gray-900);
+}
+
+.vrfm-person-meta {
+  font-size: 12px;
+  color: var(--vrfm-gray-600);
+}
+
+.vrfm-role-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--vrfm-navy-primary);
+  background: rgba(30, 58, 95, 0.08);
+  border-radius: 20px;
+  padding: 4px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ===== ATTACHMENTS ===== */
+.vrfm-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.vrfm-attachment-card {
+  background: #ffffff;
+  border: 1px solid var(--vrfm-gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.vrfm-attachment-thumb {
+  height: 90px;
+  background: linear-gradient(135deg, var(--vrfm-navy-light), var(--vrfm-navy-primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrfm-attachment-caption {
   display: block;
   padding: 8px 10px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--vrm-gray-700);
+  font-weight: 500;
+  color: var(--vrfm-gray-700);
 }
 
 /* ===== TIMELINE ===== */
-.vrm-timeline {
+.vrfm-timeline {
   display: flex;
   flex-direction: column;
 }
 
-.vrm-timeline-step {
+.vrfm-timeline-step {
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -417,128 +430,238 @@
   padding-bottom: 22px;
 }
 
-.vrm-timeline-step:last-child {
+.vrfm-timeline-step:last-child {
   padding-bottom: 0;
 }
 
-.vrm-timeline-dot {
+.vrfm-timeline-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--vrm-gray-300);
-  border: 3px solid var(--vrm-gray-50);
-  box-shadow: 0 0 0 2px var(--vrm-gray-300);
+  background: var(--vrfm-gray-300);
+  border: 3px solid var(--vrfm-gray-50);
+  box-shadow: 0 0 0 2px var(--vrfm-gray-300);
   flex-shrink: 0;
   margin-top: 1px;
   z-index: 1;
 }
 
-.vrm-timeline-step.done .vrm-timeline-dot {
-  background: var(--vrm-navy-primary);
-  box-shadow: 0 0 0 2px var(--vrm-navy-primary);
+.vrfm-timeline-step.done .vrfm-timeline-dot {
+  background: var(--vrfm-navy-primary);
+  box-shadow: 0 0 0 2px var(--vrfm-navy-primary);
 }
 
-.vrm-timeline-line {
+.vrfm-timeline-line {
   position: absolute;
   left: 6px;
   top: 16px;
   bottom: -6px;
   width: 2px;
-  background: var(--vrm-gray-200);
+  background: var(--vrfm-gray-200);
 }
 
-.vrm-timeline-content {
+.vrfm-timeline-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.vrm-timeline-label {
+.vrfm-timeline-label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--vrm-gray-900);
+  color: var(--vrfm-gray-900);
 }
 
-.vrm-timeline-time {
+.vrfm-timeline-time {
   font-size: 12px;
-  color: var(--vrm-gray-600);
+  color: var(--vrfm-gray-600);
 }
 
-/* ===== FOOTER (mirrors .eb-modal-footer) ===== */
-.vrm-footer {
-  padding: 16px 32px;
-  border-top: 2px solid var(--vrm-gray-200);
+/* ===== FOOTER ===== */
+.vrfm-footer {
+  padding: 14px 28px;
+  background: #f0f3f8;
+  border-top: 2px solid var(--vrfm-gray-200);
   display: flex;
   justify-content: flex-end;
-  align-items: center;
   gap: 12px;
-  background: #f0f3f8;
   position: sticky;
   bottom: 0;
-  z-index: 10;
 }
 
-/* Buttons mirror .eb-btn / .eb-btn-primary / .eb-btn-secondary */
-.vrm-btn {
-  padding: 12px 24px;
+.vrfm-btn {
+  padding: 11px 22px;
   border: none;
   border-radius: 6px;
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.vrm-btn:focus {
-  outline: none;
-}
-
-.vrm-btn-primary {
-  background: var(--vrm-red-primary);
+.vrfm-btn-primary {
+  background: var(--vrfm-red-primary);
   color: #ffffff;
 }
 
-.vrm-btn-primary:hover {
-  background: var(--vrm-red-dark);
+.vrfm-btn-primary:hover {
+  background: var(--vrfm-red-dark);
 }
 
-.vrm-btn-secondary {
+.vrfm-btn-secondary {
   background: #ffffff;
-  color: var(--vrm-gray-700);
-  border: 1px solid var(--vrm-gray-300);
+  color: var(--vrfm-gray-700);
+  border: 1px solid var(--vrfm-gray-300);
 }
 
-.vrm-btn-secondary:hover {
-  background: var(--vrm-gray-50);
+.vrfm-btn-secondary:hover {
+  background: var(--vrfm-gray-50);
 }
 
-/* ===== SCROLLBAR (matches EBlotter's thin gray scrollbar) ===== */
-.vrm-body::-webkit-scrollbar {
+/* ===== SUBTITLE (header) ===== */
+.vrfm-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ===== LOADING / ERROR STATES ===== */
+.vrfm-state-box {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--vrfm-gray-600);
+  font-size: 13px;
+}
+
+.vrfm-state-error {
+  margin: 16px;
+  padding: 20px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
+/* ===== EMPTY STATES ===== */
+.vrfm-empty-box {
+  text-align: center;
+  padding: 28px;
+  color: #9ca3af;
+  background: rgba(30, 58, 95, 0.03);
+  border-radius: 8px;
+  border: 1px dashed var(--vrfm-gray-200);
+  font-size: 13px;
+}
+
+.vrfm-empty-title {
+  font-weight: 600;
+  color: #6b7280;
+  margin: 8px 0 2px;
+}
+
+.vrfm-empty-sub {
+  font-size: 12px;
+}
+
+/* ===== CARD TITLE (Persons / Suspect cards) ===== */
+h4.vrfm-card-title,
+.vrfm-card-title {
+  font-family: "Inter", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  color: var(--vrfm-navy-primary) !important;
+  opacity: 1 !important;
+  padding: 12px 20px;
+  margin: 0 !important;
+  background: rgba(30, 58, 95, 0.05);
+  border-bottom: 1px solid var(--vrfm-gray-200);
+  letter-spacing: 0.3px;
+}
+
+.vrfm-card + .vrfm-card {
+  margin-top: 12px;
+}
+
+/* ===== MEDIA TABS (Photo / Video) ===== */
+.vrfm-media-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.vrfm-media-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 7px;
+  border: 1.5px solid var(--vrfm-gray-300);
+  background: #ffffff;
+  color: var(--vrfm-gray-600);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  transition: all 0.15s;
+}
+
+.vrfm-media-tab.active {
+  border-color: var(--vrfm-navy-primary);
+  background: var(--vrfm-navy-primary);
+  color: #ffffff;
+}
+
+/* ===== ATTACHMENT MEDIA (real thumbnails, replaces icon placeholder) ===== */
+.vrfm-attachment-card {
+  display: block;
+  text-decoration: none;
+}
+
+.vrfm-attachment-media {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+
+.vrfm-attachment-meta {
+  padding: 8px 10px;
+}
+
+.vrfm-attachment-date {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* ===== SCROLLBAR ===== */
+.vrfm-body::-webkit-scrollbar {
   width: 6px;
 }
 
-.vrm-body::-webkit-scrollbar-track {
+.vrfm-body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.vrm-body::-webkit-scrollbar-thumb {
+.vrfm-body::-webkit-scrollbar-thumb {
   background: #d1d5db;
   border-radius: 999px;
 }
 
-.vrm-body::-webkit-scrollbar-thumb:hover {
+.vrfm-body::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
 
-/* ===== RESPONSIVE (mirrors EBlotter's mobile bottom-sheet modal) ===== */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-  .vrm-overlay {
+  .vrfm-overlay {
     padding: 0;
     align-items: flex-end;
   }
 
-  .vrm-modal {
+  .vrfm-modal {
     margin: 0;
     width: 100%;
     max-width: 100%;
@@ -546,53 +669,43 @@
     border-radius: 16px 16px 0 0;
   }
 
-  .vrm-header {
-    padding: 16px 20px;
+  .vrfm-header {
+    padding: 14px 18px;
     border-radius: 16px 16px 0 0;
   }
 
-  .vrm-header-right {
+  .vrfm-header-right {
     gap: 10px;
   }
 
-  .vrm-title {
-    font-size: 16px;
+  .vrfm-title {
+    font-size: 15px;
   }
 
-  .vrm-section-title,
-  .vrm-section-body {
+  .vrfm-section-title,
+  .vrfm-section-body {
     padding-left: 16px;
     padding-right: 16px;
   }
 
-  .vrm-grid {
-    grid-template-columns: 1fr !important;
+  .vrfm-grid {
+    grid-template-columns: 1fr;
   }
 
-  .vrm-item,
-  .vrm-item-full,
-  .vrm-item-span2 {
-    grid-column: span 1 !important;
-    border-right: none !important;
+  .vrfm-item,
+  .vrfm-item-full,
+  .vrfm-item-span2 {
+    grid-column: span 1;
+    border-right: none;
   }
 
-  .vrm-footer {
+  .vrfm-footer {
     padding: 12px 16px;
     flex-direction: column-reverse;
   }
 
-  .vrm-btn {
+  .vrfm-btn {
     width: 100%;
     text-align: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .vrm-title {
-    font-size: 14px;
-  }
-
-  .vrm-attachment-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 }
