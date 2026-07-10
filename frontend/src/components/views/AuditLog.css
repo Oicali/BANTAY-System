@@ -50,12 +50,12 @@
 }
 
 .al-btn-primary {
-  background: var(--navy-dark, #0a1628);
+  background: var(--red-primary, #c1272d);
   color: #ffffff;
 }
 
 .al-btn-primary:hover {
-  background: #06101e;
+  background: var(--red-dark, #8b1a1f);
 }
 
 .al-btn-secondary {
