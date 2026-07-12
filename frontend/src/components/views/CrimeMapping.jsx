@@ -823,15 +823,18 @@ function CrimeMapping() {
 
   const getPHTToday = () => getPHTDate(0);
 
-  const getPHTOneYearAgo = () => {
-    const now = new Date();
-    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
-    const phtToday = new Date(phtMs);
-    const oneYearAgo = new Date(phtToday);
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    oneYearAgo.setDate(oneYearAgo.getDate() + 1);
-    return oneYearAgo.toISOString().slice(0, 10);
-  };
+const getPHTOneYearAgo = () => {
+  const now = new Date();
+  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+  const phtToday = new Date(phtMs);
+
+  // Same month, one year back, pinned to the 1st
+  const year = phtToday.getUTCFullYear() - 1;
+  const month = phtToday.getUTCMonth();
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+
+  return firstOfMonth.toISOString().slice(0, 10);
+};
 
   const defaultDateTo = getPHTToday();
   const defaultDateFrom = getPHTOneYearAgo();
