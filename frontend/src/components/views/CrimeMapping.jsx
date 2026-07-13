@@ -585,11 +585,12 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
     o.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const toggle = (b) => {
-    onChange(
-      selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
-    );
-  };
+const toggle = (b) => {
+  onChange(
+    selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
+  );
+  setSearch(""); // ← clear the search text after a pick
+};
 
   const removeOne = (b, e) => {
     e.stopPropagation();

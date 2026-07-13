@@ -250,18 +250,7 @@ const OngoingShiftCard = ({ patrol, geoJSONData, myShifts, isUpcoming }) => {
           </div>
         </div>
 
-        {/* Status pill */}
-        {isUpcoming ? (
-          <div className="pdv-upcoming-pill">
-            <span className="pdv-upcoming-dot" />
-            UPCOMING
-          </div>
-        ) : (
-          <div className="pdv-ongoing-live-pill">
-            <span className="pdv-live-dot" />
-            LIVE
-          </div>
-        )}
+        
       </div>
 
       {/* Card body: map + schedule */}

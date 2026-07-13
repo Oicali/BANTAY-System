@@ -215,7 +215,6 @@
   overflow: hidden;
 }
 
-/* Map controls */
 .pdv-map-controls {
   position: absolute;
   bottom: 14px;
@@ -227,7 +226,8 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   overflow: hidden;
-  z-index: 10;
+  z-index: 20; /* was 10 — mapbox-gl canvases sometimes establish their own stacking context */
+  pointer-events: auto;
 }
 .pdv-map-ctrl-btn {
   width: 34px;
@@ -240,9 +240,16 @@
   cursor: pointer;
   color: var(--gray-600);
   transition: background 0.15s;
-  stroke: currentColor;
+  padding: 0;              /* browsers add default button padding — content-box math can push/clip the svg */
+  box-sizing: border-box;  /* prevents the 34px box from growing past what you set */
+}
+.pdv-map-ctrl-btn svg {
+  display: block;      /* svg is inline by default — this avoids baseline-shift clipping */
+  flex-shrink: 0;
+  pointer-events: none; /* clicks always land on the button, not a sub-pixel gap in the svg */
 }
 .pdv-map-ctrl-btn:hover { background: var(--gray-50); color: var(--navy-primary); }
+
 .pdv-map-ctrl-divider { height: 1px; background: var(--gray-200); margin: 0; }
 
 /* Schedule panel */
