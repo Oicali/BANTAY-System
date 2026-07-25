@@ -852,28 +852,54 @@ const importBlotters = async (req, res) => {
       if (v === null || v === undefined || v === "") return false;
       return String(v).trim().toUpperCase() === "YES" || v === true || v === 1;
     };
-    const parseDate = (v) => {
-      if (!v || v === "") return null;
-      if (typeof v === "number") {
-        // Excel serial date
-        return new Date((v - 25569) * 86400 * 1000);
-      }
-      const d = new Date(v);
-      return isNaN(d.getTime()) ? null : d;
-    };
-    const parseDateTime = (dateVal, timeVal) => {
-      const d = parseDate(dateVal);
-      if (!d) return null;
-      if (timeVal && timeVal !== "") {
-        const parts = String(timeVal).split(":");
-        if (parts.length >= 2) {
-          d.setHours(parseInt(parts[0]) || 0);
-          d.setMinutes(parseInt(parts[1]) || 0);
-          d.setSeconds(0);
-        }
-      }
-      return d;
-    };
+   // NEW
+const parseDate = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") {
+    // Excel serial date is a calendar day count with no timezone of its own.
+    // Extract Y/M/D via UTC math (safe, no local-TZ drift), then build a
+    // LOCAL Date at midnight — this is what matters for pg's local getters.
+    const days = Math.floor(v);
+    const utcAnchor = new Date((days - 25569) * 86400 * 1000);
+    return new Date(
+      utcAnchor.getUTCFullYear(),
+      utcAnchor.getUTCMonth(),
+      utcAnchor.getUTCDate(),
+    );
+  }
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const excelFractionToHM = (frac) => {
+  const totalMinutes = Math.round(frac * 24 * 60);
+  return {
+    hours: Math.floor(totalMinutes / 60) % 24,
+    minutes: totalMinutes % 60,
+  };
+};
+
+const parseDateTime = (dateVal, timeVal) => {
+  const d = parseDate(dateVal);
+  if (!d) return null;
+
+  let hours = 0, minutes = 0;
+
+  if (typeof timeVal === "number") {
+    ({ hours, minutes } = excelFractionToHM(timeVal));
+  } else if (timeVal && String(timeVal).includes(":")) {
+    const parts = String(timeVal).split(":");
+    hours = parseInt(parts[0]) || 0;
+    minutes = parseInt(parts[1]) || 0;
+  } else if (typeof dateVal === "number" && dateVal % 1 !== 0) {
+    ({ hours, minutes } = excelFractionToHM(dateVal % 1));
+  }
+
+  // LOCAL setter — pg reads this back via local getters, so this is what
+  // actually ends up stored. Do NOT use setUTCHours here.
+  d.setHours(hours, minutes, 0, 0);
+  return d;
+};
     const deriveQuarter = (d) => {
       if (!d) return null;
       return Math.ceil((d.getMonth() + 1) / 3);
@@ -949,76 +975,121 @@ const importBlotters = async (req, res) => {
       }
 
       const BARANGAY_MIGRATION_MAP = {
-        ALIMA: "SINEGUELASAN",
-        BANALO: "SINEGUELASAN",
-        SINBANALI: "SINEGUELASAN",
-        CAMPOSANTO: "KAINGIN (POB.)",
-        "DAANG BUKID": "KAINGIN (POB.)",
-        "TABING DAGAT": "KAINGIN (POB.)",
-        DIGMAN: "KAINGIN DIGMAN",
-        KAINGIN: "KAINGIN DIGMAN",
-        PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)",
-        "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
-        "PANAPAAN 2": "P.F. ESPIRITU II",
-        "PANAPAAN 3": "P.F. ESPIRITU II",
-        "PANAPAAN 4": "P.F. ESPIRITU IV",
-        "PANAPAAN 5": "P.F. ESPIRITU V",
-        "PANAPAAN 6": "P.F. ESPIRITU VI",
-        "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
-        "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
-        "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
-        "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
-        "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
-        "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
-        "ANIBAN 1": "ANIBAN I",
-        "ANIBAN 2": "ANIBAN II",
-        "HABAY 1": "HABAY I",
-        "HABAY 2": "HABAY II",
-        "LIGAS 1": "LIGAS I",
-        "LIGAS 2": "LIGAS II",
-        "MABOLO 1": "MABOLO",
-        "MABOLO 2": "MABOLO",
-        "MABOLO 3": "MABOLO",
-        "MALIKSI 1": "MALIKSI I",
-        "MALIKSI 2": "MALIKSI II",
-        "MALIKSI 3": "MALIKSI II",
-        "MAMBOG 1": "MAMBOG I",
-        "MAMBOG 2": "MAMBOG II",
-        "MAMBOG 3": "MAMBOG III",
-        "MAMBOG 4": "MAMBOG IV",
-        "MAMBOG 5": "MAMBOG II",
-        "MOLINO 1": "MOLINO I",
-        "MOLINO 2": "MOLINO II",
-        "MOLINO 3": "MOLINO III",
-        "MOLINO 4": "MOLINO IV",
-        "MOLINO 5": "MOLINO V",
-        "MOLINO 6": "MOLINO VI",
-        "MOLINO 7": "MOLINO VII",
-        "NIOG 1": "NIOG",
-        "NIOG 2": "NIOG",
-        "NIOG 3": "NIOG",
-        "REAL 1": "REAL",
-        "REAL 2": "REAL",
-        "SALINAS 1": "SALINAS I",
-        "SALINAS 2": "SALINAS II",
-        "SALINAS 3": "SALINAS II",
-        "SALINAS 4": "SALINAS II",
-        "SAN NICOLAS 1": "SAN NICOLAS I",
-        "SAN NICOLAS 2": "SAN NICOLAS II",
-        "SAN NICOLAS 3": "SAN NICOLAS III",
-        "TALABA 1": "TALABA I",
-        "TALABA 2": "TALABA II",
-        "TALABA 3": "TALABA III",
-        "TALABA 4": "TALABA III",
-        "TALABA 5": "TALABA III",
-        "TALABA 6": "TALABA III",
-        "TALABA 7": "TALABA I",
-        "ZAPOTE 1": "ZAPOTE I",
-        "ZAPOTE 2": "ZAPOTE II",
-        "ZAPOTE 3": "ZAPOTE III",
-        "ZAPOTE 4": "ZAPOTE II",
-        "KAINGIN DIGMAN": "KAINGIN DIGMAN",
-      };
+  ALIMA: "SINEGUELASAN",
+  BANALO: "SINEGUELASAN",
+  SINBANALI: "SINEGUELASAN",
+  CAMPOSANTO: "KAINGIN (POB.)",
+  "DAANG BUKID": "KAINGIN (POB.)",
+  "TABING DAGAT": "KAINGIN (POB.)",
+  DIGMAN: "KAINGIN DIGMAN",
+  KAINGIN: "KAINGIN DIGMAN",
+ 
+  // ── PANAPAAN -> P.F. ESPIRITU (full rename family) ──
+  PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 2": "P.F. ESPIRITU II",
+  "PANAPAAN 3": "P.F. ESPIRITU II",
+  "PANAPAAN 4": "P.F. ESPIRITU IV",
+  "PANAPAAN 5": "P.F. ESPIRITU V",
+  "PANAPAAN 6": "P.F. ESPIRITU VI",
+  "PANAPAAN I": "P.F. ESPIRITU I (PANAPAAN)",       // <-- NEW
+  "PANAPAAN II": "P.F. ESPIRITU II",                 // <-- NEW
+  "PANAPAAN III": "P.F. ESPIRITU II",                // <-- NEW
+  "PANAPAAN IV": "P.F. ESPIRITU IV",                 // <-- NEW
+  "PANAPAAN V": "P.F. ESPIRITU V",                   // <-- NEW
+  "PANAPAAN VI": "P.F. ESPIRITU VI",                 // <-- NEW
+ 
+  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
+  "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
+  "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
+  "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
+  "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
+  "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
+ 
+  "ANIBAN 1": "ANIBAN I",
+  "ANIBAN 2": "ANIBAN II",
+  "HABAY 1": "HABAY I",
+  "HABAY 2": "HABAY II",
+  "LIGAS 1": "LIGAS I",
+  "LIGAS 2": "LIGAS II",
+ 
+  // ── MABOLO (merges to unsuffixed canonical name) ──
+  "MABOLO 1": "MABOLO",
+  "MABOLO 2": "MABOLO",
+  "MABOLO 3": "MABOLO",
+  "MABOLO I": "MABOLO",     // <-- NEW
+  "MABOLO II": "MABOLO",    // <-- NEW
+  "MABOLO III": "MABOLO",   // <-- NEW
+ 
+  // ── MALIKSI ──
+  "MALIKSI 1": "MALIKSI I",
+  "MALIKSI 2": "MALIKSI II",
+  "MALIKSI 3": "MALIKSI II",
+  "MALIKSI III": "MALIKSI II",   // <-- NEW (3 -> II mismatch)
+ 
+  // ── MAMBOG ──
+  "MAMBOG 1": "MAMBOG I",
+  "MAMBOG 2": "MAMBOG II",
+  "MAMBOG 3": "MAMBOG III",
+  "MAMBOG 4": "MAMBOG IV",
+  "MAMBOG 5": "MAMBOG II",
+  "MAMBOG V": "MAMBOG II",       // <-- NEW (5 -> II mismatch)
+ 
+  "MOLINO 1": "MOLINO I",
+  "MOLINO 2": "MOLINO II",
+  "MOLINO 3": "MOLINO III",
+  "MOLINO 4": "MOLINO IV",
+  "MOLINO 5": "MOLINO V",
+  "MOLINO 6": "MOLINO VI",
+  "MOLINO 7": "MOLINO VII",
+ 
+  "NIOG 1": "NIOG",
+  "NIOG 2": "NIOG",
+  "NIOG 3": "NIOG",
+  "NIOG I": "NIOG",
+  "NIOG II": "NIOG",
+  "NIOG III": "NIOG",
+ 
+  // ── REAL (merges to unsuffixed canonical name) ──
+  "REAL 1": "REAL",
+  "REAL 2": "REAL",
+  "REAL I": "REAL",    // <-- NEW
+  "REAL II": "REAL",   // <-- NEW
+ 
+  // ── SALINAS ──
+  "SALINAS 1": "SALINAS I",
+  "SALINAS 2": "SALINAS II",
+  "SALINAS 3": "SALINAS II",
+  "SALINAS 4": "SALINAS II",
+  "SALINAS III": "SALINAS II",   // <-- NEW (3 -> II mismatch)
+  "SALINAS IV": "SALINAS II",    // <-- NEW (4 -> II mismatch)
+ 
+  "SAN NICOLAS 1": "SAN NICOLAS I",
+  "SAN NICOLAS 2": "SAN NICOLAS II",
+  "SAN NICOLAS 3": "SAN NICOLAS III",
+ 
+  // ── TALABA ──
+  "TALABA 1": "TALABA I",
+  "TALABA 2": "TALABA II",
+  "TALABA 3": "TALABA III",
+  "TALABA 4": "TALABA III",
+  "TALABA 5": "TALABA III",
+  "TALABA 6": "TALABA III",
+  "TALABA 7": "TALABA I",
+  "TALABA IV": "TALABA III",     // <-- NEW (4 -> III mismatch)
+  "TALABA V": "TALABA III",      // <-- NEW (5 -> III mismatch)
+  "TALABA VI": "TALABA III",     // <-- NEW (6 -> III mismatch)
+  "TALABA VII": "TALABA I",      // <-- NEW (7 -> I mismatch)
+ 
+  // ── ZAPOTE ──
+  "ZAPOTE 1": "ZAPOTE I",
+  "ZAPOTE 2": "ZAPOTE II",
+  "ZAPOTE 3": "ZAPOTE III",
+  "ZAPOTE 4": "ZAPOTE II",
+  "ZAPOTE IV": "ZAPOTE II",      // <-- NEW (4 -> II mismatch)
+ 
+  "KAINGIN DIGMAN": "KAINGIN DIGMAN",
+};
 
       const barangay =
         BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] || rawBarangay;

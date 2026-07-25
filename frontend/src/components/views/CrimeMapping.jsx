@@ -585,12 +585,12 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
     o.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-const toggle = (b) => {
-  onChange(
-    selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
-  );
-  setSearch(""); // ← clear the search text after a pick
-};
+  const toggle = (b) => {
+    onChange(
+      selected.includes(b) ? selected.filter((x) => x !== b) : [...selected, b],
+    );
+    setSearch(""); // ← clear the search text after a pick
+  };
 
   const removeOne = (b, e) => {
     e.stopPropagation();
@@ -799,7 +799,6 @@ function CrimeMapping() {
   const [heatGeoJSON, setHeatGeoJSON] = useState(null);
   const [clusterGeoJSON, setClusterGeoJSON] = useState(null);
   const [heatLoading, setHeatLoading] = useState(false);
-  const [selectedCluster, setSelectedCluster] = useState(null);
 
   const [officers, setOfficers] = useState([]);
   const [showOfficers, setShowOfficers] = useState(true);
@@ -824,18 +823,18 @@ function CrimeMapping() {
 
   const getPHTToday = () => getPHTDate(0);
 
-const getPHTOneYearAgo = () => {
-  const now = new Date();
-  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
-  const phtToday = new Date(phtMs);
+  const getPHTOneYearAgo = () => {
+    const now = new Date();
+    const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+    const phtToday = new Date(phtMs);
 
-  // Same month, one year back, pinned to the 1st
-  const year = phtToday.getUTCFullYear() - 1;
-  const month = phtToday.getUTCMonth();
-  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+    // Same month, one year back, pinned to the 1st
+    const year = phtToday.getUTCFullYear() - 1;
+    const month = phtToday.getUTCMonth();
+    const firstOfMonth = new Date(Date.UTC(year, month, 1));
 
-  return firstOfMonth.toISOString().slice(0, 10);
-};
+    return firstOfMonth.toISOString().slice(0, 10);
+  };
 
   const defaultDateTo = getPHTToday();
   const defaultDateFrom = getPHTOneYearAgo();
@@ -879,6 +878,7 @@ const getPHTOneYearAgo = () => {
 
   const mapRef = useRef(null);
   const incidenceTooltipTimerRef = useRef(null);
+  const brgyTooltipRef = useRef(null); // <-- NEW
 
   // Helper to avoid repetition — define once above your return()
   const LegendPin = ({ color, incidentType }) => {
@@ -924,6 +924,20 @@ const getPHTOneYearAgo = () => {
       clearTimeout(incidenceTooltipTimerRef.current);
       incidenceTooltipTimerRef.current = null;
     }
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (
+          brgyTooltipRef.current &&
+          !brgyTooltipRef.current.contains(e.target)
+        ) {
+          setHoveredBarangay(null);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const rect = e.currentTarget.getBoundingClientRect();
     const tooltipWidth = 260;
@@ -1136,7 +1150,6 @@ const getPHTOneYearAgo = () => {
   const handleModeToggle = useCallback(() => {
     setHeatmapMode((m) => !m);
     setSelectedPin(null);
-    setSelectedCluster(null);
   }, []);
 
   const buildGeoJSON = useCallback(() => {
@@ -1367,32 +1380,6 @@ const getPHTOneYearAgo = () => {
     [geoJSONData, isBarangayUser, userBarangay],
   );
 
-  const handleMapClick = useCallback(
-    (e) => {
-      if (!heatmapMode || !mapRef.current) return;
-
-      const features = mapRef.current.queryRenderedFeatures(e.point, {
-        layers: ["cluster-circles"],
-      });
-
-      if (features.length > 0) {
-        const f = features[0];
-        setSelectedCluster({
-          lng: f.geometry.coordinates[0],
-          lat: f.geometry.coordinates[1],
-          count: f.properties.count,
-          crime: f.properties.dominant_crime,
-          barangay: f.properties.dominant_barangay,
-          rank: f.properties.rank,
-          modus: f.properties.dominant_modus,
-          crime_types: f.properties.crime_types,
-        });
-      } else {
-        setSelectedCluster(null);
-      }
-    },
-    [heatmapMode],
-  );
 
   const geoJSON = buildGeoJSON();
 
@@ -1842,7 +1829,7 @@ const getPHTOneYearAgo = () => {
               attributionControl={false}
               onZoom={(e) => setZoom(e.viewState.zoom)}
               onDblClick={handleMapDblClick}
-              onClick={handleMapClick}
+              
               doubleClickZoom={false}
               onMouseMove={(e) => {
                 if (hoveredOfficerRef.current) return; // ← reads ref, always current value
@@ -2017,10 +2004,13 @@ const getPHTOneYearAgo = () => {
                     setSelectedPin(null);
                     setShowMorePopup(false);
                   }}
-                  closeOnClick={false}
+                  closeOnClick={true}
                   maxWidth="290px"
                 >
-                  <div className="crmap-popup">
+                  <div
+                    className="crmap-popup"
+                    onMouseEnter={() => setHoveredBarangay(null)}
+                  >
                     <div
                       className="crmap-popup-header"
                       style={{
@@ -2150,53 +2140,7 @@ const getPHTOneYearAgo = () => {
                   </Marker>
                 ))}
 
-              {heatmapMode && selectedCluster && (
-                <Popup
-                  longitude={selectedCluster.lng}
-                  latitude={selectedCluster.lat}
-                  anchor="bottom"
-                  onClose={() => setSelectedCluster(null)}
-                  closeOnClick={false}
-                  maxWidth="240px"
-                >
-                  <div className="crmap-popup">
-                    <div
-                      className="crmap-popup-header"
-                      style={{
-                        background:
-                          INCIDENT_COLORS[selectedCluster.crime] || "#1e3a5f",
-                      }}
-                    >
-                      <span className="crmap-popup-type">
-                        Cluster #{selectedCluster.rank}
-                      </span>
-                      <span className="crmap-popup-status-badge">
-                        {selectedCluster.count} incidents
-                      </span>
-                    </div>
-
-                    <div className="crmap-popup-body">
-                      {[
-                        ["Top crime", selectedCluster.crime || "N/A"],
-                        ["Barangay", selectedCluster.barangay || "N/A"],
-                        ["Incidents", selectedCluster.count],
-                        ["Modus", selectedCluster.modus || "N/A"],
-                        [
-                          "Crime types",
-                          Array.isArray(selectedCluster.crime_types)
-                            ? selectedCluster.crime_types.length
-                            : 1,
-                        ],
-                      ].map(([lbl, val]) => (
-                        <div className="crmap-popup-row" key={lbl}>
-                          <span className="crmap-popup-lbl">{lbl}</span>
-                          <span className="crmap-popup-val">{val}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Popup>
-              )}
+              
             </Map>
 
             {hoveredOfficer && (
@@ -2224,6 +2168,7 @@ const getPHTOneYearAgo = () => {
 
             {showBrgyTooltip && hoveredBarangay && (
               <div
+                ref={brgyTooltipRef}
                 className="crmap-brgy-tooltip"
                 style={{
                   left: hoveredBarangay.x + 12,
@@ -2898,7 +2843,7 @@ const getPHTOneYearAgo = () => {
                                   zoom: 14,
                                   duration: 800,
                                 });
-                                setSelectedCluster(null);
+                              
                               }}
                             >
                               <div
