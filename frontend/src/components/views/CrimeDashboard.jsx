@@ -1,5 +1,6 @@
 // frontend/src/components/views/CrimeDashboard.jsx
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   BarChart,
   Bar,
@@ -33,6 +34,7 @@ import PdfPreviewModal from "../modals/PdfPreviewModal";
 
 // ─── FEATURE FLAGS ────────────────────────────────────────────────────────────
 const SHOW_MONTHLY_DELTAS = false; // Set to false to hide all "vs last month" deltas
+const SHOW_BACKTEST_REPORT = true;
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
@@ -1892,8 +1894,6 @@ const CrimeBreakdownTooltip = ({ row, nameKey }) => {
   return (
     <div
       style={{
-        position: "absolute",
-        zIndex: 500,
         background: "#fff",
         border: "1px solid #e5e7eb",
         borderRadius: 8,
@@ -1977,14 +1977,24 @@ const PlaceOfCommission = ({ data }) => {
   );
 
   const handleMouseEnter = (row, e) => {
-    const rect = containerRef.current?.getBoundingClientRect();
     const rowRect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 200;
+    const viewportPadding = 8;
+
+    // Prefer showing to the right of the row; flip to left if it would overflow
+    let left = rowRect.right + 8;
+    if (left + tooltipWidth > window.innerWidth - viewportPadding) {
+      left = rowRect.left - tooltipWidth - 8;
+    }
+    left = Math.max(viewportPadding, left);
+
     setHoveredRow(row);
     setTooltipPos({
-      x: rowRect.left - (rect?.left || 0) ,
-      y: rowRect.top - (rect?.top || 0),
+      x: left,
+      y: rowRect.top,
     });
   };
+
   return (
     <div
       ref={containerRef}
@@ -1998,17 +2008,21 @@ const PlaceOfCommission = ({ data }) => {
         </span>
       </div>
 
-      {hoveredRow && (
-        <div
-          style={{
-            position: "absolute",
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-          }}
-        >
-          <CrimeBreakdownTooltip row={hoveredRow} nameKey="place" />
-        </div>
-      )}
+      {hoveredRow &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y,
+              zIndex: 2000,
+            }}
+          >
+            <CrimeBreakdownTooltip row={hoveredRow} nameKey="place" />
+          </div>,
+          document.body,
+        )}
 
       <table className="cd-brgy-table">
         <thead>
@@ -2080,7 +2094,6 @@ const PlaceOfCommission = ({ data }) => {
     </div>
   );
 };
-
 // ─── BARANGAY TABLE ───────────────────────────────────────────────────────────
 const BarangayTable = ({ data }) => {
   const [sortCol, setSortCol] = useState("count");
@@ -2121,12 +2134,20 @@ const BarangayTable = ({ data }) => {
   };
 
   const handleMouseEnter = (row, e) => {
-    const rect = containerRef.current?.getBoundingClientRect();
     const rowRect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 200;
+    const viewportPadding = 8;
+
+    // Prefer showing to the left of the row (matches old behavior); flip to right if it would overflow
+    let left = rowRect.left - tooltipWidth - 8;
+    if (left < viewportPadding) {
+      left = rowRect.right + 8;
+    }
+
     setHoveredRow(row);
     setTooltipPos({
-      x: rowRect.left - (rect?.left || 0), // show LEFT of the row, 210px wide
-      y: rowRect.top - (rect?.top || 0),
+      x: left,
+      y: rowRect.top,
     });
   };
 
@@ -2153,17 +2174,21 @@ const BarangayTable = ({ data }) => {
         </span>
       </div>
 
-      {hoveredRow && (
-        <div
-          style={{
-            position: "absolute",
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-          }}
-        >
-          <CrimeBreakdownTooltip row={hoveredRow} nameKey="barangay" />
-        </div>
-      )}
+      {hoveredRow &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y,
+              zIndex: 2000,
+            }}
+          >
+            <CrimeBreakdownTooltip row={hoveredRow} nameKey="barangay" />
+          </div>,
+          document.body,
+        )}
 
       <table className="cd-brgy-table">
         <thead>
@@ -2238,251 +2263,328 @@ const BarangayTable = ({ data }) => {
   );
 };
 
-// ─── TREND SPARKLINE ──────────────────────────────────────────────────────────
-const TrendSparkline = ({
-  crimeType,
-  weeklyRows,
-  linregData,
-  mode,
-  forecastState = "full",
-}) => {
-  const crimeRows = useMemo(() => {
-    if (!weeklyRows?.length) return [];
-    return weeklyRows
-      .filter((r) => r.incident_type === crimeType)
-      .sort((a, b) => new Date(a.week_start) - new Date(b.week_start))
-      .map((r, i) => ({ index: i, week: r.week_start, count: r.count }));
-  }, [weeklyRows, crimeType]);
+// ─── BARANGAY RISK TABLE ──────────────────────────────────────────────────────
+const TIER_STYLE = {
+  SBA:    { bg: "#14532d", color: "#4ade80" },
+  FREQ:   { bg: "#422006", color: "#fbbf24" },
+  SPARSE: { bg: "#1e293b", color: "#64748b" },
+};
 
-  const lr = useMemo(() => {
-    if (!linregData?.per_crime) return null;
-    return linregData.per_crime.find((l) => l.crime === crimeType) || null;
-  }, [linregData, crimeType]);
+const CRIME_PILL_COLORS = {
+  MURDER:               { bg: "#3f0e0e", color: "#fca5a5" },
+  THEFT:                { bg: "#0c2240", color: "#93c5fd" },
+  RAPE:                 { bg: "#2d1054", color: "#c4b5fd" },
+  ROBBERY:              { bg: "#1a2e0a", color: "#86efac" },
+  HOMICIDE:             { bg: "#2c1a0a", color: "#fdba74" },
+  "SPECIAL COMPLEX CRIME": { bg: "#1a1a2e", color: "#a5b4fc" },
+  "PHYSICAL INJURY":    { bg: "#1a2a1a", color: "#6ee7b7" },
+  "CARNAPPING - MC":    { bg: "#0c2240", color: "#93c5fd" },
+  "CARNAPPING - MV":    { bg: "#0c2240", color: "#7dd3fc" },
+};
 
-  // Croston has no slope — use trend from moving average comparison
-  // lr.trend is already set correctly from compute_croston
-  // lr.predicted_next_week comes from Croston rate
-  // lr.confidence replaces the old confidence_level
+const CRIME_PILL_LABEL = {
+  MURDER: "Murder", THEFT: "Theft", RAPE: "Rape", ROBBERY: "Robbery",
+  HOMICIDE: "Homicide", "SPECIAL COMPLEX CRIME": "Spec. Complex",
+  "PHYSICAL INJURY": "Phys. Inj.", "CARNAPPING - MC": "Carnap MC",
+  "CARNAPPING - MV": "Carnap MV",
+};
 
-  if (!crimeRows.length) return null;
+const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [showBacktest, setShowBacktest] = useState(false);
+  const [selectedFold, setSelectedFold] = useState(null);
 
-  const regressionData = useMemo(() => {
-    if (!lr || lr.smoothed_demand === undefined) return [];
-    // Croston rate = smoothed_demand / smoothed_interval
-    const rate = lr.smoothed_demand / Math.max(lr.smoothed_interval || 1, 1);
-    return crimeRows.map((r) => ({
-      ...r,
-      regression: Math.max(0, parseFloat(rate.toFixed(2))),
-    }));
-  }, [crimeRows, lr]);
+  if (!forecastData) return null;
 
-  const chartData = useMemo(() => {
-    if (!regressionData.length) return crimeRows;
-    const rate = lr.smoothed_demand / Math.max(lr.smoothed_interval || 1, 1);
-    const forecastVal = Math.max(0, parseFloat(rate.toFixed(2)));
+  const rows        = forecastData.barangay_risk || [];
+  const backtest    = forecastData.backtest || null;
+  const decayWindow = forecastData.decay_window_used ?? 90;
+  const totalBrgys  = forecastData.total_barangays ?? 0;
 
-    return [
-      ...regressionData,
-      {
-        index: regressionData.length,
-        week: "Forecast",
-        count: null,
-        regression: forecastVal,
-        predicted: lr.predicted_next_week ?? forecastVal,
-      },
-    ];
-  }, [regressionData, lr, crimeRows]);
+  if (rows.length === 0) {
+    return (
+      <div className="cd-risk-insufficient">
+        Insufficient data to produce barangay risk rankings.
+      </div>
+    );
+  }
 
-  const trendColor =
-    lr?.trend === "increasing"
-      ? "#ef4444"
-      : lr?.trend === "decreasing"
-        ? "#22c55e"
-        : "#6b7280";
+  const toggleRow = (rank) =>
+    setExpandedRow(expandedRow === rank ? null : rank);
 
-  const trendLabel =
-    lr?.trend === "increasing"
-      ? "↑ Increasing"
-      : lr?.trend === "decreasing"
-        ? "↓ Decreasing"
-        : "→ Stable";
+  const getScoreClass = (score) => {
+    if (score >= 80) return { num: "cd-score-critical", fill: "cd-fill-critical" };
+    if (score >= 65) return { num: "cd-score-high",     fill: "cd-fill-high" };
+    if (score >= 45) return { num: "cd-score-medium",   fill: "cd-fill-medium" };
+    return                  { num: "cd-score-low",      fill: "cd-fill-low" };
+  };
 
-  const isRetrospective = mode === "retrospective";
-  const hasEnoughData =
-    typeof lr?.confidence === "number" && lr.confidence >= 50;
-  const insufficientForecast =
-    !lr ||
-    lr?.predicted_next_week === null ||
-    lr?.confidence === 0 ||
-    forecastState === "insufficient";
+  const getRecency = (days) => {
+    if (days <= 3)  return { color: "#dc2626", weight: 700 };
+    if (days <= 7)  return { color: "#ea580c", weight: 700 };
+    if (days <= 30) return { color: "#ca8a04", weight: 600 };
+    return                 { color: "var(--gray-600)", weight: 400 };
+  };
 
-  const isLimitedForecast = forecastState === "limited";
+  const getTierClass = (tier) => {
+    if (tier === "SBA")    return "cd-tier-sba";
+    if (tier === "FREQ")   return "cd-tier-freq";
+    return "cd-tier-sparse";
+  };
 
-  const tickInterval =
-    crimeRows.length <= 8
-      ? 0
-      : crimeRows.length <= 20
-        ? 1
-        : crimeRows.length <= 40
-          ? 3
-          : 5;
-
-  const fmtWeek = (iso) => {
-    if (!iso || iso === "Forecast") return iso;
-    const [y, m, d] = iso.split("-");
-    return `${m}/${d}/${y.slice(2)}`;
+  const verdictClass = (v) => {
+    if (v === "trustworthy")       return "cd-backtest-verdict-trust";
+    if (v === "use with caution")  return "cd-backtest-verdict-caution";
+    return "cd-backtest-verdict-weak";
   };
 
   return (
-    <div className="cd-ai-sparkline-wrap">
-      <div className="cd-ai-sparkline-header">
-        <span className="cd-ai-sparkline-title">Weekly Trend</span>
-        <span className="cd-ai-sparkline-badge" style={{ color: trendColor }}>
-          {trendLabel}
-        </span>
-        {!hasEnoughData && (
-          <span className="cd-ai-sparkline-warning">
-            ⚠ Only {crimeRows.length} incident week
-            {crimeRows.length !== 1 ? "s" : ""} recorded — trend and forecast
-            may not be reliable
-          </span>
-        )}
-        {!insufficientForecast &&
-          lr?.predicted_next_week !== null &&
-          lr?.predicted_next_week !== undefined && (
-            <span className="cd-ai-sparkline-forecast">
-              {isRetrospective ? (
-                <>
-                  Historical projection:{" "}
-                  <strong>{lr.predicted_next_week}</strong> (period ended)
-                </>
-              ) : isLimitedForecast ? (
-                <>
-                  Forecast: <strong>{lr.predicted_next_week}</strong> next week
-                  · {lr.confidence}% confidence{" "}
-                  <span style={{ color: "#f59e0b" }}>⚠ Limited data</span>
-                </>
-              ) : (
-                <>
-                  Forecast: <strong>{lr.predicted_next_week}</strong> next week
-                  · {lr.confidence}% confidence
-                </>
-              )}
-            </span>
-          )}
-        {insufficientForecast && (
-          <span className="cd-ai-sparkline-warning">
-            ⚠ Insufficient data for forecast
-          </span>
+    <div className="cd-risk-section">
+
+      {/* Header */}
+      <div className="cd-risk-header">
+        <div>
+          <div className="cd-risk-title">
+            Top 15 High-Risk Barangays — Structural Risk Ranking
+          </div>
+          <div className="cd-risk-subtitle">
+            Historical data · Decay window: {decayWindow} days · Click row to expand
+          </div>
+        </div>
+        {showBacktestReport && backtest?.status === "ok" && (
+          <button
+            className="cd-risk-toggle-btn"
+            onClick={() => setShowBacktest((v) => !v)}
+          >
+            {showBacktest ? "▾ Hide" : "▸ Show"} Reliability Report
+          </button>
         )}
       </div>
 
-      <ResponsiveContainer width="100%" height={120}>
-        <LineChart
-          data={chartData}
-          margin={{ top: 8, right: 16, left: 0, bottom: 28 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="#f3f4f6"
-            vertical={false}
-          />
-          <XAxis
-            dataKey="week"
-            tickFormatter={fmtWeek}
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
-            interval={tickInterval}
-            angle={-35}
-            textAnchor="end"
-            height={32}
-          />
-          <YAxis
-            tick={{ fontSize: 9, fill: "#9ca3af" }}
-            width={20}
-            allowDecimals={false}
-          />
-          <Tooltip
-            contentStyle={{ fontSize: 11, borderRadius: 4 }}
-            formatter={(val, name) => {
-              if (name === "count") return [val, "Actual"];
-              if (name === "regression") return [val, "Trend line"];
-              if (name === "predicted")
-                return [
-                  val,
-                  isRetrospective ? "Historical projection" : "Forecast",
-                ];
-              return [val, name];
-            }}
-            labelFormatter={(label) =>
-              label === "Forecast"
-                ? isRetrospective
-                  ? "Week Following Assessment Period"
-                  : "Next Week (Forecast)"
-                : `Week of ${label}`
-            }
-          />
-          <Line
-            type="linear"
-            dataKey="count"
-            stroke="#1e3a5f"
-            strokeWidth={2}
-            dot={{ r: 3, fill: "#1e3a5f", strokeWidth: 0 }}
-            activeDot={{ r: 4 }}
-            connectNulls={false}
-          />
-          <Line
-            type="linear"
-            dataKey="regression"
-            stroke={trendColor}
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            dot={false}
-            activeDot={false}
-          />
-          {!isLimitedForecast && (
-            <Line
-              type="linear"
-              dataKey="predicted"
-              stroke="#f59e0b"
-              strokeWidth={0}
-              dot={{ r: 5, fill: "#f59e0b", strokeWidth: 2, stroke: "#fff" }}
-              activeDot={{ r: 6 }}
-            />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
+      {/* Backtest insufficient warning */}
+      {showBacktestReport && backtest?.status === "insufficient" && (
+        <div className="cd-backtest-insufficient">
+          ⚠ {backtest.message}
+        </div>
+      )}
 
-      <div className="cd-ai-sparkline-legend">
-        <span>
-          <span
-            className="cd-sparkline-dot"
-            style={{ background: "#1e3a5f" }}
-          />
-          Actual
-        </span>
-        <span>
-          <span
-            className="cd-sparkline-dash"
-            style={{ borderColor: trendColor }}
-          />
-          Smoothed Rate
-        </span>
-        <span>
-          <span
-            className="cd-sparkline-dot"
-            style={{ background: "#f59e0b" }}
-          />
-          {isRetrospective ? "Historical Projection" : "Forecast"}
-        </span>
-        {!hasEnoughData && lr?.confidence > 0 && (
-          <span style={{ marginLeft: "auto", fontSize: 10, color: "#f59e0b" }}>
-            {lr.confidence}% confidence
-          </span>
-        )}
+      {/* Backtest panel */}
+      {showBacktestReport && showBacktest && backtest?.status === "ok" && (
+        <div className="cd-backtest-panel">
+          <div className="cd-backtest-title">Backtest Reliability Report</div>
+          <div className="cd-backtest-meta">
+            {backtest.folds} weekly folds · Walk-forward validation ·{" "}
+            Verdict:{" "}
+            <span className={`cd-backtest-verdict ${verdictClass(backtest.model_verdict)}`}>
+              {backtest.model_verdict}
+            </span>
+          </div>
+
+          <div className="cd-backtest-metrics">
+            {[
+              { label: "Hit Rate @ Top 5",   value: `${backtest.hit_rate_top5}%`  },
+              { label: "Hit Rate @ Top 10",  value: `${backtest.hit_rate_top10}%` },
+              { label: "Hit Rate @ Top 15",  value: `${backtest.hit_rate_top15}%` },
+              { label: "Avg Rank of Actual", value: backtest.mean_rank ?? "—"     },
+            ].map((m, i) => (
+              <div key={i} className="cd-backtest-metric-box">
+                <div className="cd-backtest-metric-label">{m.label}</div>
+                <div className="cd-backtest-metric-val">{m.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {backtest.per_fold?.length > 0 && (
+            <div>
+              <div className="cd-backtest-fold-label">
+                Per-week result (✓ = actual crime barangay in top 15) — click to see phase 1 ranking
+              </div>
+              <div className="cd-backtest-folds">
+                {backtest.per_fold.map((f, i) => (
+                  <div
+                    key={i}
+                    className={`cd-backtest-fold-dot ${f.hit_top15 ? "cd-fold-hit" : "cd-fold-miss"}`}
+                    title={`Fold ${f.fold} — Test week: ${f.test_week_start} to ${f.test_week_end} — ${f.hit_top15 ? "Hit" : "Miss"} — Actual: ${f.actual_brgy?.join(", ")}`}
+                    onClick={() => setSelectedFold(selectedFold === i ? null : i)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {f.hit_top15 ? "✓" : "✗"}
+                  </div>
+                ))}
+              </div>
+
+              {selectedFold !== null && backtest.per_fold[selectedFold] && (
+                <div style={{ marginTop: 12, background: "var(--white)", border: "1px solid var(--gray-200)", borderRadius: 8, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-primary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+                    Phase 1 Ranking — Fold {backtest.per_fold[selectedFold].fold}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--gray-600)", marginBottom: 10 }}>
+                    Trained on data up to <strong>{backtest.per_fold[selectedFold].train_end}</strong> · 
+                    Testing week <strong>{backtest.per_fold[selectedFold].test_week_start}</strong> to <strong>{backtest.per_fold[selectedFold].test_week_end}</strong> · 
+                    Actual crime in: <strong style={{ color: backtest.per_fold[selectedFold].hit_top10 ? "#16a34a" : "#dc2626" }}>{backtest.per_fold[selectedFold].actual_brgy?.join(", ") || "none"}</strong>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: "var(--navy-dark)", color: "var(--white)" }}>
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>Barangay</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Risk Score</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Freq</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>SBA</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Recency</th>
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>Actual?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backtest.per_fold[selectedFold].phase1_top15?.map((row, i) => {
+                        const isActual = backtest.per_fold[selectedFold].actual_brgy?.includes(row.barangay);
+                        return (
+                          <tr key={i} style={{ borderBottom: "1px solid var(--gray-100)", background: isActual ? "rgba(34,197,94,0.08)" : undefined }}>
+                            <td style={{ padding: "6px 10px", color: "var(--gray-400)", fontWeight: 700 }}>{row.rank}</td>
+                            <td style={{ padding: "6px 10px", fontWeight: 600, color: isActual ? "#16a34a" : "var(--navy-primary)" }}>
+                              {formatBarangayLabel(row.barangay)}
+                              {isActual && <span style={{ marginLeft: 6, fontSize: 10, background: "rgba(34,197,94,0.15)", color: "#16a34a", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>ACTUAL</span>}
+                            </td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "var(--navy-dark)" }}>{row.risk_score}</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.freq_rate}</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.sba_score}</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.recency.toFixed(3)}</td>
+                            <td style={{ padding: "6px 10px" }}>
+                              {isActual
+                                ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Hit</span>
+                                : <span style={{ color: "var(--gray-400)" }}>—</span>
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="cd-risk-table-wrap">
+        <table className="cd-risk-table">
+          <thead>
+            <tr>
+              {["#", "Barangay", "Risk Score", "Primary Risk", "Last Incident", "Tier", "Why Flagged", ""].map((h, i) => (
+                <th key={i}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const sc       = getScoreClass(row.risk_score);
+              const rec      = getRecency(row.days_since_last);
+              const isExpanded = expandedRow === row.rank;
+
+              return (
+                <React.Fragment key={row.rank}>
+                  <tr
+                    onClick={() => toggleRow(row.rank)}
+                    style={{ background: isExpanded ? "var(--gray-50)" : undefined }}
+                  >
+                    <td className="cd-brgy-rank">{row.rank}</td>
+
+                    <td className="cd-risk-brgy-name">
+  {formatBarangayLabel(row.barangay)}
+</td>
+
+                    <td>
+                      <div className="cd-risk-score-wrap">
+                        <span className={`cd-risk-score-num ${sc.num}`}>
+                          {row.risk_score}
+                        </span>
+                        <div className="cd-risk-bar-bg">
+                          <div
+                            className={`cd-risk-bar-fill ${sc.fill}`}
+                            style={{ width: `${row.risk_score}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+
+                    <td>
+                      <div className="cd-risk-crime-pills">
+                        {(row.top_crimes || []).map((c, i) => {
+                          const ps = CRIME_PILL_COLORS[c] || { bg: "var(--gray-100)", color: "var(--gray-600)" };
+                          return (
+                            <span
+                              key={i}
+                              className="cd-risk-crime-pill"
+                              style={{ background: ps.bg, color: ps.color }}
+                            >
+                              {CRIME_PILL_LABEL[c] || c}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+
+                    <td>
+                      <span style={{ fontSize: 12, fontWeight: rec.weight, color: rec.color }}>
+                        {row.last_incident}
+                      </span>
+                      <div style={{ fontSize: 10, color: rec.color, opacity: 0.8 }}>
+                        {row.days_since_last}d ago
+                      </div>
+                    </td>
+
+                    <td>
+                      <span className={`cd-risk-tier ${getTierClass(row.tier)}`}>
+                        {row.tier}
+                      </span>
+                    </td>
+
+                    <td style={{ fontSize: 11.5, color: "var(--gray-600)", maxWidth: 200, lineHeight: 1.5 }}>
+                      {row.why_flagged}
+                    </td>
+
+                    <td style={{ color: "var(--gray-400)", fontSize: 12 }}>
+                      {isExpanded ? "▴" : "▾"}
+                    </td>
+                  </tr>
+
+                  {isExpanded && (
+                    <tr className="cd-risk-expand-row">
+                      <td colSpan={8}>
+                        <div className="cd-risk-expand-inner">
+                          <div className="cd-risk-expand-label">
+                            {formatBarangayLabel(row.barangay)} — Detail
+                          </div>
+                          <div className="cd-risk-detail-stats">
+                            {[
+                              { label: "Total Incidents", value: row.total },
+                              { label: "Active Weeks",    value: row.nonzero_weeks },
+                              { label: "Avg Interval",    value: row.avg_interval_days ? `~${Math.round(row.avg_interval_days)}d` : "N/A" },
+                              { label: "Days Since Last", value: `${row.days_since_last}d` },
+                              { label: "Model Tier",      value: row.tier },
+                            ].map((s, i) => (
+                              <div key={i} className="cd-risk-detail-stat">
+                                <span className="cd-risk-detail-stat-label">{s.label}</span>
+                                <span className="cd-risk-detail-stat-val">{s.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 };
+
 
 // ─── MODULE-LEVEL CACHE ───────────────────────────────────────────────────────
 const CACHE_TTL = 5 * 60 * 1000;
@@ -2544,6 +2646,7 @@ const CrimeDashboard = () => {
   const [showAiErrorModal, setShowAiErrorModal] = useState(false);
   const [aiErrorMessage, setAiErrorMessage] = useState("");
   const [showShortRangeModal, setShowShortRangeModal] = useState(false);
+  const [barangayForecast, setBarangayForecast] = useState(null);
   const [pendingDayCount, setPendingDayCount] = useState(0);
 
   const fetchIdRef = useRef(0);
@@ -2640,6 +2743,7 @@ const CrimeDashboard = () => {
       setIsExportLoading,
       assessment,
       analysisData,
+      barangayForecast,
     );
 
   const fetchOverview = (filters, force = false) => {
@@ -2737,6 +2841,7 @@ const CrimeDashboard = () => {
     }
     // For patrol users without assignment, respect their manual selection
     setAssessment(null);
+    setBarangayForecast(null);
     setAppliedFilters(newFilters);
     fetchOverview(newFilters, true);
   };
@@ -2802,7 +2907,7 @@ const CrimeDashboard = () => {
 
       setAssessment(json.assessment);
       setAnalysisData(json.analysis);
-      console.log("AI assessment response:", json);
+      setBarangayForecast(json.barangay_forecast || null);
     } catch (err) {
       console.error("Generate assessment error:", err);
       const msg = err.message || "";
@@ -2857,6 +2962,10 @@ const CrimeDashboard = () => {
 
       <LoadingModal isOpen={isLoading} message="Loading crime data..." />
       <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
+      <LoadingModal
+        isOpen={isGeneratingAssessment}
+        message={assessmentPhase || "Generating AI assessment..."}
+      />
 
       <div className="cd-page-header">
         <div className="cd-page-header-left">
@@ -2983,40 +3092,25 @@ const CrimeDashboard = () => {
       >
         {!assessment && (
           <div className="cd-ai-generate-wrap">
-            {!isGeneratingAssessment ? (
-              <>
-                <button
-                  className="cd-generate-btn"
-                  onClick={handleGenerateAssessment}
-                  disabled={isLoading || !dashData.summary.length}
-                >
-                  Generate Assessment
-                </button>
-                <p className="cd-ai-helper-text">
-                  Generates an AI-powered EMPO QUAD assessment based on current
-                  filters.{" "}
-                  <b>
-                    More historical data improves forecast confidence and trend
-                    accuracy.
-                  </b>
-                  <br />
-                  <span className="cd-ai-forecast-note">
-                    ⓘ Trend sparklines and forecasts use all available
-                    historical weekly data — not just the selected date range —
-                    to ensure reliable Croston forecast predictions.
-                  </span>
-                </p>
-              </>
-            ) : (
-              <div className="cd-ai-loading-wrap">
-                <div className="cd-ai-dots">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <p className="cd-ai-phase-text">{assessmentPhase}</p>
-              </div>
-            )}
+            <button
+              className="cd-generate-btn"
+              onClick={handleGenerateAssessment}
+              disabled={isLoading || isGeneratingAssessment || !dashData.summary.length}
+            >
+              Generate Assessment
+            </button>
+            <p className="cd-ai-helper-text">
+              Generates an AI-powered EMPO QUAD assessment based on current
+              filters.{" "}
+              <b>
+                More historical data improves forecast confidence and trend
+                accuracy.
+              </b>
+              <br />
+              <span className="cd-ai-forecast-note">
+                ⓘ Barangay risk scores use all available historical data regardless of the selected date filter.
+              </span>
+            </p>
           </div>
         )}
 
@@ -3029,34 +3123,13 @@ const CrimeDashboard = () => {
                   Generated:{" "}
                   {assessment.generatedAt
                     ? new Date(assessment.generatedAt).toLocaleString()
-                    : "Just now"}
+                    : new Date().toLocaleString()}
                 </p>
               </div>
               <span className="cd-ai-badge">AI Output</span>
             </div>
 
-            {assessment.scope && (
-              <div className="cd-ai-scope">
-                <div className="cd-ai-scope-item">
-                  <span className="cd-ai-scope-label">Date Range</span>
-                  <span className="cd-ai-scope-value">
-                    {assessment.scope.dateRange || "-"}
-                  </span>
-                </div>
-                <div className="cd-ai-scope-item">
-                  <span className="cd-ai-scope-label">Crime Type</span>
-                  <span className="cd-ai-scope-value">
-                    {assessment.scope.crimes || "-"}
-                  </span>
-                </div>
-                <div className="cd-ai-scope-item">
-                  <span className="cd-ai-scope-label">Barangay</span>
-                  <span className="cd-ai-scope-value">
-                    {assessment.scope.barangays || "-"}
-                  </span>
-                </div>
-              </div>
-            )}
+            
 
             {assessment.stats && (
               <div className="cd-ai-stat-row">
@@ -3086,27 +3159,48 @@ const CrimeDashboard = () => {
               </p>
             </div>
 
+            {barangayForecast && (
+              <div className="cd-ai-block">
+                <BarangayRiskTable
+                  forecastData={barangayForecast}
+                  showBacktestReport={SHOW_BACKTEST_REPORT}
+                />
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                margin: "20px 0 16px",
+              }}
+            >
+              <div style={{ flex: 1, height: 1, background: "var(--gray-200)" }} />
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--gray-400)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  padding: "0 12px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Per-Crime EMPO QUAD Assessment
+              </div>
+              <div style={{ flex: 1, height: 1, background: "var(--gray-200)" }} />
+            </div>
+
             {(assessment.per_crime || []).map((crime, idx) => (
               <div key={idx} className="cd-ai-block cd-ai-crime-block">
-                <h4>{crime.crime_type}</h4>
-
-                {(() => {
-                  const crimeForecast = analysisData?.croston?.per_crime?.find(
-                    (c) => c.crime === crime.crime_type,
-                  );
-                  const forecastState =
-                    crimeForecast?.forecast_state || "insufficient";
-                  if (forecastState === "insufficient") return null;
-                  return (
-                    <TrendSparkline
-                      crimeType={crime.crime_type}
-                      weeklyRows={analysisData?.historical_weekly_rows}
-                      linregData={analysisData?.croston}
-                      mode={analysisData?.mode}
-                      forecastState={forecastState}
-                    />
-                  );
-                })()}
+                <h4>
+                  {crime.crime_type}
+                  {crime.is_ecp && (
+                    <span className="cd-ai-ecp-badge">ECP</span>
+                  )}
+                </h4>
 
                 <div className="cd-ai-quad-item">
                   <span className="cd-ai-quad-label">Crime Assessment</span>
@@ -3116,7 +3210,7 @@ const CrimeDashboard = () => {
                 <div className="cd-ai-quad-item">
                   <span className="cd-ai-quad-label">Operations</span>
                   <p>
-                    {crime.operations
+                    {(crime.operations || "")
                       .split("\n")
                       .filter(Boolean)
                       .map((line, i) => (

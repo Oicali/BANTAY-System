@@ -28,9 +28,10 @@ export function useExportDashboard(
   setIsExportLoading,
   assessment = null,
   analysisData = null,
+  barangayForecast = null,
 ) {
   const [isExporting, setIsExporting] = useState(false);
-  const [pdfPreview, setPdfPreview] = useState(null);   // ← add this
+  const [pdfPreview, setPdfPreview] = useState(null);
 
   const closePreview = () => {
     pdfPreview?.revoke();
@@ -59,8 +60,9 @@ export function useExportDashboard(
         barangay:     dashData.barangay     ?? [],
         modus:        dashData.modus        ?? [],
         completeData: dashData.completeData ?? [],
-        assessment:   assessment   ?? null,
-        analysisData: analysisData ?? null,
+        assessment:      assessment      ?? null,
+        analysisData:    analysisData    ?? null,
+        barangayForecast: barangayForecast ?? null,
         meta: {
           dateFrom:   appliedFilters.dateFrom   ?? null,
           dateTo:     appliedFilters.dateTo     ?? null,

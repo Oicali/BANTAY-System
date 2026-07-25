@@ -36,6 +36,27 @@ const analyzeWithPython = async ({
   return response.data;
 };
 
+const forecastBarangayRisk = async ({
+  barangays = [],
+  date_from,
+  date_to,
+  crime_types = [],
+  decay_window = 90,
+}) => {
+  if (!date_from || !date_to) {
+    throw new Error("date_from and date_to are required");
+  }
+
+  const response = await axios.post(
+    `${PYTHON_SERVICE_URL}/forecast`,
+    { barangays, date_from, date_to, crime_types, decay_window },
+    { timeout: 300000, headers: { "Content-Type": "application/json" } },
+  );
+
+  return response.data;
+};
+
 module.exports = {
   analyzeWithPython,
+  forecastBarangayRisk,
 };

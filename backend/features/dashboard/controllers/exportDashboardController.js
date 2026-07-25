@@ -552,7 +552,138 @@ function buildCompleteDataTable(completeData) {
   });
 }
 
-function buildAssessmentSection(assessment, analysisData) {
+function buildBarangayLabel(name = "") {
+  const ROMAN = new Set(["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"]);
+  return String(name)
+    .toLowerCase()
+    .replace(/\b\w+/g, (word) => {
+      const upper = word.toUpperCase();
+      if (ROMAN.has(upper)) return upper;
+      if (upper === "P" || upper === "F") return upper;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    });
+}
+
+function buildBarangayRiskTable(barangayForecast) {
+  const rows = (barangayForecast?.barangay_risk || []).slice(0, 15);
+  if (!rows.length) return [];
+
+  const elements = [];
+
+  elements.push(
+    new Paragraph({
+      spacing: { before: 160, after: 80 },
+      children: [
+        new TextRun({
+          text: "Barangay Risk Forecast (Top 15)",
+          bold: true,
+          size: 22,
+          font: "Arial",
+          color: DARK,
+        }),
+      ],
+    }),
+  );
+
+  if (barangayForecast?.decay_window_used) {
+    elements.push(
+      bodyText(
+        `Structural risk ranking based on historical frequency, interval pattern, and recency · Decay window: ${barangayForecast.decay_window_used} days`,
+      ),
+    );
+    elements.push(spacer(60));
+  }
+
+  const COL = [500, 2200, 1300, 1200, 1700, 3566];
+  const TWIDTH = COL.reduce((a, b) => a + b, 0);
+
+  elements.push(
+    new Table({
+      width: { size: TWIDTH, type: WidthType.DXA },
+      columnWidths: COL,
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: [
+            hCell("#", COL[0], { center: true }),
+            hCell("Barangay", COL[1]),
+            hCell("Risk Score", COL[2], { center: true }),
+            hCell("Tier", COL[3], { center: true }),
+            hCell("Last Incident", COL[4]),
+            hCell("Why Flagged", COL[5]),
+          ],
+        }),
+        ...rows.map((row, i) =>
+          new TableRow({
+            children: [
+              dCell(row.rank, COL[0], { center: true, alt: i % 2 === 1 }),
+              dCell(buildBarangayLabel(row.barangay), COL[1], {
+                alt: i % 2 === 1,
+                bold: true,
+              }),
+              dCell(row.risk_score, COL[2], {
+                center: true,
+                alt: i % 2 === 1,
+                bold: true,
+                color:
+                  row.risk_score >= 80
+                    ? "dc2626"
+                    : row.risk_score >= 65
+                      ? "ea580c"
+                      : row.risk_score >= 45
+                        ? "ca8a04"
+                        : "6b7280",
+              }),
+              dCell(row.tier, COL[3], { center: true, alt: i % 2 === 1 }),
+              dCell(
+                `${row.last_incident} (${row.days_since_last}d ago)`,
+                COL[4],
+                { alt: i % 2 === 1, size: 16 },
+              ),
+              dCell(row.why_flagged || "-", COL[5], {
+                alt: i % 2 === 1,
+                size: 16,
+              }),
+            ],
+          }),
+        ),
+      ],
+    }),
+  );
+  elements.push(spacer(80));
+
+  // Backtest reliability summary, if available
+  const backtest = barangayForecast?.backtest;
+  if (backtest?.status === "ok") {
+    elements.push(
+      new Paragraph({
+        spacing: { before: 120, after: 60 },
+        children: [
+          new TextRun({
+            text: "Model Reliability (Walk-Forward Backtest)",
+            bold: true,
+            size: 20,
+            font: "Arial",
+            color: "374151",
+          }),
+        ],
+      }),
+    );
+    elements.push(
+      bodyText(
+        `${backtest.folds} weekly folds · Hit Rate @Top5: ${backtest.hit_rate_top5}% · @Top10: ${backtest.hit_rate_top10}% · @Top15: ${backtest.hit_rate_top15}% · Avg Rank: ${backtest.mean_rank ?? "—"} · Verdict: ${backtest.model_verdict}`,
+      ),
+    );
+    elements.push(spacer(80));
+  } else if (backtest?.status === "insufficient") {
+    elements.push(bodyText(`⚠ ${backtest.message}`));
+    elements.push(spacer(80));
+  }
+
+  return elements;
+}
+
+function buildAssessmentSection(assessment, analysisData, barangayForecast) {
   if (!assessment) return [];
 
   const elements = [];
@@ -618,14 +749,14 @@ function buildAssessmentSection(assessment, analysisData) {
     elements.push(spacer(80));
   }
 
-  // General assessment
-  if (assessment.general_assessment) {
+  // Overall assessment
+  if (assessment.overall_assessment) {
     elements.push(
       new Paragraph({
         spacing: { before: 160, after: 80 },
         children: [
           new TextRun({
-            text: "General Assessment",
+            text: "Overall Assessment",
             bold: true,
             size: 22,
             font: "Arial",
@@ -634,14 +765,59 @@ function buildAssessmentSection(assessment, analysisData) {
         ],
       }),
     );
-    elements.push(bodyText(assessment.general_assessment));
+    elements.push(bodyText(assessment.overall_assessment));
     elements.push(spacer(80));
+  }
+
+  // Barangay Risk Forecast table
+  elements.push(...buildBarangayRiskTable(barangayForecast));
+
+  // Per-crime section divider
+  if ((assessment.per_crime || []).length > 0) {
+    elements.push(
+      new Paragraph({
+        spacing: { before: 120, after: 160 },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB", space: 4 },
+        },
+        children: [
+          new TextRun({
+            text: "PER-CRIME EMPO QUAD ASSESSMENT",
+            bold: true,
+            size: 18,
+            font: "Arial",
+            color: "9CA3AF",
+          }),
+        ],
+      }),
+    );
   }
 
   // Per-crime sections
   const perCrime = assessment.per_crime || [];
   for (const crime of perCrime) {
-    // Crime type heading
+    // Crime type heading (+ ECP badge if flagged)
+    const headingRuns = [
+      new TextRun({
+        text: crime.crime_type || "",
+        bold: true,
+        size: 24,
+        font: "Arial",
+        color: DARK,
+      }),
+    ];
+    if (crime.is_ecp) {
+      headingRuns.push(
+        new TextRun({
+          text: "   [ECP — Emerging Crime Problem]",
+          bold: true,
+          size: 18,
+          font: "Arial",
+          color: "DC2626",
+        }),
+      );
+    }
+
     elements.push(
       new Paragraph({
         spacing: { before: 240, after: 80 },
@@ -649,15 +825,7 @@ function buildAssessmentSection(assessment, analysisData) {
           left: { style: BorderStyle.SINGLE, size: 16, color: DARK, space: 4 },
         },
         indent: { left: 120 },
-        children: [
-          new TextRun({
-            text: crime.crime_type || "",
-            bold: true,
-            size: 24,
-            font: "Arial",
-            color: DARK,
-          }),
-        ],
+        children: headingRuns,
       }),
     );
 
@@ -707,7 +875,7 @@ function buildAssessmentSection(assessment, analysisData) {
 
     // QUAD sections
     const quadSections = [
-      { label: "Crime Assessment", value: crime.general_assessment },
+      { label: "Crime Assessment", value: crime.crime_assessment },
       { label: "Operations", value: crime.operations },
       { label: "Intelligence", value: crime.intelligence },
       { label: "Investigations", value: crime.investigations },
@@ -781,6 +949,7 @@ async function buildExportDoc({
   images = {},
   assessment = null,
   analysisData = null,
+  barangayForecast = null,
 }) {
   const totals = summary.reduce(
     (acc, d) => ({
@@ -1021,7 +1190,7 @@ async function buildExportDoc({
     ...(completeData.length > 0
       ? [buildCompleteDataTable(completeData), spacer()]
       : [bodyText("No records found for the selected filters.")]),
-    ...buildAssessmentSection(assessment, analysisData),
+    ...buildAssessmentSection(assessment, analysisData, barangayForecast),
   ];
 
   const doc = new Document({
@@ -1061,6 +1230,7 @@ const exportDashboard = async (req, res) => {
       images = {},
       assessment = null,
       analysisData = null,
+      barangayForecast = null,
     } = req.body;
 
     // Step 1: Build the .docx buffer (same as before)
@@ -1075,6 +1245,7 @@ const exportDashboard = async (req, res) => {
       images,
       assessment,
       analysisData,
+      barangayForecast,
     });
 
     // Step 2: Convert .docx → .pdf via LibreOffice
