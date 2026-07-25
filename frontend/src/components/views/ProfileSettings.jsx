@@ -5,6 +5,7 @@ import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
 import LoadingModal from "../modals/LoadingModal";
+import ImageCropperModal from "../modals/ImageCropperModal";
 
 const PSGC = "https://psgc.gitlab.io/api";
 const POLL_MS = 15000;
@@ -46,7 +47,8 @@ export default function ProfileSettings() {
 
   const [profilePicturePreview, setProfilePicturePreview] = useState(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const [usernameVisible, setUsernameVisible] = useState(false);
@@ -562,24 +564,37 @@ export default function ProfileSettings() {
     setErrorMessage("");
   };
 
-  const handleProfilePictureChange = async (e) => {
+  const handleProfilePictureChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const previousPreview = profilePicturePreview;
     if (file.size > 5 * 1024 * 1024) {
       setErrorMessage("Image size must be less than 5MB");
+      e.target.value = "";
       return;
     }
     if (!["image/jpeg", "image/png"].includes(file.type)) {
       setErrorMessage("Only JPG and PNG images are allowed");
+      e.target.value = "";
       return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCroppedPhotoUpload = async (croppedFile) => {
+    setCropperOpen(false);
+    const previousPreview = profilePicturePreview;
     setIsUploadingPhoto(true);
     setErrorMessage("");
     try {
       const token = localStorage.getItem("token");
       const fd = new FormData();
-      fd.append("profilePicture", file);
+      fd.append("profilePicture", croppedFile);
       const res = await fetch(`${API_URL}/users/profile/picture`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -601,7 +616,6 @@ export default function ProfileSettings() {
       setProfilePicturePreview(previousPreview);
     } finally {
       setIsUploadingPhoto(false);
-      e.target.value = "";
     }
   };
 
@@ -2347,7 +2361,12 @@ export default function ProfileSettings() {
           </div>
         </div>
       )}
-
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        onClose={() => setCropperOpen(false)}
+        onCropDone={handleCroppedPhotoUpload}
+      />
       <ChangePasswordModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}

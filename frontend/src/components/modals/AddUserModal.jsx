@@ -5,6 +5,7 @@ import {
   CURRENT_BARANGAYS,
   LEGACY_BARANGAY_OPTIONS,
 } from "../../utils/barangayOptions";
+import ImageCropperModal from "../modals/ImageCropperModal";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const API_URL = import.meta.env.VITE_API_URL;
@@ -38,7 +39,8 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profilePicturePreview, setProfilePicturePreview] = useState(null);
-
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState(null);
   // PSGC dropdown data
   const [regions, setRegions] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -502,14 +504,22 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
 
   const handleProfilePictureChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, profilePicture: file }));
-      const reader = new FileReader();
-      reader.onloadend = () => setProfilePicturePreview(reader.result);
-      reader.readAsDataURL(file);
-      if (errors.profilePicture)
-        setErrors((prev) => ({ ...prev, profilePicture: "" }));
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCropperImageSrc(reader.result);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropDone = (croppedFile) => {
+    setFormData((prev) => ({ ...prev, profilePicture: croppedFile }));
+    setProfilePicturePreview(URL.createObjectURL(croppedFile));
+    setCropperOpen(false);
+    if (errors.profilePicture)
+      setErrors((prev) => ({ ...prev, profilePicture: "" }));
   };
 
   const resetForm = () => {
@@ -1287,7 +1297,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                         onChange={handleChange}
                         className="aum-form-input"
                       >
-                        <option value="Technical Administrator">Technical Administrator</option>
+                        <option value="Technical Administrator">
+                          Technical Administrator
+                        </option>
                         <option value="Administrator">Administrator</option>
                         <option value="Investigator">Investigator</option>
                         <option value="Patrol">Patrol</option>
@@ -1332,59 +1344,75 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
 
           {/* BARANGAY USER FORM */}
           {/* BARANGAY USER FORM */}
-{step === "barangay" && (
-  <>
-    <div className="aum-modal-header">
-      <div className="aum-header-with-back">
-        <button type="button" className="aum-back-button" onClick={handleBack}>
-          ← Back
-        </button>
-        <h2>Add Barangay User</h2>
-        <button type="button" className="aum-modal-close" onClick={handleClose}>
-          ×
-        </button>
-      </div>
-    </div>
+          {step === "barangay" && (
+            <>
+              <div className="aum-modal-header">
+                <div className="aum-header-with-back">
+                  <button
+                    type="button"
+                    className="aum-back-button"
+                    onClick={handleBack}
+                  >
+                    ← Back
+                  </button>
+                  <h2>Add Barangay User</h2>
+                  <button
+                    type="button"
+                    className="aum-modal-close"
+                    onClick={handleClose}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
 
-    <form onSubmit={handleSubmit} className="aum-modal-form">
-      {renderInfoBox()}
-      {renderProfilePicture("profilePictureBarangay")}
-      {renderPersonalInfo()}
-      {renderContactInfo()}
-      {renderBarangayAddressInfo()}
+              <form onSubmit={handleSubmit} className="aum-modal-form">
+                {renderInfoBox()}
+                {renderProfilePicture("profilePictureBarangay")}
+                {renderPersonalInfo()}
+                {renderContactInfo()}
+                {renderBarangayAddressInfo()}
 
-      {/* ADD THIS SECTION */}
-      <div className="aum-form-section">
-        <h3 className="aum-form-section-title">Official Information</h3>
-        <div className="aum-form-row">
-          <div className="aum-form-group">
-            <label className="aum-form-label">Role *</label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="aum-form-input"
-            >
-              <option value="Brgy. Captain">Brgy. Captain</option>
-              <option value="Brgy. Official">Brgy. Official</option>
-            </select>
-          </div>
+                {/* ADD THIS SECTION */}
+                <div className="aum-form-section">
+                  <h3 className="aum-form-section-title">
+                    Official Information
+                  </h3>
+                  <div className="aum-form-row">
+                    <div className="aum-form-group">
+                      <label className="aum-form-label">Role *</label>
+                      <select
+                        name="role"
+                        value={formData.role}
+                        onChange={handleChange}
+                        className="aum-form-input"
+                      >
+                        <option value="Brgy. Captain">Brgy. Captain</option>
+                        <option value="Brgy. Official">Brgy. Official</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="aum-modal-actions">
+                  <button
+                    type="submit"
+                    className="aum-btn aum-btn-primary"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Adding User..." : "Add Barangay User"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
         </div>
-      </div>
-
-      <div className="aum-modal-actions">
-        <button
-          type="submit"
-          className="aum-btn aum-btn-primary"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Adding User..." : "Add Barangay User"}
-        </button>
-      </div>
-    </form>
-  </>
-)}
-        </div>
+        <ImageCropperModal
+          isOpen={cropperOpen}
+          imageSrc={cropperImageSrc}
+          onClose={() => setCropperOpen(false)}
+          onCropDone={handleCropDone}
+        />
       </div>
     </>
   );

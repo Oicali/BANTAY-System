@@ -7,6 +7,7 @@ import {
 } from "../../utils/barangayOptions";
 import "./EditUserModal.css";
 import LoadingModal from "../modals/LoadingModal";
+import ImageCropperModal from "../modals/ImageCropperModal";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
@@ -64,7 +65,8 @@ const EditUserModal = ({
   const [profilePicture, setProfilePicture] = useState(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState(null);
   const fileInputRef = useRef(null);
-
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState(null);
   // Roles
   const [allRoles, setAllRoles] = useState([]);
   const [availableRoles, setAvailableRoles] = useState([]);
@@ -645,15 +647,28 @@ const EditUserModal = ({
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setServerError("Please select a valid image file");
+      e.target.value = "";
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
       setServerError("File size must be less than 5MB");
+      e.target.value = "";
       return;
     }
-    setProfilePicture(file);
-    setProfilePicturePreview(URL.createObjectURL(file));
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result);
+      setCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
     setServerError("");
+    e.target.value = "";
+  };
+
+  const handleCropDone = (croppedFile) => {
+    setProfilePicture(croppedFile);
+    setProfilePicturePreview(URL.createObjectURL(croppedFile));
+    setCropperOpen(false);
   };
 
   const handlePasswordPaste = (e) => e.preventDefault();
@@ -947,12 +962,11 @@ const EditUserModal = ({
                 </div>
               </div>
 
-              <div className="eum-password-toggle" hidden> 
+              <div className="eum-password-toggle" hidden>
                 <button
                   type="button"
                   className="eum-toggle-password-btn"
                   disabled={isSubmitting}
-                  
                   onClick={() => {
                     setShowPasswordFields(!showPasswordFields);
                     if (showPasswordFields) {
@@ -1176,7 +1190,7 @@ const EditUserModal = ({
                     onChange={handleChange}
                     disabled={isSubmitting}
                     className="eum-form-input"
-                    style={{ fontSize: '16px' }}
+                    style={{ fontSize: "16px" }}
                     max={(() => {
                       const d = new Date();
                       return new Date(
@@ -1227,7 +1241,7 @@ const EditUserModal = ({
                       maxLength="10"
                       placeholder="9XXXXXXXXX"
                       className="eum-form-input eum-phone-input"
-                      style={{ fontSize: '16px' }}
+                      style={{ fontSize: "16px" }}
                     />
                   </div>
                   {errors.phone && (
@@ -1252,7 +1266,7 @@ const EditUserModal = ({
                       maxLength="10"
                       placeholder="9XXXXXXXXX (optional)"
                       className="eum-form-input eum-phone-input"
-                      style={{ fontSize: '16px' }}
+                      style={{ fontSize: "16px" }}
                     />
                   </div>
                   {errors.alternate_phone && (
@@ -1487,88 +1501,96 @@ const EditUserModal = ({
             )}
 
             {/* ── Official Information — Barangay ── */}
-{isBarangay && (
-  <div className="eum-form-section">
-    <h3 className="eum-form-section-title">
-      Official Information (Barangay)
-    </h3>
-    <div className="eum-form-row">
-      {/* REPLACE the disabled role input with a real select */}
-      <div className="eum-form-group">
-        <label className="eum-form-label">Role *</label>
-        <select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          disabled={isSubmitting}
-          className="eum-form-input"
-        >
-          <option value="Brgy. Captain">Brgy. Captain</option>
-          <option value="Brgy. Official">Brgy. Official</option>
-        </select>
-      </div>
-      <div
-        className="eum-form-group"
-        ref={(el) => (errorRefs.current["assigned_barangay_code"] = el)}
-      >
-        <label className="eum-form-label">Assigned Barangay *</label>
-        <select
-          name="assigned_barangay_code"
-          value={formData.assigned_barangay_code}
-          onChange={(e) => {
-            setFormData((prev) => ({
-              ...prev,
-              assigned_barangay_code: e.target.value,
-            }));
-            clearError("assigned_barangay_code");
-          }}
-          disabled={isSubmitting}
-          className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
-        >
-          {!formData.assigned_barangay_code && (
-            <option value="">Select Barangay</option>
-          )}
-          {CURRENT_BARANGAYS.map((b) => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-          <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
-            {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
-              <option key={i} value={b.value}>{b.label}</option>
-            ))}
-          </optgroup>
-        </select>
-        {errors.assigned_barangay_code && (
-          <span className="eum-error-text">
-            {errors.assigned_barangay_code}
-          </span>
-        )}
-      </div>
-    </div>
-    <div className="eum-form-row">
-      <div
-        className="eum-form-group eum-full-width"
-        ref={(el) => (errorRefs.current["address_line"] = el)}
-      >
-        <label className="eum-form-label">
-          House No. / Blk / Lot / Street / Subdivision
-        </label>
-        <input
-          type="text"
-          name="address_line"
-          value={formData.address_line}
-          onChange={handleChange}
-          disabled={isSubmitting}
-          maxLength="255"
-          className="eum-form-input"
-          placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
-        />
-        <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-          {formData.address_line.length}/255 characters
-        </span>
-      </div>
-    </div>
-  </div>
-)}
+            {isBarangay && (
+              <div className="eum-form-section">
+                <h3 className="eum-form-section-title">
+                  Official Information (Barangay)
+                </h3>
+                <div className="eum-form-row">
+                  {/* REPLACE the disabled role input with a real select */}
+                  <div className="eum-form-group">
+                    <label className="eum-form-label">Role *</label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      className="eum-form-input"
+                    >
+                      <option value="Brgy. Captain">Brgy. Captain</option>
+                      <option value="Brgy. Official">Brgy. Official</option>
+                    </select>
+                  </div>
+                  <div
+                    className="eum-form-group"
+                    ref={(el) =>
+                      (errorRefs.current["assigned_barangay_code"] = el)
+                    }
+                  >
+                    <label className="eum-form-label">
+                      Assigned Barangay *
+                    </label>
+                    <select
+                      name="assigned_barangay_code"
+                      value={formData.assigned_barangay_code}
+                      onChange={(e) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          assigned_barangay_code: e.target.value,
+                        }));
+                        clearError("assigned_barangay_code");
+                      }}
+                      disabled={isSubmitting}
+                      className={`eum-form-input ${errors.assigned_barangay_code ? "eum-error" : ""}`}
+                    >
+                      {!formData.assigned_barangay_code && (
+                        <option value="">Select Barangay</option>
+                      )}
+                      {CURRENT_BARANGAYS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                      <optgroup label="── Pre-2023 Names (Auto-resolved) ──">
+                        {LEGACY_BARANGAY_OPTIONS.map((b, i) => (
+                          <option key={i} value={b.value}>
+                            {b.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    {errors.assigned_barangay_code && (
+                      <span className="eum-error-text">
+                        {errors.assigned_barangay_code}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="eum-form-row">
+                  <div
+                    className="eum-form-group eum-full-width"
+                    ref={(el) => (errorRefs.current["address_line"] = el)}
+                  >
+                    <label className="eum-form-label">
+                      House No. / Blk / Lot / Street / Subdivision
+                    </label>
+                    <input
+                      type="text"
+                      name="address_line"
+                      value={formData.address_line}
+                      onChange={handleChange}
+                      disabled={isSubmitting}
+                      maxLength="255"
+                      className="eum-form-input"
+                      placeholder="e.g., Blk 4 Lot 12, Sunshine Subd. (optional)"
+                    />
+                    <span style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                      {formData.address_line.length}/255 characters
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Server error banner */}
             {serverError && (
@@ -1722,6 +1744,12 @@ const EditUserModal = ({
             </div>
           </form>
         </div>
+        <ImageCropperModal
+          isOpen={cropperOpen}
+          imageSrc={cropperImageSrc}
+          onClose={() => setCropperOpen(false)}
+          onCropDone={handleCropDone}
+        />
       </div>
     </>
   );
