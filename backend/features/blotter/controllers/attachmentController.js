@@ -1,7 +1,8 @@
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
 const streamifier = require("streamifier");
-
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;  // 8MB
+const MAX_VIDEO_SIZE = 80 * 1024 * 1024; // 80MB
 // Upload to Cloudinary via stream
 const uploadToCloudinary = (buffer, folder, publicId, resourceType = "image") => {
   return new Promise((resolve, reject) => {
@@ -33,6 +34,17 @@ const uploadAttachment = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
+    const isVideo = req.file.mimetype.startsWith("video/");
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+
+    if (req.file.size > maxSize) {
+      return res.status(400).json({
+        success: false,
+        message: isVideo
+          ? "Video exceeds 80MB limit"
+          : "Photo exceeds 8MB limit",
+      });
+    }
 
     const blotter = await pool.query(
       `SELECT blotter_id FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
@@ -53,8 +65,6 @@ const uploadAttachment = async (req, res) => {
       });
     }
 
-    // ← Detect resource type from mimetype
-    const isVideo = req.file.mimetype.startsWith("video/");
     const resourceType = isVideo ? "video" : "image";
 
     const publicId = `bantay_evidence_${id}_${Date.now()}`;

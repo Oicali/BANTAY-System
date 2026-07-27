@@ -216,7 +216,7 @@ function EBlotter() {
     type: "success",
   });
   const [viewAttachments, setViewAttachments] = useState([]);
-
+  const [pendingExport, setPendingExport] = useState(null);
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
   const activeReportTabRef = useRef("reports"); // ADD THIS
@@ -431,6 +431,35 @@ function EBlotter() {
       const json = await res.json();
       const records = json.data ?? [];
 
+      if (records.length === 0) {
+        setIsExportLoading(false);
+        showReactToast("No records found for this date range.", "error");
+        return;
+      }
+      if (records.length > 10000) {
+        setIsExportLoading(false);
+        showReactToast(
+          "Too many records (10,000+). Please narrow your date range.",
+          "error",
+        );
+        return;
+      }
+
+      // Show confirmation instead of exporting immediately
+      setIsExportLoading(false);
+      setPendingExport({ dateFrom, dateTo, records });
+    } catch (err) {
+      setIsExportLoading(false);
+      showReactToast(err.message || "Export failed", "error");
+    }
+  };
+
+  const confirmExport = async () => {
+    const { dateFrom, dateTo, records } = pendingExport;
+    setPendingExport(null);
+    setIsExportLoading(true);
+    try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters/export`,
         {
@@ -442,14 +471,11 @@ function EBlotter() {
           body: JSON.stringify({ records, meta: { dateFrom, dateTo } }),
         },
       );
-
       if (!response.ok) throw new Error("Export failed");
 
-      const dateStr = `${dateFrom}_to_${dateTo}`;
-      const filename = `blotter_${dateStr}.pdf`;
+      const filename = `blotter_${dateFrom}_to_${dateTo}.pdf`;
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
-
       setPdfPreview({
         blobUrl,
         download: () => {
@@ -2825,21 +2851,31 @@ function EBlotter() {
     <div className="eb-content-area">
       <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
 
-      {pdfPreview && (
-        <PdfPreviewModal
-          blobUrl={pdfPreview.blobUrl}
-          onDownload={() => {
-            pdfPreview.download();
-            pdfPreview.revoke();
-            setPdfPreview(null);
-          }}
-          onClose={() => {
-            pdfPreview.revoke();
-            setPdfPreview(null);
-          }}
-        />
+      {pendingExport && (
+        <div className="eb-modal" style={{ zIndex: 10002 }}>
+          <div
+            className="eb-modal-content"
+            style={{ maxWidth: 400, padding: 24 }}
+          >
+            <h3>Confirm Export</h3>
+            <p>
+              You are about to export <b>{pendingExport.records.length}</b>{" "}
+              record(s) as PDF.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button
+                className="eb-btn eb-btn-secondary"
+                onClick={() => setPendingExport(null)}
+              >
+                Cancel
+              </button>
+              <button className="eb-btn eb-btn-primary" onClick={confirmExport}>
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
       {showExportModal && (
         <ExportBlotterModal
           onClose={() => setShowExportModal(false)}

@@ -65,7 +65,7 @@ router.post(
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(400).json({
             success: false,
-            message: "File too large. Photos must be under 5MB and videos under 50MB.",
+            message: "File too large. Photos must be under 8MB and videos under 80MB.",
           });
         }
         return res.status(400).json({
