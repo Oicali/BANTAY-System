@@ -1642,6 +1642,15 @@ function CrimeMapping() {
                     : getPHTToday();
                 setFilters((f) => ({ ...f, date_from: from, date_to: autoTo }));
               }}
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
             />
             <span className="crmap-date-arrow">→</span>
             <input
@@ -1658,6 +1667,15 @@ function CrimeMapping() {
               onChange={(e) =>
                 setFilters((f) => ({ ...f, date_to: e.target.value }))
               }
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
             />
           </div>
 

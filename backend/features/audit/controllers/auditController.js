@@ -96,24 +96,16 @@ const getAuditLogs = async (req, res) => {
       [...values, limit, offset],
     );
 
-    // ── Stats (unfiltered totals — always reflects full table) ──
-    // ── Stats ──
+    // ── Stats — now scoped to the SAME filters as the table above ──
     const statsResult = await pool.query(
-      isRestricted
-        ? `SELECT
+      `SELECT
          COUNT(*)                                            AS total,
-         COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) AS today,
-         COUNT(DISTINCT user_id)                            AS unique_users,
-         COUNT(*) FILTER (WHERE status = 'failed')          AS failed
-       FROM audit_logs
-       WHERE user_id = $1`
-        : `SELECT
-         COUNT(*)                                            AS total,
-         COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE) AS today,
-         COUNT(DISTINCT user_id)                            AS unique_users,
-         COUNT(*) FILTER (WHERE status = 'failed')          AS failed
-       FROM audit_logs`,
-      isRestricted ? [req.user.user_id] : [],
+         COUNT(*) FILTER (WHERE al.created_at >= CURRENT_DATE) AS today,
+         COUNT(DISTINCT al.user_id)                          AS unique_users,
+         COUNT(*) FILTER (WHERE al.status = 'failed')        AS failed
+       FROM audit_logs al
+       ${where}`,
+      values,
     );
     const s = statsResult.rows[0];
 

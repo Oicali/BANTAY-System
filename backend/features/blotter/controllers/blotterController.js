@@ -464,9 +464,13 @@ const getAllBlotters = async (req, res) => {
     // Backend safety net: enforce referred flag strictly
     let results = blotters;
     if (req.query.referred === "false") {
-      results = blotters.filter((b) => !b.referred_by_barangay);
+      results = blotters.filter(
+        (b) => !b.referred_by_barangay || b.status !== "Pending"
+      );
     } else if (req.query.referred === "true") {
-      results = blotters.filter((b) => b.referred_by_barangay === true);
+      results = blotters.filter(
+        (b) => b.referred_by_barangay === true && b.status === "Pending"
+      );
     }
 
     // Reminder-access: inject out-of-barangay referrals the patrol was reminded about

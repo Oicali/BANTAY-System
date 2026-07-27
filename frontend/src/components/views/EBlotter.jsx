@@ -599,9 +599,13 @@ function EBlotter() {
 
         // Safety net: enforce tab separation client-side regardless of backend filter
         if (currentTab === "reports") {
-          results = results.filter((b) => !b.referred_by_barangay);
+          results = results.filter(
+            (b) => !b.referred_by_barangay || b.status !== "Pending",
+          );
         } else if (currentTab === "referred") {
-          results = results.filter((b) => b.referred_by_barangay === true);
+          results = results.filter(
+            (b) => b.referred_by_barangay === true && b.status === "Pending",
+          );
         }
 
         // Search filter for referred tab

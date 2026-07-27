@@ -6,6 +6,7 @@ import LoadingModal from "../modals/LoadingModal";
 
 const ITEMS_PER_PAGE = 15;
 const API_URL = import.meta.env.VITE_API_URL;
+const getToday = () => new Date().toISOString().slice(0, 10);
 
 const DEFAULT_FILTERS = {
   searchTerm: "",
@@ -81,7 +82,12 @@ const AuditLog = () => {
   // Near the top of the AuditLog component, after the state declarations
   const rawUser = localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
-  const RESTRICTED_ROLES = ["Brgy. Captain", "Brgy. Official", "Investigator", "Patrol"];
+  const RESTRICTED_ROLES = [
+    "Brgy. Captain",
+    "Brgy. Official",
+    "Investigator",
+    "Patrol",
+  ];
   const isRestricted = RESTRICTED_ROLES.includes(currentUser?.role);
 
   // ===================================================
@@ -304,9 +310,29 @@ const AuditLog = () => {
               type="date"
               className="al-filter-input"
               value={draft.dateFrom}
-              onChange={(e) =>
-                setDraft((f) => ({ ...f, dateFrom: e.target.value }))
-              }
+              max={(() => {
+                if (!draft.dateTo) return getToday();
+                const d = new Date(draft.dateTo);
+                d.setDate(d.getDate() - 1);
+                return d.toISOString().slice(0, 10);
+              })()}
+              onChange={(e) => {
+                const from = e.target.value;
+                const autoTo =
+                  draft.dateTo && draft.dateTo > from
+                    ? draft.dateTo
+                    : getToday();
+                setDraft((f) => ({ ...f, dateFrom: from, dateTo: autoTo }));
+              }}
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
             />
           </div>
 
@@ -316,9 +342,25 @@ const AuditLog = () => {
               type="date"
               className="al-filter-input"
               value={draft.dateTo}
+              min={(() => {
+                if (!draft.dateFrom) return undefined;
+                const d = new Date(draft.dateFrom);
+                d.setDate(d.getDate() + 1);
+                return d.toISOString().slice(0, 10);
+              })()}
+              max={getToday()}
               onChange={(e) =>
                 setDraft((f) => ({ ...f, dateTo: e.target.value }))
               }
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
             />
           </div>
         </div>
@@ -366,28 +408,37 @@ const AuditLog = () => {
                   {logs.length === 0 ? (
                     <tr>
                       <td
-  colSpan={isRestricted ? 6 : 7}
-  style={{ textAlign: "center", padding: "40px", color: "#6c757d" }}
->
+                        colSpan={isRestricted ? 6 : 7}
+                        style={{
+                          textAlign: "center",
+                          padding: "40px",
+                          color: "#6c757d",
+                        }}
+                      >
                         No audit log entries match your filters.
                       </td>
                     </tr>
                   ) : (
                     logs.map((log) => (
                       <tr key={log.log_id}>
-  <td className="al-col-id">
-    <span className="al-log-id">#{log.log_id.slice(0, 8)}</span>
-  </td>
-
+                        <td className="al-col-id">
+                          <span className="al-log-id">
+                            #{log.log_id.slice(0, 8)}
+                          </span>
+                        </td>
 
                         {/* User — plain text, no avatar */}
                         {/* User — rank + full name, role underneath */}
                         {!isRestricted && (
-  <td className="al-col-user">
-    <div className="al-user-name">{log.display_name || log.username || "—"}</div>
-    <div className="al-user-email">{log.role_name || "—"}</div>
-  </td>
-)}
+                          <td className="al-col-user">
+                            <div className="al-user-name">
+                              {log.display_name || log.username || "—"}
+                            </div>
+                            <div className="al-user-email">
+                              {log.role_name || "—"}
+                            </div>
+                          </td>
+                        )}
 
                         {/* Event name */}
                         <td className="al-col-event">
