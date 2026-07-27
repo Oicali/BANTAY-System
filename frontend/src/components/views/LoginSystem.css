@@ -85,8 +85,8 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   gap: 32px;
-  margin-bottom: 40px;
   flex-shrink: 0;
+  
 }
 
 .logo-image {
@@ -108,14 +108,14 @@ html, body, #root {
   display: block;
   margin: 0;
   padding: 0;
+  
 }
 
 /* Title Section */
 .title-section {
   text-align: center;
-  margin-top: -29px;
-  margin-bottom: 32px;
   flex-shrink: 0;
+  margin-top: 20px;
 }
 
 .main-title {
@@ -125,7 +125,8 @@ html, body, #root {
   color: #0f172a;
   letter-spacing: -0.02em;
   line-height: 1.2;
-  margin-bottom: 12px;
+
+  margin-top: 12px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 

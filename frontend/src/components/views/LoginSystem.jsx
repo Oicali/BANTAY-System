@@ -424,27 +424,22 @@ const LoginSystem = () => {
       {/* Left Side - Branding */}
       <div className="branding-side">
         <div className="logo-container">
-          <img src="/images/logo2.png" alt="PNP Logo" className="logo-image" />
-          <img
-            src="/images/logo1.png"
-            alt="Cavite Logo"
-            className="logo-image2"
-          />
+          <img src="/images/Bantay-logo.png" alt="PNP Logo" className="logo-image" />
         </div>
 
-        <div className="title-section">
-          <h1 className="main-title">PHILIPPINE NATIONAL POLICE</h1>
-          <p className="subtitle">Bacoor City Station</p>
-        </div>
+        
 
         <div className="red-line"></div>
 
         <div className="bantay-logo-box">
           <img
-            src="/images/logo3.png"
+            src="/images/Long-logo.png"
             alt="BANTAY System"
             className="bantay-logo-image"
           />
+        </div>
+        <div className="title-section">
+          <h1 className="main-title">Bacoor Anti-Criminality Network for Targeted Actions and Yields </h1>
         </div>
 
         <p className="tagline">
@@ -453,7 +448,7 @@ const LoginSystem = () => {
 
         <div className="bottom-line"></div>
 
-        <div className="republic-text">REPUBLIC OF THE PHILIPPINES</div>
+       
       </div>
 
       {/* Right Side - Forms */}

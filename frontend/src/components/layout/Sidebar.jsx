@@ -24,9 +24,9 @@ export default function Sidebar({
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <img
-              src="/images/pnp.png"
+              src="/images/Bantay-logo.png"
               alt="PNP Logo"
-              className="logo-icon"
+              className="logo-icon-sidebar"
               style={{
                 width: "48px",
                 height: "48px",
@@ -34,7 +34,7 @@ export default function Sidebar({
               }}
             />
             <div className="logo-text">
-              <h1>B.A.N.T.A.Y.</h1>
+              <h1 style={{ letterSpacing: "2px"}}>B.A.N.T.A.Y.</h1>
               <p>City of Bacoor</p>
             </div>
           </div>
