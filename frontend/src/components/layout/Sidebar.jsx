@@ -34,8 +34,8 @@ export default function Sidebar({
               }}
             />
             <div className="logo-text">
-              <h1>BANTAY</h1>
-              <p>PNP Bacoor</p>
+              <h1>B.A.N.T.A.Y.</h1>
+              <p>City of Bacoor</p>
             </div>
           </div>
         </div>
