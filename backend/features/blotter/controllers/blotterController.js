@@ -1900,11 +1900,12 @@ const detectCrimeType = async (req, res) => {
     });
   }
 
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  const GROQ_MODEL =
-    process.env.GROQ_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+  const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const CF_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+  const CF_MODEL =
+    process.env.CLOUDFLARE_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct";
 
-  if (!GROQ_API_KEY) {
+  if (!CF_ACCOUNT_ID || !CF_API_TOKEN) {
     return res.status(500).json({
       success: false,
       message: "AI service not configured",
@@ -1954,9 +1955,8 @@ Reply with ONLY the exact crime type name from the list above, OR the exact text
   try {
     const axios = require("axios");
     const response = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
+      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/${CF_MODEL}`,
       {
-        model: GROQ_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 20,
@@ -1965,12 +1965,14 @@ Reply with ONLY the exact crime type name from the list above, OR the exact text
         timeout: 15000,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${GROQ_API_KEY}`,
+          Authorization: `Bearer ${CF_API_TOKEN}`,
         },
       },
     );
 
-    const raw = response.data?.choices?.[0]?.message?.content?.trim() || "";
+    let raw = response.data?.result?.response;
+    if (raw && typeof raw !== "string") raw = JSON.stringify(raw);
+    raw = (raw || "").trim();
 
     // Check for explicit non-crime response
     if (raw.toUpperCase() === "NOT_AN_INDEX_CRIME") {
