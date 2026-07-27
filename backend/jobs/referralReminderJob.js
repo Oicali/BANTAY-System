@@ -62,7 +62,7 @@ const scheduleReferralReminders = (blotterId, blotterEntryNumber, barangay, patr
           type: "REFERRAL_ADMIN_ESCALATION",
           title: "Referral Needs Attention",
           message: `Referral #${blotterEntryNumber} in Brgy. ${barangay} still has no responder after 30 minutes. Please remind a patrol officer.`,
-          linkTo: `/e-blotter?referral=${blotterId}`,
+          linkTo: `/e-blotter`,
         },
         null
       );
