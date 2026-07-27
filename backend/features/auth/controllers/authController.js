@@ -389,13 +389,13 @@ const verifyOTP = async (req, res) => {
     }
 
     const result = await authService.verifyOTP(email, code, ip);
-    res.status(result.success ? 200 : 400).json(result);
+    const status = result.success ? 200 : (result.locked ? 429 : 400);
+    res.status(status).json(result);
   } catch (error) {
     console.error("Verify OTP error:", error);
     res.status(500).json({ success: false, message: "OTP verification failed" });
   }
 };
-
 // ============================================================
 // RESEND OTP
 // ============================================================

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import "./LoginSystem.css";
 import { jwtDecode } from "jwt-decode";
-import { useNavigate } from "react-router-dom"; // add this
+import { useNavigate } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -35,6 +35,13 @@ const LoginSystem = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // ── OTP lockout state (mirrors ProfileSettings' session-locked pattern) ──
+  const [otpLocked, setOtpLocked] = useState(false);
+  const [otpLockMins, setOtpLockMins] = useState(0);
+  const [otpLockCountdown, setOtpLockCountdown] = useState("");
+  const otpLockTimerRef = useRef(null);
+  const otpLockedUntilRef = useRef(null);
+
   const codeInputs = useRef([]);
 
   const navigate = useNavigate();
@@ -42,7 +49,7 @@ const LoginSystem = () => {
   // Timer for verification code
   useEffect(() => {
     let interval;
-    if (currentView === "verify" && timer > 0) {
+    if (currentView === "verify" && timer > 0 && !otpLocked) {
       interval = setInterval(() => {
         setTimer((prev) => {
           if (prev <= 1) {
@@ -54,7 +61,7 @@ const LoginSystem = () => {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [currentView, timer]);
+  }, [currentView, timer, otpLocked]);
 
   // Clear messages when changing views, but keep max attempts error
   useEffect(() => {
@@ -64,12 +71,43 @@ const LoginSystem = () => {
     setSuccess("");
   }, [currentView]);
 
+  // Cleanup lock timer on unmount
+  useEffect(() => {
+    return () => clearInterval(otpLockTimerRef.current);
+  }, []);
+
+  // ── Countdown for OTP lockout — target-timestamp based, same as ProfileSettings ──
+  const startOtpLockCountdown = (minsLeft) => {
+    clearInterval(otpLockTimerRef.current);
+    const until = Date.now() + minsLeft * 60_000;
+    otpLockedUntilRef.current = until;
+    const tick = () => {
+      const msLeft = until - Date.now();
+      if (msLeft <= 0) {
+        setOtpLockCountdown("0m 00s");
+        clearInterval(otpLockTimerRef.current);
+        setOtpLocked(false); // auto-unlock UI when countdown reaches 0
+        return;
+      }
+      const totalSecs = Math.ceil(msLeft / 1000);
+      const m = Math.floor(totalSecs / 60);
+      const s = totalSecs % 60;
+      setOtpLockCountdown(`${m}m ${String(s).padStart(2, "0")}s`);
+    };
+    tick();
+    otpLockTimerRef.current = setInterval(tick, 1000);
+  };
+
+  const resetOtpLockState = () => {
+    setOtpLocked(false);
+    setOtpLockMins(0);
+    setOtpLockCountdown("");
+    clearInterval(otpLockTimerRef.current);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-
-    // Limit all text inputs to 50 characters
     const limitedValue = value.slice(0, 50);
-
     setFormData({
       ...formData,
       [name]: limitedValue,
@@ -101,13 +139,11 @@ const LoginSystem = () => {
     }
   };
 
-  // Prevent paste on password fields
   const handlePasswordPaste = (e) => {
     e.preventDefault();
     return false;
   };
 
-  // Prevent copy and cut on password fields
   const handlePasswordCopy = (e) => {
     e.preventDefault();
     return false;
@@ -134,7 +170,6 @@ const LoginSystem = () => {
     return null;
   };
 
-  // Password requirement checker
   const checkPasswordRequirements = (password) => {
     return {
       length: password.length >= 8,
@@ -180,7 +215,7 @@ const LoginSystem = () => {
       localStorage.setItem("role", decoded.role);
       localStorage.setItem("userId", decoded.user_id);
       localStorage.setItem("username", decoded.username);
-      localStorage.setItem("user", JSON.stringify(data.user)); // ← ADD THIS
+      localStorage.setItem("user", JSON.stringify(data.user));
 
       setSuccess("Login successful!");
       setFormData((prev) => ({
@@ -225,16 +260,31 @@ const LoginSystem = () => {
         setTimeout(() => {
           setCurrentView("verify");
           setSuccess("");
-          setTimer(120); // 2 minutes
+          setTimer(120);
           setCanResend(false);
+          resetOtpLockState();
         }, 1500);
       } else {
-        // Check if max attempts reached → Redirect to login with error
+        // ── Locked out from a previous 3-strike verify failure ──
+        if (data.locked) {
+          setIsLoading(false);
+          setTimeout(() => {
+            setCurrentView("verify");
+            setSuccess("");
+            setTimer(120);
+            setCanResend(false);
+            const minsLeft = data.minutesLeft || 15;
+            setOtpLockMins(minsLeft);
+            startOtpLockCountdown(minsLeft);
+            setOtpLocked(true);
+          }, 300);
+          return;
+        }
+
         if (data.message && data.message.includes("Maximum OTP requests")) {
           setCurrentView("login");
-          // Set error AFTER view change to avoid clearing
           setTimeout(() => setError(data.message), 0);
-          setFormData((prev) => ({ ...prev, email: "" })); // Clear email for security
+          setFormData((prev) => ({ ...prev, email: "" }));
         } else {
           setError(data.message || "Failed to send verification code");
         }
@@ -280,11 +330,30 @@ const LoginSystem = () => {
           setCurrentView("reset");
           setSuccess("");
         }, 1500);
-      } else {
-        setError(data.message || "Invalid verification code");
-        setIsLoading(false);
-        setIsVerifying(false);
+        return;
       }
+
+      // ── Locked out after 3 wrong attempts (mirrors ProfileSettings' d.sessionLocked branch) ──
+      if (data.locked) {
+        setIsVerifying(false);
+        setIsLoading(false);
+        const minsLeft = data.minutesLeft || 15;
+        setOtpLockMins(minsLeft);
+        startOtpLockCountdown(minsLeft);
+        setOtpLocked(true);
+        setError("");
+        return;
+      }
+
+      // ── Normal wrong-code case ──
+      setError(data.message || "Invalid verification code");
+      setFormData((prev) => ({
+        ...prev,
+        verificationCode: ["", "", "", "", "", ""],
+      }));
+      setTimeout(() => codeInputs.current[0]?.focus(), 60);
+      setIsLoading(false);
+      setIsVerifying(false);
     } catch (error) {
       setError("Failed to verify code. Please try again.");
       console.error("Error:", error);
@@ -293,7 +362,7 @@ const LoginSystem = () => {
   };
 
   const handleResendCode = async () => {
-    if (!canResend || isLoading) return;
+    if (!canResend || isLoading || otpLocked) return;
 
     setIsLoading(true);
     setError("");
@@ -310,7 +379,7 @@ const LoginSystem = () => {
       const data = await response.json();
 
       if (data.success) {
-        setTimer(120); // 2 minutes
+        setTimer(120);
         setCanResend(false);
         setFormData({
           ...formData,
@@ -322,11 +391,20 @@ const LoginSystem = () => {
           setIsLoading(false);
         }, 2000);
       } else {
-        // Check if max attempts reached → Redirect to login with error
+        // ── Locked out (resend blocked because of a prior 3-strike verify failure) ──
+        if (data.locked) {
+          setIsLoading(false);
+          const minsLeft = data.minutesLeft || 15;
+          setOtpLockMins(minsLeft);
+          startOtpLockCountdown(minsLeft);
+          setOtpLocked(true);
+          return;
+        }
+
         if (data.message && data.message.includes("Maximum OTP requests")) {
           setCurrentView("login");
           setTimeout(() => setError(data.message), 0);
-          setFormData((prev) => ({ ...prev, email: "" })); // Clear email for security
+          setFormData((prev) => ({ ...prev, email: "" }));
         } else {
           setError(data.message || "Failed to resend code");
         }
@@ -390,6 +468,7 @@ const LoginSystem = () => {
         });
         setSuccess("");
         setIsLoading(false);
+        resetOtpLockState();
       }, 2000);
     } catch (error) {
       console.error("Reset password error:", error);
@@ -411,6 +490,7 @@ const LoginSystem = () => {
       newPassword: "",
       confirmPassword: "",
     });
+    resetOtpLockState();
   };
 
   const handleKeyPress = (e, action) => {
@@ -426,8 +506,6 @@ const LoginSystem = () => {
         <div className="logo-container">
           <img src="/images/Bantay-logo.png" alt="PNP Logo" className="logo-image" />
         </div>
-
-        
 
         <div className="red-line"></div>
 
@@ -447,8 +525,6 @@ const LoginSystem = () => {
         </p>
 
         <div className="bottom-line"></div>
-
-       
       </div>
 
       {/* Right Side - Forms */}
@@ -622,8 +698,55 @@ const LoginSystem = () => {
             </div>
           )}
 
-          {/* Verification Code View */}
-          {currentView === "verify" && (
+          {/* Verification Code View — LOCKED state */}
+          {currentView === "verify" && otpLocked && (
+            <div style={{ textAlign: "center" }}>
+              <h2 className="form-title">Verification Locked</h2>
+              <p className="form-subtitle">
+                Too many incorrect attempts. For your security, this process
+                is temporarily locked.
+              </p>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "#fef3c7",
+                  border: "1px solid #fcd34d",
+                  borderRadius: 8,
+                  padding: "8px 20px",
+                  margin: "16px 0",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#92400e",
+                  letterSpacing: 1,
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#92400e"
+                  strokeWidth="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                {otpLockCountdown || `${otpLockMins}m 00s`}
+              </div>
+              <button
+                className="primary-button"
+                onClick={handleBackToLogin}
+                style={{ marginTop: "8px" }}
+              >
+                Back to Login
+              </button>
+            </div>
+          )}
+
+          {/* Verification Code View — ACTIVE state */}
+          {currentView === "verify" && !otpLocked && (
             <div>
               <h2 className="form-title">Enter Verification Code</h2>
               <p className="form-subtitle-small">

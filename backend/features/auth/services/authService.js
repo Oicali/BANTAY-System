@@ -6,6 +6,9 @@ const bcrypt = require("bcrypt");
 const pool   = require("../../../config/database");
 const { logAudit } = require("../../../shared/utils/auditLogger");
 
+const OTP_MAX_ATTEMPTS = 3;
+const OTP_LOCKOUT_MS = 15 * 60 * 1000;
+
 // Generate 6-digit OTP
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -86,6 +89,9 @@ async function sendOTP(email, ipAddress = null) {
     const otpRow = await pool.query(
       `SELECT request_count,
               last_request_at,
+              attempts,
+              locked_until,
+              (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
               (last_request_at::date = CURRENT_DATE) AS is_same_day,
               EXTRACT(EPOCH FROM (NOW() - last_request_at)) AS seconds_since_last
        FROM otp_requests WHERE email = $1`,
@@ -96,6 +102,29 @@ async function sendOTP(email, ipAddress = null) {
 
     if (otpRow.rows.length > 0) {
       const record = otpRow.rows[0];
+
+      // ── Block sending while the 15-min lock (from 3 failed verify attempts) is active ──
+      if (record.is_locked) {
+        const msLeft = new Date(record.locked_until).getTime() - Date.now();
+        const minsLeft = Math.ceil(msLeft / 60000);
+
+        await logAudit({
+          username:    email,
+          eventName:   "OTP Requested",
+          description: `OTP request blocked — locked for ${minsLeft} more minute(s) after 3 failed attempts`,
+          action:      "OTP",
+          status:      "failed",
+          source:      null,
+          ipAddress,
+        });
+
+        return {
+          success: false,
+          locked: true,
+          minutesLeft: minsLeft,
+          message: `Too many incorrect attempts. Please try again in ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`,
+        };
+      }
 
       // Cooldown check: must wait 60 seconds between requests
       if (record.seconds_since_last !== null && record.seconds_since_last < 60) {
@@ -140,15 +169,18 @@ async function sendOTP(email, ipAddress = null) {
     const otp     = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
 
+    // Reset attempts + lock whenever a fresh OTP is issued
     await pool.query(
-      `INSERT INTO otp_requests (email, otp_hash, expires_at, request_count, last_request_at)
-       VALUES ($1, $2, NOW() + INTERVAL '2 minutes', $3, CURRENT_TIMESTAMP)
+      `INSERT INTO otp_requests (email, otp_hash, expires_at, request_count, last_request_at, attempts, locked_until)
+       VALUES ($1, $2, NOW() + INTERVAL '2 minutes', $3, CURRENT_TIMESTAMP, 0, NULL)
        ON CONFLICT (email)
        DO UPDATE SET
          otp_hash        = EXCLUDED.otp_hash,
          expires_at      = EXCLUDED.expires_at,
          request_count   = EXCLUDED.request_count,
-         last_request_at = EXCLUDED.last_request_at`,
+         last_request_at = EXCLUDED.last_request_at,
+         attempts        = 0,
+         locked_until    = NULL`,
       [email, otpHash, requestCount]
     );
 
@@ -213,6 +245,9 @@ async function verifyOTP(email, code, ipAddress = null) {
   try {
     const otpCheck = await pool.query(
       `SELECT otp_hash,
+              attempts,
+              locked_until,
+              (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
               (expires_at < NOW()) AS is_expired
        FROM otp_requests
        WHERE email = $1`,
@@ -235,6 +270,29 @@ async function verifyOTP(email, code, ipAddress = null) {
 
     const otp = otpCheck.rows[0];
 
+    // ── Already locked from a previous 3-strike failure ──
+    if (otp.is_locked) {
+      const msLeft = new Date(otp.locked_until).getTime() - Date.now();
+      const minsLeft = Math.ceil(msLeft / 60000);
+
+      await logAudit({
+        username:    email,
+        eventName:   "OTP Verification",
+        description: `OTP verification blocked — locked for ${minsLeft} more minute(s)`,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
+        ipAddress,
+      });
+
+      return {
+        success: false,
+        locked: true,
+        minutesLeft: minsLeft,
+        message: `Too many incorrect attempts. Please try again in ${minsLeft} minute${minsLeft === 1 ? "" : "s"}.`,
+      };
+    }
+
     if (otp.is_expired) {
       await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
 
@@ -254,17 +312,59 @@ async function verifyOTP(email, code, ipAddress = null) {
     const valid = await bcrypt.compare(code, otp.otp_hash);
 
     if (!valid) {
+      const newAttempts = otp.attempts + 1;
+
+      // ── 3rd wrong attempt: lock verification + sending for 15 minutes ──
+      if (newAttempts >= OTP_MAX_ATTEMPTS) {
+        const lockedUntil = new Date(Date.now() + OTP_LOCKOUT_MS);
+
+        await pool.query(
+          `UPDATE otp_requests
+           SET attempts = $2, locked_until = $3
+           WHERE email = $1`,
+          [email, newAttempts, lockedUntil]
+        );
+
+        await logAudit({
+          username:    email,
+          eventName:   "OTP Verification",
+          description: `3 incorrect OTP attempts for ${email} — locked for 15 minutes`,
+          action:      "OTP",
+          status:      "failed",
+          source:      null,
+          ipAddress,
+        });
+
+        return {
+          success: false,
+          locked: true,
+          minutesLeft: Math.ceil(OTP_LOCKOUT_MS / 60000),
+          message: "Too many incorrect attempts. This account is locked for 15 minutes.",
+        };
+      }
+
+      await pool.query(
+        "UPDATE otp_requests SET attempts = $2 WHERE email = $1",
+        [email, newAttempts]
+      );
+
+      const attemptsLeft = OTP_MAX_ATTEMPTS - newAttempts;
+
       await logAudit({
         username:    email,
         eventName:   "OTP Verification",
-        description: `Invalid OTP entered for ${email}`,
+        description: `Invalid OTP entered for ${email} — ${attemptsLeft} attempt(s) left`,
         action:      "OTP",
         status:      "failed",
         source:      null,
         ipAddress,
       });
 
-      return { success: false, message: "Invalid OTP." };
+      return {
+        success: false,
+        message: `Invalid OTP — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} remaining`,
+        attemptsLeft,
+      };
     }
 
     await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
