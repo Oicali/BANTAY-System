@@ -172,7 +172,40 @@ const AuditLog = () => {
   // ===================================================
   // EXPORT CSV
   // ===================================================
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    let all = [];
+    let page = 1;
+    const limit = 100; // backend max
+
+    while (true) {
+      const params = new URLSearchParams();
+      params.set("page", page);
+      params.set("limit", limit);
+      if (appliedFilters.searchTerm.trim())
+        params.set("search", appliedFilters.searchTerm.trim());
+      if (appliedFilters.statusFilter !== "all")
+        params.set("status", appliedFilters.statusFilter);
+      if (appliedFilters.dateFrom)
+        params.set("dateFrom", appliedFilters.dateFrom);
+      if (appliedFilters.dateTo) params.set("dateTo", appliedFilters.dateTo);
+
+      const res = await fetch(`${API_URL}/audit-log?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) throw new Error("Export fetch failed");
+      const data = await res.json();
+
+      all = all.concat(data.logs || []);
+
+      if (page >= (data.pagination?.totalPages || 1)) break;
+      page++;
+    }
+
     const cols = [
       "log_id",
       "username",
@@ -184,7 +217,7 @@ const AuditLog = () => {
       "ip_address",
       "created_at",
     ];
-    const rows = logs.map((r) =>
+    const rows = all.map((r) =>
       [
         r.log_id,
         r.username || "",
@@ -200,9 +233,13 @@ const AuditLog = () => {
     const csv = [cols.join(","), ...rows].join("\n");
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = `audit_log_page${currentPage}.csv`;
+    a.download = `audit_log_${appliedFilters.dateFrom || "all"}_to_${appliedFilters.dateTo || "all"}.csv`;
     a.click();
-  };
+  } catch (err) {
+    console.error("Export error:", err);
+    setError("Failed to export audit logs.");
+  }
+};
 
   // ===================================================
   // HELPERS
