@@ -471,7 +471,17 @@ function EBlotter() {
           body: JSON.stringify({ records, meta: { dateFrom, dateTo } }),
         },
       );
-      if (!response.ok) throw new Error("Export failed");
+
+      if (!response.ok) {
+        let msg = "Export failed";
+        try {
+          const errData = await response.json();
+          if (errData.message) msg = errData.message;
+        } catch {
+          // response wasn't JSON (e.g. HTML error page) — keep generic msg
+        }
+        throw new Error(msg);
+      }
 
       const filename = `blotter_${dateFrom}_to_${dateTo}.pdf`;
       const blob = await response.blob();
@@ -2852,7 +2862,10 @@ function EBlotter() {
       <LoadingModal isOpen={isExportLoading} message="Preparing export..." />
 
       {pendingExport && (
-        <div className="eb-modal" style={{ zIndex: 10002 }}>
+        <div
+          className="eb-modal"
+          style={{ zIndex: 10002, alignItems: "center" }}
+        >
           <div
             className="eb-modal-content"
             style={{ maxWidth: 400, padding: 24 }}
