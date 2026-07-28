@@ -2861,17 +2861,14 @@ function EBlotter() {
       if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
         return reject("Only MP4, WebM, or MOV files are allowed.");
       }
-      if (file.size > 50 * 1024 * 1024) {
-        return reject("Video must be under 50MB.");
+      if (file.size > 80 * 1024 * 1024) {
+        return reject("Video must be under 80MB.");
       }
       const url = URL.createObjectURL(file);
       const vid = document.createElement("video");
       vid.preload = "metadata";
       vid.onloadedmetadata = () => {
         URL.revokeObjectURL(url);
-        if (vid.duration > 60) {
-          return reject("Video must be 60 seconds or less.");
-        }
         resolve();
       };
       vid.onerror = () => {
@@ -2880,6 +2877,17 @@ function EBlotter() {
       };
       vid.src = url;
     });
+
+  const validatePhotoFile = (file) => {
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      return "Only JPG, PNG, or WebP images are allowed.";
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      return "Photo must be under 8MB.";
+    }
+    return null; // no error
+  };
 
   return (
     <div className="eb-content-area">
@@ -7338,6 +7346,13 @@ function EBlotter() {
                                     showReactToast(err, "error");
                                     return;
                                   }
+                                } else {
+                                  const photoError = validatePhotoFile(file);
+                                  if (photoError) {
+                                    showReactToast(photoError, "error");
+                                    e.target.value = "";
+                                    return;
+                                  }
                                 }
                                 const preview = URL.createObjectURL(file);
                                 setPendingModalFiles((prev) => [
@@ -7376,7 +7391,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    JPG, PNG, WebP · Max 5MB · Up to 5 photos
+                                    JPG, PNG, WebP · Max 8MB · Up to 5 photos
                                   </div>
                                 </>
                               ) : (
@@ -7416,8 +7431,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    MP4, WebM, MOV · Max 50MB · 60s max · Up to
-                                    3 videos
+                                    MP4, WebM, MOV · Max 80MB · Up to 3 videos
                                   </div>
                                 </>
                               )}
@@ -7437,6 +7451,13 @@ function EBlotter() {
                                       await validateVideoFile(file);
                                     } catch (err) {
                                       showReactToast(err, "error");
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                  } else {
+                                    const photoError = validatePhotoFile(file);
+                                    if (photoError) {
+                                      showReactToast(photoError, "error");
                                       e.target.value = "";
                                       return;
                                     }
@@ -7685,6 +7706,31 @@ function EBlotter() {
                               background: "white",
                               textAlign: "center",
                             }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={async (e) => {
+                              e.preventDefault();
+                              const file = e.dataTransfer.files[0];
+                              if (!file) return;
+                              if (attachMediaTab === "video") {
+                                try {
+                                  await validateVideoFile(file);
+                                } catch (err) {
+                                  showReactToast(err, "error");
+                                  return;
+                                }
+                              } else {
+                                const photoError = validatePhotoFile(file);
+                                if (photoError) {
+                                  showReactToast(photoError, "error");
+                                  return;
+                                }
+                              }
+                              const preview = URL.createObjectURL(file);
+                              setPendingModalFiles((prev) => [
+                                ...prev,
+                                { file, caption: "", preview },
+                              ]);
+                            }}
                           >
                             {attachMediaTab === "image" ? (
                               <>
@@ -7713,7 +7759,7 @@ function EBlotter() {
                                 <div
                                   style={{ fontSize: "11px", color: "#9ca3af" }}
                                 >
-                                  JPG, PNG, WebP · Max 5MB
+                                  JPG, PNG, WebP · Max 8MB
                                 </div>
                               </>
                             ) : (
@@ -7750,7 +7796,7 @@ function EBlotter() {
                                 <div
                                   style={{ fontSize: "11px", color: "#9ca3af" }}
                                 >
-                                  MP4, WebM, MOV · Max 50MB · 60s max
+                                  MP4, WebM, MOV · Max 80MB
                                 </div>
                               </>
                             )}
@@ -7770,6 +7816,13 @@ function EBlotter() {
                                     await validateVideoFile(file);
                                   } catch (err) {
                                     showReactToast(err, "error");
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                } else {
+                                  const photoError = validatePhotoFile(file);
+                                  if (photoError) {
+                                    showReactToast(photoError, "error");
                                     e.target.value = "";
                                     return;
                                   }
