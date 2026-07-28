@@ -293,17 +293,6 @@ function buildModusBlock(top3Modus, modusDescriptions = []) {
     .join("\n      ");
 }
 
-function buildClusterBlock(clusters) {
-  if (!clusters || clusters.length === 0)
-    return "No significant geographic clusters detected.";
-
-  return clusters
-    .map((c, i) => {
-      const label = String.fromCharCode(65 + i);
-      return `Cluster ${label}: ${c.count} incident(s) in ${c.dominant_barangay || "Unknown barangay"} (geographic cluster — may span barangay borders) — dominant crime: ${c.dominant_crime}, dominant modus: ${c.dominant_modus}`;
-    })
-    .join("\n");
-}
 
 function buildDiagnosticsBlock(diagnosticData) {
   if (!diagnosticData) return "No diagnostic data available.";
@@ -628,7 +617,7 @@ Return VALID JSON ONLY. No markdown, no backticks, no code fences, no extra keys
 All newlines within string values must be represented as \\n, not literal line breaks. One object only.
 {
   "crime_type": "${crimeType}",
-  "crime_assessment": "5 to 6 sentences — unified performance and diagnostic summary. Structure strictly as follows: (1) state total incidents, CCE%, CSE% — numbers only, (2) state trend direction and ECP status if applicable, (3) state peak temporal pattern — peak hour in AM/PM format, peak day, peak month, (4) WHY the crime pattern exists — use DIAGNOSTIC ANALYTICS to name dominant place group and explain the environmental driver, (5) state peak time window at top place type and the real-world activity it corresponds to, (6) state concentration level and what it means for patrol scope — reference ${hotspotBarangay} as the highest-risk area per the risk model. Use causal language throughout.",
+  "crime_assessment": "5 to 6 sentences — unified performance and diagnostic summary. Structure strictly as follows: (1) state total incidents, CCE%, CSE% — numbers only, (2) state trend direction — if ECP is YES write 'warrants ECP declaration — Station Patrol Plan must be adjusted'; if ECP is NO do not mention ECP at all, (3) state peak temporal pattern — peak hour in AM/PM format, peak day, peak month, (4) WHY the crime pattern exists — use DIAGNOSTIC ANALYTICS to name dominant place group and explain the environmental driver, (5) state peak time window at top place type and the real-world activity it corresponds to, (6) state concentration level and what it means for patrol scope — reference ${hotspotBarangay} as the highest-risk area per the risk model. Use causal language throughout.",
   "operations": "Write the Five-Part Plan as a single plain-text string. Must Do tasks MUST be in chronological time order. Use exactly this format:\\nSituation: [deployment implication of crime pattern — reference ${hotspotBarangay} as primary risk area from risk model and the dominant place type]\\nMission: [one sentence objective — what the patrol unit aims to accomplish]\\nExecution: [patrol method matched to place type from data; reference peak hours; note that specific barangay deployment is guided by the risk table shown to the commander]\\nMust Do (1): At [time AM/PM], [specific patrol action] at [place type from data — NO barangay name]\\nMust Do (2): At [time AM/PM], [specific patrol action] at [place type from data — NO barangay name]\\n[Add Must Do (3)-(5) only if strongly supported by data — minimum 2, maximum 5]\\nCoordinating Instructions: [force multipliers — may reference risk areas generally]",
   "intelligence": "1 to 2 sentences. Reference at least one modus by name from ACTUAL MODUS IN DATA. State what information patrollers collect as bee workers and from whom — focus on WHO to collect from and WHAT to collect, not which specific barangay. Flag ECP if applicable.",
   "investigations": "1 to 2 sentences. If under_investigation is 0, state all cases cleared/solved. If > 0, state the number of open cases, reference modus from ACTUAL MODUS IN DATA, and name specific barangays only when tied to actual open case locations — not as generic patrol targets.",
@@ -640,6 +629,7 @@ Critical rules:
 - crime_assessment must be the commander's strategic implication — NOT a duplicate of Operations Situation.
 - ONLY use modus names from ACTUAL MODUS IN DATA. Never invent modus names.
 - Reference ${hotspotBarangay} in Crime Assessment and Situation ONLY. Must Do tasks must NEVER contain a barangay name — action and time only. This is a hard rule.
+- NEVER write "No ECP declared", "ECP not warranted", or any negative ECP statement. If ECP is NO, do not mention ECP at all. Only write about ECP when is_ecp is YES.
 - Do NOT use markdown — no asterisks, bold, italics, headers, backticks, or code fences. Plain text only.
 - ALL time references must use AM/PM format (e.g. "8:00 AM – 9:00 AM") — never 24-hour time.
 - MUST DO tasks must be plain prose sentences — never JSON arrays or bullet lists.

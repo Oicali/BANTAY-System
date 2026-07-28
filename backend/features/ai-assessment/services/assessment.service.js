@@ -241,17 +241,6 @@ const buildBaseAssessment = (analysis) => {
     const peakDay = crime.peak_day || "peak days";
     const peakMonth = crime.peak_month || "peak month";
 
-    let forecastText;
-    const forecastState = crime.forecast_state || "insufficient";
-
-    if (forecastState === "full") {
-      forecastText = ` Forecast: ${crime.predicted_next_week} incident(s) next week (${crime.confidence}% confidence).`;
-    } else if (forecastState === "limited") {
-      forecastText = ` Forecast: ${crime.predicted_next_week} incident(s) next week (${crime.confidence}% confidence — limited data).`;
-    } else {
-      forecastText = " Insufficient data for forecast.";
-    }
-
     const trendLabel =
       {
         increasing: "increasing",
@@ -262,8 +251,8 @@ const buildBaseAssessment = (analysis) => {
 
     const crimeAssessment =
       `${prettifyCrime(crime.crime)}: ${crime.total} incident(s), CCE ${pctText(crime.cce_percent)}%, CSE ${pctText(crime.cse_percent)}%. ` +
-      `Trend is ${trendLabel}.${forecastText} ` +
-      `${crime.is_ecp ? "Warrants ECP declaration. " : ""}` +
+      `Trend is ${trendLabel}. ` +
+      `${crime.is_ecp ? "Warrants ECP declaration — Station Patrol Plan must be adjusted. " : ""}` +
       `Concentration in ${hotspotBarangay} during ${peakDay}s around ${peakHour} in ${peakMonth} indicates a patrol gap requiring targeted deployment.`;
 
     return {

@@ -594,7 +594,9 @@ function buildBarangayRiskTable(barangayForecast) {
     elements.push(spacer(60));
   }
 
-  const COL = [500, 2200, 1300, 1200, 1700, 3566];
+  // Tier column dropped to match current dashboard table (tier now shown only
+  // in the row-expansion detail on screen, not as a top-level column).
+  const COL = [500, 2400, 1300, 1800, 4466];
   const TWIDTH = COL.reduce((a, b) => a + b, 0);
 
   elements.push(
@@ -608,9 +610,8 @@ function buildBarangayRiskTable(barangayForecast) {
             hCell("#", COL[0], { center: true }),
             hCell("Barangay", COL[1]),
             hCell("Risk Score", COL[2], { center: true }),
-            hCell("Tier", COL[3], { center: true }),
-            hCell("Last Incident", COL[4]),
-            hCell("Why Flagged", COL[5]),
+            hCell("Last Incident", COL[3]),
+            hCell("Why Flagged", COL[4]),
           ],
         }),
         ...rows.map((row, i) =>
@@ -634,13 +635,12 @@ function buildBarangayRiskTable(barangayForecast) {
                         ? "ca8a04"
                         : "6b7280",
               }),
-              dCell(row.tier, COL[3], { center: true, alt: i % 2 === 1 }),
               dCell(
                 `${row.last_incident} (${row.days_since_last}d ago)`,
-                COL[4],
+                COL[3],
                 { alt: i % 2 === 1, size: 16 },
               ),
-              dCell(row.why_flagged || "-", COL[5], {
+              dCell(row.why_flagged || "-", COL[4], {
                 alt: i % 2 === 1,
                 size: 16,
               }),

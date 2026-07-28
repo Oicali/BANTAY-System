@@ -915,7 +915,11 @@ def compute_barangay_risk(
     if incidents_df.empty:
         return {"barangay_risk": [], "backtest": None, "decay_window_used": decay_window}
 
-    ref_date = pd.Timestamp(reference_date) if reference_date else pd.Timestamp(date_to)
+    ref_date = (
+    pd.Timestamp(reference_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    if reference_date
+    else pd.Timestamp(date_to).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+)
     total_weeks = max((pd.Timestamp(date_to) - pd.Timestamp(date_from)).days / 7, 1)
 
     # ── Per-barangay aggregation ──────────────────────────────────────────────
@@ -1093,7 +1097,7 @@ def _run_backtest(
             continue
 
         # ── Lightweight inline scoring — no recursive call ────────────────────
-        ref_date    = pd.Timestamp(fold_end_date)
+        ref_date = pd.Timestamp(fold_end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
         total_weeks_train = max(
             (ref_date - pd.Timestamp(date_from)).days / 7, 1
         )
@@ -1245,6 +1249,21 @@ def get_clusters(payload: ClustersRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+def is_significant_ecp(crime_key, per_crime_sba, crime_stat, total_weeks):
+    cr = per_crime_sba.get(crime_key, {})
+
+    if cr.get("forecast_state") == "insufficient":
+        return False
+
+    if cr.get("trend", "stable") != "increasing":
+        return False
+
+    min_incidents = max(3, round(total_weeks * 0.05))
+    if crime_stat.get("total", 0) < min_incidents:
+        return False
+
+    return True
+
 
 # ─── /analyze — FULL ASSESSMENT ENDPOINT ──────────────────────────────────────
 
@@ -1320,10 +1339,15 @@ def analyze(payload: AnalyzeRequest):
             crime_stat["forecast_state"]      = cr.get("forecast_state", "insufficient")
             crime_stat["nonzero_weeks"]       = cr.get("nonzero_weeks", 0)
             crime_stat["forecast_method"]     = cr.get("method", "none")
-            crime_stat["is_ecp"]              = (
-                crime_stat["trend"] == "increasing"
-                and crime_stat["cse_percent"] < 30.0
-                and cr.get("forecast_state") in ["full", "limited"]
+            date_range_weeks = max(
+                (pd.Timestamp(payload.date_to) - pd.Timestamp(payload.date_from)).days / 7,
+                1,
+            )
+            crime_stat["is_ecp"] = is_significant_ecp(
+                crime,
+                per_crime_sba,
+                crime_stat,
+                date_range_weeks,
             )
 
         temporal_map = {

@@ -73,6 +73,7 @@ const AuditLog = () => {
     uniqueUsers: 0,
     failed: 0,
   });
+  const [isExporting, setIsExporting] = useState(false);
 
   const [draft, setDraft] = useState({ ...DEFAULT_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
@@ -173,6 +174,7 @@ const AuditLog = () => {
   // EXPORT CSV
   // ===================================================
   const handleExportCSV = async () => {
+  setIsExporting(true);
   try {
     const token = localStorage.getItem("token");
     let all = [];
@@ -238,6 +240,8 @@ const AuditLog = () => {
   } catch (err) {
     console.error("Export error:", err);
     setError("Failed to export audit logs.");
+  } finally {
+    setIsExporting(false);
   }
 };
 
@@ -273,8 +277,12 @@ const AuditLog = () => {
           >
             <RefreshIcon /> Refresh
           </button>
-          <button className="al-btn al-btn-primary" onClick={handleExportCSV}>
-            <ExportIcon /> Export
+          <button
+            className="al-btn al-btn-primary"
+            onClick={handleExportCSV}
+            disabled={isExporting}
+          >
+            <ExportIcon /> {isExporting ? "Exporting..." : "Export"}
           </button>
         </div>
       </div>
@@ -418,6 +426,10 @@ const AuditLog = () => {
           </button>
         </div>
       </div>
+
+      <LoadingModal isOpen={isExporting} message={"Exporting audit logs..."} />
+
+      <LoadingModal isOpen={isExporting} message={"Exporting audit logs..."} />
 
       {/* Table */}
       <div className="al-table-card">
