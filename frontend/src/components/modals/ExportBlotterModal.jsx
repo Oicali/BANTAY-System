@@ -9,7 +9,21 @@ oneYearAgo.setDate(oneYearAgo.getDate() + 1);
 const ExportBlotterModal = ({ onClose, onExport, isExporting }) => {
   const [dateFrom, setDateFrom] = useState(toIso(oneYearAgo));
   const [dateTo, setDateTo] = useState(toIso(today));
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState("");
 
+  const MAX_RANGE_DAYS = 365;
+
+  const validate = () => {
+    if (!dateFrom || !dateTo) return "Both dates are required.";
+    const from = new Date(dateFrom),
+      to = new Date(dateTo);
+    if (from > to) return "Start Date cannot be after End Date.";
+    const days = (to - from) / 86400000;
+    if (days > MAX_RANGE_DAYS)
+      return `Maximum export range is ${MAX_RANGE_DAYS} days (1 year).`;
+    return "";
+  };
   return (
     <div
       style={{
@@ -205,6 +219,12 @@ const ExportBlotterModal = ({ onClose, onExport, isExporting }) => {
             />
           </div>
 
+          {error && (
+            <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 12px" }}>
+              {error}
+            </p>
+          )}
+
           {/* Footer buttons */}
           <div style={{ display: "flex", gap: 10 }}>
             <button
@@ -225,7 +245,15 @@ const ExportBlotterModal = ({ onClose, onExport, isExporting }) => {
               Cancel
             </button>
             <button
-              onClick={() => onExport(dateFrom, dateTo)}
+              onClick={async () => {
+                const err = validate();
+                if (err) {
+                  setError(err);
+                  return;
+                }
+                setError("");
+                await onExport(dateFrom, dateTo); // parent now does count-check + confirm
+              }}
               disabled={isExporting}
               style={{
                 flex: 2,
