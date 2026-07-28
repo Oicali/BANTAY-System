@@ -65,6 +65,28 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
   const [changesLeft, setChangesLeft] = useState(null);
 
   const otpRef = useRef(null);
+  // ── Persisted lock timestamps (mirrors mobile's AsyncStorage approach) ────
+  const LOCK_KEYS = { session: "cpm_session_locked", pw: "cpm_pw_locked" };
+
+  function readLock(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const { until } = JSON.parse(raw);
+      if (Date.now() < until) return until;
+      localStorage.removeItem(key);
+      return null;
+    } catch {
+      localStorage.removeItem(key);
+      return null;
+    }
+  }
+
+  function writeLock(key, until) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ until }));
+    } catch {}
+  }
   const currentPwRef = useRef(null);
   const countdownRef = useRef(null);
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
@@ -97,7 +119,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     tick();
     countdownRef.current = setInterval(tick, 1000);
     return () => clearInterval(countdownRef.current);
-  }, [step, blockedUntilTs, sessionLockedUntilTs, pwLockedUntilTs]);
+  }, [isOpen, step, blockedUntilTs, sessionLockedUntilTs, pwLockedUntilTs]);
 
   const pw = passwordData.newPassword;
   const checks = {
@@ -111,6 +133,25 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
   const allPass = Object.values(checks).every(Boolean);
 
   const checkStatus = useCallback(async () => {
+    // Check persisted locks FIRST — avoids restart-on-reopen from rounded minsLeft
+    const savedPwUntil = readLock(LOCK_KEYS.pw);
+    if (savedPwUntil) {
+      setCurrentPwLocked(true);
+      setCurrentPwLockedMins(Math.ceil((savedPwUntil - Date.now()) / 60000));
+      setPwLockedUntilTs(savedPwUntil);
+      setPwLockedCountdown(fmtCountdown(savedPwUntil - Date.now()));
+      setStep("pw-locked");
+      return;
+    }
+    const savedSessionUntil = readLock(LOCK_KEYS.session);
+    if (savedSessionUntil) {
+      setSessionLockMins(Math.ceil((savedSessionUntil - Date.now()) / 60000));
+      setSessionLockedUntilTs(savedSessionUntil);
+      setSessionLockedCountdown(fmtCountdown(savedSessionUntil - Date.now()));
+      setStep("session-locked");
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/status`, {
@@ -118,23 +159,27 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
       });
       const d = await res.json();
       if (d.blocked) {
+        const until = Date.now() + (d.msLeft ?? (d.hoursLeft ?? 24) * 3_600_000);
         setRateLimitHours(d.hoursLeft ?? null);
-        // Use exact msLeft from backend for accurate countdown (not rounded hoursLeft)
-        setBlockedUntilTs(
-          Date.now() + (d.msLeft ?? (d.hoursLeft ?? 24) * 3_600_000),
-        );
+        setBlockedUntilTs(until);
+        setBlockedCountdown(fmtCountdown(until - Date.now()));
         setStep("blocked");
       } else if (d.sessionLocked) {
-        const mins = d.minsLeft ?? 15;
-        setSessionLockMins(mins);
-        setSessionLockedUntilTs(Date.now() + mins * 60_000);
+        const until = Date.now() + (d.msLeft ?? (d.minsLeft ?? 15) * 60_000);
+        setSessionLockMins(Math.ceil((until - Date.now()) / 60000));
+        setSessionLockedUntilTs(until);
+        setSessionLockedCountdown(fmtCountdown(until - Date.now()));
+        writeLock(LOCK_KEYS.session, until);
         setStep("session-locked");
       } else if (d.pwLocked) {
-        const mins = d.minsLeft ?? 15;
+        const until = Date.now() + (d.msLeft ?? (d.minsLeft ?? 15) * 60_000);
         setCurrentPwLocked(true);
-        setCurrentPwLockedMins(mins);
-        setPwLockedUntilTs(Date.now() + mins * 60_000);
+        setCurrentPwLockedMins(Math.ceil((until - Date.now()) / 60000));
+        setPwLockedUntilTs(until);
+        setPwLockedCountdown(fmtCountdown(until - Date.now()));
+        writeLock(LOCK_KEYS.pw, until);
         setStep("pw-locked");
+      
       } else {
         setStep("verify-current");
         setTimeout(() => currentPwRef.current?.focus(), 120);
@@ -144,7 +189,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
       setTimeout(() => currentPwRef.current?.focus(), 120);
     }
   }, []);
-
   useEffect(() => {
     if (isOpen) {
       setStep("checking");
@@ -180,12 +224,11 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
       stepRef.current = "checking";
       setResendsLeft(3);
       clearInterval(otpRef.current);
-      clearInterval(countdownRef.current);
       checkStatus();
     }
     return () => {
       clearInterval(otpRef.current);
-      clearInterval(countdownRef.current);
+      
     };
   }, [isOpen, checkStatus]);
 
@@ -295,9 +338,11 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
       if (!res.ok) {
         if (d.locked) {
           const mins = d.minutesLeft ?? 15;
+          const until = Date.now() + (d.msLeft ?? mins * 60_000);
           setCurrentPwLocked(true);
           setCurrentPwLockedMins(mins);
-          setPwLockedUntilTs(Date.now() + mins * 60_000);
+          setPwLockedUntilTs(until);
+          writeLock(LOCK_KEYS.pw, until);
           setCurrentPw("");
           setStep("pw-locked");
           return;
@@ -312,8 +357,10 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         }
         if (d.sessionLocked) {
           const mins = d.minutesLeft ?? 15;
+          const until = Date.now() + (d.msLeft ?? mins * 60_000);
           setSessionLockMins(mins);
-          setSessionLockedUntilTs(Date.now() + mins * 60_000);
+          setSessionLockedUntilTs(until);
+          writeLock(LOCK_KEYS.session, until);
           setStep("session-locked");
           return;
         }
@@ -375,8 +422,10 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
           setRateLimitMsg(d.message);
         } else if (d.sessionLocked) {
           const mins = d.minutesLeft ?? 15;
+          const until = Date.now() + (d.msLeft ?? mins * 60_000);
           setSessionLockMins(mins);
-          setSessionLockedUntilTs(Date.now() + mins * 60_000);
+          setSessionLockedUntilTs(until);
+          writeLock(LOCK_KEYS.session, until);
           setStep("session-locked");
         } else if (res.status === 401) {
           setCurrentPwError(
@@ -564,14 +613,14 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         display: "inline-flex",
         alignItems: "center",
         gap: 8,
-        background: "#fef3c7",
-        border: "1px solid #fcd34d",
+        background: "#EEF3FF", // ← still amber, kailangan palitan
+        border: "1px solid #0f15c372",
         borderRadius: 8,
         padding: "8px 20px",
         margin: "12px 0",
-        fontSize: 'clamp(15px, 4vw, 20px)',
+        fontSize: "clamp(15px, 4vw, 20px)",
         fontWeight: 700,
-        color: "#92400e",
+        color: "#0F172A", // ← still amber, kailangan palitan
         letterSpacing: 1,
       }}
     >
@@ -580,7 +629,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         height="18"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#92400e"
+        stroke="#0e2492"
         strokeWidth="2"
       >
         <circle cx="12" cy="12" r="10" />
@@ -691,18 +740,20 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         {/* BLOCKED — 24h daily limit with live countdown */}
         {step === "blocked" && (
           <div className="cpm-modal-body cpm-blocked-body">
-            <div className="cpm-blocked-icon">
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+            <div className="cpm-icon-outer">
+              <div className="cpm-icon-inner">
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0B2D6B"
+                  strokeWidth="1.8"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
             </div>
             <h3 className="cpm-blocked-title">Password Change Unavailable</h3>
             <p className="cpm-blocked-msg">
@@ -740,18 +791,20 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         {/* SESSION-LOCKED — OTP exhausted with live countdown */}
         {step === "session-locked" && (
           <div className="cpm-modal-body cpm-blocked-body">
-            <div className="cpm-blocked-icon" style={{ background: "#fff3cd" }}>
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#c2410c"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+            <div className="cpm-icon-outer">
+              <div className="cpm-icon-inner">
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0B2D6B"
+                  strokeWidth="1.8"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
             </div>
             <h3 className="cpm-blocked-title">Change Password Unavailable</h3>
             <p className="cpm-blocked-msg">
@@ -790,18 +843,20 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         {/* PW-LOCKED — wrong password too many times with live countdown */}
         {step === "pw-locked" && (
           <div className="cpm-modal-body cpm-blocked-body">
-            <div className="cpm-blocked-icon" style={{ background: "#fff3cd" }}>
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#c2410c"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+            <div className="cpm-icon-outer">
+              <div className="cpm-icon-inner">
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0B2D6B"
+                  strokeWidth="1.8"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
             </div>
             <h3 className="cpm-blocked-title">Change Password Unavailable</h3>
             <p className="cpm-blocked-msg">
@@ -1126,12 +1181,12 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
             )}
             <div className="cpm-otp-boxes">
               {otpBoxes.map((v, i) => (
-                <input            
-  key={i}
-  ref={otpRefs[i]}
-  className={`cpm-otp-box ...`}
-  type="text"
-  inputMode="numeric"
+                <input
+                  key={i}
+                  ref={otpRefs[i]}
+                  className={`cpm-otp-box ...`}
+                  type="text"
+                  inputMode="numeric"
                   maxLength={6}
                   value={v}
                   autoComplete="one-time-code"

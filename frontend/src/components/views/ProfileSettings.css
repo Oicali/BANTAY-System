@@ -925,6 +925,44 @@ textarea.ps-form-input:disabled {
   margin-bottom: 18px;
   color: #6c757d;
 }
+/* ── Mobile-matching double-circle icon (navy) ──────────────────────────── */
+.em-icon-outer {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: #EEF3FF;
+  border: 1px solid #D6E0F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(11, 45, 107, 0.08);
+}
+.em-icon-inner {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #DCE8FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Live countdown badge (navy, matches ChangePasswordModal) ──────────── */
+.em-countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #EEF3FF;
+  border: 1px solid #D6E0F5;
+  border-radius: 8px;
+  padding: 8px 20px;
+  margin: 8px 0 4px;
+  font-size: clamp(15px, 4vw, 20px);
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: 1px;
+}
 .em-blocked-title {
   font-size: 17px;
   font-weight: 700;

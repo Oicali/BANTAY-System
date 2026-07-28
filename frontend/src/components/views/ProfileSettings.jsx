@@ -89,6 +89,12 @@ export default function ProfileSettings() {
   const [emailCooldownHours, setEmailCooldownHours] = useState(0);
   const [emailBlockedUntilTs, setEmailBlockedUntilTs] = useState(null);
   const [emailCooldownCountdown, setEmailCooldownCountdown] = useState("");
+  const [emailSessionLockedUntilTs, setEmailSessionLockedUntilTs] =
+    useState(null);
+  const [emailSessionLockedCountdown, setEmailSessionLockedCountdown] =
+    useState("");
+  const [emailPwLockedUntilTs, setEmailPwLockedUntilTs] = useState(null);
+  const [emailPwLockedCountdown, setEmailPwLockedCountdown] = useState("");
   const emailCooldownTimerRef = useRef(null);
 
   const [emailNewInput, setEmailNewInput] = useState("");
@@ -140,6 +146,44 @@ export default function ProfileSettings() {
   const municipalitiesRef = useRef([]);
   const barangaysRef = useRef([]);
 
+  // ── Countdown helper (same format used by ChangePasswordModal) ────────────
+  function fmtCountdown(msLeft) {
+    if (msLeft <= 0) return "0m 00s";
+    const totalSecs = Math.ceil(msLeft / 1000);
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = totalSecs % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+    return `${m}m ${String(s).padStart(2, "0")}s`;
+  }
+
+  // ── Persisted lock timestamps for the email flow ───────────────────────────
+  const EMAIL_LOCK_KEYS = {
+    blocked: "cem_blocked",
+    session: "cem_session_locked",
+    pw: "cem_pw_locked",
+  };
+
+  function readEmailLock(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const { until } = JSON.parse(raw);
+      if (Date.now() < until) return until;
+      localStorage.removeItem(key);
+      return null;
+    } catch {
+      localStorage.removeItem(key);
+      return null;
+    }
+  }
+
+  function writeEmailLock(key, until) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ until }));
+    } catch {}
+  }
+
   const [shouldScrollToError, setShouldScrollToError] = useState(false);
   const errorRefs = useRef({});
   const FIELD_ORDER = [
@@ -173,30 +217,36 @@ export default function ProfileSettings() {
   useEffect(() => {
     emailNewResendsLeftRef.current = emailNewResendsLeft;
   }, [emailNewResendsLeft]);
+
   useEffect(() => {
     clearInterval(emailCooldownTimerRef.current);
-    if (emailStep !== "cooldown" || !emailBlockedUntilTs) return;
+    const hasCooldown = emailStep === "cooldown" && emailBlockedUntilTs;
+    const hasSession =
+      emailStep === "session-locked" && emailSessionLockedUntilTs;
+    const hasPwLock = emailStep === "pw-locked" && emailPwLockedUntilTs;
+    if (!hasCooldown && !hasSession && !hasPwLock) return;
     const tick = () => {
-      const msLeft = emailBlockedUntilTs - Date.now();
-      if (msLeft <= 0) {
-        setEmailCooldownCountdown("0m 00s");
-        clearInterval(emailCooldownTimerRef.current);
-        return;
-      }
-      const totalSecs = Math.ceil(msLeft / 1000);
-      const h = Math.floor(totalSecs / 3600);
-      const m = Math.floor((totalSecs % 3600) / 60);
-      const s = totalSecs % 60;
-      setEmailCooldownCountdown(
-        h > 0
-          ? `${h}h ${String(m).padStart(2, "0")}m`
-          : `${m}m ${String(s).padStart(2, "0")}s`,
-      );
+      const now = Date.now();
+      if (hasCooldown)
+        setEmailCooldownCountdown(fmtCountdown(emailBlockedUntilTs - now));
+      if (hasSession)
+        setEmailSessionLockedCountdown(
+          fmtCountdown(emailSessionLockedUntilTs - now),
+        );
+      if (hasPwLock)
+        setEmailPwLockedCountdown(fmtCountdown(emailPwLockedUntilTs - now));
     };
     tick();
     emailCooldownTimerRef.current = setInterval(tick, 1000);
     return () => clearInterval(emailCooldownTimerRef.current);
-  }, [emailStep, emailBlockedUntilTs]);
+  }, [
+    emailModal,
+    emailStep,
+    emailBlockedUntilTs,
+    emailSessionLockedUntilTs,
+    emailPwLockedUntilTs,
+  ]);
+
   useEffect(() => {
     if (successMessage) {
       const t = setTimeout(() => setSuccessMessage(""), 5000);
@@ -946,10 +996,10 @@ export default function ProfileSettings() {
           (currentStep === "old-otp" || currentStep === "new-otp")
         ) {
           const lockMins = 15;
-          localStorage.setItem(
-            "cem_session_locked",
-            JSON.stringify({ until: Date.now() + lockMins * 60_000 }),
-          );
+          const lockUntil = Date.now() + lockMins * 60_000;
+          setEmailSessionLockedUntilTs(lockUntil);
+          setEmailSessionLockedCountdown(fmtCountdown(lockUntil - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.session, lockUntil);
           // FIX: Persist lock to backend so it survives logout/re-login
           const token = localStorage.getItem("token");
           fetch(`${API_URL}/users/email/force-lock`, {
@@ -1020,6 +1070,34 @@ export default function ProfileSettings() {
     emailNewResendsLeftRef.current = 3;
     emailStepRef.current = "checking";
 
+    // ── Check persisted locks FIRST — instant, no flash, no backend round trip ──
+    const savedPwUntil = readEmailLock(EMAIL_LOCK_KEYS.pw);
+    if (savedPwUntil) {
+      setEmailPwLocked(Math.ceil((savedPwUntil - Date.now()) / 60000));
+      setEmailPwLockedUntilTs(savedPwUntil);
+      setEmailPwLockedCountdown(fmtCountdown(savedPwUntil - Date.now()));
+      setEmailStep("pw-locked");
+      return;
+    }
+    const savedSessionUntil = readEmailLock(EMAIL_LOCK_KEYS.session);
+    if (savedSessionUntil) {
+      setEmailSessionLockMins(
+        Math.ceil((savedSessionUntil - Date.now()) / 60000),
+      );
+      setEmailSessionLockedUntilTs(savedSessionUntil);
+      setEmailSessionLockedCountdown(
+        fmtCountdown(savedSessionUntil - Date.now()),
+      );
+      setEmailStep("session-locked");
+      return;
+    }
+    const savedBlockedUntil = readEmailLock(EMAIL_LOCK_KEYS.blocked);
+    if (savedBlockedUntil) {
+      setEmailBlockedUntilTs(savedBlockedUntil);
+      setEmailCooldownCountdown(fmtCountdown(savedBlockedUntil - Date.now()));
+      setEmailStep("cooldown");
+      return;
+    }
     // ── Always call backend first — it persists the lock by userId ──────────
     // The in-memory session store on the backend survives logout/re-login
     // because it is keyed by userId, not by browser session.
@@ -1028,67 +1106,41 @@ export default function ProfileSettings() {
       const res = await fetch(`${API_URL}/users/email/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       const d = await res.json();
       if (d.blocked) {
         const hrs = d.hoursLeft ?? 24;
+        const until = Date.now() + (d.msLeft ?? hrs * 3_600_000);
         setEmailCooldownHours(hrs);
-        setEmailBlockedUntilTs(Date.now() + (d.msLeft ?? hrs * 3_600_000));
+        setEmailBlockedUntilTs(until);
+        setEmailCooldownCountdown(fmtCountdown(until - Date.now()));
+        writeEmailLock(EMAIL_LOCK_KEYS.blocked, until);
         setEmailStep("cooldown");
-        return; // ← THIS was the missing line causing email cooldown to not show
+        return;
       }
       if (d.sessionLocked) {
         const lockMins = d.minsLeft || 15;
+        const until = Date.now() + (d.msLeft ?? lockMins * 60_000);
         setEmailSessionLockMins(lockMins);
-        // Also write to localStorage so re-opens before backend clears it are instant
-        localStorage.setItem(
-          "cem_session_locked",
-          JSON.stringify({ until: Date.now() + lockMins * 60_000 }),
-        );
+        setEmailSessionLockedUntilTs(until);
+        setEmailSessionLockedCountdown(fmtCountdown(until - Date.now()));
+        writeEmailLock(EMAIL_LOCK_KEYS.session, until);
         setEmailStep("session-locked");
         return;
       }
       if (d.pwLocked) {
-        setEmailPwLocked(d.minsLeft || 15);
+        const mins = d.minsLeft || 15;
+        const until = Date.now() + (d.msLeft ?? mins * 60_000);
+        setEmailPwLocked(mins);
+        setEmailPwLockedUntilTs(until);
+        setEmailPwLockedCountdown(fmtCountdown(until - Date.now()));
+        writeEmailLock(EMAIL_LOCK_KEYS.pw, until);
         setEmailStep("pw-locked");
         return;
       }
       // Backend says clear — also double-check localStorage fast-path
-      try {
-        const stored = localStorage.getItem("cem_session_locked");
-        if (stored) {
-          const { until } = JSON.parse(stored);
-          if (Date.now() < until) {
-            const minsLeft = Math.ceil((until - Date.now()) / 60_000);
-            setEmailSessionLockMins(minsLeft);
-            setEmailStep("session-locked");
-            return;
-          } else {
-            localStorage.removeItem("cem_session_locked");
-          }
-        }
-      } catch {
-        localStorage.removeItem("cem_session_locked");
-      }
-
       setEmailStep("password");
     } catch {
-      // Network error — fall back to localStorage check then show form
-      try {
-        const stored = localStorage.getItem("cem_session_locked");
-        if (stored) {
-          const { until } = JSON.parse(stored);
-          if (Date.now() < until) {
-            const minsLeft = Math.ceil((until - Date.now()) / 60_000);
-            setEmailSessionLockMins(minsLeft);
-            setEmailStep("session-locked");
-            return;
-          } else {
-            localStorage.removeItem("cem_session_locked");
-          }
-        }
-      } catch {
-        localStorage.removeItem("cem_session_locked");
-      }
       setEmailStep("password");
     }
   };
@@ -1155,25 +1207,36 @@ export default function ProfileSettings() {
       const d = await res.json();
       if (!res.ok) {
         if (d.cooldown) {
-          setEmailCooldownHours(d.hoursLeft || 24);
+          const hrs = d.hoursLeft || 24;
+          const until = Date.now() + (d.msLeft ?? hrs * 3_600_000);
+          setEmailCooldownHours(hrs);
+          setEmailBlockedUntilTs(until);
+          setEmailCooldownCountdown(fmtCountdown(until - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.blocked, until);
           setEmailStep("cooldown");
           return;
         }
         if (d.locked) {
-          setEmailPwLocked(d.minutesLeft || 15);
+          const mins = d.minutesLeft || 15;
+          const until = Date.now() + (d.msLeft ?? mins * 60_000);
+          setEmailPwLocked(mins);
+          setEmailPwLockedUntilTs(until);
+          setEmailPwLockedCountdown(fmtCountdown(until - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.pw, until);
           setEmailStep("pw-locked");
           return;
         }
         if (d.sessionLocked) {
           const lm = d.minutesLeft || 15;
+          const until = Date.now() + (d.msLeft ?? lm * 60_000);
           setEmailSessionLockMins(lm);
-          localStorage.setItem(
-            "cem_session_locked",
-            JSON.stringify({ until: Date.now() + lm * 60_000 }),
-          );
+          setEmailSessionLockedUntilTs(until);
+          setEmailSessionLockedCountdown(fmtCountdown(until - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.session, until);
           setEmailStep("session-locked");
           return;
         }
+
         setEmailPwAttemptsLeft(d.attemptsLeft ?? emailPwAttemptsLeft - 1);
         setEmailPasswordErr(d.message || "Incorrect password");
         setEmailPassword("");
@@ -1204,11 +1267,11 @@ export default function ProfileSettings() {
       if (!res.ok) {
         if (d.sessionLocked) {
           const lm = d.minutesLeft || 15;
+          const until = Date.now() + (d.msLeft ?? lm * 60_000);
           setEmailSessionLockMins(lm);
-          localStorage.setItem(
-            "cem_session_locked",
-            JSON.stringify({ until: Date.now() + lm * 60_000 }),
-          );
+          setEmailSessionLockedUntilTs(until);
+          setEmailSessionLockedCountdown(fmtCountdown(until - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.session, until);
           setEmailStep("session-locked");
           return;
         }
@@ -1268,13 +1331,13 @@ export default function ProfileSettings() {
         // In handleVerifyOldOtp, change the sessionLocked block:
         if (d.sessionLocked || d.autoClose) {
           const lm = d.minutesLeft || 15;
+          const until = Date.now() + (d.msLeft ?? lm * 60_000);
           setEmailSessionLockMins(lm);
-          localStorage.setItem(
-            "cem_session_locked",
-            JSON.stringify({ until: Date.now() + lm * 60_000 }),
-          );
-          clearInterval(emailOldTimerRef.current);
-          setEmailModalErr(""); // FIX: clear stale "Incorrect code" error
+          setEmailSessionLockedUntilTs(until);
+          setEmailSessionLockedCountdown(fmtCountdown(until - Date.now()));
+          writeEmailLock(EMAIL_LOCK_KEYS.session, until);
+          clearInterval(emailOldTimerRef.current); // keep matching ref
+          setEmailModalErr("");
           setEmailStep("session-locked");
           return;
         }
@@ -2463,18 +2526,20 @@ export default function ProfileSettings() {
               {/* COOLDOWN */}
               {emailStep === "cooldown" && (
                 <div className="em-blocked-body">
-                  <div className="em-blocked-icon">
-                    <svg
-                      width="40"
-                      height="40"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    >
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                      <polyline points="22,6 12,13 2,6" />
-                    </svg>
+                  <div className="em-icon-outer">
+                    <div className="em-icon-inner">
+                      <svg
+                        width="30"
+                        height="30"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#0B2D6B"
+                        strokeWidth="1.8"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </div>
                   </div>
                   <h3 className="em-blocked-title">Email Change Unavailable</h3>
                   <p className="em-blocked-msg">
@@ -2498,28 +2563,13 @@ export default function ProfileSettings() {
                   >
                     You can update your email again in:
                   </p>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: "#fef3c7",
-                      border: "1px solid #fcd34d",
-                      borderRadius: 8,
-                      padding: "8px 20px",
-                      margin: "4px 0 12px",
-                      fontSize: 20,
-                      fontWeight: 700,
-                      color: "#92400e",
-                      letterSpacing: 1,
-                    }}
-                  >
+                  <div className="em-countdown-badge">
                     <svg
                       width="18"
                       height="18"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#92400e"
+                      stroke="#94A3B8"
                       strokeWidth="2"
                     >
                       <circle cx="12" cy="12" r="10" />
@@ -2537,36 +2587,57 @@ export default function ProfileSettings() {
                 </div>
               )}
 
-              {/* PW-LOCKED */}
               {emailStep === "pw-locked" && (
                 <div className="em-blocked-body">
-                  <div
-                    className="em-blocked-icon"
-                    style={{ background: "#fff3cd" }}
+                  <div className="em-icon-outer">
+                    <div className="em-icon-inner">
+                      <svg
+                        width="30"
+                        height="30"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#0B2D6B"
+                        strokeWidth="1.8"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="em-blocked-title">Change Email Unavailable</h3>
+                  <p className="em-blocked-msg">
+                    Too many incorrect password attempts. Your access has been
+                    temporarily paused to protect your account.
+                  </p>
+                  <p className="em-blocked-msg">
+                    If this wasn't you, your password may be at risk. Consider
+                    changing it from a trusted device once this lock expires.
+                  </p>
+
+                  <p
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: "#212529",
+                      marginBottom: 4,
+                    }}
                   >
+                    Try again in:
+                  </p>
+                  <div className="em-countdown-badge">
                     <svg
-                      width="40"
-                      height="40"
+                      width="18"
+                      height="18"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#c2410c"
-                      strokeWidth="1.5"
+                      stroke="#94A3B8"
+                      strokeWidth="2"
                     >
-                      <rect x="3" y="11" width="18" height="11" rx="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
                     </svg>
+                    {emailPwLockedCountdown || "Calculating…"}
                   </div>
-                  <h3 className="em-blocked-title">Update Email Unavailable</h3>
-                  <p className="em-blocked-msg">
-                    Too many incorrect password attempts.
-                  </p>
-                  <p className="em-blocked-time">
-                    Please try again after{" "}
-                    <strong>
-                      {emailPwLocked} minute{emailPwLocked !== 1 ? "s" : ""}
-                    </strong>
-                    .
-                  </p>
                   <button
                     className="em-btn em-btn-secondary em-btn-full"
                     onClick={closeEmailModal}
@@ -2580,35 +2651,50 @@ export default function ProfileSettings() {
               {/* SESSION-LOCKED */}
               {emailStep === "session-locked" && (
                 <div className="em-blocked-body">
-                  <div
-                    className="em-blocked-icon"
-                    style={{ background: "#fff3cd" }}
-                  >
-                    <svg
-                      width="40"
-                      height="40"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#c2410c"
-                      strokeWidth="1.5"
-                    >
-                      <rect x="3" y="11" width="18" height="11" rx="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
+                  <div className="em-icon-outer">
+                    <div className="em-icon-inner">
+                      <svg
+                        width="30"
+                        height="30"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#0B2D6B"
+                        strokeWidth="1.8"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    </div>
                   </div>
-                  <h3 className="em-blocked-title">Update Email Unavailable</h3>
+                  <h3 className="em-blocked-title">Change Email Unavailable</h3>
                   <p className="em-blocked-msg">
                     For security reasons, this process has been temporarily
                     locked.
                   </p>
-                  <p className="em-blocked-time">
-                    Please try again after{" "}
-                    <strong>
-                      {emailSessionLockMins} minute
-                      {emailSessionLockMins !== 1 ? "s" : ""}
-                    </strong>
-                    .
+                  <p
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: "#212529",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Try again in:
                   </p>
+                  <div className="em-countdown-badge">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#94A3B8"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    {emailSessionLockedCountdown || "Calculating…"}
+                  </div>
                   <button
                     className="em-btn em-btn-secondary em-btn-full"
                     onClick={closeEmailModal}
