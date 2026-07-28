@@ -458,6 +458,10 @@ function EBlotter() {
     const { dateFrom, dateTo, records } = pendingExport;
     setPendingExport(null);
     setIsExportLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min client-side cap
+
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -469,16 +473,19 @@ function EBlotter() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ records, meta: { dateFrom, dateTo } }),
+          signal: controller.signal,
         },
       );
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        let msg = "Export failed";
+        let msg = `Export failed (status ${response.status})`;
         try {
           const errData = await response.json();
           if (errData.message) msg = errData.message;
         } catch {
-          // response wasn't JSON (e.g. HTML error page) — keep generic msg
+          // response wasn't JSON — keep status-based message
         }
         throw new Error(msg);
       }
@@ -499,7 +506,20 @@ function EBlotter() {
         revoke: () => URL.revokeObjectURL(blobUrl),
       });
     } catch (err) {
-      showReactToast(err.message || "Export failed", "error");
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        showReactToast(
+          "Export is taking too long (2+ min). The server may be overloaded — try a smaller date range or check server logs.",
+          "error",
+        );
+      } else if (err.message === "Failed to fetch") {
+        showReactToast(
+          "Could not reach the server. Check your connection or that the API is reachable.",
+          "error",
+        );
+      } else {
+        showReactToast(err.message || "Export failed", "error");
+      }
     } finally {
       setIsExportLoading(false);
     }
