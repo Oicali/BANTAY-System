@@ -174,76 +174,76 @@ const AuditLog = () => {
   // EXPORT CSV
   // ===================================================
   const handleExportCSV = async () => {
-  setIsExporting(true);
-  try {
-    const token = localStorage.getItem("token");
-    let all = [];
-    let page = 1;
-    const limit = 100; // backend max
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      let all = [];
+      let page = 1;
+      const limit = 100; // backend max
 
-    while (true) {
-      const params = new URLSearchParams();
-      params.set("page", page);
-      params.set("limit", limit);
-      if (appliedFilters.searchTerm.trim())
-        params.set("search", appliedFilters.searchTerm.trim());
-      if (appliedFilters.statusFilter !== "all")
-        params.set("status", appliedFilters.statusFilter);
-      if (appliedFilters.dateFrom)
-        params.set("dateFrom", appliedFilters.dateFrom);
-      if (appliedFilters.dateTo) params.set("dateTo", appliedFilters.dateTo);
+      while (true) {
+        const params = new URLSearchParams();
+        params.set("page", page);
+        params.set("limit", limit);
+        if (appliedFilters.searchTerm.trim())
+          params.set("search", appliedFilters.searchTerm.trim());
+        if (appliedFilters.statusFilter !== "all")
+          params.set("status", appliedFilters.statusFilter);
+        if (appliedFilters.dateFrom)
+          params.set("dateFrom", appliedFilters.dateFrom);
+        if (appliedFilters.dateTo) params.set("dateTo", appliedFilters.dateTo);
 
-      const res = await fetch(`${API_URL}/audit-log?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!res.ok) throw new Error("Export fetch failed");
-      const data = await res.json();
+        const res = await fetch(`${API_URL}/audit-log?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!res.ok) throw new Error("Export fetch failed");
+        const data = await res.json();
 
-      all = all.concat(data.logs || []);
+        all = all.concat(data.logs || []);
 
-      if (page >= (data.pagination?.totalPages || 1)) break;
-      page++;
+        if (page >= (data.pagination?.totalPages || 1)) break;
+        page++;
+      }
+
+      const cols = [
+        "log_id",
+        "username",
+        "email",
+        "event_name",
+        "description",
+        "status",
+        "source",
+        "ip_address",
+        "created_at",
+      ];
+      const rows = all.map((r) =>
+        [
+          r.log_id,
+          r.username || "",
+          r.email || "",
+          r.event_name,
+          `"${(r.description || "").replace(/"/g, '""')}"`,
+          r.status,
+          r.source || "",
+          r.ip_address || "",
+          r.created_at,
+        ].join(","),
+      );
+      const csv = [cols.join(","), ...rows].join("\n");
+      const a = document.createElement("a");
+      a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+      a.download = `audit_log_${appliedFilters.dateFrom || "all"}_to_${appliedFilters.dateTo || "all"}.csv`;
+      a.click();
+    } catch (err) {
+      console.error("Export error:", err);
+      setError("Failed to export audit logs.");
+    } finally {
+      setIsExporting(false);
     }
-
-    const cols = [
-      "log_id",
-      "username",
-      "email",
-      "event_name",
-      "description",
-      "status",
-      "source",
-      "ip_address",
-      "created_at",
-    ];
-    const rows = all.map((r) =>
-      [
-        r.log_id,
-        r.username || "",
-        r.email || "",
-        r.event_name,
-        `"${(r.description || "").replace(/"/g, '""')}"`,
-        r.status,
-        r.source || "",
-        r.ip_address || "",
-        r.created_at,
-      ].join(","),
-    );
-    const csv = [cols.join(","), ...rows].join("\n");
-    const a = document.createElement("a");
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = `audit_log_${appliedFilters.dateFrom || "all"}_to_${appliedFilters.dateTo || "all"}.csv`;
-    a.click();
-  } catch (err) {
-    console.error("Export error:", err);
-    setError("Failed to export audit logs.");
-  } finally {
-    setIsExporting(false);
-  }
-};
+  };
 
   // ===================================================
   // HELPERS
@@ -443,7 +443,6 @@ const AuditLog = () => {
               <table className="al-data-table">
                 <thead>
                   <tr>
-                    <th className="al-col-id">Log ID</th>
                     {!isRestricted && <th className="al-col-user">User</th>}
                     {/* ← */}
                     <th className="al-col-event">Event</th>
@@ -457,7 +456,7 @@ const AuditLog = () => {
                   {logs.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isRestricted ? 6 : 7}
+                        colSpan={isRestricted ? 5 : 6}
                         style={{
                           textAlign: "center",
                           padding: "40px",
@@ -470,11 +469,7 @@ const AuditLog = () => {
                   ) : (
                     logs.map((log) => (
                       <tr key={log.log_id}>
-                        <td className="al-col-id">
-                          <span className="al-log-id">
-                            #{log.log_id.slice(0, 8)}
-                          </span>
-                        </td>
+                        
 
                         {/* User — plain text, no avatar */}
                         {/* User — rank + full name, role underneath */}

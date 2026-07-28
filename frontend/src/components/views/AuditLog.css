@@ -292,7 +292,6 @@ input[type="date"].al-filter-input::-webkit-calendar-picker-indicator {
 
 /* ── Column widths ── */
 /* ── Column widths ── */
-.al-col-id     { width: 110px; }
 .al-col-user   { width: 200px; }
 .al-col-event  { width: 160px; }
 .al-col-desc   { min-width: 160px; max-width: 320px; }
@@ -505,7 +504,6 @@ input[type="date"].al-filter-input::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 400px) {
-  .al-col-id { display: none; }
   .al-data-table th,
   .al-data-table td { padding: 8px 10px; font-size: 12px; }
   .al-event-badge { font-size: 10px; padding: 2px 6px; }
