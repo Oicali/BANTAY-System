@@ -2881,7 +2881,7 @@ const CrimeDashboard = () => {
 
     const phases = [
       "Querying blotter records...",
-      "Running spatial clustering...",
+      "Computing Barangay Risk Scores...",
       "Computing forecasts...",
       ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
       "Finalizing assessment...",
@@ -2944,7 +2944,7 @@ const CrimeDashboard = () => {
     }
   };
 
-  const handleGenerateAssessment = () => {
+const handleGenerateAssessment = () => {
     if (isLoading || !dashData.summary.length) return;
 
     const dayCount = Math.round(
@@ -2952,7 +2952,9 @@ const CrimeDashboard = () => {
         86400000,
     );
 
-    if (dayCount < 180) {
+    const MIN_RECOMMENDED_DAYS = 238; // 34 weeks, matches backtest fold requirement
+
+    if (dayCount < MIN_RECOMMENDED_DAYS) {
       setPendingDayCount(dayCount);
       setShowShortRangeModal(true);
       return;

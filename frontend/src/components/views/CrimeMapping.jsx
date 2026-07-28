@@ -2451,7 +2451,7 @@ function CrimeMapping() {
             >
               <path d="M12 2c0 6-8 8-8 14a8 8 0 0 0 16 0c0-4-2-7-4-9 0 3-1.5 4-3 4 1-3 0-6-1-9z" />
             </svg>
-            {heatmapMode ? "Choropleth" : "Heatmap"}
+            {heatmapMode ? "Heatmap" : "Choropleth"}
           </button>
 
           {!heatmapMode && zoom < 13 && (
