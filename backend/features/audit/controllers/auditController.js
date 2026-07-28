@@ -30,7 +30,11 @@ const getAuditLogs = async (req, res) => {
         al.username    ILIKE $${values.length} OR
         al.ip_address  ILIKE $${values.length} OR
         al.description ILIKE $${values.length} OR
-        al.event_name  ILIKE $${values.length}
+        al.event_name  ILIKE $${values.length} OR
+        r.role_name    ILIKE $${values.length} OR
+        pr.abbreviation ILIKE $${values.length} OR
+        u.first_name   ILIKE $${values.length} OR
+        u.last_name    ILIKE $${values.length}
       )`);
     }
 
@@ -59,14 +63,21 @@ const getAuditLogs = async (req, res) => {
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+    // Shared JOIN clause — needed everywhere `where` might reference
+    // r.role_name / pr.abbreviation / u.first_name / u.last_name.
+    const joins = `
+      LEFT JOIN users u        ON al.user_id = u.user_id
+      LEFT JOIN roles r        ON u.role_id  = r.role_id
+      LEFT JOIN pnp_ranks pr   ON u.rank_id  = pr.rank_id
+    `;
+
     // ── Count query ──
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM audit_logs al ${where}`,
+      `SELECT COUNT(*) FROM audit_logs al ${joins} ${where}`,
       values,
     );
     const total = parseInt(countResult.rows[0].count);
 
-    // ── Data query ──
     // ── Data query ──
     const dataResult = await pool.query(
       `SELECT
@@ -86,9 +97,7 @@ const getAuditLogs = async (req, res) => {
      r.role_name,
      pr.abbreviation AS rank_abbr
    FROM audit_logs al
-   LEFT JOIN users u        ON al.user_id = u.user_id
-   LEFT JOIN roles r        ON u.role_id  = r.role_id
-   LEFT JOIN pnp_ranks pr   ON u.rank_id  = pr.rank_id
+   ${joins}
    ${where}
    ORDER BY al.created_at DESC
    LIMIT $${values.length + 1}
@@ -104,6 +113,7 @@ const getAuditLogs = async (req, res) => {
          COUNT(DISTINCT al.user_id)                          AS unique_users,
          COUNT(*) FILTER (WHERE al.status = 'failed')        AS failed
        FROM audit_logs al
+       ${joins}
        ${where}`,
       values,
     );
@@ -131,7 +141,7 @@ const getAuditLogs = async (req, res) => {
       };
     });
     return res.status(200).json({
-      logs, // ← was: dataResult.rows
+      logs,
       pagination: {
         total,
         page,
@@ -142,7 +152,7 @@ const getAuditLogs = async (req, res) => {
         total: parseInt(s.total),
         today: parseInt(s.today),
         uniqueUsers: parseInt(s.unique_users),
-        failed: parseInt(s.failed), // ✅ matches frontend key
+        failed: parseInt(s.failed),
       },
     });
   } catch (err) {
