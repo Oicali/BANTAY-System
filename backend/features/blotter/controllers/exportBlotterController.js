@@ -199,7 +199,7 @@ const buildCrimeBreakdownTable = (records) => {
 
   const rows = Object.entries(byCrime).sort((a, b) => b[1].total - a[1].total);
 
-  const COL = [3200, 900, 900, 900, 900, 900, 900];
+  const COL = [3066, 900, 1300, 1300, 1400, 1300, 1200];
   const TWIDTH = COL.reduce((a, b) => a + b, 0);
 
   const pct = (n, d) => (d ? ((n / d) * 100).toFixed(1) : "0.0");
@@ -330,10 +330,11 @@ const buildRecordsTable = (records) => {
 
 async function buildBlotterDoc({ records, meta }) {
   const now = new Date().toLocaleString("en-PH", {
-    dateStyle: "long",
-    timeStyle: "short",
-    hour12: true,
-  });
+  dateStyle: "long",
+  timeStyle: "short",
+  hour12: true,
+  timeZone: "Asia/Manila",
+});
 
   const dateRange =
     meta.dateFrom && meta.dateTo
