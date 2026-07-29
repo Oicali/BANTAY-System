@@ -2928,6 +2928,18 @@ function EBlotter() {
           isExporting={isExportLoading}
         />
       )}
+      {pdfPreview && (
+        <PdfPreviewModal
+          blobUrl={pdfPreview.blobUrl}
+          onDownload={() => {
+            pdfPreview.download();
+          }}
+          onClose={() => {
+            pdfPreview.revoke();
+            setPdfPreview(null);
+          }}
+        />
+      )}
       <LoadingModal isOpen={loading} message="Loading records..." />
       <LoadingModal isOpen={fetchingEdit} message="Loading blotter data..." />
       <LoadingModal isOpen={fetchingView} message="Loading blotter data..." />
