@@ -219,14 +219,12 @@ body {
 .eb-table-reports th:nth-child(5) { width: 15%; }
 .eb-table-reports th:nth-child(6) { width: 25%; }
 
-/* Referred tab (7 cols) */
-.eb-table-referred th:nth-child(1) { width: 16%; }
-.eb-table-referred th:nth-child(2) { width: 13%; }
-.eb-table-referred th:nth-child(3) { width: 13%; }
-.eb-table-referred th:nth-child(4) { width: 17%; }
-.eb-table-referred th:nth-child(5) { width: 13%; }
-.eb-table-referred th:nth-child(6) { width: 10%; }
-.eb-table-referred th:nth-child(7) { width: 17%; }
+/* Referred tab (5 cols) */
+.eb-table-referred th:nth-child(1) { width: 18%; }
+.eb-table-referred th:nth-child(2) { width: 22%; }
+.eb-table-referred th:nth-child(3) { width: 18%; }
+.eb-table-referred th:nth-child(4) { width: 15%; }
+.eb-table-referred th:nth-child(5) { width: 27%; }
 /* All cells wrap by default */
 .eb-table-card .eb-data-table td {
   white-space: normal;

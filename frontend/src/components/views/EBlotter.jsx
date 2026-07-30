@@ -8784,65 +8784,67 @@ function EBlotter() {
             className={`eb-data-table ${activeReportTab === "referred" ? "eb-table-referred" : "eb-table-reports"}`}
           >
             <thead>
-              <tr>
-                <th>Report ID</th>
-                <th>Crime Type</th>
-                <th>Location</th>
-                <th>Date Reported</th>
-                {activeReportTab === "referred" && <th>Responder</th>}
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+  <tr>
+    {activeReportTab !== "referred" && <th>Report ID</th>}
+    <th>Crime Type</th>
+    <th>Location</th>
+    <th>Date Reported</th>
+    {activeReportTab === "referred" && <th>Responder</th>}
+    {activeReportTab !== "referred" && <th>Status</th>}
+    <th>Actions</th>
+  </tr>
+</thead>
             <tbody>
               {loading ? null : blotters.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={activeReportTab === "referred" ? 7 : 6}
-                    style={{
-                      textAlign: "center",
-                      padding: "32px",
-                      color: "#9ca3af",
-                    }}
-                  >
-                    No records found
-                  </td>
+  colSpan={activeReportTab === "referred" ? 5 : 6}
+  style={{
+    textAlign: "center",
+    padding: "32px",
+    color: "#9ca3af",
+  }}
+>
+  No records found
+</td>
                 </tr>
               ) : (
                 paginatedBlotters.map((b) => (
                   <tr key={b.blotter_id}>
-                    <td>
-                      <span
-                        style={{
-                          fontFamily: "monospace",
-                          fontWeight: "700",
-                          color: "var(--navy-primary)",
-                          fontSize: "13px",
-                          background: "rgba(30,58,95,0.07)",
-                          padding: "4px 10px",
-                          borderRadius: "6px",
-                          display: "inline-block",
-                        }}
-                      >
-                        {b.blotter_entry_number}
-                      </span>
-                      {b.data_source === "ciras_import" && (
+                    {activeReportTab !== "referred" && (
+                      <td>
                         <span
                           style={{
-                            marginLeft: "6px",
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            background: "#e0f2fe",
-                            color: "#0369a1",
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            verticalAlign: "middle",
+                            fontFamily: "monospace",
+                            fontWeight: "700",
+                            color: "var(--navy-primary)",
+                            fontSize: "13px",
+                            background: "rgba(30,58,95,0.07)",
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                            display: "inline-block",
                           }}
                         >
-                          CIRAS
+                          {b.blotter_entry_number}
                         </span>
-                      )}
-                    </td>
+                        {b.data_source === "ciras_import" && (
+                          <span
+                            style={{
+                              marginLeft: "6px",
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              background: "#e0f2fe",
+                              color: "#0369a1",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              verticalAlign: "middle",
+                            }}
+                          >
+                            CIRAS
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td>
                       <span
                         style={{
@@ -8935,13 +8937,15 @@ function EBlotter() {
                         )}
                       </td>
                     )}
-                    <td>
-                      <span
-                        className={`eb-status-badge ${getStatusClass(b.status)}`}
-                      >
-                        {b.status}
-                      </span>
-                    </td>
+                    {activeReportTab !== "referred" && (
+  <td>
+    <span
+      className={`eb-status-badge ${getStatusClass(b.status)}`}
+    >
+      {b.status}
+    </span>
+  </td>
+)}
                     <td>
                       <div className="eb-table-actions">
                         {activeReportTab === "referred" ? (
