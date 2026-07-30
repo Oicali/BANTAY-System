@@ -606,9 +606,15 @@ function EBlotter() {
   }, [activeReportTab]);
 
   // AFTER
-  const fetchBlotters = async (tabOverride, silent = false) => {
+  // AFTER
+  const fetchBlotters = async (
+    tabOverride,
+    silent = false,
+    filtersOverride = null,
+  ) => {
     const currentTab =
       tabOverride !== undefined ? tabOverride : activeReportTabRef.current;
+    const f = filtersOverride || filters;
 
     try {
       if (fetchControllerRef.current) {
@@ -623,15 +629,15 @@ function EBlotter() {
       }
 
       const queryParams = new URLSearchParams();
-      if (filters.search) queryParams.append("search", filters.search);
-      if (filters.status) queryParams.append("status", filters.status);
-      if (filters.date_from) queryParams.append("date_from", filters.date_from);
-      if (filters.date_to) queryParams.append("date_to", filters.date_to);
-      if (filters.barangay) queryParams.append("barangay", filters.barangay);
+      if (f.search) queryParams.append("search", f.search);
+      if (f.status) queryParams.append("status", f.status);
+      if (f.date_from) queryParams.append("date_from", f.date_from);
+      if (f.date_to) queryParams.append("date_to", f.date_to);
+      if (f.barangay) queryParams.append("barangay", f.barangay);
 
       if (currentTab === "referred") {
         queryParams.append("referred", "true");
-      } else if (filters.data_source !== "brgy_referral") {
+      } else if (f.data_source !== "brgy_referral") {
         queryParams.append("referred", "false");
       }
 
@@ -665,8 +671,8 @@ function EBlotter() {
         }
 
         // Search filter for referred tab
-        if (filters.search && currentTab === "referred") {
-          const q = filters.search.toLowerCase();
+        if (f.search && currentTab === "referred") {
+          const q = f.search.toLowerCase();
           results = results.filter(
             (b) =>
               (b.blotter_entry_number || "").toLowerCase().includes(q) ||
@@ -677,31 +683,30 @@ function EBlotter() {
           );
         }
 
-        if (filters.incident_type) {
+        if (f.incident_type) {
           results = results.filter(
             (b) =>
-              b.incident_type.toLowerCase() ===
-              filters.incident_type.toLowerCase(),
+              b.incident_type.toLowerCase() === f.incident_type.toLowerCase(),
           );
         }
 
-        if (filters.barangay && currentTab === "referred") {
+        if (f.barangay && currentTab === "referred") {
           results = results.filter(
             (b) =>
               (b.place_barangay || "").toUpperCase() ===
-              filters.barangay.toUpperCase(),
+              f.barangay.toUpperCase(),
           );
         }
 
-        if (filters.data_source === "brgy_referral") {
+        if (f.data_source === "brgy_referral") {
           results = results.filter((b) =>
             (b.blotter_entry_number || "").toUpperCase().startsWith("BRGY"),
           );
-        } else if (filters.data_source === "bantay_import") {
+        } else if (f.data_source === "bantay_import") {
           results = results.filter((b) =>
             (b.blotter_entry_number || "").toUpperCase().startsWith("BLT"),
           );
-        } else if (filters.data_source === "manual") {
+        } else if (f.data_source === "manual") {
           results = results.filter((b) =>
             /^\d{4}/.test(b.blotter_entry_number || ""),
           );
@@ -1654,7 +1659,7 @@ function EBlotter() {
   };
 
   const clearFilters = () => {
-    setFilters({
+    const empty = {
       search: "",
       status: "",
       incident_type: "",
@@ -1662,8 +1667,9 @@ function EBlotter() {
       date_to: "",
       barangay: "",
       data_source: "",
-    });
-    fetchBlotters(activeReportTab);
+    };
+    setFilters(empty);
+    fetchBlotters(activeReportTab, false, empty);
   };
 
   // Input helpers
@@ -8784,29 +8790,29 @@ function EBlotter() {
             className={`eb-data-table ${activeReportTab === "referred" ? "eb-table-referred" : "eb-table-reports"}`}
           >
             <thead>
-  <tr>
-    {activeReportTab !== "referred" && <th>Report ID</th>}
-    <th>Crime Type</th>
-    <th>Location</th>
-    <th>Date Reported</th>
-    {activeReportTab === "referred" && <th>Responder</th>}
-    {activeReportTab !== "referred" && <th>Status</th>}
-    <th>Actions</th>
-  </tr>
-</thead>
+              <tr>
+                {activeReportTab !== "referred" && <th>Report ID</th>}
+                <th>Crime Type</th>
+                <th>Location</th>
+                <th>Date Reported</th>
+                {activeReportTab === "referred" && <th>Responder</th>}
+                {activeReportTab !== "referred" && <th>Status</th>}
+                <th>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {loading ? null : blotters.length === 0 ? (
                 <tr>
                   <td
-  colSpan={activeReportTab === "referred" ? 5 : 6}
-  style={{
-    textAlign: "center",
-    padding: "32px",
-    color: "#9ca3af",
-  }}
->
-  No records found
-</td>
+                    colSpan={activeReportTab === "referred" ? 5 : 6}
+                    style={{
+                      textAlign: "center",
+                      padding: "32px",
+                      color: "#9ca3af",
+                    }}
+                  >
+                    No records found
+                  </td>
                 </tr>
               ) : (
                 paginatedBlotters.map((b) => (
@@ -8938,14 +8944,14 @@ function EBlotter() {
                       </td>
                     )}
                     {activeReportTab !== "referred" && (
-  <td>
-    <span
-      className={`eb-status-badge ${getStatusClass(b.status)}`}
-    >
-      {b.status}
-    </span>
-  </td>
-)}
+                      <td>
+                        <span
+                          className={`eb-status-badge ${getStatusClass(b.status)}`}
+                        >
+                          {b.status}
+                        </span>
+                      </td>
+                    )}
                     <td>
                       <div className="eb-table-actions">
                         {activeReportTab === "referred" ? (
