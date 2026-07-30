@@ -848,6 +848,19 @@ const updatePatrollersForDate = async (req, res) => {
       });
     }
 
+    // ── Snapshot who's currently on this date BEFORE we wipe it ──
+    const existingResult = await client.query(
+      `SELECT active_patroller_id, shift FROM patrol_assignment_patroller
+       WHERE patrol_id=$1 AND route_date=$2`,
+      [id, date],
+    );
+    const existingAM = new Set(
+      existingResult.rows.filter((r) => r.shift === "AM").map((r) => r.active_patroller_id)
+    );
+    const existingPM = new Set(
+      existingResult.rows.filter((r) => r.shift === "PM").map((r) => r.active_patroller_id)
+    );
+
     await client.query("BEGIN");
     await client.query(
       `DELETE FROM patrol_assignment_patroller WHERE patrol_id=$1 AND route_date=$2`,
@@ -875,6 +888,54 @@ const updatePatrollersForDate = async (req, res) => {
     }
 
     await client.query("COMMIT");
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Schedule Updated",
+      description: `Updated patrollers for patrol ID ${id} on ${date} (AM: ${patroller_ids_am?.length || 0}, PM: ${patroller_ids_pm?.length || 0})`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+
+    // ── Notify only NEWLY added patrollers (not ones already on this date) ──
+    const newlyAddedAM = (patroller_ids_am || []).filter((pid) => !existingAM.has(pid));
+    const newlyAddedPM = (patroller_ids_pm || []).filter((pid) => !existingPM.has(pid));
+    const newlyAddedIds = [...new Set([...newlyAddedAM, ...newlyAddedPM])];
+
+    if (newlyAddedIds.length > 0) {
+      const patrolInfo = await pool.query(
+        `SELECT patrol_name FROM patrol_assignment WHERE patrol_id=$1`,
+        [id],
+      );
+      const patrolName = patrolInfo.rows[0]?.patrol_name || `Patrol #${id}`;
+
+      const officerResult = await pool.query(
+        `SELECT ap.active_patroller_id, ap.officer_id FROM active_patroller ap
+         WHERE ap.active_patroller_id = ANY($1::int[])`,
+        [newlyAddedIds],
+      );
+
+      await Promise.all(
+        officerResult.rows.map((row) => {
+          const shiftLabel = newlyAddedAM.includes(row.active_patroller_id)
+            ? "AM"
+            : "PM";
+          return createNotification({
+            recipientId: row.officer_id,
+            senderId: req.user.user_id,
+            senderName: req.user.username,
+            type: "PATROL_ASSIGNED",
+            title: "Added to Patrol Schedule",
+            message: `You have been added to patrol "${patrolName}" (${shiftLabel} shift) on ${date}`,
+            linkTo: "/patrol-scheduling",
+          });
+        }),
+      );
+    }
+
     res.json({ success: true, message: "Patrollers updated for date." });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -886,7 +947,6 @@ const updatePatrollersForDate = async (req, res) => {
     client.release();
   }
 };
-
 // ─────────────────────────────────────────────
 // DELETE /patrol/patrols/:id
 // ─────────────────────────────────────────────
