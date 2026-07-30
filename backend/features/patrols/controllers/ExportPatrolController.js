@@ -348,6 +348,8 @@ const exportPatrolList = async (req, res) => {
       dateStyle: "long",
       timeStyle: "short",
       hour12: true,
+      timeZone: "Asia/Manila",
+      
     });
 
     // Summary stat cells
@@ -560,6 +562,7 @@ const exportPatrolDetail = async (req, res) => {
       dateStyle: "long",
       timeStyle: "short",
       hour12: true,
+      timeZone: "Asia/Manila",
     });
 
     // ── 1. Cover / Info block ──────────────────────────────────────

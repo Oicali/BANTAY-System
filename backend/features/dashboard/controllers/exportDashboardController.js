@@ -968,6 +968,7 @@ async function buildExportDoc({
     dateStyle: "long",
     timeStyle: "short",
     hour12: true,
+    timeZone: "Asia/Manila",
   });
 
   const pushFullImage = (b64) => {
