@@ -483,7 +483,12 @@ const LoginSystem = () => {
     }
   };
   const handleResendCode = async () => {
-    if (!canResend || isLoading || fpStep !== "active") return;
+    if (
+      (!canResend && otpState !== "attempts-exceeded") ||
+      isLoading ||
+      fpStep !== "active"
+    )
+      return;
     setIsLoading(true);
     setError("");
 
