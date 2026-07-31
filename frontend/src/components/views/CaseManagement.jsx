@@ -92,7 +92,8 @@ function CaseManagement() {
   });
   const [selectedPriority, setSelectedPriority] = useState("");
   const user = getUser();
-  const isAdmin = user.role === "Administrator" || user.role === "Technical Administrator";
+  const isAdmin =
+    user.role === "Administrator" || user.role === "Technical Administrator";
   const isInvestigator = user.role === "Investigator";
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -2025,6 +2026,7 @@ function CaseManagement() {
                               style={{
                                 margin: "6px 0 0",
                                 whiteSpace: "pre-wrap",
+                                overflowWrap: "anywhere",
                               }}
                             >
                               {n.note}
