@@ -2541,7 +2541,7 @@ export default function ProfileSettings() {
                       </svg>
                     </div>
                   </div>
-                  <h3 className="em-blocked-title">Email Change Unavailable</h3>
+                  <h3 className="em-blocked-title">Change Email Unavailable</h3>
                   <p className="em-blocked-msg">
                     Your email was already changed today.
                   </p>
@@ -2667,10 +2667,16 @@ export default function ProfileSettings() {
                     </div>
                   </div>
                   <h3 className="em-blocked-title">Change Email Unavailable</h3>
+
                   <p className="em-blocked-msg">
-                    For security reasons, this process has been temporarily
-                    locked.
+                    Too many failed verification attempts. For your security,
+                    this process has been temporarily locked.
                   </p>
+                  <p className="em-blocked-msg">
+                    This is automatic protection against unauthorized access.
+                    Please wait for the timer below before trying again.
+                  </p>
+
                   <p
                     style={{
                       fontWeight: 600,

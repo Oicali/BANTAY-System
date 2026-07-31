@@ -13,6 +13,7 @@ const {
   sendOTP,
   verifyOTP,
   resendOTP,
+  forceLockOTP,
   resetPassword,
   changePassword,
 } = require("../controllers/authController");
@@ -20,19 +21,20 @@ const {
 // ============================================================
 // PUBLIC ROUTES (no auth required)
 // ============================================================
-router.post("/login",           login);
+router.post("/login", login);
 router.post("/mobile/login", mobileLogin);
-router.post("/otp/send",        sendOTP);
-router.post("/otp/verify",      verifyOTP);
-router.post("/otp/resend",      resendOTP);
-router.post("/password/reset",  resetPassword);
+router.post("/otp/send", sendOTP);
+router.post("/otp/verify", verifyOTP);
+router.post("/otp/resend", resendOTP);
+router.post("/otp/force-lock", forceLockOTP);
+router.post("/password/reset", resetPassword);
 
 // ============================================================
 // PROTECTED ROUTES (auth required)
 // ============================================================
-router.post("/logout",                    authenticate, logout);
-router.post("/logout-all",                authenticate, logoutAll);
-router.post("/password/change",           authenticate, changePassword);
-router.get("/validate-token",             authenticate, validateToken);
+router.post("/logout", authenticate, logout);
+router.post("/logout-all", authenticate, logoutAll);
+router.post("/password/change", authenticate, changePassword);
+router.get("/validate-token", authenticate, validateToken);
 
 module.exports = router;
