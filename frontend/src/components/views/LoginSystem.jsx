@@ -1101,6 +1101,16 @@ const LoginSystem = () => {
                     ? "disabled"
                     : ""
                 }`}
+                style={
+                  otpState === "attempts-exceeded" && resendsLeft > 0
+                    ? {
+                        background:
+                          "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                        color: "#ffffff",
+                        border: "none",
+                      }
+                    : undefined
+                }
               >
                 {isLoading
                   ? "Sending..."
