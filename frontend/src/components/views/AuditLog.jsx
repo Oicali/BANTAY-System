@@ -271,12 +271,12 @@ const AuditLog = () => {
           <p>Track all system activity — who did what, and when</p>
         </div>
         <div className="al-header-actions">
-          <button
+          {/* <button
             className="al-btn al-btn-secondary"
             onClick={() => fetchLogs(currentPage)}
           >
             <RefreshIcon /> Refresh
-          </button>
+          </button> */}
           <button
             className="al-btn al-btn-primary"
             onClick={handleExportCSV}
