@@ -345,6 +345,13 @@ body {
   border-bottom: 2px solid var(--gray-200);
   margin-bottom: 24px;
 }
+.cm-note-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 
 .cm-filter-input {
   padding: 8px 12px;
