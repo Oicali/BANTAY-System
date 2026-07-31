@@ -416,7 +416,23 @@ const resendOTP = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to resend OTP" });
   }
 };
+const forceLockOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const ip = getClientIp(req);
 
+    const errors = validateEmail(email);
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, errors });
+    }
+
+    const result = await authService.forceLock(email, ip);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Force lock error:", error);
+    res.status(500).json({ success: false, message: "Failed to lock session" });
+  }
+};
 // ============================================================
 // RESET PASSWORD
 // ============================================================
@@ -475,7 +491,12 @@ const resetPassword = async (req, res) => {
     );
 
     await client.query(
-      "DELETE FROM otp_requests WHERE LOWER(email) = LOWER($1)",
+      `UPDATE otp_requests
+       SET locked_until = NULL,
+           attempts = 0,
+           resends_left = 3,
+           last_recovery_completed_at = NOW()
+       WHERE LOWER(email) = LOWER($1)`,
       [email],
     );
 
@@ -891,6 +912,7 @@ module.exports = {
   sendOTP,
   verifyOTP,
   resendOTP,
+  forceLockOTP,
   resetPassword,
   changePassword,
 };

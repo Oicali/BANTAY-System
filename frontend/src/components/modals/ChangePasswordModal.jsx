@@ -755,7 +755,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
                 </svg>
               </div>
             </div>
-            <h3 className="cpm-blocked-title">Password Change Unavailable</h3>
+            <h3 className="cpm-blocked-title">Change Password Unavailable</h3>
             <p className="cpm-blocked-msg">
               You've already changed your password <strong>twice</strong> in the
               last 24 hours.
