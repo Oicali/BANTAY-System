@@ -8732,7 +8732,7 @@ function EBlotter() {
               className="eb-filter-input"
               name="date_from"
               value={filters.date_from}
-              max={new Date().toISOString().split("T")[0]}
+              max={filters.date_to || new Date().toISOString().split("T")[0]}
               onChange={handleFilterChange}
               onKeyDown={(e) => e.preventDefault()}
             />
@@ -8744,6 +8744,7 @@ function EBlotter() {
               className="eb-filter-input"
               name="date_to"
               value={filters.date_to}
+              min={filters.date_from || undefined}
               max={new Date().toISOString().split("T")[0]}
               onChange={handleFilterChange}
               onKeyDown={(e) => e.preventDefault()}

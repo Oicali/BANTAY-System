@@ -178,32 +178,35 @@ function BrgyReport() {
     );
     setShowResidentSearch(false);
   };
- const addPendingFile = async (file, caption, isVideo = false) => {
-  if (pendingFiles.length >= 5) return;
+  const addPendingFile = async (file, caption, isVideo = false) => {
+    const imageCount = pendingFiles.filter((f) => !f.isVideo).length;
+    const videoCount = pendingFiles.filter((f) => f.isVideo).length;
+    if (isVideo && videoCount >= 3) return;
+    if (!isVideo && imageCount >= 5) return;
 
-  if (isVideo) {
-    try {
-      await validateVideoFile(file);
-    } catch (err) {
-      showToast(err, "error");
-      return;
+    if (isVideo) {
+      try {
+        await validateVideoFile(file);
+      } catch (err) {
+        showToast(err, "error");
+        return;
+      }
+    } else {
+      const allowed = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowed.includes(file.type)) {
+        showToast("Only JPG, PNG, WEBP allowed", "error");
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        showToast("Max 8MB per photo", "error");
+        return;
+      }
     }
-  } else {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowed.includes(file.type)) {
-      showToast("Only JPG, PNG, WEBP allowed", "error");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("Max 5MB per photo", "error");
-      return;
-    }
-  }
 
-  const preview = URL.createObjectURL(file);
-  setPendingFiles((prev) => [...prev, { file, caption, preview, isVideo }]);
-  setPendingCaption("");
-};
+    const preview = URL.createObjectURL(file);
+    setPendingFiles((prev) => [...prev, { file, caption, preview, isVideo }]);
+    setPendingCaption("");
+  };
 
   const removePendingFile = (index) => {
     setPendingFiles((prev) => {
@@ -333,7 +336,8 @@ function BrgyReport() {
     const e = {};
     // if (!form.incident_type) e.incident_type = "Required";
     if (crimeNotIndexed) {
-      e.incident_type = "Please select a valid crime type — AI detected this narrative is not a valid index crime";
+      e.incident_type =
+        "Please select a valid crime type — AI detected this narrative is not a valid index crime";
     }
     if (!form.date_time_commission) {
       e.date_time_commission = "Required";
@@ -393,7 +397,10 @@ function BrgyReport() {
         } else {
           const firstErrorSpan = document.querySelector(".br-error");
           if (firstErrorSpan) {
-            firstErrorSpan.scrollIntoView({ behavior: "smooth", block: "center" });
+            firstErrorSpan.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
           }
         }
       }, 100);
@@ -477,30 +484,27 @@ function BrgyReport() {
     currentPage * ITEMS_PER_PAGE,
   );
 
-const validateVideoFile = (file) =>
-  new Promise((resolve, reject) => {
-    if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
-      return reject("Only MP4, WebM, or MOV files are allowed.");
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      return reject("Video must be under 50MB.");
-    }
-    const url = URL.createObjectURL(file);
-    const vid = document.createElement("video");
-    vid.preload = "metadata";
-    vid.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      if (vid.duration > 60) {
-        return reject("Video must be 60 seconds or less.");
+  const validateVideoFile = (file) =>
+    new Promise((resolve, reject) => {
+      if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
+        return reject("Only MP4, WebM, or MOV files are allowed.");
       }
-      resolve();
-    };
-    vid.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject("Could not read video file.");
-    };
-    vid.src = url;
-  });
+      if (file.size > 80 * 1024 * 1024) {
+        return reject("Video must be under 80MB.");
+      }
+      const url = URL.createObjectURL(file);
+      const vid = document.createElement("video");
+      vid.preload = "metadata";
+      vid.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      vid.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject("Could not read video file.");
+      };
+      vid.src = url;
+    });
 
   return (
     <div className="br-wrapper">
@@ -796,14 +800,18 @@ const validateVideoFile = (file) =>
                   {form.narrative.length}/3000 characters
                 </span>
                 {crimeNotIndexed && (
-                  <span style={{
-                    fontSize: "12px",
-                    color: "#b91c1c",
-                    fontWeight: 500,
-                    marginTop: "4px",
-                    display: "block",
-                  }}>
-                    ⚠ The narrative does not appear to describe a criminal offense against a human person. Please review before submitting.
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: "#b91c1c",
+                      fontWeight: 500,
+                      marginTop: "4px",
+                      display: "block",
+                    }}
+                  >
+                    ⚠ The narrative does not appear to describe a criminal
+                    offense against a human person. Please review before
+                    submitting.
                   </span>
                 )}
               </div>
@@ -1198,34 +1206,76 @@ const validateVideoFile = (file) =>
                   className="br-card-header-icon"
                   style={{ background: "#d97706" }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                    <circle cx="12" cy="13" r="4"/>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
                   </svg>
                 </div>
                 <h2 className="br-card-title">Attach CCTV / Evidence</h2>
-                <span style={{ marginLeft: "auto", fontSize: "12px", color: "#6b7280", background: "#f3f4f6", padding: "3px 10px", borderRadius: "20px" }}>
-                  Optional · Max 5 files
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    background: "#f3f4f6",
+                    padding: "3px 10px",
+                    borderRadius: "20px",
+                  }}
+                >
+                  Optional · Up to 5 photos / 3 videos
                 </span>
               </div>
 
               <div className="br-card-body">
                 {/* Info banner */}
-                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px 16px", marginBottom: "20px", fontSize: "13px", color: "#92400e" }}>
-                  Attach CCTV snapshots or footage. These will be submitted with your report.{" "}
-                  <strong>Photos: JPG/PNG · Max 5MB. Videos: MP4/WebM/MOV · Max 50MB · 60s max.</strong>
+                <div
+                  style={{
+                    background: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    marginBottom: "20px",
+                    fontSize: "13px",
+                    color: "#92400e",
+                  }}
+                >
+                  Attach CCTV snapshots or footage. These will be submitted with
+                  your report.{" "}
+                  <strong>
+                    Photos: JPG/PNG · Max 8MB. Videos: MP4/WebM/MOV · Max 80MB.
+                  </strong>
                 </div>
 
                 {/* Media Type Tabs */}
-                <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                <div
+                  style={{ display: "flex", gap: "8px", marginBottom: "16px" }}
+                >
                   {[
                     {
                       key: "image",
                       label: "Photo",
                       icon: (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                          <circle cx="12" cy="13" r="4"/>
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
                         </svg>
                       ),
                     },
@@ -1233,9 +1283,25 @@ const validateVideoFile = (file) =>
                       key: "video",
                       label: "Video",
                       icon: (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polygon points="23 7 16 12 23 17 23 7"/>
-                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polygon points="23 7 16 12 23 17 23 7" />
+                          <rect
+                            x="1"
+                            y="5"
+                            width="15"
+                            height="14"
+                            rx="2"
+                            ry="2"
+                          />
                         </svg>
                       ),
                     },
@@ -1245,12 +1311,21 @@ const validateVideoFile = (file) =>
                       type="button"
                       onClick={() => setAttachMediaTab(tab.key)}
                       style={{
-                        display: "flex", alignItems: "center", gap: "6px",
-                        padding: "8px 18px", borderRadius: "7px", border: "1.5px solid",
-                        fontWeight: 700, fontSize: "13px", cursor: "pointer",
-                        fontFamily: "DM Sans, sans-serif", transition: "all 0.15s",
-                        borderColor: attachMediaTab === tab.key ? "#1e3a5f" : "#d1d5db",
-                        background: attachMediaTab === tab.key ? "#1e3a5f" : "white",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "8px 18px",
+                        borderRadius: "7px",
+                        border: "1.5px solid",
+                        fontWeight: 700,
+                        fontSize: "13px",
+                        cursor: "pointer",
+                        fontFamily: "DM Sans, sans-serif",
+                        transition: "all 0.15s",
+                        borderColor:
+                          attachMediaTab === tab.key ? "#1e3a5f" : "#d1d5db",
+                        background:
+                          attachMediaTab === tab.key ? "#1e3a5f" : "white",
                         color: attachMediaTab === tab.key ? "white" : "#6b7280",
                       }}
                     >
@@ -1261,13 +1336,35 @@ const validateVideoFile = (file) =>
 
                 {/* Preview grid */}
                 {pendingFiles.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(150px, 1fr))",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
+                  >
                     {pendingFiles.map((item, index) => (
-                      <div key={index} style={{ position: "relative", borderRadius: "8px", overflow: "hidden", border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                      <div
+                        key={index}
+                        style={{
+                          position: "relative",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          border: "1px solid #e5e7eb",
+                          background: "#f9fafb",
+                        }}
+                      >
                         {item.isVideo ? (
                           <video
                             src={item.preview}
-                            style={{ width: "100%", height: "120px", objectFit: "cover", display: "block" }}
+                            style={{
+                              width: "100%",
+                              height: "120px",
+                              objectFit: "cover",
+                              display: "block",
+                            }}
                             muted
                             controls
                           />
@@ -1275,22 +1372,57 @@ const validateVideoFile = (file) =>
                           <img
                             src={item.preview}
                             alt={item.caption || "Evidence"}
-                            style={{ width: "100%", height: "120px", objectFit: "cover", display: "block", cursor: "zoom-in" }}
-                            onClick={() => setLightboxImage({ url: item.preview, caption: item.caption })}
+                            style={{
+                              width: "100%",
+                              height: "120px",
+                              objectFit: "cover",
+                              display: "block",
+                              cursor: "zoom-in",
+                            }}
+                            onClick={() =>
+                              setLightboxImage({
+                                url: item.preview,
+                                caption: item.caption,
+                              })
+                            }
                           />
                         )}
-                        <div style={{
-                          position: "absolute", top: "6px", left: "6px",
-                          background: item.isVideo ? "rgba(99,102,241,0.85)" : "rgba(16,185,129,0.85)",
-                          color: "white", fontSize: "9px", fontWeight: 700,
-                          padding: "2px 6px", borderRadius: "4px",
-                        }}>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "6px",
+                            left: "6px",
+                            background: item.isVideo
+                              ? "rgba(99,102,241,0.85)"
+                              : "rgba(16,185,129,0.85)",
+                            color: "white",
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                          }}
+                        >
                           {item.isVideo ? "VIDEO" : "PHOTO"}
                         </div>
                         <button
                           onClick={() => removePendingFile(index)}
                           type="button"
-                          style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer", color: "white", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          style={{
+                            position: "absolute",
+                            top: "6px",
+                            right: "6px",
+                            background: "rgba(0,0,0,0.6)",
+                            border: "none",
+                            borderRadius: "50%",
+                            width: "24px",
+                            height: "24px",
+                            cursor: "pointer",
+                            color: "white",
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
                         >
                           ×
                         </button>
@@ -1300,11 +1432,26 @@ const validateVideoFile = (file) =>
                 )}
 
                 {/* Upload area */}
-                {pendingFiles.length < 5 && (
+                {(attachMediaTab === "video"
+                  ? pendingFiles.filter((f) => f.isVideo).length < 3
+                  : pendingFiles.filter((f) => !f.isVideo).length < 5) && (
                   <div>
                     <label
                       htmlFor="evidence-upload"
-                      style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", border: "2px dashed #d1d5db", borderRadius: "10px", padding: "32px 20px", cursor: "pointer", background: "white", transition: "all 0.2s", textAlign: "center" }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "10px",
+                        padding: "32px 20px",
+                        cursor: "pointer",
+                        background: "white",
+                        transition: "all 0.2s",
+                        textAlign: "center",
+                      }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={async (e) => {
                         e.preventDefault();
@@ -1317,21 +1464,66 @@ const validateVideoFile = (file) =>
                     >
                       {attachMediaTab === "image" ? (
                         <>
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                            <circle cx="12" cy="13" r="4"/>
+                          <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#9ca3af"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                            <circle cx="12" cy="13" r="4" />
                           </svg>
-                          <div style={{ fontSize: "14px", fontWeight: 600, color: "#374151" }}>Click to upload or drag & drop</div>
-                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>CCTV snapshot or scene photo — JPG / PNG · Max 5MB</div>
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#374151",
+                            }}
+                          >
+                            Click to upload or drag & drop
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                            CCTV footage — MP4 / WebM / MOV · Max 80MB
+                          </div>
                         </>
                       ) : (
                         <>
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="23 7 16 12 23 17 23 7"/>
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                          <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#9ca3af"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polygon points="23 7 16 12 23 17 23 7" />
+                            <rect
+                              x="1"
+                              y="5"
+                              width="15"
+                              height="14"
+                              rx="2"
+                              ry="2"
+                            />
                           </svg>
-                          <div style={{ fontSize: "14px", fontWeight: 600, color: "#374151" }}>Click to upload or drag & drop</div>
-                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>CCTV footage — MP4 / WebM / MOV · Max 50MB · 60s</div>
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#374151",
+                            }}
+                          >
+                            Click to upload or drag & drop
+                          </div>
+                          <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                            CCTV footage — MP4 / WebM / MOV · Max 80MB
+                          </div>
                         </>
                       )}
                       <input
@@ -1353,18 +1545,43 @@ const validateVideoFile = (file) =>
                         }}
                       />
                     </label>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", fontSize: "12px", color: "#9ca3af" }}>
-                      <span>{pendingFiles.length}/5 files added</span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginTop: "8px",
+                        fontSize: "12px",
+                        color: "#9ca3af",
+                      }}
+                    >
+                      <span>
+                        {pendingFiles.filter((f) => !f.isVideo).length}/5 photos
+                        · {pendingFiles.filter((f) => f.isVideo).length}/3
+                        videos
+                      </span>
                       <span>Files will upload when you submit the report</span>
                     </div>
                   </div>
                 )}
 
-                {pendingFiles.length >= 5 && (
-                  <div style={{ textAlign: "center", padding: "16px", background: "#f0fdf4", borderRadius: "8px", border: "1px solid #bbf7d0", color: "#065f46", fontSize: "13px", fontWeight: 600 }}>
-                    ✓ Maximum 5 files added. They will upload with your report.
-                  </div>
-                )}
+                {pendingFiles.filter((f) => !f.isVideo).length >= 5 &&
+                  pendingFiles.filter((f) => f.isVideo).length >= 3 && (
+                    <div
+                      style={{
+                        textAlign: "center",
+                        padding: "16px",
+                        background: "#f0fdf4",
+                        borderRadius: "8px",
+                        border: "1px solid #bbf7d0",
+                        color: "#065f46",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✓ Maximum files reached (5 photos, 3 videos). They will
+                      upload with your report.
+                    </div>
+                  )}
               </div>
               {/* closes evidence br-card-body */}
             </div>
@@ -1390,7 +1607,6 @@ const validateVideoFile = (file) =>
               </svg>
               {submitting ? "Submitting..." : "Submit Incident Report"}
             </button>
-
           </div>
           {/* closes persons br-card-body */}
         </div>
