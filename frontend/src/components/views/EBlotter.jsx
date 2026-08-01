@@ -1069,7 +1069,7 @@ function EBlotter() {
           })),
         );
         setSuspects(data.data.suspects);
-        setHasSuspect(true);
+        setHasSuspect(data.data.suspects && data.data.suspects.length > 0);
         const hasNoPsgcCodes = data.data.complainants.every(
           (c) => !c.region_code && !c.province_code && !c.municipality_code,
         );
@@ -1724,11 +1724,7 @@ function EBlotter() {
         }
 
         // Contact Number validation (optional)
-        if (
-          c.contact_number &&
-          c.contact_number.length > 0 &&
-          !isImportedRecord
-        ) {
+        if (c.contact_number && c.contact_number.length > 0) {
           if (c.contact_number.length !== 11) {
             errors[`${p}_contact_number`] = "Must be exactly 11 digits";
           } else if (!c.contact_number.startsWith("09")) {
