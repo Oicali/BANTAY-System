@@ -202,6 +202,8 @@ function EBlotter() {
   const [trashLoading, setTrashLoading] = useState(false);
   const [hasSuspect, setHasSuspect] = useState(false);
   const [isImportedRecord, setIsImportedRecord] = useState(false);
+  const [unlockedAddress, setUnlockedAddress] = useState({});
+  const [unlockedSuspectAddress, setUnlockedSuspectAddress] = useState({});
   const [offenseModus, setOffenseModus] = useState({});
   const [offenseSelectedModus, setOffenseSelectedModus] = useState({});
   const [typeOfPlace, setTypeOfPlace] = useState("");
@@ -2382,6 +2384,8 @@ function EBlotter() {
     resetForm();
     setHasSuspect(false);
     setIsImportedRecord(false);
+    setUnlockedAddress({});
+    setUnlockedSuspectAddress({});
     setSelectedBrgyFeature(null);
     setViewAttachments([]);
     setModalAttachments([]);
@@ -4283,7 +4287,8 @@ function EBlotter() {
                           (c.region ||
                             c.district_province ||
                             c.city_municipality ||
-                            c.barangay) ? (
+                            c.barangay) &&
+                          !unlockedAddress[i] ? (
                             <div
                               className="eb-modal-form-group"
                               style={{ gridColumn: "span 4" }}
@@ -4315,6 +4320,26 @@ function EBlotter() {
                               >
                                 Address from imported record — read only
                               </small>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUnlockedAddress((prev) => ({
+                                    ...prev,
+                                    [i]: true,
+                                  }))
+                                }
+                                style={{
+                                  marginTop: "6px",
+                                  fontSize: "12px",
+                                  color: "#2563eb",
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  padding: 0,
+                                }}
+                              >
+                                ✎ Edit this address
+                              </button>
                             </div>
                           ) : (
                             <>
@@ -5198,7 +5223,8 @@ function EBlotter() {
                             (s.region ||
                               s.district_province ||
                               s.city_municipality ||
-                              s.barangay) ? (
+                              s.barangay) &&
+                            !unlockedSuspectAddress[i] ? (
                               <div
                                 className="eb-modal-form-group"
                                 style={{ gridColumn: "span 4" }}
@@ -5230,6 +5256,26 @@ function EBlotter() {
                                 >
                                   Address from imported record — read only
                                 </small>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setUnlockedSuspectAddress((prev) => ({
+                                      ...prev,
+                                      [i]: true,
+                                    }))
+                                  }
+                                  style={{
+                                    marginTop: "6px",
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                  }}
+                                >
+                                  ✎ Edit this address
+                                </button>
                               </div>
                             ) : (
                               <>
