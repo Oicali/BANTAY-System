@@ -129,17 +129,20 @@ async function sendOTP(email, ipAddress = null) {
 
       // ── Daily block: only if a PREVIOUS recovery was actually completed ──
       if (record.last_recovery_completed_at) {
-        const dayMs = 24 * 60 * 60 * 1000;
-        const msSince =
-          Date.now() - new Date(record.last_recovery_completed_at).getTime();
-        if (msSince < dayMs) {
-          const msLeft = dayMs - msSince;
+        const blockCheck = await pool.query(
+          `SELECT
+             (last_recovery_completed_at + INTERVAL '24 hours' > NOW()) AS is_blocked,
+             EXTRACT(EPOCH FROM (last_recovery_completed_at + INTERVAL '24 hours' - NOW())) * 1000 AS ms_left
+           FROM otp_requests WHERE email = $1`,
+          [email]
+        );
+        const block = blockCheck.rows[0];
+        if (block.is_blocked) {
           return {
             success: false,
             blocked: true,
-            msLeft,
-            message:
-              "You've already successfully recovered your password today. Please try again tomorrow.",
+            msLeft: Math.round(block.ms_left),
+            message: "You've already successfully recovered your password today. Please try again tomorrow.",
           };
         }
       }
