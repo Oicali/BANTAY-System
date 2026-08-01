@@ -26,7 +26,8 @@ function fmtCountdown(msLeft) {
 }
 
 // ── Persisted lock timestamps for forgot-password OTP flow ────────────────
-const FP_LOCK_KEYS = { blocked: "fp_blocked", session: "fp_session_locked" };
+const fpLockKey = (type, email) =>
+  `fp_${type}_${(email || "").toLowerCase().trim()}`;
 
 function readFpLock(key) {
   try {
@@ -159,7 +160,7 @@ const LoginSystem = () => {
     const until = Date.now() + (msLeft ?? (hoursLeft ?? 24) * 3_600_000);
     setBlockedUntilTs(until);
     setBlockedCountdown(fmtCountdown(until - Date.now()));
-    writeFpLock(FP_LOCK_KEYS.blocked, until);
+    writeFpLock(fpLockKey("blocked", formData.email), until);
     setFpStep("blocked");
   };
 
@@ -168,7 +169,7 @@ const LoginSystem = () => {
     const until = Date.now() + (msLeft ?? mins * 60_000);
     setSessionLockedUntilTs(until);
     setSessionLockedCountdown(fmtCountdown(until - Date.now()));
-    writeFpLock(FP_LOCK_KEYS.session, until);
+    writeFpLock(fpLockKey("session", formData.email), until);
     setFpStep("session-locked");
   };
   const resetFpLockState = () => {
@@ -320,7 +321,7 @@ const LoginSystem = () => {
     }
 
     // ── Check persisted locks first — instant, no flash ──
-    const savedBlocked = readFpLock(FP_LOCK_KEYS.blocked);
+    const savedBlocked = readFpLock(fpLockKey("blocked", formData.email));
     if (savedBlocked) {
       setBlockedUntilTs(savedBlocked);
       setBlockedCountdown(fmtCountdown(savedBlocked - Date.now()));
@@ -328,7 +329,7 @@ const LoginSystem = () => {
       setFpStep("blocked");
       return;
     }
-    const savedSession = readFpLock(FP_LOCK_KEYS.session);
+    const savedSession = readFpLock(fpLockKey("session", formData.email));
     if (savedSession) {
       setSessionLockedUntilTs(savedSession);
       setSessionLockedCountdown(fmtCountdown(savedSession - Date.now()));
@@ -1100,17 +1101,7 @@ const LoginSystem = () => {
                   resendsLeft <= 0
                     ? "disabled"
                     : ""
-                }`}
-                style={
-                  otpState === "attempts-exceeded" && resendsLeft > 0
-                    ? {
-                        background:
-                          "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
-                        color: "#ffffff",
-                        border: "none",
-                      }
-                    : undefined
-                }
+                } ${otpState === "attempts-exceeded" && resendsLeft > 0 ? "urgent-resend" : ""}`}
               >
                 {isLoading
                   ? "Sending..."
