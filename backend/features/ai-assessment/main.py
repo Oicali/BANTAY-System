@@ -1198,7 +1198,7 @@ def _run_backtest(
             "phase1_top15":    fold_top15_snapshot,
         })
     if not fold_results:
-        return {"status": "insufficient", "message": "No valid folds produced."}
+        return {"status": "insufficient", "message": "No valid folds produced due to insufficient crime occurrence."}
 
     hit5  = sum(1 for f in fold_results if f["hit_top5"])
     hit10 = sum(1 for f in fold_results if f["hit_top10"])

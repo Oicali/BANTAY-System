@@ -491,16 +491,17 @@ const getHeatmap = async (req, res) => {
       baseWhere += ` AND date_time_commission < ($${p++}::date + interval '1 day')`;
       params.push(date_to);
     }
-    if (incident_type) {
-      const types = (
-        Array.isArray(incident_type) ? incident_type : incident_type.split(",")
-      )
-        .map((t) => t.trim().toUpperCase())
-        .filter(Boolean);
-      if (types.length > 0) {
-        baseWhere += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
-        params.push(types);
-      }
+
+    // ── Parse crime types ONCE — reused for both the SQL filter and the AI payload ──
+    const incidentTypesList = incident_type
+      ? (Array.isArray(incident_type) ? incident_type : incident_type.split(","))
+          .map((t) => t.trim().toUpperCase())
+          .filter(Boolean)
+      : [];
+
+    if (incidentTypesList.length > 0) {
+      baseWhere += ` AND UPPER(TRIM(incident_type)) = ANY($${p++}::text[])`;
+      params.push(incidentTypesList);
     }
 
     const rawBarangays = req.query.barangays || req.query.barangay;
@@ -572,7 +573,7 @@ const getHeatmap = async (req, res) => {
     const aiPayload = {
       date_from: date_from || "2000-01-01",
       date_to: date_to || new Date().toISOString().slice(0, 10),
-      crime_types: incident_type ? [incident_type] : [],
+      crime_types: incidentTypesList,
       barangays: barangayList.length > 0 ? barangayList : [],
     };
 
