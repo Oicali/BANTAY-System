@@ -263,22 +263,18 @@ async function verifyOTP(email, code, ipAddress = null) {
     }
 
     if (otp.is_expired) {
-      await pool.query("DELETE FROM otp_requests WHERE email = $1", [email]);
-
       await logAudit({
-        username: email,
-        eventName: "OTP Verification",
+        username:    email,
+        eventName:   "OTP Verification",
         description: `OTP expired for ${email}`,
-        action: "OTP",
-        status: "failed",
-        source: null,
+        action:      "OTP",
+        status:      "failed",
+        source:      null,
         ipAddress,
       });
-
-      return {
-        success: false,
-        message: "OTP expired. Please request a new one.",
-      };
+    
+      return { success: false, message: "OTP expired. Please request a new one." };
+    
     }
 
     const valid = await bcrypt.compare(code, otp.otp_hash);
