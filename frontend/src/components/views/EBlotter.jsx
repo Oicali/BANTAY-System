@@ -4315,31 +4315,40 @@ function EBlotter() {
                                   color: "#6b7280",
                                 }}
                               />
-                              <small
-                                style={{ color: "#9ca3af", fontSize: "11px" }}
-                              >
-                                Address from imported record — read only
-                              </small>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setUnlockedAddress((prev) => ({
-                                    ...prev,
-                                    [i]: true,
-                                  }))
-                                }
+                              <div
                                 style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
                                   marginTop: "6px",
-                                  fontSize: "12px",
-                                  color: "#2563eb",
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  padding: 0,
                                 }}
                               >
-                                ✎ Edit this address
-                              </button>
+                                <small
+                                  style={{ color: "#9ca3af", fontSize: "11px" }}
+                                >
+                                  Address from imported record — read only
+                                </small>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setUnlockedAddress((prev) => ({
+                                      ...prev,
+                                      [i]: true,
+                                    }))
+                                  }
+                                  style={{
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    color: "#2563eb",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: 0,
+                                  }}
+                                >
+                                  ✎ Edit this address
+                                </button>
+                              </div>
                             </div>
                           ) : (
                             <>
@@ -5251,31 +5260,43 @@ function EBlotter() {
                                     color: "#6b7280",
                                   }}
                                 />
-                                <small
-                                  style={{ color: "#9ca3af", fontSize: "11px" }}
-                                >
-                                  Address from imported record — read only
-                                </small>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setUnlockedSuspectAddress((prev) => ({
-                                      ...prev,
-                                      [i]: true,
-                                    }))
-                                  }
+                                <div
                                   style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
                                     marginTop: "6px",
-                                    fontSize: "12px",
-                                    color: "#2563eb",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    padding: 0,
                                   }}
                                 >
-                                  ✎ Edit this address
-                                </button>
+                                  <small
+                                    style={{
+                                      color: "#9ca3af",
+                                      fontSize: "11px",
+                                    }}
+                                  >
+                                    Address from imported record — read only
+                                  </small>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setUnlockedSuspectAddress((prev) => ({
+                                        ...prev,
+                                        [i]: true,
+                                      }))
+                                    }
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 600,
+                                      color: "#2563eb",
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      padding: 0,
+                                    }}
+                                  >
+                                    ✎ Edit this address
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <>
