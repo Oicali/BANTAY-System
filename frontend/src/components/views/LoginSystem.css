@@ -566,6 +566,18 @@ input:-webkit-autofill:active {
   box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
 }
 
+.secondary-button.urgent-resend {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: #ffffff;
+  border: none;
+}
+
+.secondary-button.urgent-resend:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  box-shadow: 0 8px 25px rgba(220, 38, 38, 0.45);
+  transform: translateY(-2px);
+}
+
 /* Secondary Button */
 .secondary-button {
   width: 100%;
