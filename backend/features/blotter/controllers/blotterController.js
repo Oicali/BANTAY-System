@@ -424,8 +424,8 @@ const createBlotter = async (req, res) => {
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
-      eventName: "Blotter Created",
-      description: `Created blotter entry for incident type "${blotterData.incident_type}"`,
+      eventName: "Crime Report Created",
+      description: `Created crime report for incident type "${blotterData.incident_type}"`,
       action: "CREATE",
       status: "success",
       source: "Web Portal",
@@ -433,14 +433,14 @@ const createBlotter = async (req, res) => {
     });
     res.status(201).json({
       success: true,
-      message: "Blotter entry created successfully",
+      message: "Crime report created successfully",
       data: result,
     });
   } catch (error) {
-    console.error("Create blotter error:", error);
+    console.error("Create crime report error:", error);
     res.status(500).json({
       success: false,
-      message: "Error creating blotter entry",
+      message: "Error creating crime report",
       error: error.message,
     });
   }
@@ -530,14 +530,14 @@ const getBlotterById = async (req, res) => {
     const { id } = req.params;
     const parsedId = parseInt(id, 10);
     if (isNaN(parsedId)) {
-      return res.status(400).json({ success: false, message: "Invalid blotter ID" });
+      return res.status(400).json({ success: false, message: "Invalid crime report ID" });
     }
     const blotter = await Blotter.getByIdRaw(parsedId);
 
     if (!blotter) {
       return res.status(404).json({
         success: false,
-        message: "Blotter not found",
+        message: "Crime report not found",
       });
     }
 
@@ -546,10 +546,10 @@ const getBlotterById = async (req, res) => {
       data: blotter,
     });
   } catch (error) {
-    console.error("Get blotter error:", error);
+    console.error("Get crime report error:", error);
     res.status(500).json({
       success: false,
-      message: "Error fetching blotter",
+      message: "Error fetching crime report",
       error: error.message,
     });
   }
@@ -585,15 +585,15 @@ const updateBlotterStatus = async (req, res) => {
     if (!blotter) {
       return res.status(404).json({
         success: false,
-        message: "Blotter not found",
+        message: "Crime report not found",
       });
     }
 
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
-      eventName: "Blotter Status Updated",
-      description: `Updated blotter ID ${id} status to "${status}"`,
+      eventName: "Crime Report Status Updated",
+      description: `Updated crime report ID ${id} status to "${status}"`,
       action: "UPDATE",
       status: "success",
       source: "Web Portal",
@@ -601,14 +601,14 @@ const updateBlotterStatus = async (req, res) => {
     });
     res.status(200).json({
       success: true,
-      message: "Blotter status updated successfully",
+      message: "Crime report status updated successfully",
       data: blotter,
     });
   } catch (error) {
-    console.error("Update blotter error:", error);
+    console.error("Update crime report error:", error);
     res.status(500).json({
       success: false,
-      message: "Error updating blotter",
+      message: "Error updating crime report",
       error: error.message,
     });
   }
@@ -622,14 +622,14 @@ const deleteBlotter = async (req, res) => {
     if (!blotter) {
       return res.status(404).json({
         success: false,
-        message: "Blotter not found",
+        message: "Crime report not found",
       });
     }
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
-      eventName: "Blotter Deleted",
-      description: `Soft-deleted blotter ID ${id}`,
+      eventName: "Crime Report Deleted",
+      description: `Soft-deleted crime report ID ${id}`,
       action: "DELETE",
       status: "success",
       source: "Web Portal",
@@ -674,13 +674,13 @@ if (deleted.rows[0]?.place_barangay) {
 
 res.status(200).json({
   success: true,
-  message: "Blotter deleted successfully",
+  message: "Crime report deleted successfully",
 });
   } catch (error) {
-    console.error("Delete blotter error:", error);
+    console.error("Delete crime report error:", error);
     res.status(500).json({
       success: false,
-      message: "Error deleting blotter",
+      message: "Error deleting crime report",
       error: error.message,
     });
   }
@@ -731,14 +731,14 @@ const updateBlotter = async (req, res) => {
     if (!result) {
       return res
         .status(404)
-        .json({ success: false, message: "Blotter not found" });
+        .json({ success: false, message: "Crime report not found" });
     }
 
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
-      eventName: "Blotter Updated",
-      description: `Updated blotter ID ${id}`,
+      eventName: "Crime Report Updated",
+      description: `Updated crime report ID ${id}`,
       action: "UPDATE",
       status: "success",
       source: "Web Portal",
@@ -746,14 +746,14 @@ const updateBlotter = async (req, res) => {
     });
     res.status(200).json({
       success: true,
-      message: "Blotter updated successfully",
+      message: "Crime report updated successfully",
       data: result,
     });
   } catch (error) {
-    console.error("Update blotter error:", error);
+    console.error("Update crime report error:", error);
     res.status(500).json({
       success: false,
-      message: "Error updating blotter",
+      message: "Error updating crime report",
       error: error.message,
     });
   }
@@ -790,14 +790,14 @@ const restoreBlotter = async (req, res) => {
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
-      eventName: "Blotter Restored",
-      description: `Restored blotter ID ${id}`,
+      eventName: "Crime Report Restored",
+      description: `Restored crime report ID ${id}`,
       action: "UPDATE",
       status: "success",
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    res.json({ success: true, message: "Blotter restored successfully" });
+    res.json({ success: true, message: "Crime report restored successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1560,7 +1560,7 @@ const acceptReferral = async (req, res) => {
     if (blotter.rows.length === 0) {
       return res
         .status(404)
-        .json({ success: false, message: "Blotter not found" });
+        .json({ success: false, message: "Crime report not found" });
     }
     if (!blotter.rows[0].referred_by_barangay) {
       return res
@@ -1593,7 +1593,7 @@ const acceptReferral = async (req, res) => {
         userId: req.user?.user_id,
         username: req.user?.username,
         eventName: "Referral Accepted",
-        description: `Accepted barangay referral for blotter ID ${id}`,
+        description: `Accepted barangay referral for crime report ID ${id}`,
         action: "UPDATE",
         status: "success",
         source: "Web Portal",
@@ -2031,7 +2031,7 @@ const checkReminderAccess = async (req, res) => {
     const { id } = req.params;
     const parsedId = parseInt(id, 10);
     if (isNaN(parsedId)) {
-      return res.status(400).json({ success: false, message: "Invalid blotter ID" });
+      return res.status(400).json({ success: false, message: "Invalid crime report ID" });
     }
 
     const result = await pool.query(
@@ -2060,7 +2060,7 @@ const respondToReferral = async (req, res) => {
     if (blotter.rows.length === 0)
       return res
         .status(404)
-        .json({ success: false, message: "Blotter not found" });
+        .json({ success: false, message: "Crime report not found" });
     if (!blotter.rows[0].referred_by_barangay)
       return res
         .status(400)
@@ -2180,7 +2180,7 @@ const remindPatrols = async (req, res) => {
     if (blotter.rows.length === 0) {
       return res
         .status(404)
-        .json({ success: false, message: "Blotter not found" });
+        .json({ success: false, message: "Crime report not found" });
     }
 
     if (!blotter.rows[0].referred_by_barangay) {

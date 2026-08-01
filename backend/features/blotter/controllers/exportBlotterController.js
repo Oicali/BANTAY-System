@@ -352,7 +352,7 @@ async function buildBlotterDoc({ records, meta }) {
           },
           spacing: { after: 60 },
           children: [
-            new TextRun({ text: "BLOTTER RECORDS REPORT  ", size: 16, color: "6B7280", font: "Arial" }),
+            new TextRun({ text: "INDEX CRIME RECORDS REPORT  ", size: 16, color: "6B7280", font: "Arial" }),
             new TextRun({ text: dateRange, size: 16, color: "6B7280", font: "Arial" }),
           ],
         }),
@@ -386,7 +386,7 @@ async function buildBlotterDoc({ records, meta }) {
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
       children: [
-        new TextRun({ text: "BLOTTER RECORDS REPORT", bold: true, size: 40, font: "Arial", color: DARK }),
+        new TextRun({ text: "INDEX CRIME RECORDS REPORT", bold: true, size: 40, font: "Arial", color: DARK }),
       ],
     }),
     new Paragraph({
@@ -478,8 +478,8 @@ const exportBlotter = async (req, res) => {
     await logAudit({
       userId:      req.user?.user_id,
       username:    req.user?.username,
-      eventName:   "Blotter Export",
-      description: `Blotter records exported (${dateStr})`,
+      eventName:   "Index Crime Export",
+      description: `Index crime records exported (${dateStr})`,
       action:      "EXPORT",
       status:      "success",
       source:      "Web Portal",
@@ -487,7 +487,7 @@ const exportBlotter = async (req, res) => {
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="blotter_${dateStr}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="index_crime_${dateStr}.pdf"`);
     res.send(pdfBuffer);
   } catch (err) {
     console.error("exportBlotter error:", err);
@@ -495,7 +495,7 @@ const exportBlotter = async (req, res) => {
     await logAudit({
       userId:    req.user?.user_id,
       username:  req.user?.username,
-      eventName: "Blotter Export Failed",
+      eventName: "Index Crime Export Failed",
       description: err.message,
       action:    "EXPORT",
       status:    "failed",
