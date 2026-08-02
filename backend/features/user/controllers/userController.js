@@ -39,15 +39,17 @@ const getAllUsers = async (req, res) => {
     }
 
     if (search) {
-      conditions.push(`(
-        u.username ILIKE $${paramIdx} OR
-        u.email ILIKE $${paramIdx} OR
-        u.first_name ILIKE $${paramIdx} OR
-        u.last_name ILIKE $${paramIdx}
-      )`);
-      params.push(`%${search}%`);
-      paramIdx++;
-    }
+  conditions.push(`(
+    u.username ILIKE $${paramIdx} OR
+    u.email ILIKE $${paramIdx} OR
+    u.first_name ILIKE $${paramIdx} OR
+    u.last_name ILIKE $${paramIdx} OR
+    pr.rank_name ILIKE $${paramIdx} OR
+    pr.abbreviation ILIKE $${paramIdx}
+  )`);
+  params.push(`%${search}%`);
+  paramIdx++;
+}
 
     if (role && role !== "all") {
       conditions.push(`r.role_name = $${paramIdx++}`);
@@ -64,13 +66,14 @@ const getAllUsers = async (req, res) => {
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) AS total
+  `SELECT COUNT(*) AS total
    FROM users u
    LEFT JOIN roles r ON u.role_id = r.role_id
+   LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
    LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
    ${whereClause}`,
-      params,
-    );
+  params,
+);
     const total = parseInt(countResult.rows[0].total);
 
     const dataResult = await pool.query(
