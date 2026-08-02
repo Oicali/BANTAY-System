@@ -9,10 +9,12 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selectAll, setSelectAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     if (isOpen) {
       fetchPatrols();
+      setSearchTerm("");
     }
   }, [isOpen]);
 
@@ -35,11 +37,19 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
   }
 };
 
+  const filteredPatrols = patrols.filter((patrol) => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    const fullName = `${patrol.first_name || ""} ${patrol.last_name || ""}`.toLowerCase();
+    const rank = (patrol.rank_abbreviation || "").toLowerCase();
+    return fullName.includes(term) || rank.includes(term);
+  });
+
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedPatrols([]);
     } else {
-      setSelectedPatrols(patrols.map(p => p.user_id));
+      setSelectedPatrols(filteredPatrols.map(p => p.user_id));
     }
     setSelectAll(!selectAll);
   };
@@ -117,6 +127,30 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
             </div>
           ) : (
             <>
+              <div className="remind-search-wrap">
+                <svg className="remind-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  type="text"
+                  className="remind-search-input"
+                  placeholder="Search by name or rank..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    className="remind-search-clear"
+                    onClick={() => setSearchTerm("")}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
               <div className="remind-select-all">
                 <label className="remind-checkbox-label">
                   <input
@@ -130,29 +164,33 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
               </div>
 
               <div className="remind-patrol-list">
-                {patrols.map(patrol => (
-                  <label key={patrol.user_id} className="remind-patrol-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedPatrols.includes(patrol.user_id)}
-                      onChange={() => handleTogglePatrol(patrol.user_id)}
-                    />
-                    <div className="remind-patrol-avatar">
-                      {patrol.profile_picture ? (
-                        <img src={patrol.profile_picture} alt="" />
-                      ) : (
-                        <span>{patrol.first_name?.[0]}{patrol.last_name?.[0]}</span>
-                      )}
-                    </div>
-                    <div className="remind-patrol-info">
-                      <div className="remind-patrol-name">
-                        {patrol.rank_abbreviation && `${patrol.rank_abbreviation}. `}
-                        {patrol.first_name} {patrol.last_name}
+                {filteredPatrols.length === 0 ? (
+                  <div className="remind-no-results">No patrol officers match "{searchTerm}"</div>
+                ) : (
+                  filteredPatrols.map(patrol => (
+                    <label key={patrol.user_id} className="remind-patrol-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedPatrols.includes(patrol.user_id)}
+                        onChange={() => handleTogglePatrol(patrol.user_id)}
+                      />
+                      <div className="remind-patrol-avatar">
+                        {patrol.profile_picture ? (
+                          <img src={patrol.profile_picture} alt="" />
+                        ) : (
+                          <span>{patrol.first_name?.[0]}{patrol.last_name?.[0]}</span>
+                        )}
                       </div>
-                      <div className="remind-patrol-email">{patrol.email}</div>
-                    </div>
-                  </label>
-                ))}
+                      <div className="remind-patrol-info">
+                        <div className="remind-patrol-name">
+                          {patrol.rank_abbreviation && `${patrol.rank_abbreviation}. `}
+                          {patrol.first_name} {patrol.last_name}
+                        </div>
+                        <div className="remind-patrol-email">{patrol.email}</div>
+                      </div>
+                    </label>
+                  ))
+                )}
               </div>
             </>
           )}
