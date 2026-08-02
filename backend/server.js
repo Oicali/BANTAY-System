@@ -8,6 +8,9 @@ const { recoverPendingReferrals } = require("./jobs/referralReminderJob");
 
 const app = express();
 
+// ── Trust Railway's proxy so req.ip / X-Forwarded-For resolve to the real client IP ──
+app.set("trust proxy", 1);
+
 // ── 1. CORS ───────────────────────────────────────────────────────────────────
 const allowedOrigins = [
   ...(process.env.FRONTEND_URL || "").split(",").map(url => url.trim()),

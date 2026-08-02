@@ -6,13 +6,28 @@ import LoadingModal from "../modals/LoadingModal";
 
 const ITEMS_PER_PAGE = 15;
 const API_URL = import.meta.env.VITE_API_URL;
-const getToday = () => new Date().toISOString().slice(0, 10);
+const getToday = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const addDays = (dateStr, days) => {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const DEFAULT_FILTERS = {
   searchTerm: "",
   statusFilter: "all",
-  dateFrom: "",
-  dateTo: "",
+  dateFrom: addDays(getToday(), -364),
+  dateTo: getToday(),
 };
 
 // =====================================================
@@ -352,61 +367,62 @@ const AuditLog = () => {
           <div className="al-filter-group">
             <label className="al-filter-label">Date from</label>
             <input
-              type="date"
-              className="al-filter-input"
-              value={draft.dateFrom}
-              max={(() => {
-                if (!draft.dateTo) return getToday();
-                const d = new Date(draft.dateTo);
-                d.setDate(d.getDate() - 1);
-                return d.toISOString().slice(0, 10);
-              })()}
-              onChange={(e) => {
-                const from = e.target.value;
-                const autoTo =
-                  draft.dateTo && draft.dateTo > from
-                    ? draft.dateTo
-                    : getToday();
-                setDraft((f) => ({ ...f, dateFrom: from, dateTo: autoTo }));
-              }}
-              onKeyDown={(e) => e.preventDefault()}
-              onPaste={(e) => e.preventDefault()}
-              onClick={(e) => {
-                if (e.target.showPicker) {
-                  try {
-                    e.target.showPicker();
-                  } catch {}
-                }
-              }}
-            />
+  type="date"
+  className="al-filter-input"
+  value={draft.dateFrom}
+  max={(() => {
+    if (!draft.dateTo) return getToday();
+    return addDays(draft.dateTo, -1);
+  })()}
+  min={draft.dateTo ? addDays(draft.dateTo, -364) : undefined}
+  onChange={(e) => {
+    const from = e.target.value;
+    let autoTo = draft.dateTo && draft.dateTo > from ? draft.dateTo : getToday();
+    // clamp autoTo so range never exceeds 364 days
+    const maxAllowedTo = addDays(from, 364);
+    if (autoTo > maxAllowedTo) autoTo = maxAllowedTo;
+    if (autoTo > getToday()) autoTo = getToday();
+    setDraft((f) => ({ ...f, dateFrom: from, dateTo: autoTo }));
+  }}
+  onKeyDown={(e) => e.preventDefault()}
+  onPaste={(e) => e.preventDefault()}
+  onClick={(e) => {
+    if (e.target.showPicker) {
+      try {
+        e.target.showPicker();
+      } catch {}
+    }
+  }}
+/>
           </div>
 
           <div className="al-filter-group">
             <label className="al-filter-label">Date to</label>
             <input
-              type="date"
-              className="al-filter-input"
-              value={draft.dateTo}
-              min={(() => {
-                if (!draft.dateFrom) return undefined;
-                const d = new Date(draft.dateFrom);
-                d.setDate(d.getDate() + 1);
-                return d.toISOString().slice(0, 10);
-              })()}
-              max={getToday()}
-              onChange={(e) =>
-                setDraft((f) => ({ ...f, dateTo: e.target.value }))
-              }
-              onKeyDown={(e) => e.preventDefault()}
-              onPaste={(e) => e.preventDefault()}
-              onClick={(e) => {
-                if (e.target.showPicker) {
-                  try {
-                    e.target.showPicker();
-                  } catch {}
-                }
-              }}
-            />
+  type="date"
+  className="al-filter-input"
+  value={draft.dateTo}
+  min={(() => {
+    if (!draft.dateFrom) return undefined;
+    return addDays(draft.dateFrom, 1);
+  })()}
+  max={(() => {
+    const today = getToday();
+    if (!draft.dateFrom) return today;
+    const rangeMax = addDays(draft.dateFrom, 364);
+    return rangeMax < today ? rangeMax : today;
+  })()}
+  onChange={(e) => setDraft((f) => ({ ...f, dateTo: e.target.value }))}
+  onKeyDown={(e) => e.preventDefault()}
+  onPaste={(e) => e.preventDefault()}
+  onClick={(e) => {
+    if (e.target.showPicker) {
+      try {
+        e.target.showPicker();
+      } catch {}
+    }
+  }}
+/>
           </div>
         </div>
 
