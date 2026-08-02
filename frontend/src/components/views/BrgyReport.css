@@ -334,7 +334,21 @@
 .br-table tbody tr:hover { background: #f8f9fa; }
 .br-table tbody tr:last-child { border-bottom: none; }
 
-.br-table td { padding: 13px 16px; vertical-align: middle; }
+.br-table td { padding: 13px 16px; vertical-align: top; }
+/* Keep all columns on one line except Street/Location, which wraps */
+.br-table td:nth-child(1),
+.br-table td:nth-child(2),
+.br-table td:nth-child(4),
+.br-table td:nth-child(5),
+.br-table td:nth-child(6) {
+  white-space: nowrap;
+}
+
+.br-table td:nth-child(3) {
+  white-space: normal;
+  word-break: break-word;
+  max-width: 260px;
+}
 
 .br-ref-num {
   font-family: monospace;
