@@ -436,7 +436,9 @@ await notifyAllByRole(["Administrator", "Technical Administrator"], {
 // =====================================================
 const verifyAccount = async (req, res) => {
   const client = await pool.connect();
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")[0]
+  .trim();
 
   try {
     const { token } = req.query;
