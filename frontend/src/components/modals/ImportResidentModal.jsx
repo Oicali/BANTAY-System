@@ -7,7 +7,7 @@ function ImportResidentModal({ onClose, onSuccess }) {
   const [result, setResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [toast, setToast] = useState(false);
+  const [toast, setToast] = useState(null);
   const fileRef = useRef();
 
   const handleFile = (f) => {
@@ -40,14 +40,43 @@ function ImportResidentModal({ onClose, onSuccess }) {
 
       if (rows.length > 0) {
         const firstRow = rows[0];
-        // Validate resident template columns
         const hasRequiredColumns =
           "FIRST_NAME" in firstRow && "LAST_NAME" in firstRow;
-
         if (!hasRequiredColumns) {
           setLoading(false);
-          setToast(true);
-          setTimeout(() => setToast(false), 4000);
+          setToast(
+            "⚠️ Invalid template. Columns FIRST_NAME and LAST_NAME are required.",
+          );
+          setTimeout(() => setToast(null), 4000);
+          return;
+        }
+
+        const seen = new Set();
+        let hasEmpty = false;
+        let hasDupe = false;
+
+        for (const row of rows) {
+          const fn = String(row.FIRST_NAME).trim().toLowerCase();
+          const ln = String(row.LAST_NAME).trim().toLowerCase();
+          if (!fn || !ln) {
+            hasEmpty = true;
+            continue;
+          }
+          const key = `${fn}|${ln}|${row.DATE_OF_BIRTH || ""}`;
+          if (seen.has(key)) hasDupe = true;
+          seen.add(key);
+        }
+
+        if (hasEmpty) {
+          setLoading(false);
+          setToast("⚠️ Some rows have blank FIRST_NAME or LAST_NAME.");
+          setTimeout(() => setToast(null), 4000);
+          return;
+        }
+        if (hasDupe) {
+          setLoading(false);
+          setToast("⚠️ Duplicate residents found in the file.");
+          setTimeout(() => setToast(null), 4000);
           return;
         }
       }
@@ -293,9 +322,9 @@ function ImportResidentModal({ onClose, onSuccess }) {
           style={{
             position: "fixed",
             bottom: "24px",
-left: "16px",
-right: "16px",
-transform: "none",
+            left: "16px",
+            right: "16px",
+            transform: "none",
             background: "#1e3a5f",
             color: "white",
             padding: "12px 24px",

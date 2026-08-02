@@ -107,6 +107,27 @@ const importResidents = async (req, res) => {
           continue;
         }
 
+        const dob = parseDate(row["DATE_OF_BIRTH"]);
+
+        // ── check if this resident already exists — keep old record, skip insert
+        const dupeCheck = await client.query(
+          `SELECT 1 FROM barangay_residents
+           WHERE barangay_code = $1
+             AND LOWER(first_name) = LOWER($2)
+             AND LOWER(last_name) = LOWER($3)
+             AND is_active = true`,
+          [barangayCode, firstName, lastName],
+        );
+
+        if (dupeCheck.rows.length > 0) {
+          errors.push({
+            row: i + 2,
+            message: `${firstName} ${lastName} already exists — kept existing record`,
+          });
+          skipped++;
+          continue; // ← old record untouched, this row not inserted
+        }
+
         await client.query(
           `INSERT INTO barangay_residents
             (barangay_code, first_name, middle_name, last_name, qualifier,
@@ -118,9 +139,9 @@ const importResidents = async (req, res) => {
             firstName,
             str(row["MIDDLE_NAME"]),
             lastName,
-            str(row["QUALIFIER"]),
+         str(row["QUALIFIER"]),
             str(row["GENDER"]),
-            parseDate(row["DATE_OF_BIRTH"]),
+            dob,
             str(row["CONTACT_NUMBER"]),
             str(row["HOUSE_STREET"]),
             str(row["CIVIL_STATUS"]),
