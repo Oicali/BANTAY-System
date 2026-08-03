@@ -505,6 +505,27 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
   const handleProfilePictureChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (!["image/jpeg", "image/jpg", "image/png"].includes(file.type)) {
+      setErrors((prev) => ({
+        ...prev,
+        profilePicture: "Please select a valid JPEG or PNG image",
+      }));
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({
+        ...prev,
+        profilePicture: "File size must be less than 5MB",
+      }));
+      e.target.value = "";
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, profilePicture: "" }));
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setCropperImageSrc(reader.result);

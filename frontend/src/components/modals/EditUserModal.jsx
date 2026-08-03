@@ -646,12 +646,18 @@ const EditUserModal = ({
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setServerError("Please select a valid image file");
+      setErrors((prev) => ({
+        ...prev,
+        profilePicture: "Please select a valid image file",
+      }));
       e.target.value = "";
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setServerError("File size must be less than 5MB");
+      setErrors((prev) => ({
+        ...prev,
+        profilePicture: "File size must be less than 5MB",
+      }));
       e.target.value = "";
       return;
     }
@@ -661,7 +667,7 @@ const EditUserModal = ({
       setCropperOpen(true);
     };
     reader.readAsDataURL(file);
-    setServerError("");
+    setErrors((prev) => ({ ...prev, profilePicture: "" }));
     e.target.value = "";
   };
 
