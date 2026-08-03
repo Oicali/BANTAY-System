@@ -138,6 +138,8 @@ body {
 }
 
 /* ── FILTER BAR — CrimeMapping style ────────────────────────── */
+
+/* ── FILTER BAR — CrimeMapping style ────────────────────────── */
 .psch-filter-bar {
   display: flex;
   align-items: center;
@@ -147,8 +149,9 @@ body {
   border: 1px solid var(--gray-200);
   border-radius: 8px;
   margin-bottom: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   border-left: 4px solid var(--navy-primary);
+  overflow-x: auto;
 }
 
 .psch-filter-icon {
@@ -159,8 +162,8 @@ body {
 }
 
 .psch-filter-search {
-  flex: 1;
-  min-width: 160px;
+  flex: 2 1 200px;      /* was: flex: 1 1 160px; */
+  min-width: 160px;     /* was: 140px */
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
   border-radius: 6px;
@@ -189,6 +192,7 @@ body {
   cursor: pointer;
   transition: border-color 0.2s;
   min-width: 140px;
+  flex-shrink: 0;
 }
 .psch-filter-select:focus { border-color: var(--navy-primary); }
 
@@ -196,6 +200,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 .psch-filter-date {
   padding: 8px 10px;
@@ -216,7 +221,6 @@ body {
 }
 .psch-filter-arrow { font-size: 13px; color: var(--gray-400); flex-shrink: 0; }
 
-/* Apply → red-primary */
 .psch-filter-apply {
   padding: 8px 20px;
   background: var(--red-primary);

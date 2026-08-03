@@ -8,7 +8,7 @@ import Notification from "../modals/Notification";
 import { ShieldCheck, AlertTriangle, Car, Users } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
-const VEHICLE_TYPES = ["Car/Sedan", "SUV/Van"];
+const VEHICLE_TYPES = ["Pickup Patrols", "Patrol Sedans / Crossovers", "Patrol Motorcycles"];
 const PAGE_SIZE = 5;
 
 // ── FIX 1: FilterBar and Pagination are defined OUTSIDE the component.
@@ -279,12 +279,15 @@ const PatrollerDashboard = () => {
   const [activeTable, setActiveTable] = useState("patrollers");
   const [patrollers, setPatrollers] = useState([]);
   const [mobileUnits, setMobileUnits] = useState([]);
+  const [loadingAction, setLoadingAction] = useState("add");
   const [stats, setStats] = useState({
     active_patrols_today: 0,
     unassigned_patrollers: 0,
     mobile_units: 0,
     total_officers: 0,
   });
+
+  const [plateError, setPlateError] = useState("");
 
   // ── Patroller filters & pagination ────────────────────
   const [patrollerSearch, setPatrollerSearch] = useState("");
@@ -366,9 +369,7 @@ const PatrollerDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ── FIX 5: Compute online/offline counts from patrollers array ─────────────
-  //    "Online Patrollers Today" = patrollers whose last_location_at is within 30s
-  //    "Offline Patrollers"      = all others (previously "Unassigned Patrollers")
+  
   const onlineCount = patrollers.filter((o) => {
     const lastSeen = o.last_location_at ? new Date(o.last_location_at) : null;
     return lastSeen && Date.now() - lastSeen.getTime() <= 30000;
@@ -376,13 +377,19 @@ const PatrollerDashboard = () => {
 
   const offlineCount = patrollers.length - onlineCount;
 
+  
+ const totalPatrollerCount = patrollers.length;
+ 
+
   // ── Modal handlers ─────────────────────────────────────
-  const openAddModal = () => {
-    setModalMode("add");
-    setSelectedUnit(null);
-    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
-    setShowModal(true);
-  };
+const openAddModal = () => {
+  setModalMode("add");
+  setSelectedUnit(null);
+  setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
+  setAutoFilledName("");
+  setPlateError("");
+  setShowModal(true);
+};
 
   const openEditModal = (unit) => {
     setModalMode("edit");
@@ -405,13 +412,18 @@ const PatrollerDashboard = () => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   // ── Submit ─────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
-      setNotif({ message: "Please fill in all required fields.", type: "warning" });
-      return;
-    }
-    setSubmitLoading(true);
-    try {
+ const handleSubmit = async () => {
+  if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
+    setNotif({ message: "Please fill in all required fields.", type: "warning" });
+    return;
+  }
+  if (!PLATE_REGEX.test(form.plate_number) || plateError) {
+    setNotif({ message: plateError || "Please enter a valid plate number.", type: "warning" });
+    return;
+  }
+  setLoadingAction(modalMode); // "add" or "edit"
+  setSubmitLoading(true);
+  try {
       const url =
         modalMode === "add"
           ? `${API_BASE}/patrol/mobile-units`
@@ -453,6 +465,7 @@ const handleDelete = async () => {
   if (!deleteTarget) return;
   const id = deleteTarget.id;
   setDeleteTarget(null);
+  setLoadingAction("delete");
   setSubmitLoading(true);
   try {
     const res = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
@@ -477,6 +490,61 @@ const handleDelete = async () => {
   const getInitials = (name) => (name ? name.substring(0, 2).toUpperCase() : "NA");
 
   const formatDateTime = (ts) => (ts ? new Date(ts).toLocaleDateString() : "No Data");
+
+const getVehicleBadgeClass = (type) => {
+    switch (type) {
+      case "Pickup Patrols": return "vehicle-pickup";
+      case "Patrol Sedans / Crossovers": return "vehicle-sedan";
+      case "Patrol Motorcycles": return "vehicle-motorcycle";
+      default: return "vehicle-other";
+    }
+  };
+
+  const PLATE_REGEX = /^[A-Z]{2,3}[\s-]?\d{3,5}$/;
+
+  const handlePlateChange = (e) => {
+  const value = e.target.value.toUpperCase();
+  setForm((prev) => ({ ...prev, plate_number: value }));
+
+  if (!value) {
+    setPlateError("");
+    return;
+  }
+  if (!PLATE_REGEX.test(value)) {
+    setPlateError("Enter a valid plate number (e.g. ABC 1234).");
+    return;
+  }
+  const isDuplicate = mobileUnits.some(
+    (u) =>
+      u.plate_number?.toUpperCase() === value &&
+      (modalMode === "add" || u.mobile_unit_id !== selectedUnit?.mobile_unit_id)
+  );
+  setPlateError(isDuplicate ? "This plate number is already registered." : "");
+};
+
+const VEHICLE_NAME_PRESETS = {
+  "Pickup Patrols": "Mobile Patrol",
+  "Patrol Sedans / Crossovers": "Sedan Patrol",
+  "Patrol Motorcycles": "Motorcycle Patrol",
+};
+
+const [autoFilledName, setAutoFilledName] = useState("");
+
+const handleVehicleTypeChange = (e) => {
+  const type = e.target.value;
+
+  if (!type) {
+    setForm((prev) => ({ ...prev, vehicle_type: "" }));
+    return;
+  }
+
+  const base = VEHICLE_NAME_PRESETS[type];
+  const countSameType = mobileUnits.filter((u) => u.vehicle_type === type).length;
+  const preset = base ? `${base} ${countSameType + 1}` : "";
+
+  setAutoFilledName(preset);
+  setForm((prev) => ({ ...prev, vehicle_type: type, mobile_unit_name: preset }));
+};
 
   // ── FIX 2: Build barangay options from live patroller data ─────────────────
   const barangayOptions = [
@@ -622,8 +690,8 @@ const handleDelete = async () => {
                 <Users size={20} />
               </div>
             </div>
-            <div className="stat-value">{stats.total_officers}</div>
-            <div className="stat-label">Total Officers</div>
+             <div className="stat-value">{totalPatrollerCount}</div>
+            <div className="stat-label">Total Patrollers</div>
           </div>
         </div>
 
@@ -829,9 +897,7 @@ const handleDelete = async () => {
                             <span className="unit-badge">{unit.mobile_unit_name}</span>
                           </td>
                           <td>
-                            <span
-                              className={`vehicle-badge ${unit.vehicle_type === "Car/Sedan" ? "vehicle-car" : "vehicle-suv"}`}
-                            >
+                         <span className={`vehicle-badge ${getVehicleBadgeClass(unit.vehicle_type)}`}>
                               {unit.vehicle_type}
                             </span>
                           </td>
@@ -905,11 +971,7 @@ const handleDelete = async () => {
                 <label>
                   Vehicle Type <span className="required">*</span>
                 </label>
-                <select
-                  name="vehicle_type"
-                  value={form.vehicle_type}
-                  onChange={handleFormChange}
-                >
+               <select name="vehicle_type" value={form.vehicle_type} onChange={handleVehicleTypeChange}>
                   <option value="">— Select Vehicle Type —</option>
                   {VEHICLE_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
@@ -921,13 +983,18 @@ const handleDelete = async () => {
                   Plate Number <span className="required">*</span>
                 </label>
                 <input
-                  type="text"
-                  name="plate_number"
-                  value={form.plate_number}
-                  onChange={handleFormChange}
-                  placeholder="e.g. ABC 1234"
-                  style={{ textTransform: "uppercase" }}
-                />
+  type="text"
+  name="plate_number"
+  value={form.plate_number}
+  onChange={handlePlateChange}
+  placeholder="e.g. ABC 1234"
+  style={{ textTransform: "uppercase" }}
+/>
+{plateError && (
+  <span style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px", display: "block" }}>
+    {plateError}
+  </span>
+)}
               </div>
             </div>
             <div className="modal-footer">
@@ -949,10 +1016,16 @@ const handleDelete = async () => {
   />
 )}
       <LoadingModal isOpen={loading} message="Loading dashboard..." />
-      <LoadingModal
-        isOpen={submitLoading}
-        message={modalMode === "add" ? "Adding mobile unit..." : "Saving changes..."}
-      />
+<LoadingModal
+  isOpen={submitLoading}
+  message={
+    loadingAction === "add"
+      ? "Adding mobile unit..."
+      : loadingAction === "edit"
+        ? "Saving changes..."
+        : "Deleting mobile unit..."
+  }
+/>
 
       {notif && (
         <Notification

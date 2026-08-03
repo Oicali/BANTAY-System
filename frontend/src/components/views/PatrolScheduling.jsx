@@ -126,19 +126,19 @@ const PatrolScheduling = () => {
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [barangayFilters, setBarangayFilters] = useState([]);
   const [barangaySearch, setBrgySearch] = useState("");
-  const [showBrgyDropdown, setShowBrgyDropdown] = useState(false);
+
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
   // Applied filter values (only change on Apply click)
   const [appliedFilters, setAppliedFilters] = useState({
-    search: "",
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-    barangays: [],
-  });
+  search: "",
+  status: "all",
+  dateFrom: "",
+  dateTo: "",
+  barangay: "",
+});
 
   // Hover popups
   const [patrollerAnchor, setPatrollerAnchor] = useState(null);
@@ -310,40 +310,39 @@ const PatrolScheduling = () => {
   ];
 
   const handleApply = () => {
-    setAppliedFilters({
-      search,
-      status: statusFilter,
-      dateFrom,
-      dateTo,
-      barangays: barangayFilters,
-    });
-    setFiltersApplied(
-      search !== "" ||
-        statusFilter !== "all" ||
-        dateFrom !== "" ||
-        dateTo !== "" ||
-        barangayFilters.length > 0,
-    );
-    setCurrentPage(1);
-  };
+  setAppliedFilters({
+    search,
+    status: statusFilter,
+    dateFrom,
+    dateTo,
+    barangay: barangaySearch,
+  });
+  setFiltersApplied(
+    search !== "" ||
+      statusFilter !== "all" ||
+      dateFrom !== "" ||
+      dateTo !== "" ||
+      barangaySearch !== "",
+  );
+  setCurrentPage(1);
+};
 
   const handleReset = () => {
-    setSearch("");
-    setStatus("all");
-    setDateFrom("");
-    setDateTo("");
-    setBarangayFilters([]);
-    setBrgySearch("");
-    setAppliedFilters({
-      search: "",
-      status: "all",
-      dateFrom: "",
-      dateTo: "",
-      barangays: [],
-    });
-    setFiltersApplied(false);
-    setCurrentPage(1);
-  };
+  setSearch("");
+  setStatus("all");
+  setDateFrom("");
+  setDateTo("");
+  setBrgySearch("");
+  setAppliedFilters({
+    search: "",
+    status: "all",
+    dateFrom: "",
+    dateTo: "",
+    barangay: "",
+  });
+  setFiltersApplied(false);
+  setCurrentPage(1);
+};
 
   const handleExportListClick = async () => {
     if (isExporting) return;
@@ -383,53 +382,39 @@ const PatrolScheduling = () => {
     }
   };
 
-  // Filter
-  const allBarangays = [
-    ...new Set(
-      patrols.flatMap((p) =>
-        (p.routes || [])
-          .filter((r) => (r.stop_order || 0) <= 0 && r.barangay)
-          .map((r) => r.barangay),
-      ),
-    ),
-  ].sort();
-
-  const filteredBrgyOptions = allBarangays.filter((b) =>
-    b.toLowerCase().includes(barangaySearch.toLowerCase()),
-  );
+ 
 
   const filteredPatrols = patrols.filter((p) => {
-    const { search: s, status: st, dateFrom: df, dateTo: dt } = appliedFilters;
+  const { search: s, status: st, dateFrom: df, dateTo: dt, barangay: bg } = appliedFilters;
 
-    if (
-      s &&
-      !(
-        (p.patrol_name || "").toLowerCase().includes(s.toLowerCase()) ||
-        (p.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase())
-      )
+  if (
+    s &&
+    !(
+      (p.patrol_name || "").toLowerCase().includes(s.toLowerCase()) ||
+      (p.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase())
     )
-      return false;
+  )
+    return false;
 
-    if (st !== "all" && getPatrolStatus(p) !== st) return false;
+  if (st !== "all" && getPatrolStatus(p) !== st) return false;
 
-    if (df) {
-      const start = parseLocalDate(p.start_date);
-      if (start && start < parseLocalDate(df)) return false;
-    }
-    if (dt) {
-      const end = parseLocalDate(p.end_date);
-      if (end && end > parseLocalDate(dt)) return false;
-    }
-    if (appliedFilters.barangays.length > 0) {
-      const hasMatch = appliedFilters.barangays.every((selected) =>
-        (p.routes || []).some(
-          (r) => (r.stop_order || 0) <= 0 && r.barangay === selected,
-        ),
-      );
-      if (!hasMatch) return false;
-    }
-    return true;
-  });
+  if (df) {
+    const start = parseLocalDate(p.start_date);
+    if (start && start < parseLocalDate(df)) return false;
+  }
+  if (dt) {
+    const end = parseLocalDate(p.end_date);
+    if (end && end > parseLocalDate(dt)) return false;
+  }
+  if (bg) {
+    const barangays = getUniqueBarangays(p.routes);
+    const hasMatch = barangays.some((b) =>
+      b.toLowerCase().includes(bg.toLowerCase()),
+    );
+    if (!hasMatch) return false;
+  }
+  return true;
+});
 
   // Sort — default date ascending only (no sort dropdown)
   const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
@@ -627,77 +612,16 @@ const PatrolScheduling = () => {
             />
           </div>
 
-          <div
-  className="psch-brgy-dropdown-wrap"
-  style={{ position: "relative", flex: "1 1 100%", minWidth: 0 }}
->
-            {/* Search input */}
-            <input
-              className="psch-filter-select"
-              type="text"
-              placeholder="Filter by barangay..."
-              value={
-                barangayFilters.length > 0
-                  ? barangayFilters.join(", ") +
-                    (barangaySearch ? ", " + barangaySearch : "")
-                  : barangaySearch
-              }
-              onChange={(e) => {
-                // Only update the search portion (after the last comma)
-                const parts = e.target.value.split(",");
-                setBrgySearch(parts[parts.length - 1].trim());
-                setShowBrgyDropdown(true);
-              }}
-              onFocus={() => setShowBrgyDropdown(true)}
-              onBlur={() => setTimeout(() => setShowBrgyDropdown(false), 150)}
-              onKeyDown={(e) => {
-                // Backspace on empty search removes last selected barangay
-                if (e.key === "Backspace" && barangaySearch === "") {
-                  setBarangayFilters((prev) => prev.slice(0, -1));
-                }
-              }}
-            />
-
-            {/* Dropdown options */}
-            {showBrgyDropdown && filteredBrgyOptions.length > 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  zIndex: 999,
-                  background: "#fff",
-                  border: "1px solid #dde3f0",
-                  borderRadius: 8,
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  minWidth: 200,
-                  width: "100%",
-                }}
-              >
-                {filteredBrgyOptions
-                  .filter((b) => !barangayFilters.includes(b)) // hide already selected
-                  .map((b) => (
-                    <div
-                      key={b}
-                      style={{
-                        padding: "8px 14px",
-                        cursor: "pointer",
-                        fontSize: 13,
-                      }}
-                      onMouseDown={() => {
-                        setBarangayFilters((prev) => [...prev, b]);
-                        setBrgySearch("");
-                        setShowBrgyDropdown(false);
-                      }}
-                    >
-                      {b}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+        <input
+  className="psch-filter-select"
+  type="text"
+  placeholder="Filter by barangay..."
+  value={barangaySearch}
+  onChange={(e) => setBrgySearch(e.target.value)}
+  onKeyDown={(e) => e.key === "Enter" && handleApply()}
+  style={{ flex: 1, minWidth: 140 }}
+/>
+                
           <button className="psch-filter-apply" onClick={handleApply}>
             Apply Filters
           </button>
@@ -767,8 +691,13 @@ const PatrolScheduling = () => {
 
                         <td>
                           <span className="psch-unit-text">
-                            {patrol.mobile_unit_name || "—"}
-                          </span>
+  {patrol.mobile_unit_name
+    ? patrol.mobile_unit_name
+    : patrol.deleted_unit_name
+      ? <span className="unassigned-badge">Unit Removed ({patrol.deleted_unit_name})</span>
+      : <span className="unassigned-badge">Unit Removed</span>
+  }
+</span>
                         </td>
 
                         <td>
