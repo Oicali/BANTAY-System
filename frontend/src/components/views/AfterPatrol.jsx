@@ -98,7 +98,7 @@ const getMyRole = () => {
     return json.role ?? json.user_role ?? json.roles ?? null;
   } catch { return null; }
 };
-
+  
 // ── Top-level helper: covers both admin roles ──────────────────────
 const isAdminRole = (role) =>
   role === "Administrator" || role === "Technical Administrator";

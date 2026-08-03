@@ -42,16 +42,23 @@ const getPatrolStats = async (req, res) => {
     const mobileUnits = await pool.query(
       `SELECT COUNT(*) AS mobile_units FROM mobile_unit`,
     );
-    const totalOfficers = await pool.query(
-      `SELECT COUNT(*) AS total_officers FROM active_patroller`,
-    );
-    const unassigned = await pool.query(`
-      SELECT COUNT(*) AS unassigned_patrollers
-      FROM active_patroller ap
-      WHERE ap.active_patroller_id NOT IN (
-        SELECT pap.active_patroller_id FROM patrol_assignment_patroller pap
-      )
-    `);
+   const totalOfficers = await pool.query(`
+    SELECT COUNT(*) AS total_officers
+    FROM active_patroller ap
+    JOIN users u ON ap.officer_id = u.user_id
+    WHERE u.role_id = 3
+      AND u.status != 'deactivated'
+`);
+   const unassigned = await pool.query(`
+  SELECT COUNT(*) AS unassigned_patrollers
+  FROM active_patroller ap
+  JOIN users u ON ap.officer_id = u.user_id
+  WHERE u.role_id = 3
+    AND u.status != 'deactivated'
+    AND ap.active_patroller_id NOT IN (
+      SELECT pap.active_patroller_id FROM patrol_assignment_patroller pap
+    )
+`);
     res.json({
       success: true,
       data: {
@@ -93,6 +100,7 @@ const getActivePatrollers = async (req, res) => {
       LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
       LEFT JOIN officer_locations ol ON ap.officer_id = ol.user_id
       WHERE u.role_id = 3
+      AND u.status != 'deactivated'
       ORDER BY ap.active_patroller_id, pa.start_date DESC NULLS LAST
     `);
 
@@ -160,6 +168,7 @@ const getAvailablePatrollers = async (req, res) => {
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
           WHERE u.role_id = 3
+           AND u.status = 'active'
             AND ap.active_patroller_id NOT IN (
               SELECT DISTINCT pap.active_patroller_id
               FROM patrol_assignment_patroller pap
@@ -182,6 +191,7 @@ const getAvailablePatrollers = async (req, res) => {
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
           WHERE u.role_id = 3
+           AND u.status != 'deactivated'
             AND ap.active_patroller_id NOT IN (
               SELECT DISTINCT pap.active_patroller_id
               FROM patrol_assignment_patroller pap
@@ -203,6 +213,7 @@ const getAvailablePatrollers = async (req, res) => {
         FROM active_patroller ap
         JOIN users u ON ap.officer_id = u.user_id
         WHERE u.role_id = 3
+         AND u.status != 'deactivated'
         ORDER BY officer_name ASC
       `);
     }
@@ -236,12 +247,13 @@ const getAvailableMobileUnits = async (req, res) => {
       } else {
         result = await pool.query(
           `SELECT mobile_unit_id, mobile_unit_name, vehicle_type, plate_number
-           FROM mobile_unit
-           WHERE mobile_unit_id NOT IN (
-             SELECT mobile_unit_id FROM patrol_assignment
-             WHERE start_date <= $2
-               AND end_date   >= $1
-           )
+FROM mobile_unit mu
+WHERE NOT EXISTS (
+  SELECT 1 FROM patrol_assignment pa
+  WHERE pa.mobile_unit_id = mu.mobile_unit_id
+    AND pa.start_date <= $2
+    AND pa.end_date   >= $1
+)
            ORDER BY mobile_unit_name`,
           [start, end]
         );
@@ -292,6 +304,7 @@ const createMobileUnit = async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [mobile_unit_name, vehicle_type, plate_number, created_by],
     );
+    
 
     await logAudit({
       userId: req.user?.user_id,
@@ -367,26 +380,55 @@ const updateMobileUnit = async (req, res) => {
 // ─────────────────────────────────────────────
 const deleteMobileUnit = async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    // Get the unit's current name before it's gone
+    const unitResult = await client.query(
+      `SELECT mobile_unit_name FROM mobile_unit WHERE mobile_unit_id = $1`,
+      [id],
+    );
+    if (unitResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ success: false, message: "Not found." });
+    }
+    const unitName = unitResult.rows[0].mobile_unit_name;
+
+    // Snapshot the name onto any patrol_assignment rows that reference this unit
+    await client.query(
+      `UPDATE patrol_assignment
+       SET deleted_unit_name = $1
+       WHERE mobile_unit_id = $2`,
+      [unitName, id],
+    );
+
+    // Now delete — FK will SET NULL on mobile_unit_id automatically
+    const result = await client.query(
       `DELETE FROM mobile_unit WHERE mobile_unit_id=$1`,
       [id],
     );
-    if (result.rowCount === 0)
-      return res.status(404).json({ success: false, message: "Not found." });
+
+    await client.query("COMMIT");
+
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Mobile Unit Deleted",
-      description: `Deleted mobile unit ID ${id}`,
+      description: `Deleted mobile unit ID ${id} ("${unitName}")`,
       action: "DELETE",
       status: "success",
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+
     res.json({ success: true, message: "Mobile unit deleted." });
   } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Delete mobile unit error:", error);
     res.status(500).json({ success: false, message: "Server error" });
+  } finally {
+    client.release();
   }
 };
 
@@ -402,6 +444,7 @@ const getPatrols = async (req, res) => {
         pa.start_date,
         pa.end_date,
         pa.mobile_unit_id,
+        pa.deleted_unit_name,
         mu.mobile_unit_name,
         mu.plate_number,
         
@@ -472,7 +515,7 @@ const getPatrols = async (req, res) => {
         ) AS routes
 
       FROM patrol_assignment pa
-      JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
       ORDER BY pa.start_date DESC, pa.patrol_id DESC
     `);
     const data = result.rows.map((p) => ({
@@ -1082,6 +1125,7 @@ const getMyPatrols = async (req, res) => {
         pa.start_date,
         pa.end_date,
         pa.mobile_unit_id,
+        pa.deleted_unit_name,
         mu.mobile_unit_name,
         mu.plate_number,
 
@@ -1150,7 +1194,7 @@ const getMyPatrols = async (req, res) => {
         ) AS routes
 
       FROM patrol_assignment pa
-      JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
       WHERE pa.patrol_id IN (
         SELECT DISTINCT pap.patrol_id
         FROM patrol_assignment_patroller pap
