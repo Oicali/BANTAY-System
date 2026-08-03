@@ -5,7 +5,6 @@
 // Ensures data integrity before processing
 
 class ProfileValidator {
-
   // =====================================================
   // VALIDATE NAME FIELDS
   // =====================================================
@@ -156,7 +155,9 @@ class ProfileValidator {
     }
 
     if (!/(?=.*[@$!%*?&#])/.test(password)) {
-      errors.push("Password must contain at least one special character (@$!%*?&#)");
+      errors.push(
+        "Password must contain at least one special character (@$!%*?&#)",
+      );
     }
 
     return errors;
@@ -169,14 +170,29 @@ class ProfileValidator {
     const errors = {};
 
     // Name fields
-    const firstNameError = this.validateName(data.first_name, "First name", 50, true);
+    const firstNameError = this.validateName(
+      data.first_name,
+      "First name",
+      50,
+      true,
+    );
     if (firstNameError) errors.first_name = firstNameError;
 
-    const lastNameError = this.validateName(data.last_name, "Last name", 50, true);
+    const lastNameError = this.validateName(
+      data.last_name,
+      "Last name",
+      50,
+      true,
+    );
     if (lastNameError) errors.last_name = lastNameError;
 
     if (data.middle_name) {
-      const middleNameError = this.validateName(data.middle_name, "Middle name", 50, false);
+      const middleNameError = this.validateName(
+        data.middle_name,
+        "Middle name",
+        50,
+        false,
+      );
       if (middleNameError) errors.middle_name = middleNameError;
     }
 
@@ -195,26 +211,49 @@ class ProfileValidator {
     if (phoneError) errors.phone = phoneError;
 
     if (data.alternate_phone) {
-      const altPhoneError = this.validatePhone(data.alternate_phone, "Alternate phone number", false);
+      const altPhoneError = this.validatePhone(
+        data.alternate_phone,
+        "Alternate phone number",
+        false,
+      );
       if (altPhoneError) errors.alternate_phone = altPhoneError;
     }
 
-    if (data.phone && data.alternate_phone && data.phone === data.alternate_phone) {
-      errors.alternate_phone = "Alternate phone cannot be the same as primary phone";
+    if (
+      data.phone &&
+      data.alternate_phone &&
+      data.phone === data.alternate_phone
+    ) {
+      errors.alternate_phone =
+        "Alternate phone cannot be the same as primary phone";
     }
 
     // Structured address fields (all optional)
     const regionErr = this.validatePsgcCode(data.region_code, "Region code");
     if (regionErr) errors.region_code = regionErr;
 
-    const provinceErr = this.validatePsgcCode(data.province_code, "Province code");
+    const provinceErr = this.validatePsgcCode(
+      data.province_code,
+      "Province code",
+    );
     if (provinceErr) errors.province_code = provinceErr;
 
-    const municipalityErr = this.validatePsgcCode(data.municipality_code, "Municipality code");
+    const municipalityErr = this.validatePsgcCode(
+      data.municipality_code,
+      "Municipality code",
+    );
     if (municipalityErr) errors.municipality_code = municipalityErr;
 
-    const barangayErr = this.validatePsgcCode(data.barangay_code, "Barangay code");
-    if (barangayErr) errors.barangay_code = barangayErr;
+    // Barangay accounts store their barangay as a NAME (e.g. "Sineguelasan"),
+    // not a numeric PSGC code — only enforce the numeric format when the value
+    // actually looks like a PSGC code (police accounts use real numeric codes).
+    if (data.barangay_code && /^\d+$/.test(data.barangay_code.trim())) {
+      const barangayErr = this.validatePsgcCode(
+        data.barangay_code,
+        "Barangay code",
+      );
+      if (barangayErr) errors.barangay_code = barangayErr;
+    }
 
     const addressLineErr = this.validateAddressLine(data.address_line);
     if (addressLineErr) errors.address_line = addressLineErr;
@@ -250,8 +289,13 @@ class ProfileValidator {
       errors.confirmPassword = "Passwords do not match";
     }
 
-    if (data.currentPassword && data.newPassword && data.currentPassword === data.newPassword) {
-      errors.newPassword = "New password must be different from current password";
+    if (
+      data.currentPassword &&
+      data.newPassword &&
+      data.currentPassword === data.newPassword
+    ) {
+      errors.newPassword =
+        "New password must be different from current password";
     }
 
     return {
