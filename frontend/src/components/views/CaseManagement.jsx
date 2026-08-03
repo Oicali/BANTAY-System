@@ -159,12 +159,18 @@ function CaseManagement() {
         if (f.search && f.search.trim().length > 0) {
           const searchTerm = f.search.trim().toUpperCase();
           result = result.filter((c) => {
-            const displayNum = (
-              c.blotter_entry_number ||
-              c.case_number ||
-              ""
-            ).toUpperCase();
-            return displayNum.includes(searchTerm);
+            const haystack = [
+              c.blotter_entry_number,
+              c.case_number,
+              c.incident_type,
+              c.barangay,
+              c.location,
+              c.assigned_io_name,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toUpperCase();
+            return haystack.includes(searchTerm);
           });
         }
         if (f.sort_updated === "newest") {

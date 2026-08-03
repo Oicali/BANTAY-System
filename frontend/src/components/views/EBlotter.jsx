@@ -126,7 +126,11 @@ const BARANGAY_MIGRATION_MAP = {
   "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
   "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
 };
-
+const toLocalDateTimeString = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
 const FieldError = ({ error }) => {
   if (!error) return null;
   return <span className="eb-field-error">{error}</span>;
@@ -5985,7 +5989,7 @@ function EBlotter() {
                           type="datetime-local"
                           className={`eb-modal-input ${fieldErrors.date_time_commission ? "error" : ""}`}
                           value={caseDetail.date_time_commission}
-                          max={new Date().toISOString().slice(0, 16)}
+                          max={toLocalDateTimeString()}
                           onKeyDown={(e) => e.preventDefault()}
                           onChange={(e) => {
                             updateCaseDetail(
@@ -6013,7 +6017,7 @@ function EBlotter() {
                           type="datetime-local"
                           className={`eb-modal-input ${fieldErrors.date_time_reported ? "error" : ""}`}
                           value={caseDetail.date_time_reported}
-                          max={new Date().toISOString().slice(0, 16)}
+                          max={toLocalDateTimeString()}
                           onKeyDown={(e) => e.preventDefault()}
                           onChange={(e) => {
                             updateCaseDetail(
@@ -7592,7 +7596,15 @@ function EBlotter() {
                               fontSize: "11px",
                             }}
                           >
-                            {pendingModalFiles.length}/5 files
+                            {(() => {
+                              const imgs = pendingModalFiles.filter(
+                                (f) => !f.file.type.startsWith("video"),
+                              ).length;
+                              const vids = pendingModalFiles.filter((f) =>
+                                f.file.type.startsWith("video"),
+                              ).length;
+                              return `Photos: ${imgs}/5 · Videos: ${vids}/3`;
+                            })()}
                           </span>
                         </div>
 
@@ -7772,139 +7784,49 @@ function EBlotter() {
                         )}
 
                         {/* Upload */}
-                        {pendingModalFiles.length < 5 && (
-                          <label
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "8px",
-                              border: "2px dashed #d1d5db",
-                              borderRadius: "8px",
-                              padding: "20px",
-                              cursor: "pointer",
-                              background: "white",
-                              textAlign: "center",
-                            }}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={async (e) => {
-                              e.preventDefault();
-                              const file = e.dataTransfer.files[0];
-                              if (!file) return;
-                              if (attachMediaTab === "video") {
-                                try {
-                                  await validateVideoFile(file);
-                                } catch (err) {
-                                  showReactToast(err, "error");
-                                  return;
-                                }
-                              } else {
-                                const photoError = validatePhotoFile(file);
-                                if (photoError) {
-                                  showReactToast(photoError, "error");
-                                  return;
-                                }
-                              }
-                              const preview = URL.createObjectURL(file);
-                              setPendingModalFiles((prev) => [
-                                ...prev,
-                                { file, caption: "", preview },
-                              ]);
-                            }}
-                          >
-                            {attachMediaTab === "image" ? (
-                              <>
-                                <svg
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#9ca3af"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                                  <circle cx="12" cy="13" r="4" />
-                                </svg>
-                                <div
-                                  style={{
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#374151",
-                                  }}
-                                >
-                                  Click or drag to upload photo
-                                </div>
-                                <div
-                                  style={{ fontSize: "11px", color: "#9ca3af" }}
-                                >
-                                  JPG, PNG, WebP · Max 8MB
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <svg
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="#9ca3af"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                >
-                                  <polygon points="23 7 16 12 23 17 23 7" />
-                                  <rect
-                                    x="1"
-                                    y="5"
-                                    width="15"
-                                    height="14"
-                                    rx="2"
-                                    ry="2"
-                                  />
-                                </svg>
-                                <div
-                                  style={{
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    color: "#374151",
-                                  }}
-                                >
-                                  Click or drag to upload video
-                                </div>
-                                <div
-                                  style={{ fontSize: "11px", color: "#9ca3af" }}
-                                >
-                                  MP4, WebM, MOV · Max 80MB
-                                </div>
-                              </>
-                            )}
-                            <input
-                              type="file"
-                              accept={
-                                attachMediaTab === "image"
-                                  ? "image/jpeg,image/png,image/webp"
-                                  : "video/mp4,video/webm,video/quicktime"
-                              }
-                              style={{ display: "none" }}
-                              onChange={async (e) => {
-                                const file = e.target.files[0];
+                        {(() => {
+                          const pendingImages = pendingModalFiles.filter(
+                            (f) => !f.file.type.startsWith("video"),
+                          ).length;
+                          const pendingVideos = pendingModalFiles.filter((f) =>
+                            f.file.type.startsWith("video"),
+                          ).length;
+                          const currentTabFull =
+                            attachMediaTab === "video"
+                              ? pendingVideos >= 3
+                              : pendingImages >= 5;
+                          if (currentTabFull) return null;
+                          return (
+                            <label
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                cursor: "pointer",
+                                background: "white",
+                                textAlign: "center",
+                              }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={async (e) => {
+                                e.preventDefault();
+                                const file = e.dataTransfer.files[0];
                                 if (!file) return;
                                 if (attachMediaTab === "video") {
                                   try {
                                     await validateVideoFile(file);
                                   } catch (err) {
                                     showReactToast(err, "error");
-                                    e.target.value = "";
                                     return;
                                   }
                                 } else {
                                   const photoError = validatePhotoFile(file);
                                   if (photoError) {
                                     showReactToast(photoError, "error");
-                                    e.target.value = "";
                                     return;
                                   }
                                 }
@@ -7913,11 +7835,120 @@ function EBlotter() {
                                   ...prev,
                                   { file, caption: "", preview },
                                 ]);
-                                e.target.value = "";
                               }}
-                            />
-                          </label>
-                        )}
+                            >
+                              {attachMediaTab === "image" ? (
+                                <>
+                                  <svg
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#9ca3af"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                  </svg>
+                                  <div
+                                    style={{
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Click or drag to upload photo
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#9ca3af",
+                                    }}
+                                  >
+                                    JPG, PNG, WebP · Max 8MB
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <svg
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#9ca3af"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <polygon points="23 7 16 12 23 17 23 7" />
+                                    <rect
+                                      x="1"
+                                      y="5"
+                                      width="15"
+                                      height="14"
+                                      rx="2"
+                                      ry="2"
+                                    />
+                                  </svg>
+                                  <div
+                                    style={{
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Click or drag to upload video
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#9ca3af",
+                                    }}
+                                  >
+                                    MP4, WebM, MOV · Max 80MB
+                                  </div>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept={
+                                  attachMediaTab === "image"
+                                    ? "image/jpeg,image/png,image/webp"
+                                    : "video/mp4,video/webm,video/quicktime"
+                                }
+                                style={{ display: "none" }}
+                                onChange={async (e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  if (attachMediaTab === "video") {
+                                    try {
+                                      await validateVideoFile(file);
+                                    } catch (err) {
+                                      showReactToast(err, "error");
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                  } else {
+                                    const photoError = validatePhotoFile(file);
+                                    if (photoError) {
+                                      showReactToast(photoError, "error");
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                  }
+                                  const preview = URL.createObjectURL(file);
+                                  setPendingModalFiles((prev) => [
+                                    ...prev,
+                                    { file, caption: "", preview },
+                                  ]);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
