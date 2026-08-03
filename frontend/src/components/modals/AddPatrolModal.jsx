@@ -6,6 +6,7 @@ import "./PatrolModal.css";
 import LoadingModal from "./LoadingModal";
 import Notification from "./Notification";
 import TimePicker from "./TimePicker";
+import { createPortal } from "react-dom";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -23,6 +24,28 @@ const parseLocalDate = (d) => {
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
 };
 
+const MAX_PATROL_DAYS = 7;
+
+const diffDaysInclusive = (start, end) => {
+  if (!start || !end) return 0;
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  const s = new Date(sy, sm - 1, sd);
+  const e = new Date(ey, em - 1, ed);
+  return Math.round((e - s) / 86400000) + 1;
+};
+
+const addDaysToDateStr = (dateStr, days) => {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+};
+
+const maxEndDate = (startDate) =>
+  startDate ? addDaysToDateStr(startDate, MAX_PATROL_DAYS - 1) : undefined;
+
 const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
   const mapRef = useRef(null);
   const [loading, setLoading]         = useState(false);
@@ -32,6 +55,8 @@ const AddPatrolModal = ({ mobileUnits, geoJSONData, onClose, onSave }) => {
   const [hoveredBrgy, setHoveredBrgy] = useState(null);
 const [showPatrollers, setShowPatrollers] = useState(false);
 const [patrollerPage, setPatrollerPage]   = useState(1);
+const [hoveredPatroller, setHoveredPatroller] = useState(null);
+const [hoverAnchor, setHoverAnchor]           = useState(null);
 
 
 
@@ -273,9 +298,12 @@ const updateTask = (id, field, v) => setTasks((prev) => {
     if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
       setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
     }
-    if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
-      setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
-    }
+   if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
+  setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
+}
+if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
+  setNotif({ message: `Patrol duration cannot exceed ${MAX_PATROL_DAYS} days.`, type: "warning" }); return;
+}
     if (barangays.length === 0) {
       setNotif({ message: "Please select at least one barangay on the map.", type: "warning" }); return;
     }
@@ -394,16 +422,57 @@ for (const task of tasks) {
     }
   </select>
 </div>
-            <div className="apm-field">
-              <label>Start Date <span className="apm-req">*</span></label>
-              <input type="date" value={form.start_date}
-                onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))} />
-            </div>
-            <div className="apm-field">
-              <label>End Date <span className="apm-req">*</span></label>
-              <input type="date" value={form.end_date} min={form.start_date}
-                onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))} />
-            </div>
+           <div className="apm-field">
+  <label>Start Date <span className="apm-req">*</span></label>
+  <input
+    type="date"
+    value={form.start_date}
+    onChange={(e) => {
+      const newStart = e.target.value;
+      if (!newStart) { setForm((p) => ({ ...p, start_date: "" })); return; }
+
+      setForm((p) => {
+        // If current end_date now exceeds the 7-day window, clear it and force re-pick
+        if (p.end_date && diffDaysInclusive(newStart, p.end_date) > MAX_PATROL_DAYS) {
+          setNotif({ message: `Patrol duration is limited to ${MAX_PATROL_DAYS} days. Please re-select the end date.`, type: "warning" });
+          return { ...p, start_date: newStart, end_date: "" };
+        }
+        // Also guard against end_date being before the new start_date
+        if (p.end_date && p.end_date < newStart) {
+          return { ...p, start_date: newStart, end_date: "" };
+        }
+        return { ...p, start_date: newStart };
+      });
+    }}
+  />
+</div>
+<div className="apm-field">
+  <label>End Date <span className="apm-req">*</span></label>
+  <input
+    type="date"
+    value={form.end_date}
+    min={form.start_date}
+    max={maxEndDate(form.start_date)}
+    onChange={(e) => {
+      const newEnd = e.target.value;
+      if (!newEnd) { setForm((p) => ({ ...p, end_date: "" })); return; }
+
+      if (!form.start_date) {
+        setNotif({ message: "Please select a start date first.", type: "warning" });
+        return;
+      }
+      if (newEnd < form.start_date) {
+        setNotif({ message: "End date cannot be before start date.", type: "warning" });
+        return; // reject — state not updated, input reverts to previous valid value
+      }
+      if (diffDaysInclusive(form.start_date, newEnd) > MAX_PATROL_DAYS) {
+        setNotif({ message: `Patrol duration cannot exceed ${MAX_PATROL_DAYS} days (max: ${maxEndDate(form.start_date)}).`, type: "warning" });
+        return; // reject
+      }
+      setForm((p) => ({ ...p, end_date: newEnd }));
+    }}
+  />
+</div>
           </div>
           <div className="apm-topbar-actions">
             <button className="apm-btn-cancel" onClick={onClose}>Cancel</button>
@@ -596,9 +665,11 @@ for (const task of tasks) {
       const isOtherShift = otherShiftIds.includes(p.active_patroller_id);
       return (
         <div key={p.active_patroller_id}
-          className={`apm-check-item ${isSelected ? "apm-checked" : ""} ${isOtherShift ? "apm-other-shift" : ""}`}
-          onClick={() => togglePatroller(p.active_patroller_id)}
-          title={isOtherShift ? `Already assigned to ${activeShift === "AM" ? "PM" : "AM"} shift` : ""}>
+  className={`apm-check-item ${isSelected ? "apm-checked" : ""} ${isOtherShift ? "apm-other-shift" : ""}`}
+  onClick={() => togglePatroller(p.active_patroller_id)}
+  onMouseEnter={(e) => { setHoveredPatroller(p); setHoverAnchor(e.currentTarget); }}
+  onMouseLeave={() => { setHoveredPatroller(null); setHoverAnchor(null); }}
+  title={isOtherShift ? `Already assigned to ${activeShift === "AM" ? "PM" : "AM"} shift` : ""}>
           <div className="apm-avatar" style={{ overflow: "hidden", padding: 0 }}>
             {p.profile_picture ? (
               <img src={p.profile_picture} alt={p.officer_name}
@@ -729,10 +800,62 @@ const hasOverlap = prevTask
           </div>
         </div>
       </div>
-
+        {hoveredPatroller && hoverAnchor && (
+  <PatrollerHoverCard patroller={hoveredPatroller} anchorEl={hoverAnchor} />
+)}        
       <LoadingModal isOpen={loading} message="Creating patrol..." />
       {notif && <Notification message={notif.message} type={notif.type} onClose={() => setNotif(null)} duration={3000} />}
     </div>
+  );
+};
+
+const PatrollerHoverCard = ({ patroller, anchorEl }) => {
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (anchorEl) {
+      const rect = anchorEl.getBoundingClientRect();
+      setPos({ top: rect.bottom + 8, left: rect.left });
+    }
+  }, [anchorEl]);
+
+  const initials = patroller.officer_name
+    ? patroller.officer_name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+    : "??";
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed", top: pos.top, left: pos.left, zIndex: 1300,
+        background: "#fff", border: "1px solid #dee2e6", borderRadius: "12px",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.14)", padding: "14px 16px",
+        minWidth: "160px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          width: "52px", height: "52px", borderRadius: "50%",
+          background: "#1e3a5f", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "18px", fontWeight: 700,
+          overflow: "hidden", padding: 0,
+        }}
+      >
+        {patroller.profile_picture ? (
+          <img
+            src={patroller.profile_picture}
+            alt={patroller.officer_name}
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+          />
+        ) : initials}
+      </div>
+      <div style={{ fontWeight: 700, fontSize: "14px", color: "#0a1628", textAlign: "center" }}>
+        {patroller.rank ? `${patroller.rank} ${patroller.officer_name}` : patroller.officer_name}
+      </div>
+    </div>,
+    document.body
   );
 };
 
