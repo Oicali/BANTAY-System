@@ -39,16 +39,21 @@ const getAllUsers = async (req, res) => {
     }
 
     if (search) {
-  conditions.push(`(
-    u.username ILIKE $${paramIdx} OR
-    u.email ILIKE $${paramIdx} OR
-    u.first_name ILIKE $${paramIdx} OR
-    u.last_name ILIKE $${paramIdx} OR
-    pr.rank_name ILIKE $${paramIdx} OR
-    pr.abbreviation ILIKE $${paramIdx}
-  )`);
-  params.push(`%${search}%`);
-  paramIdx++;
+  const searchTokens = search.trim().split(/\s+/).filter(Boolean);
+
+  searchTokens.forEach((token) => {
+    conditions.push(`(
+      u.username ILIKE $${paramIdx} OR
+      u.email ILIKE $${paramIdx} OR
+      u.first_name ILIKE $${paramIdx} OR
+      u.last_name ILIKE $${paramIdx} OR
+      u.middle_name ILIKE $${paramIdx} OR
+      pr.rank_name ILIKE $${paramIdx} OR
+      pr.abbreviation ILIKE $${paramIdx}
+    )`);
+    params.push(`%${token}%`);
+    paramIdx++;
+  });
 }
 
     if (role && role !== "all") {
