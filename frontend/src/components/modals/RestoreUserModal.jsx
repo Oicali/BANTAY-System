@@ -47,6 +47,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locked, setLocked] = useState(false);
   const [lockCountdown, setLockCountdown] = useState("");
+  const [checkingLock, setCheckingLock] = useState(true);
   const lockTimerRef = useRef(null);
   const lockUntilRef = useRef(null);
 
@@ -59,6 +60,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     setShowPassword(false);
     setError("");
     setAttemptsLeft(null);
+    setCheckingLock(true);
     clearInterval(lockTimerRef.current);
 
     // Fast path: paint instantly if we already know about a lock
@@ -89,8 +91,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     }
     if (!fastPathLocked) setLocked(false);
 
-    // Source of truth: ask the backend, since it knows about locks set from
-    // any session/browser, even before this code existed on this device.
+    // Source of truth: ask the backend
     (async () => {
       try {
         const token = localStorage.getItem("token");
@@ -121,10 +122,11 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
         }
       } catch {
         // network hiccup — leave whatever the fast path already decided
+      } finally {
+        setCheckingLock(false);
       }
     })();
   }, [isOpen]);
-
   const handleClose = () => {
     setAdminPassword("");
     setShowPassword(false);
@@ -209,7 +211,20 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
   };
 
   if (!isOpen || !user) return null;
-
+  if (checkingLock) {
+    return (
+      <div className="rum-modal-overlay">
+        <div
+          className="rum-modal-container"
+          style={{ padding: 40, textAlign: "center" }}
+        >
+          <p style={{ color: "#6b7280", fontSize: 14 }}>
+            Checking account status…
+          </p>
+        </div>
+      </div>
+    );
+  }
   const displayName =
     user.first_name && user.last_name
       ? `${user.first_name} ${user.last_name}`
