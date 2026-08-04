@@ -89,6 +89,15 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     if (!stillLocked) setLocked(false);
   }, [isOpen]);
 
+  const handleClose = () => {
+    setAdminPassword("");
+    setShowPassword(false);
+    setError("");
+    setAttemptsLeft(null);
+    clearInterval(lockTimerRef.current);
+    onClose();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -150,6 +159,9 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
         return;
       }
 
+      // Wrong password (not locked yet) — clear the field so the user
+      // isn't left staring at their incorrect attempt.
+      setAdminPassword("");
       setError(data.message || "Failed to restore user");
       if (data.attemptsLeft !== undefined) setAttemptsLeft(data.attemptsLeft);
     } catch (err) {
@@ -167,201 +179,293 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
       ? `${user.first_name} ${user.last_name}`
       : user.username;
 
+  const LockIcon = ({ size = 30, color = "#0B2D6B", strokeWidth = 1.8 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+
   return (
     <>
       <LoadingModal isOpen={isSubmitting} message="Restoring account..." />
-      <div className="rum-modal-overlay" onClick={onClose}>
+      {/* Overlay is decorative only now — clicking it will NOT close the
+          modal, so an accidental click outside won't interrupt this
+          security-sensitive flow. Use the × or the buttons instead. */}
+      <div className="rum-modal-overlay">
         <div
           className="rum-modal-container"
+          style={{ overflow: "hidden" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="rum-modal-header">
-            <h2>Restore User Account</h2>
-            <button
-              className="rum-modal-close"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              ×
-            </button>
-          </div>
-
           {locked ? (
-            <div
-              className="rum-modal-form"
-              style={{ textAlign: "center", padding: "8px 4px" }}
-            >
+            <>
+              {/* Dark header — mirrors the ChangePasswordModal lock header */}
               <div
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  background: "#EAF1FB",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 16px",
+                  gap: 12,
+                  background: "#0B1E3D",
+                  padding: "18px 22px",
+                  color: "#fff",
                 }}
               >
-                <svg
-                  width="30"
-                  height="30"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#0B2D6B"
-                  strokeWidth="1.8"
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
                 >
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+                  <LockIcon size={18} color="#fff" strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#fff",
+                    }}
+                  >
+                    Restore Account Unavailable
+                  </h2>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12.5,
+                      color: "rgba(255,255,255,0.65)",
+                    }}
+                  >
+                    Too many incorrect attempts
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "rgba(255,255,255,0.8)",
+                    fontSize: 20,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    padding: 4,
+                  }}
+                >
+                  ×
+                </button>
               </div>
-              <h3
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: "#212529",
-                  margin: "0 0 8px",
-                }}
-              >
-                Too Many Incorrect Attempts
-              </h3>
-              <p
-                style={{
-                  color: "#6b7280",
-                  fontSize: 13,
-                  margin: "0 0 4px",
-                  lineHeight: 1.5,
-                }}
-              >
-                For your security, this action has been temporarily locked.
-              </p>
-              <p
-                style={{
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: "#212529",
-                  margin: "16px 0 4px",
-                }}
-              >
-                Try again in:
-              </p>
+
               <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: "#F3F4F6",
-                  borderRadius: 8,
-                  padding: "8px 16px",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: "#212529",
-                }}
+                className="rum-modal-form"
+                style={{ textAlign: "center", padding: "28px 24px" }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#94A3B8"
-                  strokeWidth="2"
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    background: "#EAF1FB",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 18px",
+                  }}
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                {lockCountdown || "Calculating…"}
-              </div>
-              <button
-                type="button"
-                className="rum-btn rum-btn-secondary"
-                onClick={onClose}
-                style={{ marginTop: 24, width: "100%" }}
-              >
-                Close
-              </button>
-            </div>
-          ) : (
-            <form className="rum-modal-form" onSubmit={handleSubmit}>
-              <div className="rum-info-box">
-                <div className="rum-info-content">
-                  <h3>Restore Account Confirmation</h3>
-                  <p>
-                    You are about to restore the account for{" "}
-                    <strong>{displayName}</strong>.
-                  </p>
-                  <p>
-                    This will re-activate the user's account and allow them to
-                    log in again.
-                  </p>
-                  <p className="rum-info-description">
-                    To confirm this action, please enter your administrator
-                    password below.
-                  </p>
+                  <LockIcon />
                 </div>
-              </div>
-
-              <div className="rum-form-section">
-                <div className="rum-form-section-title">
-                  Administrator Verification
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#212529",
+                    margin: "0 0 10px",
+                  }}
+                >
+                  Restore Account Unavailable
+                </h3>
+                <p
+                  style={{
+                    color: "#4b5563",
+                    fontSize: 13.5,
+                    margin: "0 0 8px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Too many incorrect password attempts. This action has been
+                  temporarily paused to protect your account.
+                </p>
+                <p
+                  style={{
+                    color: "#6b7280",
+                    fontSize: 13.5,
+                    margin: "0 0 4px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  This is automatic protection against unauthorized access.
+                  Please wait for the timer below before trying again.
+                </p>
+                <p
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: "#212529",
+                    margin: "18px 0 6px",
+                  }}
+                >
+                  Try again in:
+                </p>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#EEF3FF",
+                    border: "1px solid #DCE6FB",
+                    borderRadius: 999,
+                    padding: "10px 22px",
+                    fontWeight: 700,
+                    fontSize: 18,
+                    color: "#1F3A66",
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#1F3A66"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  {lockCountdown || "Calculating…"}
                 </div>
-                <div className="rum-form-section-description">
-                  For security purposes, we need to verify your identity before
-                  restoring this account.
-                </div>
-
-                <div className="rum-form-group">
-                  <label className="rum-form-label">Your Password</label>
-                  <div className="rum-password-input-wrapper">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className={`rum-form-input ${error ? "rum-error" : ""}`}
-                      placeholder="Enter your administrator password"
-                      value={adminPassword}
-                      onChange={(e) => {
-                        setAdminPassword(e.target.value);
-                        setError("");
-                      }}
-                      disabled={isSubmitting}
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      className="rum-password-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isSubmitting}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                  </div>
-                  {error && (
-                    <div className="rum-error-text">
-                      {error}
-                      {attemptsLeft !== null &&
-                        ` — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left`}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rum-modal-actions">
                 <button
                   type="button"
                   className="rum-btn rum-btn-secondary"
-                  onClick={onClose}
-                  disabled={isSubmitting}
+                  onClick={handleClose}
+                  style={{ marginTop: 26, width: "100%" }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rum-btn rum-btn-success"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Restoring..." : "Restore Account"}
+                  Got it, Close
                 </button>
               </div>
-            </form>
+            </>
+          ) : (
+            <>
+              <div className="rum-modal-header">
+                <h2>Restore User Account</h2>
+                <button
+                  className="rum-modal-close"
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form className="rum-modal-form" onSubmit={handleSubmit}>
+                <div className="rum-info-box">
+                  <div className="rum-info-content">
+                    <h3>Restore Account Confirmation</h3>
+                    <p>
+                      You are about to restore the account for{" "}
+                      <strong>{displayName}</strong>.
+                    </p>
+                    <p>
+                      This will re-activate the user's account and allow them to
+                      log in again.
+                    </p>
+                    <p className="rum-info-description">
+                      To confirm this action, please enter your administrator
+                      password below.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rum-form-section">
+                  <div className="rum-form-section-title">
+                    Administrator Verification
+                  </div>
+                  <div className="rum-form-section-description">
+                    For security purposes, we need to verify your identity
+                    before restoring this account.
+                  </div>
+
+                  <div className="rum-form-group">
+                    <label className="rum-form-label">Your Password</label>
+                    <div className="rum-password-input-wrapper">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className={`rum-form-input ${error ? "rum-error" : ""}`}
+                        placeholder="Enter your administrator password"
+                        value={adminPassword}
+                        onChange={(e) => {
+                          setAdminPassword(e.target.value);
+                          setError("");
+                        }}
+                        disabled={isSubmitting}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="rum-password-toggle"
+                        onClick={() => setShowPassword(!showPassword)}
+                        disabled={isSubmitting}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={20} />
+                        ) : (
+                          <Eye size={20} />
+                        )}
+                      </button>
+                    </div>
+                    {error && (
+                      <div className="rum-error-text">
+                        {error}
+                        {attemptsLeft !== null &&
+                          ` — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rum-modal-actions">
+                  <button
+                    type="button"
+                    className="rum-btn rum-btn-secondary"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rum-btn rum-btn-success"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Restoring..." : "Restore Account"}
+                  </button>
+                </div>
+              </form>
+            </>
           )}
         </div>
       </div>
