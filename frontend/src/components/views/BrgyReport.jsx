@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./BrgyReport.css";
 import LoadingModal from "../modals/LoadingModal";
+import { LIMITS } from "../../utils/attachmentLimits";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/blotters`;
 const ITEMS_PER_PAGE = 15;
@@ -181,8 +182,8 @@ function BrgyReport() {
   const addPendingFile = async (file, caption, isVideo = false) => {
     const imageCount = pendingFiles.filter((f) => !f.isVideo).length;
     const videoCount = pendingFiles.filter((f) => f.isVideo).length;
-    if (isVideo && videoCount >= 3) return;
-    if (!isVideo && imageCount >= 5) return;
+    if (isVideo && videoCount >= LIMITS.VIDEO_MAX_COUNT) return;
+    if (!isVideo && imageCount >= LIMITS.PHOTO_MAX_COUNT) return;
 
     if (isVideo) {
       try {
@@ -192,15 +193,22 @@ function BrgyReport() {
         return;
       }
     } else {
-      const allowed = ["image/jpeg", "image/png", "image/webp"];
-      if (!allowed.includes(file.type)) {
-        showToast("Only JPG, PNG, WEBP allowed", "error");
+      if (!LIMITS.PHOTO_TYPES.includes(file.type)) {
+        showToast("Only JPG, PNG, WEBP, HEIC allowed", "error");
         return;
       }
-      if (file.size > 8 * 1024 * 1024) {
-        showToast("Max 8MB per photo", "error");
+      if (file.size > LIMITS.PHOTO_MAX_MB * 1024 * 1024) {
+        showToast(`Max ${LIMITS.PHOTO_MAX_MB}MB per photo`, "error");
         return;
       }
+    }
+    const currentTotal = pendingFiles.reduce((s, f) => s + f.file.size, 0);
+    if (currentTotal + file.size > LIMITS.TOTAL_MAX_MB * 1024 * 1024) {
+      showToast(
+        `Total attachments would exceed ${LIMITS.TOTAL_MAX_MB}MB`,
+        "error",
+      );
+      return;
     }
 
     const preview = URL.createObjectURL(file);
@@ -489,8 +497,8 @@ function BrgyReport() {
       if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
         return reject("Only MP4, WebM, or MOV files are allowed.");
       }
-      if (file.size > 80 * 1024 * 1024) {
-        return reject("Video must be under 80MB.");
+      if (file.size > LIMITS.VIDEO_MAX_MB * 1024 * 1024) {
+        return reject(`Video must be under ${LIMITS.VIDEO_MAX_MB}MB.`);
       }
       const url = URL.createObjectURL(file);
       const vid = document.createElement("video");
@@ -1231,7 +1239,7 @@ function BrgyReport() {
                     borderRadius: "20px",
                   }}
                 >
-                  Optional · Up to 5 photos / 3 videos
+                  {`Optional · Up to ${LIMITS.PHOTO_MAX_COUNT} photos / ${LIMITS.VIDEO_MAX_COUNT} videos`}
                 </span>
               </div>
 
@@ -1251,7 +1259,7 @@ function BrgyReport() {
                   Attach CCTV snapshots or footage. These will be submitted with
                   your report.{" "}
                   <strong>
-                    Photos: JPG/PNG · Max 8MB. Videos: MP4/WebM/MOV · Max 80MB.
+                    {`Photos: JPG/PNG/HEIC · Max ${LIMITS.PHOTO_MAX_MB}MB. Videos: MP4/WebM/MOV · Max ${LIMITS.VIDEO_MAX_MB}MB.`}
                   </strong>
                 </div>
 
@@ -1433,8 +1441,10 @@ function BrgyReport() {
 
                 {/* Upload area */}
                 {(attachMediaTab === "video"
-                  ? pendingFiles.filter((f) => f.isVideo).length < 3
-                  : pendingFiles.filter((f) => !f.isVideo).length < 5) && (
+                  ? pendingFiles.filter((f) => f.isVideo).length <
+                    LIMITS.VIDEO_MAX_COUNT
+                  : pendingFiles.filter((f) => !f.isVideo).length <
+                    LIMITS.PHOTO_MAX_COUNT) && (
                   <div>
                     <label
                       htmlFor="evidence-upload"
@@ -1487,7 +1497,7 @@ function BrgyReport() {
                             Click to upload or drag & drop
                           </div>
                           <div style={{ fontSize: "12px", color: "#9ca3af" }}>
-                            CCTV footage — MP4 / WebM / MOV · Max 80MB
+                            {`CCTV footage — MP4 / WebM / MOV · Max ${LIMITS.VIDEO_MAX_MB}MB`}
                           </div>
                         </>
                       ) : (
@@ -1522,7 +1532,7 @@ function BrgyReport() {
                             Click to upload or drag & drop
                           </div>
                           <div style={{ fontSize: "12px", color: "#9ca3af" }}>
-                            CCTV footage — MP4 / WebM / MOV · Max 80MB
+                            {`CCTV footage — MP4 / WebM / MOV · Max ${LIMITS.VIDEO_MAX_MB}MB`}
                           </div>
                         </>
                       )}
@@ -1555,17 +1565,17 @@ function BrgyReport() {
                       }}
                     >
                       <span>
-                        {pendingFiles.filter((f) => !f.isVideo).length}/5 photos
-                        · {pendingFiles.filter((f) => f.isVideo).length}/3
-                        videos
+                        {`${pendingFiles.filter((f) => !f.isVideo).length}/${LIMITS.PHOTO_MAX_COUNT} photos · ${pendingFiles.filter((f) => f.isVideo).length}/${LIMITS.VIDEO_MAX_COUNT} videos`}
                       </span>
                       <span>Files will upload when you submit the report</span>
                     </div>
                   </div>
                 )}
 
-                {pendingFiles.filter((f) => !f.isVideo).length >= 5 &&
-                  pendingFiles.filter((f) => f.isVideo).length >= 3 && (
+                {pendingFiles.filter((f) => !f.isVideo).length >=
+                  LIMITS.PHOTO_MAX_COUNT &&
+                  pendingFiles.filter((f) => f.isVideo).length >=
+                    LIMITS.VIDEO_MAX_COUNT && (
                     <div
                       style={{
                         textAlign: "center",
@@ -1578,8 +1588,7 @@ function BrgyReport() {
                         fontWeight: 600,
                       }}
                     >
-                      ✓ Maximum files reached (5 photos, 3 videos). They will
-                      upload with your report.
+                      {`✓ Maximum files reached (${LIMITS.PHOTO_MAX_COUNT} photos, ${LIMITS.VIDEO_MAX_COUNT} videos). They will upload with your report.`}
                     </div>
                   )}
               </div>

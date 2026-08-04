@@ -15,6 +15,7 @@ import RemindPatrolModal from "../modals/RemindPatrolModal";
 import ExportBlotterModal from "../modals/ExportBlotterModal";
 import PdfPreviewModal from "../modals/PdfPreviewModal";
 import ViewReferralModal from "../modals/ViewReferralModal";
+import { LIMITS } from "../../utils/attachmentLimits";
 
 const OFFENSE_TO_CRIME_TYPE = {
   Murder: "MURDER",
@@ -2871,8 +2872,8 @@ function EBlotter() {
       if (!["video/mp4", "video/webm", "video/quicktime"].includes(file.type)) {
         return reject("Only MP4, WebM, or MOV files are allowed.");
       }
-      if (file.size > 80 * 1024 * 1024) {
-        return reject("Video must be under 80MB.");
+      if (file.size > LIMITS.VIDEO_MAX_MB * 1024 * 1024) {
+        return reject(`Video must be under ${LIMITS.VIDEO_MAX_MB}MB.`);
       }
       const url = URL.createObjectURL(file);
       const vid = document.createElement("video");
@@ -2889,12 +2890,11 @@ function EBlotter() {
     });
 
   const validatePhotoFile = (file) => {
-    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowed.includes(file.type)) {
-      return "Only JPG, PNG, or WebP images are allowed.";
+    if (!LIMITS.PHOTO_TYPES.includes(file.type)) {
+      return "Only JPG, PNG, WebP, or HEIC images are allowed.";
     }
-    if (file.size > 8 * 1024 * 1024) {
-      return "Photo must be under 8MB.";
+    if (file.size > LIMITS.PHOTO_MAX_MB * 1024 * 1024) {
+      return `Photo must be under ${LIMITS.PHOTO_MAX_MB}MB.`;
     }
     return null; // no error
   };
@@ -7075,7 +7075,7 @@ function EBlotter() {
                               const pendingVideos = pendingModalFiles.filter(
                                 (f) => f.file.type.startsWith("video"),
                               ).length;
-                              return `Photos: ${savedImages + pendingImages}/5 · Videos: ${savedVideos + pendingVideos}/3`;
+                              return `Photos: ${savedImages + pendingImages}/${LIMITS.PHOTO_MAX_COUNT} · Videos: ${savedVideos + pendingVideos}/${LIMITS.VIDEO_MAX_COUNT}`;
                             })()}
                           </span>
                         </div>
@@ -7397,8 +7397,12 @@ function EBlotter() {
                           const pendingVideos = pendingModalFiles.filter((f) =>
                             f.file.type.startsWith("video"),
                           ).length;
-                          const imagesFull = savedImages + pendingImages >= 5;
-                          const videosFull = savedVideos + pendingVideos >= 3;
+                          const imagesFull =
+                            savedImages + pendingImages >=
+                            LIMITS.PHOTO_MAX_COUNT;
+                          const videosFull =
+                            savedVideos + pendingVideos >=
+                            LIMITS.VIDEO_MAX_COUNT;
                           const currentTabFull =
                             attachMediaTab === "video"
                               ? videosFull
@@ -7439,6 +7443,20 @@ function EBlotter() {
                                     return;
                                   }
                                 }
+                                const currentTotal = pendingModalFiles.reduce(
+                                  (s, f) => s + f.file.size,
+                                  0,
+                                );
+                                if (
+                                  currentTotal + file.size >
+                                  LIMITS.TOTAL_MAX_MB * 1024 * 1024
+                                ) {
+                                  showReactToast(
+                                    `Total attachments would exceed ${LIMITS.TOTAL_MAX_MB}MB`,
+                                    "error",
+                                  );
+                                  return;
+                                }
                                 const preview = URL.createObjectURL(file);
                                 setPendingModalFiles((prev) => [
                                   ...prev,
@@ -7476,7 +7494,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    JPG, PNG, WebP · Max 8MB · Up to 5 photos
+                                    {`JPG, PNG, WebP, HEIC · Max ${LIMITS.PHOTO_MAX_MB}MB · Up to ${LIMITS.PHOTO_MAX_COUNT} photos`}
                                   </div>
                                 </>
                               ) : (
@@ -7516,7 +7534,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    MP4, WebM, MOV · Max 80MB · Up to 3 videos
+                                    {`MP4, WebM, MOV · Max ${LIMITS.VIDEO_MAX_MB}MB · Up to ${LIMITS.VIDEO_MAX_COUNT} videos`}
                                   </div>
                                 </>
                               )}
@@ -7546,6 +7564,21 @@ function EBlotter() {
                                       e.target.value = "";
                                       return;
                                     }
+                                  }
+                                  const currentTotal = pendingModalFiles.reduce(
+                                    (s, f) => s + f.file.size,
+                                    0,
+                                  );
+                                  if (
+                                    currentTotal + file.size >
+                                    LIMITS.TOTAL_MAX_MB * 1024 * 1024
+                                  ) {
+                                    showReactToast(
+                                      `Total attachments would exceed ${LIMITS.TOTAL_MAX_MB}MB`,
+                                      "error",
+                                    );
+                                    e.target.value = "";
+                                    return;
                                   }
                                   const preview = URL.createObjectURL(file);
                                   setPendingModalFiles((prev) => [
@@ -7603,7 +7636,7 @@ function EBlotter() {
                               const vids = pendingModalFiles.filter((f) =>
                                 f.file.type.startsWith("video"),
                               ).length;
-                              return `Photos: ${imgs}/5 · Videos: ${vids}/3`;
+                              return `Photos: ${imgs}/${LIMITS.PHOTO_MAX_COUNT} · Videos: ${vids}/${LIMITS.VIDEO_MAX_COUNT}`;
                             })()}
                           </span>
                         </div>
@@ -7793,8 +7826,8 @@ function EBlotter() {
                           ).length;
                           const currentTabFull =
                             attachMediaTab === "video"
-                              ? pendingVideos >= 3
-                              : pendingImages >= 5;
+                              ? pendingVideos >= LIMITS.VIDEO_MAX_COUNT
+                              : pendingImages >= LIMITS.PHOTO_MAX_COUNT;
                           if (currentTabFull) return null;
                           return (
                             <label
@@ -7827,8 +7860,23 @@ function EBlotter() {
                                   const photoError = validatePhotoFile(file);
                                   if (photoError) {
                                     showReactToast(photoError, "error");
+                                    e.target.value = "";
                                     return;
                                   }
+                                }
+                                const currentTotal = pendingModalFiles.reduce(
+                                  (s, f) => s + f.file.size,
+                                  0,
+                                );
+                                if (
+                                  currentTotal + file.size >
+                                  LIMITS.TOTAL_MAX_MB * 1024 * 1024
+                                ) {
+                                  showReactToast(
+                                    `Total attachments would exceed ${LIMITS.TOTAL_MAX_MB}MB`,
+                                    "error",
+                                  );
+                                  return;
                                 }
                                 const preview = URL.createObjectURL(file);
                                 setPendingModalFiles((prev) => [
@@ -7867,7 +7915,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    JPG, PNG, WebP · Max 8MB
+                                    {`JPG, PNG, WebP, HEIC · Max ${LIMITS.PHOTO_MAX_MB}MB`}
                                   </div>
                                 </>
                               ) : (
@@ -7907,7 +7955,7 @@ function EBlotter() {
                                       color: "#9ca3af",
                                     }}
                                   >
-                                    MP4, WebM, MOV · Max 80MB
+                                    {`MP4, WebM, MOV · Max ${LIMITS.VIDEO_MAX_MB}MB`}
                                   </div>
                                 </>
                               )}
@@ -7937,6 +7985,21 @@ function EBlotter() {
                                       e.target.value = "";
                                       return;
                                     }
+                                  }
+                                  const currentTotal = pendingModalFiles.reduce(
+                                    (s, f) => s + f.file.size,
+                                    0,
+                                  );
+                                  if (
+                                    currentTotal + file.size >
+                                    LIMITS.TOTAL_MAX_MB * 1024 * 1024
+                                  ) {
+                                    showReactToast(
+                                      `Total attachments would exceed ${LIMITS.TOTAL_MAX_MB}MB`,
+                                      "error",
+                                    );
+                                    e.target.value = "";
+                                    return;
                                   }
                                   const preview = URL.createObjectURL(file);
                                   setPendingModalFiles((prev) => [

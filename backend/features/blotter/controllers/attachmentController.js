@@ -1,25 +1,31 @@
 const pool = require("../../../config/database");
 const cloudinary = require("../../../config/cloudinary");
 const streamifier = require("streamifier");
-const MAX_IMAGE_SIZE = 8 * 1024 * 1024;  // 8MB
-const MAX_VIDEO_SIZE = 80 * 1024 * 1024; // 80MB
+const MAX_IMAGE_SIZE = 12 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 180 * 1024 * 1024;
+const MAX_PHOTOS = 8;
+const MAX_VIDEOS = 3;
 // Upload to Cloudinary via stream
 const uploadToCloudinary = (buffer, folder, publicId, resourceType = "image") => {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        public_id: publicId,
-        resource_type: resourceType,  // ← was hardcoded "image"
-        // Only apply image transformations for images
-        ...(resourceType === "image" && {
-          transformation: [{ quality: "auto", fetch_format: "auto" }],
-        }),
-      },
-      (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      }
+   const uploadOpts = {
+  folder,
+  public_id: publicId,
+  resource_type: resourceType,
+  ...(resourceType === "image" && {
+    quality: "auto",
+    fetch_format: "auto",
+  }),
+};
+
+const stream = resourceType === "video"
+  ? cloudinary.uploader.upload_large_stream(
+      { ...uploadOpts, chunk_size: 6000000 }, // required for files >100MB
+      (error, result) => { if (error) reject(error); else resolve(result); }
+    )
+  : cloudinary.uploader.upload_stream(
+      uploadOpts,
+      (error, result) => { if (error) reject(error); else resolve(result); }
     );
     streamifier.createReadStream(buffer).pipe(stream);
   });
@@ -41,8 +47,8 @@ const uploadAttachment = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: isVideo
-          ? "Video exceeds 80MB limit"
-          : "Photo exceeds 8MB limit",
+          ? "Video exceeds 180MB limit"
+          : "Photo exceeds 12MB limit",
       });
     }
 
@@ -55,15 +61,17 @@ const uploadAttachment = async (req, res) => {
     }
 
     const count = await pool.query(
-      `SELECT COUNT(*) FROM blotter_attachments WHERE blotter_id = $1`,
-      [id]
-    );
-    if (parseInt(count.rows[0].count) >= 5) {
-      return res.status(400).json({
-        success: false,
-        message: "Maximum 5 attachments per report",
-      });
-    }
+  `SELECT file_type FROM blotter_attachments WHERE blotter_id = $1`,
+  [id]
+);
+const photoCount = count.rows.filter(r => !r.file_type.startsWith("video")).length;
+const videoCount = count.rows.filter(r => r.file_type.startsWith("video")).length;
+if (isVideo && videoCount >= MAX_VIDEOS) {
+  return res.status(400).json({ success: false, message: `Maximum ${MAX_VIDEOS} videos per report` });
+}
+if (!isVideo && photoCount >= MAX_PHOTOS) {
+  return res.status(400).json({ success: false, message: `Maximum ${MAX_PHOTOS} photos per report` });
+}
 
     const resourceType = isVideo ? "video" : "image";
 
