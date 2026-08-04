@@ -1,9 +1,12 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./RestoreUserModal.css";
 import { Eye, EyeOff } from "lucide-react";
 import LoadingModal from "../modals/LoadingModal";
 
-const API_URL = import.meta.env.VITE_API_URL; // ← add here
+const API_URL = import.meta.env.VITE_API_URL;
+// Shared with DeleteUserModal — both check the same admin password lock
+// on the backend, so both should reflect the same lock state instantly.
+const REAUTH_LOCK_KEY = "admin_reauth_locked_until";
 
 function fmtCountdown(msLeft) {
   if (msLeft <= 0) return "0m 00s";
@@ -47,16 +50,43 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
   const lockTimerRef = useRef(null);
   const lockUntilRef = useRef(null);
 
-  // Reset form when modal opens/closes
-  React.useEffect(() => {
-    if (isOpen) {
-      setAdminPassword("");
-      setShowPassword(false);
-      setError("");
-      setAttemptsLeft(null);
-      setLocked(false);
-      clearInterval(lockTimerRef.current);
+  // Every time the modal opens, re-check the shared lock immediately —
+  // this is what makes the lock screen appear right away on reopen,
+  // instead of only after a failed submit.
+  useEffect(() => {
+    if (!isOpen) return;
+    setAdminPassword("");
+    setShowPassword(false);
+    setError("");
+    setAttemptsLeft(null);
+    clearInterval(lockTimerRef.current);
+
+    let stillLocked = false;
+    try {
+      const raw = localStorage.getItem(REAUTH_LOCK_KEY);
+      if (raw) {
+        const { until } = JSON.parse(raw);
+        if (until && until > Date.now()) {
+          stillLocked = true;
+          setLocked(true);
+          startLockCountdown(
+            until - Date.now(),
+            setLockCountdown,
+            lockTimerRef,
+            lockUntilRef,
+            () => {
+              setLocked(false);
+              localStorage.removeItem(REAUTH_LOCK_KEY);
+            },
+          );
+        } else {
+          localStorage.removeItem(REAUTH_LOCK_KEY);
+        }
+      }
+    } catch {
+      localStorage.removeItem(REAUTH_LOCK_KEY);
     }
+    if (!stillLocked) setLocked(false);
   }, [isOpen]);
 
   const handleSubmit = async (e) => {
@@ -97,14 +127,24 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
       }
 
       if (data.locked) {
+        const msLeft = data.msLeft ?? (data.minutesLeft || 15) * 60_000;
+        try {
+          localStorage.setItem(
+            REAUTH_LOCK_KEY,
+            JSON.stringify({ until: Date.now() + msLeft }),
+          );
+        } catch {}
         setLocked(true);
         setAdminPassword("");
         startLockCountdown(
-          data.msLeft ?? (data.minutesLeft || 15) * 60_000,
+          msLeft,
           setLockCountdown,
           lockTimerRef,
           lockUntilRef,
-          () => setLocked(false),
+          () => {
+            setLocked(false);
+            localStorage.removeItem(REAUTH_LOCK_KEY);
+          },
         );
         setIsSubmitting(false);
         return;
@@ -119,6 +159,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
       setIsSubmitting(false);
     }
   };
+
   if (!isOpen || !user) return null;
 
   const displayName =
@@ -146,49 +187,104 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
           </div>
 
           {locked ? (
-            <div className="rum-modal-form" style={{ textAlign: "center" }}>
+            <div
+              className="rum-modal-form"
+              style={{ textAlign: "center", padding: "8px 4px" }}
+            >
               <div
-                className="rum-info-box"
                 style={{
-                  flexDirection: "column",
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  background: "#EAF1FB",
+                  display: "flex",
                   alignItems: "center",
-                  background: "#fef2f2",
-                  borderLeftColor: "#ef4444",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
                 }}
               >
-                <h3 style={{ color: "#991b1b" }}>
-                  Too Many Incorrect Attempts ⚠️
-                </h3>
-                <p style={{ color: "#7f1d1d" }}>
-                  For your security, this action has been temporarily locked.
-                </p>
-                <p
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 20,
-                    marginTop: 8,
-                    color: "#991b1b",
-                  }}
+                <svg
+                  width="30"
+                  height="30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0B2D6B"
+                  strokeWidth="1.8"
                 >
-                  Try again in: {lockCountdown || "Calculating…"}
-                </p>
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h3
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "#212529",
+                  margin: "0 0 8px",
+                }}
+              >
+                Too Many Incorrect Attempts
+              </h3>
+              <p
+                style={{
+                  color: "#6b7280",
+                  fontSize: 13,
+                  margin: "0 0 4px",
+                  lineHeight: 1.5,
+                }}
+              >
+                For your security, this action has been temporarily locked.
+              </p>
+              <p
+                style={{
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: "#212529",
+                  margin: "16px 0 4px",
+                }}
+              >
+                Try again in:
+              </p>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "#F3F4F6",
+                  borderRadius: 8,
+                  padding: "8px 16px",
+                  fontWeight: 700,
+                  fontSize: 18,
+                  color: "#212529",
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#94A3B8"
+                  strokeWidth="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                {lockCountdown || "Calculating…"}
               </div>
               <button
                 type="button"
                 className="rum-btn rum-btn-secondary"
                 onClick={onClose}
-                style={{ marginTop: 16 }}
+                style={{ marginTop: 24, width: "100%" }}
               >
                 Close
               </button>
             </div>
           ) : (
             <form className="rum-modal-form" onSubmit={handleSubmit}>
-              {/* Success/Info Box */}
               <div className="rum-info-box">
-                {/* <div className="rum-info-icon">✓</div> */}
                 <div className="rum-info-content">
-                  <h3>Restore Account Confirmation ✅ </h3>
+                  <h3>Restore Account Confirmation</h3>
                   <p>
                     You are about to restore the account for{" "}
                     <strong>{displayName}</strong>.
@@ -204,7 +300,6 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
                 </div>
               </div>
 
-              {/* Password Input Section */}
               <div className="rum-form-section">
                 <div className="rum-form-section-title">
                   Administrator Verification
@@ -249,7 +344,6 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="rum-modal-actions">
                 <button
                   type="button"
