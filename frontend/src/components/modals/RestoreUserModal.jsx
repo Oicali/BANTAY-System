@@ -1,163 +1,276 @@
-import React, { useState } from 'react';
-import './RestoreUserModal.css';
+import React, { useState, useRef } from "react";
+import "./RestoreUserModal.css";
 import { Eye, EyeOff } from "lucide-react";
 import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
+function fmtCountdown(msLeft) {
+  if (msLeft <= 0) return "0m 00s";
+  const totalSecs = Math.ceil(msLeft / 1000);
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+function startLockCountdown(
+  msLeft,
+  setCountdown,
+  timerRef,
+  untilRef,
+  onExpire,
+) {
+  clearInterval(timerRef.current);
+  untilRef.current = Date.now() + msLeft;
+  const tick = () => {
+    const left = untilRef.current - Date.now();
+    if (left <= 0) {
+      setCountdown("0m 00s");
+      clearInterval(timerRef.current);
+      onExpire();
+      return;
+    }
+    setCountdown(fmtCountdown(left));
+  };
+  tick();
+  timerRef.current = setInterval(tick, 1000);
+}
+
 const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
-  const [adminPassword, setAdminPassword] = useState('');
+  const [adminPassword, setAdminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [attemptsLeft, setAttemptsLeft] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [lockCountdown, setLockCountdown] = useState("");
+  const lockTimerRef = useRef(null);
+  const lockUntilRef = useRef(null);
 
   // Reset form when modal opens/closes
   React.useEffect(() => {
     if (isOpen) {
-      setAdminPassword('');
+      setAdminPassword("");
       setShowPassword(false);
-      setError('');
+      setError("");
+      setAttemptsLeft(null);
+      setLocked(false);
+      clearInterval(lockTimerRef.current);
     }
   }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
+    setAttemptsLeft(null);
 
     if (!adminPassword.trim()) {
-      setError('Administrator password is required');
+      setError("Administrator password is required");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
 
-      const response = await fetch(`${API_URL}/user-management/users/${user.user_id}/restore`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${API_URL}/user-management/users/${user.user_id}/restore`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            adminPassword: adminPassword,
+          }),
         },
-        body: JSON.stringify({
-          adminPassword: adminPassword
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (response.ok) {
-        onUserRestored(data.message || 'User restored successfully!');
+        onUserRestored(data.message || "User restored successfully!");
         onClose();
-      } else {
-        setError(data.message || 'Failed to restore user');
+        return;
       }
+
+      if (data.locked) {
+        setLocked(true);
+        setAdminPassword("");
+        startLockCountdown(
+          data.msLeft ?? (data.minutesLeft || 15) * 60_000,
+          setLockCountdown,
+          lockTimerRef,
+          lockUntilRef,
+          () => setLocked(false),
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      setError(data.message || "Failed to restore user");
+      if (data.attemptsLeft !== undefined) setAttemptsLeft(data.attemptsLeft);
     } catch (err) {
-      console.error('Restore user error:', err);
-      setError('Error connecting to server');
+      console.error("Restore user error:", err);
+      setError("Error connecting to server");
     } finally {
       setIsSubmitting(false);
     }
   };
-
   if (!isOpen || !user) return null;
 
-  const displayName = user.first_name && user.last_name 
-    ? `${user.first_name} ${user.last_name}`
-    : user.username;
+  const displayName =
+    user.first_name && user.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user.username;
 
   return (
     <>
-    <LoadingModal isOpen={isSubmitting} message="Restoring account..." />
-    <div className="rum-modal-overlay" onClick={onClose}>
-      <div className="rum-modal-container" onClick={(e) => e.stopPropagation()}>
-        <div className="rum-modal-header">
-          <h2>Restore User Account</h2>
-          <button 
-            className="rum-modal-close" 
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            ×
-          </button>
-        </div>
-
-        <form className="rum-modal-form" onSubmit={handleSubmit}>
-          {/* Success/Info Box */}
-          <div className="rum-info-box">
-            {/* <div className="rum-info-icon">✓</div> */}
-            <div className="rum-info-content">
-              <h3>Restore Account Confirmation ✅ </h3>
-              <p>
-                You are about to restore the account for <strong>{displayName}</strong>.
-              </p>
-              <p>
-                This will re-activate the user's account and allow them to log in again.
-              </p>
-              <p className="rum-info-description">
-                To confirm this action, please enter your administrator password below.
-              </p>
-            </div>
-          </div>
-
-          {/* Password Input Section */}
-          <div className="rum-form-section">
-            <div className="rum-form-section-title">Administrator Verification</div>
-            <div className="rum-form-section-description">
-              For security purposes, we need to verify your identity before restoring this account.
-            </div>
-
-            <div className="rum-form-group">
-              <label className="rum-form-label">Your Password</label>
-              <div className="rum-password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className={`rum-form-input ${error ? 'rum-error' : ''}`}
-                  placeholder="Enter your administrator password"
-                  value={adminPassword}
-                  onChange={(e) => {
-                    setAdminPassword(e.target.value);
-                    setError('');
-                  }}
-                  disabled={isSubmitting}
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="rum-password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isSubmitting}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {error && <div className="rum-error-text">{error}</div>}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="rum-modal-actions">
+      <LoadingModal isOpen={isSubmitting} message="Restoring account..." />
+      <div className="rum-modal-overlay" onClick={onClose}>
+        <div
+          className="rum-modal-container"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="rum-modal-header">
+            <h2>Restore User Account</h2>
             <button
-              type="button"
-              className="rum-btn rum-btn-secondary"
+              className="rum-modal-close"
               onClick={onClose}
               disabled={isSubmitting}
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rum-btn rum-btn-success"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Restoring...' : 'Restore Account'}
+              ×
             </button>
           </div>
-        </form>
+
+          {locked ? (
+            <div className="rum-modal-form" style={{ textAlign: "center" }}>
+              <div
+                className="rum-info-box"
+                style={{
+                  flexDirection: "column",
+                  alignItems: "center",
+                  background: "#fef2f2",
+                  borderLeftColor: "#ef4444",
+                }}
+              >
+                <h3 style={{ color: "#991b1b" }}>
+                  Too Many Incorrect Attempts ⚠️
+                </h3>
+                <p style={{ color: "#7f1d1d" }}>
+                  For your security, this action has been temporarily locked.
+                </p>
+                <p
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 20,
+                    marginTop: 8,
+                    color: "#991b1b",
+                  }}
+                >
+                  Try again in: {lockCountdown || "Calculating…"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rum-btn rum-btn-secondary"
+                onClick={onClose}
+                style={{ marginTop: 16 }}
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <form className="rum-modal-form" onSubmit={handleSubmit}>
+              {/* Success/Info Box */}
+              <div className="rum-info-box">
+                {/* <div className="rum-info-icon">✓</div> */}
+                <div className="rum-info-content">
+                  <h3>Restore Account Confirmation ✅ </h3>
+                  <p>
+                    You are about to restore the account for{" "}
+                    <strong>{displayName}</strong>.
+                  </p>
+                  <p>
+                    This will re-activate the user's account and allow them to
+                    log in again.
+                  </p>
+                  <p className="rum-info-description">
+                    To confirm this action, please enter your administrator
+                    password below.
+                  </p>
+                </div>
+              </div>
+
+              {/* Password Input Section */}
+              <div className="rum-form-section">
+                <div className="rum-form-section-title">
+                  Administrator Verification
+                </div>
+                <div className="rum-form-section-description">
+                  For security purposes, we need to verify your identity before
+                  restoring this account.
+                </div>
+
+                <div className="rum-form-group">
+                  <label className="rum-form-label">Your Password</label>
+                  <div className="rum-password-input-wrapper">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className={`rum-form-input ${error ? "rum-error" : ""}`}
+                      placeholder="Enter your administrator password"
+                      value={adminPassword}
+                      onChange={(e) => {
+                        setAdminPassword(e.target.value);
+                        setError("");
+                      }}
+                      disabled={isSubmitting}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className="rum-password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isSubmitting}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  {error && (
+                    <div className="rum-error-text">
+                      {error}
+                      {attemptsLeft !== null &&
+                        ` — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="rum-modal-actions">
+                <button
+                  type="button"
+                  className="rum-btn rum-btn-secondary"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rum-btn rum-btn-success"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Restoring..." : "Restore Account"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 };
