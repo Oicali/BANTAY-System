@@ -13,7 +13,8 @@ function ImportResidentModal({ onClose, onSuccess }) {
   const handleFile = (f) => {
     if (!f) return;
     if (!f.name.match(/\.(xlsx|csv)$/i)) {
-      alert("Only .xlsx or .csv files allowed");
+      setToast("⚠️ Only .xlsx or .csv files allowed.");
+      setTimeout(() => setToast(null), 4000);
       return;
     }
     setFile(f);
@@ -37,6 +38,12 @@ function ImportResidentModal({ onClose, onSuccess }) {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
       totalRows = rows.length;
+      if (rows.length === 0) {
+        setLoading(false);
+        setToast("⚠️ File is empty.");
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
 
       if (rows.length > 0) {
         const firstRow = rows[0];
@@ -124,11 +131,13 @@ function ImportResidentModal({ onClose, onSuccess }) {
         setResult(data.summary);
         onSuccess && onSuccess();
       } else {
-        alert(data.message || "Import failed");
+        setToast(`⚠️ ${data.message || "Import failed"}`);
+        setTimeout(() => setToast(null), 4000);
       }
     } catch (err) {
       if (interval) clearInterval(interval);
-      alert("Import failed: " + err.message);
+      setToast(`⚠️ Import failed: ${err.message}`);
+      setTimeout(() => setToast(null), 4000);
     }
     setLoading(false);
   };
@@ -337,7 +346,7 @@ function ImportResidentModal({ onClose, onSuccess }) {
             whiteSpace: "normal",
           }}
         >
-          ⚠️ Invalid template. Columns FIRST_NAME and LAST_NAME are required.
+          {toast}
         </div>
       )}
     </div>,
