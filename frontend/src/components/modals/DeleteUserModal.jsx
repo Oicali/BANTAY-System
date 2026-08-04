@@ -61,13 +61,14 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
     setAttemptsLeft(null);
     clearInterval(lockTimerRef.current);
 
-    let stillLocked = false;
+    // Fast path: paint instantly if we already know about a lock
+    let fastPathLocked = false;
     try {
       const raw = localStorage.getItem(REAUTH_LOCK_KEY);
       if (raw) {
         const { until } = JSON.parse(raw);
         if (until && until > Date.now()) {
-          stillLocked = true;
+          fastPathLocked = true;
           setLocked(true);
           startLockCountdown(
             until - Date.now(),
@@ -86,9 +87,43 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
     } catch {
       localStorage.removeItem(REAUTH_LOCK_KEY);
     }
-    if (!stillLocked) setLocked(false);
-  }, [isOpen]);
+    if (!fastPathLocked) setLocked(false);
 
+    // Source of truth: ask the backend, since it knows about locks set from
+    // any session/browser, even before this code existed on this device.
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_URL}/user-management/reauth-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+
+        if (data.locked) {
+          const until =
+            Date.now() + (data.msLeft ?? (data.minutesLeft || 15) * 60_000);
+          localStorage.setItem(REAUTH_LOCK_KEY, JSON.stringify({ until }));
+          setLocked(true);
+          startLockCountdown(
+            until - Date.now(),
+            setLockCountdown,
+            lockTimerRef,
+            lockUntilRef,
+            () => {
+              setLocked(false);
+              localStorage.removeItem(REAUTH_LOCK_KEY);
+            },
+          );
+        } else if (fastPathLocked) {
+          setLocked(false);
+          clearInterval(lockTimerRef.current);
+          localStorage.removeItem(REAUTH_LOCK_KEY);
+        }
+      } catch {
+        // network hiccup — leave whatever the fast path already decided
+      }
+    })();
+  }, [isOpen]);
   const handleClose = () => {
     setPassword("");
     setShowPassword(false);
