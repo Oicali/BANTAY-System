@@ -432,8 +432,6 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
       setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
     }
-
-if (parseLocalDate ? false : false) {} // (no-op placeholder, ignore)
 if (toDateStr(form.end_date) < toDateStr(form.start_date)) {
   setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
 }
