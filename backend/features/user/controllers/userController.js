@@ -30,7 +30,6 @@ async function checkAndTrackReauth(adminUserId, adminPassword) {
   }
 
   const admin = userResult.rows[0];
-
   if (
     admin.reauth_locked_until &&
     new Date(admin.reauth_locked_until) > new Date()
@@ -49,8 +48,20 @@ async function checkAndTrackReauth(adminUserId, adminPassword) {
     };
   }
 
-  const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
+  // The lock has expired (or never existed) by this point. If a lock was
+  // previously set, its expiry means the penalty is over — reset the
+  // counter so the admin gets a fresh set of attempts, instead of
+  // continuing to climb from wherever it left off (which was
+  // re-locking them instantly right after the cooldown ended).
+  if (admin.reauth_failed_attempts > 0 || admin.reauth_locked_until) {
+    await pool.query(
+      "UPDATE users SET reauth_failed_attempts = 0, reauth_locked_until = NULL WHERE user_id = $1",
+      [adminUserId],
+    );
+    admin.reauth_failed_attempts = 0;
+  }
 
+  const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
   if (!isPasswordValid) {
     const newAttempts = (admin.reauth_failed_attempts || 0) + 1;
     const attemptsLeft = MAX_REAUTH_ATTEMPTS - newAttempts;
