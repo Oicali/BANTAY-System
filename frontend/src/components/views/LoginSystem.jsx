@@ -658,7 +658,7 @@ const LoginSystem = () => {
         </div>
         <div className="title-section">
           <h1 className="main-title">
-            Bacoor Anti-Criminality Network for Targeted Actions and Yields{" "}
+            Bacoor Anti-criminality Network for Targeted Actions and Yields{" "}
           </h1>
         </div>
 

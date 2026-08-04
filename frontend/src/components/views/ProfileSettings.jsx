@@ -891,19 +891,19 @@ export default function ProfileSettings() {
     setSuccessMessage("");
     setErrorMessage("");
   };
-  const handlePhoneInput = (e) => {
-    const { name, value } = e.target;
-    const digits = value.replace(/\D/g, "").slice(0, 10);
-    setFormData((p) => ({ ...p, [name]: digits }));
-    if (name === "phone") setPhoneChanged(digits.length > 0);
-    if (name === "alternate_phone") setAltPhoneChanged(digits.length > 0);
-    if (validationErrors[name])
-      setValidationErrors((p) => {
-        const n = { ...p };
-        delete n[name];
-        return n;
-      });
-  };
+const handlePhoneInput = (e) => {
+  const { name, value } = e.target;
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  setFormData((p) => ({ ...p, [name]: digits }));
+  if (name === "phone") setPhoneChanged(true);
+  if (name === "alternate_phone") setAltPhoneChanged(true);
+  if (validationErrors[name])
+    setValidationErrors((p) => {
+      const n = { ...p };
+      delete n[name];
+      return n;
+    });
+};
   const handleRegionChange = (e) => {
     const code = e.target.value;
     setFormData((p) => ({
@@ -1537,17 +1537,22 @@ export default function ProfileSettings() {
         else if (t.toLowerCase() === "jr.") fmt.suffix = "Jr.";
         else if (/^[ivxlcdm]+$/i.test(t)) fmt.suffix = t.toUpperCase();
       }
-      if (phoneChanged && fmt.phone) fmt.phone = `+63${fmt.phone.trim()}`;
-      else
+      if (phoneChanged) {
+        fmt.phone = fmt.phone ? `+63${fmt.phone.trim()}` : null;
+      } else {
         fmt.phone = originalFormData.phone
           ? `+63${originalFormData.phone}`
           : null;
-      if (altPhoneChanged && fmt.alternate_phone)
-        fmt.alternate_phone = `+63${fmt.alternate_phone.trim()}`;
-      else
+      }
+      if (altPhoneChanged) {
+        fmt.alternate_phone = fmt.alternate_phone
+          ? `+63${fmt.alternate_phone.trim()}`
+          : null;
+      } else {
         fmt.alternate_phone = originalFormData.alternate_phone
           ? `+63${originalFormData.alternate_phone}`
           : null;
+      }
       if (!emailChanged || !fmt.email) fmt.email = originalFormData.email || "";
       const fd = new FormData();
       [
