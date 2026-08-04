@@ -174,6 +174,9 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
           setIsDeleting(false);
           return;
         }
+        // Wrong password (not locked yet) — clear the field so the user
+        // isn't left staring at their incorrect attempt.
+        setPassword("");
         setError(data.message || "Failed to deactivate user");
         if (data.attemptsLeft !== undefined) setAttemptsLeft(data.attemptsLeft);
         setIsDeleting(false);
@@ -186,6 +189,7 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
         );
         handleClose();
       } else {
+        setPassword("");
         setError(data.message || "Failed to deactivate user");
       }
     } catch (error) {
@@ -215,202 +219,294 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
     return user.username;
   };
 
+  const LockIcon = ({ size = 30, color = "#0B2D6B", strokeWidth = 1.8 }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+
   return (
     <>
       <LoadingModal isOpen={isDeleting} message="Deactivating user..." />
-      <div className="dum-modal-overlay" onClick={handleClose}>
+      {/* Overlay is decorative only now — clicking it will NOT close the
+          modal, so an accidental click outside won't interrupt this
+          security-sensitive flow. Use the × or the buttons instead. */}
+      <div className="dum-modal-overlay">
         <div
           className="dum-modal-container"
+          style={{ overflow: "hidden" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="dum-modal-header">
-            <h2>Deactivate User</h2>
-            <button
-              type="button"
-              className="dum-modal-close"
-              onClick={handleClose}
-              disabled={isDeleting}
-            >
-              ×
-            </button>
-          </div>
-
           {locked ? (
-            <div
-              className="dum-modal-form"
-              style={{ textAlign: "center", padding: "8px 4px" }}
-            >
+            <>
+              {/* Dark header — mirrors the ChangePasswordModal lock header */}
               <div
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  background: "#EAF1FB",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 16px",
+                  gap: 12,
+                  background: "#0B1E3D",
+                  padding: "18px 22px",
+                  color: "#fff",
                 }}
               >
-                <svg
-                  width="30"
-                  height="30"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#0B2D6B"
-                  strokeWidth="1.8"
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
                 >
-                  <rect x="3" y="11" width="18" height="11" rx="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+                  <LockIcon size={18} color="#fff" strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#fff",
+                    }}
+                  >
+                    Deactivate User Unavailable
+                  </h2>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12.5,
+                      color: "rgba(255,255,255,0.65)",
+                    }}
+                  >
+                    Too many incorrect attempts
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "rgba(255,255,255,0.8)",
+                    fontSize: 20,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    padding: 4,
+                  }}
+                >
+                  ×
+                </button>
               </div>
-              <h3
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: "#212529",
-                  margin: "0 0 8px",
-                }}
-              >
-                Too Many Incorrect Attempts
-              </h3>
-              <p
-                style={{
-                  color: "#6b7280",
-                  fontSize: 13,
-                  margin: "0 0 4px",
-                  lineHeight: 1.5,
-                }}
-              >
-                For your security, this action has been temporarily locked.
-              </p>
-              <p
-                style={{
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: "#212529",
-                  margin: "16px 0 4px",
-                }}
-              >
-                Try again in:
-              </p>
+
               <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: "#F3F4F6",
-                  borderRadius: 8,
-                  padding: "8px 16px",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: "#212529",
-                }}
+                className="dum-modal-form"
+                style={{ textAlign: "center", padding: "28px 24px" }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#94A3B8"
-                  strokeWidth="2"
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    background: "#EAF1FB",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 18px",
+                  }}
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-                {lockCountdown || "Calculating…"}
-              </div>
-              <button
-                type="button"
-                className="dum-btn dum-btn-secondary"
-                onClick={handleClose}
-                style={{ marginTop: 24, width: "100%" }}
-              >
-                Close
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="dum-modal-form">
-              <div className="dum-warning-box">
-                <div className="dum-warning-content">
-                  <h3>You are about to deactivate this user</h3>
-                  <p>
-                    <strong>{getFullName()}</strong> ({user.email})
-                  </p>
-                  <p className="dum-warning-description">
-                    This user account will be deactivated and no longer be able
-                    to access the system. This action can be reversed by
-                    reactivating the user account.
-                  </p>
+                  <LockIcon />
                 </div>
-              </div>
-
-              <div className="dum-form-section">
-                <h3 className="dum-form-section-title">
-                  Confirm Your Identity
+                <h3
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#212529",
+                    margin: "0 0 10px",
+                  }}
+                >
+                  Deactivate User Unavailable
                 </h3>
-                <p className="dum-form-section-description">
-                  Please enter your administrator password to confirm this
-                  action.
+                <p
+                  style={{
+                    color: "#4b5563",
+                    fontSize: 13.5,
+                    margin: "0 0 8px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Too many incorrect password attempts. This action has been
+                  temporarily paused to protect your account.
                 </p>
-
-                <div className="dum-form-group">
-                  <label className="dum-form-label">
-                    Administrator Password *
-                  </label>
-                  <div className="dum-password-input-wrapper">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      style={{ fontSize: "16px" }}
-                      className={`dum-form-input ${error ? "dum-error" : ""}`}
-                      value={password}
-                      onChange={handlePasswordChange}
-                      onPaste={handlePasswordPaste}
-                      onCopy={handlePasswordCopy}
-                      onCut={handlePasswordCopy}
-                      placeholder="Enter your password"
-                      disabled={isDeleting}
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      className="dum-password-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isDeleting}
-                      tabIndex="-1"
-                    >
-                      {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
-                    </button>
-                  </div>
-                  {error && (
-                    <span className="dum-error-text">
-                      {error}
-                      {attemptsLeft !== null &&
-                        ` — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left`}
-                    </span>
-                  )}
+                <p
+                  style={{
+                    color: "#6b7280",
+                    fontSize: 13.5,
+                    margin: "0 0 4px",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  This is automatic protection against unauthorized access.
+                  Please wait for the timer below before trying again.
+                </p>
+                <p
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: "#212529",
+                    margin: "18px 0 6px",
+                  }}
+                >
+                  Try again in:
+                </p>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#EEF3FF",
+                    border: "1px solid #DCE6FB",
+                    borderRadius: 999,
+                    padding: "10px 22px",
+                    fontWeight: 700,
+                    fontSize: 18,
+                    color: "#1F3A66",
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#1F3A66"
+                    strokeWidth="2"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  {lockCountdown || "Calculating…"}
                 </div>
-              </div>
-
-              <div className="dum-modal-actions">
                 <button
                   type="button"
                   className="dum-btn dum-btn-secondary"
                   onClick={handleClose}
-                  disabled={isDeleting}
+                  style={{ marginTop: 26, width: "100%" }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="dum-btn dum-btn-danger"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deactivating..." : "Deactivate User"}
+                  Got it, Close
                 </button>
               </div>
-            </form>
+            </>
+          ) : (
+            <>
+              <div className="dum-modal-header">
+                <h2>Deactivate User</h2>
+                <button
+                  type="button"
+                  className="dum-modal-close"
+                  onClick={handleClose}
+                  disabled={isDeleting}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="dum-modal-form">
+                <div className="dum-warning-box">
+                  <div className="dum-warning-content">
+                    <h3>You are about to deactivate this user</h3>
+                    <p>
+                      <strong>{getFullName()}</strong> ({user.email})
+                    </p>
+                    <p className="dum-warning-description">
+                      This user account will be deactivated and no longer be
+                      able to access the system. This action can be reversed by
+                      reactivating the user account.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="dum-form-section">
+                  <h3 className="dum-form-section-title">
+                    Confirm Your Identity
+                  </h3>
+                  <p className="dum-form-section-description">
+                    Please enter your administrator password to confirm this
+                    action.
+                  </p>
+
+                  <div className="dum-form-group">
+                    <label className="dum-form-label">
+                      Administrator Password *
+                    </label>
+                    <div className="dum-password-input-wrapper">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        style={{ fontSize: "16px" }}
+                        className={`dum-form-input ${error ? "dum-error" : ""}`}
+                        value={password}
+                        onChange={handlePasswordChange}
+                        onPaste={handlePasswordPaste}
+                        onCopy={handlePasswordCopy}
+                        onCut={handlePasswordCopy}
+                        placeholder="Enter your password"
+                        disabled={isDeleting}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="dum-password-toggle"
+                        onClick={() => setShowPassword(!showPassword)}
+                        disabled={isDeleting}
+                        tabIndex="-1"
+                      >
+                        {showPassword ? (
+                          <Eye size={20} />
+                        ) : (
+                          <EyeOff size={20} />
+                        )}
+                      </button>
+                    </div>
+                    {error && (
+                      <span className="dum-error-text">
+                        {error}
+                        {attemptsLeft !== null &&
+                          ` — ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="dum-modal-actions">
+                  <button
+                    type="button"
+                    className="dum-btn dum-btn-secondary"
+                    onClick={handleClose}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="dum-btn dum-btn-danger"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deactivating..." : "Deactivate User"}
+                  </button>
+                </div>
+              </form>
+            </>
           )}
         </div>
       </div>
