@@ -17,7 +17,8 @@ const {
   unlockUser,
   restoreUser,
   getAllRoles,
-  getRanks
+  getRanks,
+  getReauthStatus
 } = require("../controllers/userController");
 
 // Multer setup for file uploads
@@ -85,6 +86,8 @@ router.put("/users/:id/unlock", authenticate, unlockUser);
 
 // DELETE /users/:id  (deactivate)
 router.delete("/users/:id", authenticate, deactivateUser);
+
+router.get("/reauth-status", authenticate, getReauthStatus);
 
 // PUT  /users/:id/restore
 router.put("/users/:id/restore", authenticate, restoreUser);

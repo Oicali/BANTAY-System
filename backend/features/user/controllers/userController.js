@@ -92,6 +92,41 @@ async function checkAndTrackReauth(adminUserId, adminPassword) {
   );
   return { ok: true };
 }
+
+// =====================================================
+// GET REAUTH LOCK STATUS (for the current logged-in admin)
+// Called by DeleteUserModal / RestoreUserModal the moment they open, so a
+// lock set from ANY earlier session (even a different browser) shows up
+// immediately — not only after the admin types a password and submits.
+// =====================================================
+const getReauthStatus = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT reauth_locked_until FROM users WHERE user_id = $1",
+      [req.user.user_id],
+    );
+    if (result.rows.length === 0) {
+      return res.json({ success: true, locked: false });
+    }
+
+    const lockedUntil = result.rows[0].reauth_locked_until;
+    if (lockedUntil && new Date(lockedUntil) > new Date()) {
+      const msLeft = new Date(lockedUntil).getTime() - Date.now();
+      return res.json({
+        success: true,
+        locked: true,
+        msLeft,
+        minutesLeft: Math.ceil(msLeft / 60000),
+      });
+    }
+
+    res.json({ success: true, locked: false });
+  } catch (err) {
+    console.error("Get reauth status error:", err);
+    res.status(500).json({ success: false, message: "Failed to check status" });
+  }
+};
+
 // =====================================================
 // GET ALL USERS (server-side paginated)
 // =====================================================
@@ -121,10 +156,10 @@ const getAllUsers = async (req, res) => {
     }
 
     if (search) {
-  const searchTokens = search.trim().split(/\s+/).filter(Boolean);
+      const searchTokens = search.trim().split(/\s+/).filter(Boolean);
 
-  searchTokens.forEach((token) => {
-    conditions.push(`(
+      searchTokens.forEach((token) => {
+        conditions.push(`(
       u.username ILIKE $${paramIdx} OR
       u.email ILIKE $${paramIdx} OR
       u.first_name ILIKE $${paramIdx} OR
@@ -133,10 +168,10 @@ const getAllUsers = async (req, res) => {
       pr.rank_name ILIKE $${paramIdx} OR
       pr.abbreviation ILIKE $${paramIdx}
     )`);
-    params.push(`%${token}%`);
-    paramIdx++;
-  });
-}
+        params.push(`%${token}%`);
+        paramIdx++;
+      });
+    }
 
     if (role && role !== "all") {
       conditions.push(`r.role_name = $${paramIdx++}`);
@@ -153,14 +188,14 @@ const getAllUsers = async (req, res) => {
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const countResult = await pool.query(
-  `SELECT COUNT(*) AS total
+      `SELECT COUNT(*) AS total
    FROM users u
    LEFT JOIN roles r ON u.role_id = r.role_id
    LEFT JOIN pnp_ranks pr ON u.rank_id = pr.rank_id
    LEFT JOIN barangay_details bd ON u.user_id = bd.user_id
    ${whereClause}`,
-  params,
-);
+      params,
+    );
     const total = parseInt(countResult.rows[0].total);
 
     const dataResult = await pool.query(
@@ -482,14 +517,18 @@ const registerUser = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "USER_REGISTERED",
-  title: "New Account Created",
-  message: `New ${userType} account created: ${username} (${role})`,
-  linkTo: "/user-management",
-}, req.user.user_id);
+    await notifyAllByRole(
+      ["Administrator", "Technical Administrator"],
+      {
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "USER_REGISTERED",
+        title: "New Account Created",
+        message: `New ${userType} account created: ${username} (${role})`,
+        linkTo: "/user-management",
+      },
+      req.user.user_id,
+    );
     res.status(201).json({
       success: true,
       message: `Account created. A verification email has been sent to ${trimmedEmail}.`,
@@ -524,8 +563,8 @@ await notifyAllByRole(["Administrator", "Technical Administrator"], {
 const verifyAccount = async (req, res) => {
   const client = await pool.connect();
   const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173")
-  .split(",")[0]
-  .trim();
+    .split(",")[0]
+    .trim();
 
   try {
     const { token } = req.query;
@@ -1093,14 +1132,14 @@ const lockUser = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-// await notifyAllByRole(["Administrator", "Technical Administrator"], {
-//   senderId: req.user.user_id,
-//   senderName: req.user.username,
-//   type: "ACCOUNT_LOCKED",
-//   title: "Account Locked",
-//   message: `${req.user.username} locked account ID ${id}`,
-//   linkTo: "/user-management",
-// }, req.user.user_id);
+    // await notifyAllByRole(["Administrator", "Technical Administrator"], {
+    //   senderId: req.user.user_id,
+    //   senderName: req.user.username,
+    //   type: "ACCOUNT_LOCKED",
+    //   title: "Account Locked",
+    //   message: `${req.user.username} locked account ID ${id}`,
+    //   linkTo: "/user-management",
+    // }, req.user.user_id);
     res.json({ success: true, message: "Account locked successfully" });
   } catch (err) {
     console.error("Lock account error:", err);
@@ -1150,14 +1189,14 @@ const unlockUser = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-//     await notifyAllByRole(["Administrator", "Technical Administrator"], {
-//   senderId: req.user.user_id,
-//   senderName: req.user.username,
-//   type: "ACCOUNT_LOCKED",
-//   title: "Account Unlocked",
-//   message: `${req.user.username} unlocked account ID ${id}`,
-//   linkTo: "/user-management",
-// }, req.user.user_id);
+    //     await notifyAllByRole(["Administrator", "Technical Administrator"], {
+    //   senderId: req.user.user_id,
+    //   senderName: req.user.username,
+    //   type: "ACCOUNT_LOCKED",
+    //   title: "Account Unlocked",
+    //   message: `${req.user.username} unlocked account ID ${id}`,
+    //   linkTo: "/user-management",
+    // }, req.user.user_id);
     res.json({ success: true, message: "Account unlocked successfully" });
   } catch (err) {
     console.error("Unlock account error:", err);
@@ -1260,4 +1299,5 @@ module.exports = {
   restoreUser,
   getAllRoles,
   getRanks,
+  getReauthStatus,
 };
