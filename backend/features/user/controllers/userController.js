@@ -10,6 +10,88 @@ const UserValidator = require("../validators/userValidator");
 
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
 const { notifyAllByRole } = require("../../notifications/notificationService");
+
+const MAX_REAUTH_ATTEMPTS = 5;
+const REAUTH_LOCKOUT_MINUTES = 15;
+
+// Shared helper — checks/increments the admin's own reauth lockout, used by
+// both deactivateUser and restoreUser since they check the same admin's password.
+async function checkAndTrackReauth(adminUserId, adminPassword) {
+  const userResult = await pool.query(
+    "SELECT password, reauth_failed_attempts, reauth_locked_until FROM users WHERE user_id = $1",
+    [adminUserId],
+  );
+  if (userResult.rows.length === 0) {
+    return {
+      ok: false,
+      status: 401,
+      body: { success: false, message: "Admin user not found" },
+    };
+  }
+
+  const admin = userResult.rows[0];
+
+  if (
+    admin.reauth_locked_until &&
+    new Date(admin.reauth_locked_until) > new Date()
+  ) {
+    const msLeft = new Date(admin.reauth_locked_until).getTime() - Date.now();
+    return {
+      ok: false,
+      status: 429,
+      body: {
+        success: false,
+        locked: true,
+        message: "Too many incorrect attempts. Please try again later.",
+        msLeft,
+        minutesLeft: Math.ceil(msLeft / 60000),
+      },
+    };
+  }
+
+  const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
+
+  if (!isPasswordValid) {
+    const newAttempts = (admin.reauth_failed_attempts || 0) + 1;
+    const attemptsLeft = MAX_REAUTH_ATTEMPTS - newAttempts;
+
+    if (attemptsLeft <= 0) {
+      const lockUntil = new Date(Date.now() + REAUTH_LOCKOUT_MINUTES * 60_000);
+      await pool.query(
+        "UPDATE users SET reauth_failed_attempts = $1, reauth_locked_until = $2 WHERE user_id = $3",
+        [newAttempts, lockUntil, adminUserId],
+      );
+      return {
+        ok: false,
+        status: 429,
+        body: {
+          success: false,
+          locked: true,
+          message: "Too many incorrect attempts. Please try again later.",
+          msLeft: REAUTH_LOCKOUT_MINUTES * 60_000,
+          minutesLeft: REAUTH_LOCKOUT_MINUTES,
+        },
+      };
+    }
+
+    await pool.query(
+      "UPDATE users SET reauth_failed_attempts = $1 WHERE user_id = $2",
+      [newAttempts, adminUserId],
+    );
+    return {
+      ok: false,
+      status: 401,
+      body: { success: false, message: "Incorrect password", attemptsLeft },
+    };
+  }
+
+  // Success — reset counter
+  await pool.query(
+    "UPDATE users SET reauth_failed_attempts = 0, reauth_locked_until = NULL WHERE user_id = $1",
+    [adminUserId],
+  );
+  return { ok: true };
+}
 // =====================================================
 // GET ALL USERS (server-side paginated)
 // =====================================================
@@ -935,23 +1017,8 @@ const deactivateUser = async (req, res) => {
         message: "Administrator password is required",
       });
 
-    const userResult = await pool.query(
-      "SELECT password FROM users WHERE user_id = $1",
-      [req.user.user_id],
-    );
-    if (userResult.rows.length === 0)
-      return res
-        .status(401)
-        .json({ success: false, message: "Admin user not found" });
-
-    const isPasswordValid = await bcrypt.compare(
-      adminPassword,
-      userResult.rows[0].password,
-    );
-    if (!isPasswordValid)
-      return res
-        .status(401)
-        .json({ success: false, message: "Incorrect password" });
+    const reauth = await checkAndTrackReauth(req.user.user_id, adminPassword);
+    if (!reauth.ok) return res.status(reauth.status).json(reauth.body);
 
     const updateResult = await pool.query(
       "UPDATE users SET status = 'deactivated', updated_at = NOW() WHERE user_id = $1",
@@ -1129,23 +1196,8 @@ const restoreUser = async (req, res) => {
         message: "Administrator password is required",
       });
 
-    const userResult = await pool.query(
-      "SELECT password FROM users WHERE user_id = $1",
-      [req.user.user_id],
-    );
-    if (userResult.rows.length === 0)
-      return res
-        .status(401)
-        .json({ success: false, message: "Admin user not found" });
-
-    const isPasswordValid = await bcrypt.compare(
-      adminPassword,
-      userResult.rows[0].password,
-    );
-    if (!isPasswordValid)
-      return res
-        .status(401)
-        .json({ success: false, message: "Incorrect password" });
+    const reauth = await checkAndTrackReauth(req.user.user_id, adminPassword);
+    if (!reauth.ok) return res.status(reauth.status).json(reauth.body);
 
     const targetResult = await pool.query(
       "SELECT user_id, status FROM users WHERE user_id = $1",
