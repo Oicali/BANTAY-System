@@ -249,9 +249,9 @@ const buildParams = (filters) => {
 };
 
 const BLANK_FILTERS = () => {
-  const range = getPresetRange("this_month");
+  const range = getPresetRange("365d");
   return {
-    preset: "this_month",
+    preset: "365d",
     dateFrom: range.from,
     dateTo: range.to,
     crimeTypes: [],
