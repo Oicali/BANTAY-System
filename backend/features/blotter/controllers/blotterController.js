@@ -1326,19 +1326,18 @@ const importBlotters = async (req, res) => {
             finalCaseNumbers.push({ blotterId: cr.blotterId, case_number, status: caseStatus, priority });
           });
         }
-
-        await client.query(
-          `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
-           SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::int[])
-           ON CONFLICT DO NOTHING`,
-          [
-            finalCaseNumbers.map(c => c.blotterId),
-            finalCaseNumbers.map(c => c.case_number),
-            finalCaseNumbers.map(c => c.status),
-            finalCaseNumbers.map(c => c.priority),
-            finalCaseNumbers.map(() => req.user.user_id),
-          ]
-        );
+await client.query(
+  `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
+   SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::uuid[])
+   ON CONFLICT DO NOTHING`,
+  [
+    finalCaseNumbers.map(c => c.blotterId),
+    finalCaseNumbers.map(c => c.case_number),
+    finalCaseNumbers.map(c => c.status),
+    finalCaseNumbers.map(c => c.priority),
+    finalCaseNumbers.map(() => req.user.user_id),
+  ]
+);
       }
 
       await client.query("COMMIT");
