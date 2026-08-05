@@ -36,6 +36,12 @@ import PdfPreviewModal from "../modals/PdfPreviewModal";
 const SHOW_MONTHLY_DELTAS = false; // Set to false to hide all "vs last month" deltas
 const SHOW_BACKTEST_REPORT = true;
 
+// ─── DEFAULT DATE RANGE ────────────────────────────────────────────────────
+// Change this to "this_month" to switch the default range back — every
+// default/reset/"is this the default" check below reads from this one
+// constant, so nothing else needs to change.
+const DEFAULT_PRESET = "365d";
+
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
 const getToken = () => localStorage.getItem("token");
@@ -249,9 +255,9 @@ const buildParams = (filters) => {
 };
 
 const BLANK_FILTERS = () => {
-  const range = getPresetRange("365d");
+  const range = getPresetRange(DEFAULT_PRESET);
   return {
-    preset: "365d",
+    preset: DEFAULT_PRESET,
     dateFrom: range.from,
     dateTo: range.to,
     crimeTypes: [],
@@ -643,7 +649,7 @@ const FilterBar = ({
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
   const isDefault =
-    draft.preset === "this_month" &&
+    draft.preset === DEFAULT_PRESET &&
     !draft.crimeTypes.length &&
     !draft.barangays.length;
 
