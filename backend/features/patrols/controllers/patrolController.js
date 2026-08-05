@@ -1510,28 +1510,34 @@ const getMyAfterPatrolReports = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT apr.*
-       FROM after_patrol_reports apr
-       WHERE apr.patrol_id = $1
-         AND (
-           -- Report belongs to a shift this user is assigned to
-           apr.shift IN (
-             SELECT DISTINCT pap.shift
-             FROM patrol_assignment_patroller pap
-             JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
-             WHERE pap.patrol_id = $1
-               AND ap.officer_id = $2
-               AND pap.shift IS NOT NULL
-           )
-           OR
-           -- Also surface reports the user personally submitted (covers legacy data / null-shift rows)
-           apr.submitted_by IN (
-             SELECT active_patroller_id FROM active_patroller WHERE officer_id = $2
-           )
-         )
-       ORDER BY apr.patrol_date ASC`,
-      [patrol_id, userId],
-    );
+  `SELECT
+     apr.*,
+     COALESCE(
+       NULLIF(TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)), ''),
+       'Deactivated/Deleted Officer'
+     ) AS submitted_by_name,
+     u.phone AS submitted_by_contact
+   FROM after_patrol_reports apr
+   LEFT JOIN active_patroller ap ON apr.submitted_by = ap.active_patroller_id
+   LEFT JOIN users u ON ap.officer_id = u.user_id
+   WHERE apr.patrol_id = $1
+     AND (
+       apr.shift IN (
+         SELECT DISTINCT pap.shift
+         FROM patrol_assignment_patroller pap
+         JOIN active_patroller ap2 ON pap.active_patroller_id = ap2.active_patroller_id
+         WHERE pap.patrol_id = $1
+           AND ap2.officer_id = $2
+           AND pap.shift IS NOT NULL
+       )
+       OR
+       apr.submitted_by IN (
+         SELECT active_patroller_id FROM active_patroller WHERE officer_id = $2
+       )
+     )
+   ORDER BY apr.patrol_date ASC`,
+  [patrol_id, userId],
+);
 
     const data = result.rows.map((r) => ({
       ...r,

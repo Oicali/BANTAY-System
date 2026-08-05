@@ -103,6 +103,14 @@ const getMyRole = () => {
 const isAdminRole = (role) =>
   role === "Administrator" || role === "Technical Administrator";
 
+const getOfficerNameById = (patrol, id) => {
+  if (id == null) return null;
+  const match = (patrol?.patrollers || []).find(
+    (p) => String(p.officer_id) === String(id)
+  );
+  return match?.officer_name || null;
+};
+
 const getMyShift = (patrol) => {
   if (!patrol?.patrollers) return null;
   const myId = getMyUserId();
@@ -225,8 +233,19 @@ const StatusBadge = ({ status }) => {
 const emptyForm = (patrol, shift) => {
   const times = (shift && DEFAULT_TIMES[shift]) || { timeFrom: "", timeTo: "" };
   const creditHours = calcCreditHours(times.timeFrom, times.timeTo);
+
+  // Default to today's date if today falls within the patrol range,
+  // otherwise fall back to the patrol start date.
+  const start = parseLocalDate(patrol?.start_date);
+  const end   = parseLocalDate(patrol?.end_date);
+  const today = todayDate();
+  const defaultDate =
+    start && end && today >= start && today <= end
+      ? toInputDate(today)
+      : toInputDate(patrol?.start_date) || "";
+
   return {
-    date:           toInputDate(patrol?.start_date) || "",
+    date:           defaultDate,
     timeFrom:       times.timeFrom,
     timeTo:         times.timeTo,
     preDeployment:  "",
@@ -430,15 +449,129 @@ const DeleteConfirmDialog = ({ reportDate, onConfirm, onCancel }) => {
   );
 };
 
+// ── Date-has-report Confirm Dialog ──────────────────────────────────
+const DateReportConfirmDialog = ({ date, onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",
+          width: "380px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          display: "flex", flexDirection: "column", gap: "12px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Report Already Submitted</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          A report has already been submitted for{" "}
+          <strong style={{ color: "#212529" }}>{formatDate(date)}</strong>.
+          Do you want to edit it?
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: "8px 18px", background: "transparent", border: "1px solid #ced4da",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: "8px 20px", background: "#1e3a5f", border: "none",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Edit Report
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+// ── Save Changes Confirm Dialog ─────────────────────────────────────
+const SaveChangesConfirmDialog = ({ onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",
+          width: "360px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          display: "flex", flexDirection: "column", gap: "12px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Save Changes</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          Do you want to save the changes made to this report?
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: "8px 18px", background: "transparent", border: "1px solid #ced4da",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: "8px 20px", background: "#1e3a5f", border: "none",
+              borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff",
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // ── After Patrol Report Modal ──────────────────────────────────────
-const AfterPatrolModal = ({ patrol, existingReport, myShift, onClose, onSubmit, onShowToast }) => {
+const AfterPatrolModal = ({ patrol, existingReport, myShift, existingReports = [], existingReportsLoaded = true, onClose, onSubmit, onShowToast }) => {
+  // activeReport tracks whichever report is currently loaded for editing —
+  // starts as the report passed in (e.g. from History → Edit), but can change
+  // if the officer picks a different date that already has a submission.
+  const [activeReport, setActiveReport] = useState(existingReport || null);
+
+  // form stays null until a date is actually selected — either auto-picked
+  // (first unreported date) or chosen by the officer from the pills.
   const [form, setForm] = useState(
-    existingReport ? dbRowToForm(existingReport) : emptyForm(patrol, myShift)
+    existingReport ? dbRowToForm(existingReport) : null
   );
 
   const savedValues = useRef(
     existingReport ? dbRowToForm(existingReport) : {}
   );
+
+  // Map of date -> this officer's existing report, for the date-pill picker
+  const existingByDate = {};
+  (existingReports || []).forEach((rep) => {
+    existingByDate[toInputDate(rep.patrol_date)] = rep;
+  });
 
   const [shown, setShown] = useState(() => {
     const src = existingReport || {};
@@ -462,6 +595,7 @@ const AfterPatrolModal = ({ patrol, existingReport, myShift, onClose, onSubmit, 
 
  
 const [submitting, setSubmitting] = useState(false);
+const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
   const minDate     = toInputDate(patrol?.start_date);
   const maxDate     = toInputDate(patrol?.end_date);
@@ -469,9 +603,48 @@ const [submitting, setSubmitting] = useState(false);
 
   const [images, setImages] = useState([]);
   const fileInputRef = useRef(null);
-  const [existingPhotos, setExistingPhotos] = useState(
+ const [existingPhotos, setExistingPhotos] = useState(
     existingReport?.photo_urls || []
   );
+
+  // Auto-select the first allowed date (today or earlier) that has no
+  // report yet — only once, and only when the modal wasn't opened directly
+  // for a specific report (existingReport). If every allowed date already
+  // has a report, leave form as null so the "no reports to do" message shows.
+  const autoSelectedRef = useRef(false);
+
+  
+  
+  useEffect(() => {
+    if (existingReport) return;
+    if (!existingReportsLoaded) return;
+    if (autoSelectedRef.current) return;
+    autoSelectedRef.current = true;
+
+    const status = getPatrolStatus(patrol);
+    const allowedDates = patrolDates.filter((key) => {
+      const pillDate = parseLocalDate(key);
+      return !(status === "active" && pillDate > todayDate());
+    });
+
+    const unreportedDate = allowedDates.find((key) => !existingByDate[key]);
+    if (!unreportedDate) return; // everything already reported — stay blank
+
+    const blank = emptyForm(patrol, myShift);
+    blank.date = unreportedDate;
+    setForm(blank);
+    setActiveReport(null);
+    savedValues.current = {};
+    setShown({
+      preDeployment: false, action1: false, incidents: false,
+      action2: false, safetyConcerns: false, action3: false,
+      otherServices: false, visitedAreas: false, personsVisited: false,
+      numOfficials: false, numGovt: false, sector: true,
+      creditHours: true, mustDos: false,
+    });
+    setExistingPhotos([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingReportsLoaded]);
 const [deletingPhoto, setDeletingPhoto] = useState(null);
 const [deletingPhotoConfirm, setDeletingPhotoConfirm] = useState(null); // ← add this
 
@@ -529,7 +702,7 @@ const [deletingPhotoConfirm, setDeletingPhotoConfirm] = useState(null); // ← a
   };
 
   const handleDeleteExistingPhoto = (photoUrl) => {
-  if (!existingReport?.report_id) return;
+  if (!activeReport?.report_id) return;
   setDeletingPhotoConfirm(photoUrl);
 };
 const confirmDeletePhoto = async () => {
@@ -537,7 +710,7 @@ const confirmDeletePhoto = async () => {
   setDeletingPhotoConfirm(null);
   setDeletingPhoto(photoUrl);
   try {
-    const res = await fetch(`${API_BASE}/patrol/after-reports/${existingReport.report_id}/photos`, {
+    const res = await fetch(`${API_BASE}/patrol/after-reports/${activeReport.report_id}/photos`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -560,6 +733,7 @@ const confirmDeletePhoto = async () => {
 };
 
   const handleSubmit = async () => {
+    if (!form) return;
     if (!form.date) { alert("Patrol date is required."); return; }
     const chosen = parseLocalDate(form.date);
     const start  = parseLocalDate(patrol?.start_date);
@@ -603,33 +777,42 @@ const confirmDeletePhoto = async () => {
       return;
     }
 
-    if (!isEditing) {
-      try {
-        const res  = await fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
-          headers: { Authorization: `Bearer ${token()}` },
-        });
-        const data = await res.json();
-        if (data.success) {
-          const existing = data.data.find((r) => toInputDate(r.patrol_date) === form.date);
-          if (existing) {
-            const confirmed = window.confirm(
-              `A report has already been submitted for this date (${formatDate(form.date)}) by your shift.\n\nDo you want to overwrite it with your new entries?`
-            );
-            if (!confirmed) return;
-          }
-        }
-      } catch {
-        // fail silently — backend upsert handles deduplication
-      }
+    if (isEditing) {
+      // Editing an existing report — confirm before saving.
+      setShowSaveConfirm(true);
+      return;
     }
 
+    // New report — check for a same-date submission from this shift first.
+    try {
+      const res  = await fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        const existing = data.data.find((r) => toInputDate(r.patrol_date) === form.date);
+        if (existing) {
+          const confirmed = window.confirm(
+            `A report has already been submitted for this date (${formatDate(form.date)}) by your shift.\n\nDo you want to overwrite it with your new entries?`
+          );
+          if (!confirmed) return;
+        }
+      }
+    } catch {
+      // fail silently — backend upsert handles deduplication
+    }
+
+    await doSubmit();
+  };
+
+  const doSubmit = async () => {
     setSubmitting(true);
     await onSubmit(patrol.patrol_id, form, myShift, images);
     setSubmitting(false);
     onClose();
   };
 
-  const isEditing = !!existingReport;
+const isEditing = !!activeReport;
 
   return (
     <div className="pd-modal">
@@ -716,32 +899,107 @@ const confirmDeletePhoto = async () => {
             <span style={{ color: "#1e3a5f", fontWeight: 600 }}>
               Allowed dates: {formatDate(patrol?.start_date)} – {formatDate(patrol?.end_date)}
             </span>
+            {existingReportsLoaded && (
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginLeft: 4 }}>
               {patrolDates.map((key) => {
-                const isSelected = form.date === key;
-                const pillDate   = parseLocalDate(key);
-                const isFuture   = getPatrolStatus(patrol) === "active" && pillDate > todayDate();
+                const isSelected      = form?.date === key;
+                const pillDate        = parseLocalDate(key);
+                const isFuture        = getPatrolStatus(patrol) === "active" && pillDate > todayDate();
+                const existingForDate = existingByDate[key];
+                const isMissed        = !isFuture && !existingForDate;
+
                 return (
                   <button key={key} type="button"
-                    onClick={() => !isFuture && setForm((f) => ({ ...f, date: key }))}
-                    disabled={isFuture}
+                    onClick={() => {
+                      if (isFuture) return;
+
+                      if (existingForDate) {
+                        // Load the real submitted report for this date directly.
+                        const rpt    = existingForDate;
+                        const mapped = dbRowToForm(rpt);
+                        setActiveReport(rpt);
+                        setForm(mapped);
+                        savedValues.current = mapped;
+                        setShown({
+                          preDeployment:  !!(rpt.pre_deployment),
+                          action1:        !!(rpt.action_pre_deployment),
+                          incidents:      !!(rpt.incidents),
+                          action2:        !!(rpt.action_incidents),
+                          safetyConcerns: !!(rpt.safety_concerns),
+                          action3:        !!(rpt.action_safety),
+                          otherServices:  !!(rpt.other_services),
+                          visitedAreas:   !!(rpt.visited_areas),
+                          personsVisited: !!(rpt.persons_visited),
+                          numOfficials:   !!(rpt.num_officials != null && rpt.num_officials !== ""),
+                          numGovt:        !!(rpt.num_govt_officials != null && rpt.num_govt_officials !== ""),
+                          sector:         true,
+                          creditHours:    true,
+                          mustDos:        !!(rpt.must_dos),
+                        });
+                        setExistingPhotos(rpt.photo_urls || []);
+                        setImages([]);
+                      } else {
+                        // No report yet for this date — switch to a fresh blank form.
+                        setActiveReport(null);
+                        const blank = emptyForm(patrol, myShift);
+                        blank.date = key;
+                        setForm(blank);
+                        savedValues.current = {};
+                        setShown({
+                          preDeployment: false, action1: false, incidents: false,
+                          action2: false, safetyConcerns: false, action3: false,
+                          otherServices: false, visitedAreas: false, personsVisited: false,
+                          numOfficials: false, numGovt: false, sector: true,
+                          creditHours: true, mustDos: false,
+                        });
+                        setExistingPhotos([]);
+                        setImages([]);
+                      }
+                    }}
+                    
+                  disabled={isFuture}
                     style={{
+                      display: "inline-flex", alignItems: "center", gap: 4,
                       padding: "2px 10px", fontSize: 11, fontWeight: 700,
                       borderRadius: 20, cursor: isFuture ? "not-allowed" : "pointer",
                       border: "1px solid",
-                      borderColor: isSelected ? "#1e3a5f" : isFuture ? "#e5e7eb" : "#93afc9",
-                      background:  isSelected ? "#1e3a5f" : isFuture ? "#f3f4f6" : "white",
-                      color:       isSelected ? "white"   : isFuture ? "#d1d5db" : "#1e3a5f",
+                      borderColor: isSelected
+                        ? "#1e3a5f"
+                        : existingForDate ? "#86efac"
+                        : isMissed ? "#fca5a5"
+                        : isFuture ? "#e5e7eb" : "#93afc9",
+                      background: isSelected
+                        ? "#1e3a5f"
+                        : existingForDate ? "rgba(34,197,94,0.12)"
+                        : isMissed ? "rgba(220,38,38,0.08)"
+                        : isFuture ? "#f3f4f6" : "white",
+                      color: isSelected
+                        ? "white"
+                        : existingForDate ? "#15803d"
+                        : isMissed ? "#b91c1c"
+                        : isFuture ? "#d1d5db" : "#1e3a5f",
                       transition:  "all 0.15s",
                       opacity:     isFuture ? 0.5 : 1,
                     }}>
+                    {existingForDate && !isSelected && (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                    {isMissed && !isSelected && (
+                      <span style={{ fontWeight: 900 }}>!</span>
+                    )}
                     {formatDateShort(key)}
                   </button>
                 );
               })}
             </div>
+            )}
           </div>
 
+          {form ? (
+          <>
           <div className="pd-form-grid">
             <div className="pd-form-group">
               <label className="pd-modal-label">Date *</label>
@@ -761,7 +1019,7 @@ const confirmDeletePhoto = async () => {
           <h3 className="pd-section-title">2. Patrol Information</h3>
           <div className="pd-form-grid">
             <div className="pd-form-group">
-              <label className="pd-modal-label">Sector / Beat Patrolled</label>
+              <label className="pd-modal-label">Mobile Unit Used</label>
               <input type="text" className="pd-modal-input" value={form.sector}
                 readOnly
                 style={{ background: "rgba(30,58,95,0.05)", cursor: "not-allowed", color: "#6b7280" }} />
@@ -1174,22 +1432,282 @@ const confirmDeletePhoto = async () => {
               </>
             )}
           </div>
+          </>
+          ) : existingReportsLoaded === false ? (
+            <div style={{ textAlign: "center", padding: "40px 24px", color: "#9ca3af", fontSize: 13 }}>
+              Loading dates…
+            </div>
+          ) : (
+            <div style={{
+              textAlign: "center", padding: "40px 24px",
+              background: "rgba(34,197,94,0.05)", borderRadius: 10,
+              border: "1px dashed #86efac", marginTop: 4,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: "rgba(34,197,94,0.15)", margin: "0 auto 14px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                  fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1e3a5f", marginBottom: 6 }}>
+                No reports to do for today
+              </div>
+              <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 380, margin: "0 auto" }}>
+                All available dates for this patrol already have a submitted report.
+                Select a date tab above to view or edit it.
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="pd-modal-footer">
           <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="pd-btn pd-btn-navy" onClick={handleSubmit}
-            disabled={submitting} style={{ minWidth: 200 }}>
-            {submitting ? "Submitting..." : isEditing ? "Update After Patrol Report" : "Submit After Patrol Report"}
-          </button>
+          {form && (
+            <button type="button" className="pd-btn pd-btn-navy" onClick={handleSubmit}
+              disabled={submitting} style={{ minWidth: 200 }}>
+              {submitting ? "Submitting..." : isEditing ? "Update After Patrol Report" : "Submit After Patrol Report"}
+            </button>
+          )}
         </div>
-        {deletingPhotoConfirm && (
-  <DeleteConfirmDialog
-    reportDate="this photo"
-    onConfirm={confirmDeletePhoto}
-    onCancel={() => setDeletingPhotoConfirm(null)}
-  />
-)}
+      {deletingPhotoConfirm && (
+        <DeleteConfirmDialog
+          reportDate="this photo"
+          onConfirm={confirmDeletePhoto}
+          onCancel={() => setDeletingPhotoConfirm(null)}
+        />
+      )}
+      {showSaveConfirm && (
+        <SaveChangesConfirmDialog
+          onConfirm={() => { setShowSaveConfirm(false); doSubmit(); }}
+          onCancel={() => setShowSaveConfirm(false)}
+        />
+      )}
+        
+      </div>
+    </div>
+  );
+};
+
+// ── Read-only field row helper ──────────────────────────────────────
+const ViewField = ({ label, value, full }) => (
+  <div style={{
+    padding: "12px 20px",
+    gridColumn: full ? "1 / -1" : undefined,
+  }}>
+    <div style={{
+      fontSize: 11, fontWeight: 700, color: "var(--gray-400)",
+      textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 4,
+    }}>
+      {label}
+    </div>
+    <div style={{
+      fontSize: 13.5, color: value ? "var(--gray-900)" : "#9ca3af",
+      fontStyle: value ? "normal" : "italic", lineHeight: 1.5,
+      whiteSpace: "pre-wrap",
+    }}>
+      {value || "Not reported"}
+    </div>
+  </div>
+);
+
+const ViewSectionHeader = ({ children }) => (
+  <div style={{
+    fontFamily: "Inter, sans-serif", fontSize: 12, fontWeight: 700,
+    color: "white", padding: "8px 32px",
+    background: "linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%)",
+    textTransform: "uppercase", letterSpacing: "0.8px",
+  }}>
+    {children}
+  </div>
+);
+
+// ── View After Patrol Report Modal (read-only, no editing) ─────────
+const ViewAfterReportModal = ({ patrol, report, onClose }) => {
+  if (!report) return null;
+  const photos = report.photo_urls || [];
+
+  return (
+    <div className="pd-modal">
+      <div className="pd-modal-content" style={{ maxWidth: 680 }}>
+        <div className="pd-modal-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 10,
+              background: "rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, border: "1px solid rgba(255,255,255,0.2)",
+            }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <h2 style={{ margin: 0 }}>After Patrol Report</h2>
+                {report.shift && <ShiftBadge shift={report.shift} />}
+              </div>
+              <div className="pd-modal-header-sub">
+                {patrol?.patrol_name} &nbsp;·&nbsp; {formatDate(report.patrol_date)}
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                ANNEX D · PNPM-DO-DS-3-3-15 (DO)
+                <span style={{
+                  background: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.85)",
+                  padding: "1px 6px", borderRadius: 4, fontWeight: 700,
+                }}>
+                  READ-ONLY
+                </span>
+              </div>
+            </div>
+          </div>
+          <span className="pd-modal-close" onClick={onClose}>&times;</span>
+        </div>
+
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          <ViewSectionHeader>Patrol Date &amp; Time</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Date" value={formatDate(report.patrol_date)} />
+                <ViewField label="Time" value={report.time_from && report.time_to ? `${report.time_from} – ${report.time_to}` : null} />
+                <ViewField label="Credit Hours" value={report.credit_hours} />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Patrol Information</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+            <ViewField label="Mobile Unit Used" value={report.sector_beat} />
+                <ViewField label="Patrolled MUST DOs" value={report.must_dos} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Pre-Deployment Instructions</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Specific Instructions Received" value={report.pre_deployment} full />
+                <ViewField label="Action Taken" value={report.action_pre_deployment} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Incidents &amp; Unusual Events</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Incidents / Unusual Situations" value={report.incidents} full />
+                <ViewField label="Action Taken" value={report.action_incidents} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Public Safety Concerns</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Safety Concerns Observed" value={report.safety_concerns} full />
+                <ViewField label="Action Taken" value={report.action_safety} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Other Services &amp; Visited Areas</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Other Public Safety Services Rendered" value={report.other_services} full />
+                <ViewField label="Visited Areas" value={report.visited_areas} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Persons Visited</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Name of Persons Visited / Local Officials" value={report.persons_visited} full />
+                <ViewField label="No. of Officials Visited" value={report.num_officials != null ? String(report.num_officials) : null} />
+                <ViewField label="Total Gov't Officials in Area" value={report.num_govt_officials != null ? String(report.num_govt_officials) : null} />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Remarks &amp; Recommendations</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
+                <ViewField label="Remarks / Recommendations" value={report.remarks} full />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Signatures</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 20px", background: "var(--gray-50)" }}>
+            <div style={{ background: "white", border: "1px solid var(--gray-200)", borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <ViewField label="Officer 1" value={report.sig_officer_1} />
+                <ViewField label="Officer 2" value={report.sig_officer_2} />
+                <ViewField label="Supervisor" value={report.sig_supervisor} />
+              </div>
+            </div>
+          </div>
+
+          <ViewSectionHeader>Photo Documentation</ViewSectionHeader>
+          <div style={{ padding: "16px 32px 28px", background: "var(--gray-50)" }}>
+            {photos.length === 0 ? (
+              <div style={{
+                textAlign: "center", padding: 24, color: "#9ca3af",
+                background: "rgba(30,58,95,0.03)", borderRadius: 8,
+                border: "1px dashed #e5e7eb", fontSize: 13,
+              }}>
+                No photos were attached to this report.
+              </div>
+            ) : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                gap: 10,
+              }}>
+                {photos.map((url, i) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer"
+                    style={{
+                      position: "relative", borderRadius: 8,
+                      overflow: "hidden", aspectRatio: "1",
+                      border: "1px solid #e5e7eb",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                      background: "#f3f4f6", display: "block",
+                    }}>
+                    <img src={url} alt={`Photo ${i + 1}`}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <div style={{
+                      position: "absolute", top: 5, left: 5,
+                      background: "rgba(255,255,255,0.9)",
+                      borderRadius: 4, padding: "1px 5px",
+                      fontSize: 9, fontWeight: 700, color: "#1e3a5f",
+                    }}>
+                      {i + 1}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="pd-modal-footer">
+          <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   );
@@ -1203,9 +1721,9 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
   const [activeDate, setActiveDate] = useState(null);
   const [deleting,   setDeleting]   = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { reportId, reportDate }
+  const [viewingReport, setViewingReport] = useState(null); // read-only view (admin)
 
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
-
   const fetchReports = async () => {
     setLoading(true);
     try {
@@ -1300,8 +1818,13 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
   flexShrink: 0, padding: "0 20px",
         }}>
           {patrolDates.map((d) => {
-            const count    = (reportsByDate[d] || []).length;
-            const isActive = activeDate === d;
+            const count      = (reportsByDate[d] || []).length;
+            const isActive   = activeDate === d;
+            const pillDate   = parseLocalDate(d);
+            const isFuture   = getPatrolStatus(patrol) === "active" && pillDate > todayDate();
+            const isDone     = count > 0;
+            const isMissed   = !isAdmin && !isFuture && !isDone;
+
             return (
               <button key={d} type="button" onClick={() => setActiveDate(d)}
                 style={{
@@ -1314,17 +1837,39 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                   fontFamily: "inherit", transition: "all 0.15s",
                 }}>
                 {formatDateShort(d)}
-                {count > 0 && (
+                {isAdmin ? (
+                  count > 0 && (
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      minWidth: 18, height: 18, padding: "0 5px",
+                      borderRadius: 9, fontSize: 10, fontWeight: 700,
+                      background: isActive ? "#1e3a5f" : "#d1d5db",
+                      color: isActive ? "white" : "#374151",
+                    }}>
+                      {count}
+                    </span>
+                  )
+                ) : loading ? null : isDone ? (
                   <span style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    minWidth: 18, height: 18, padding: "0 5px",
-                    borderRadius: 9, fontSize: 10, fontWeight: 700,
-                    background: isActive ? "#1e3a5f" : "#d1d5db",
-                    color: isActive ? "white" : "#374151",
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: "#16a34a", color: "white", flexShrink: 0,
                   }}>
-                    {count}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
                   </span>
-                )}
+                ) : isMissed ? (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: "#dc2626", color: "white", fontWeight: 900,
+                    fontSize: 11, flexShrink: 0,
+                  }}>
+                    !
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -1393,13 +1938,17 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                         {r.shift && <ShiftBadge shift={r.shift} size="small" />}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, color: "var(--gray-400)" }}>
-                          Submitted {formatDateTime(r.submitted_at)}
-                        </span>
-                        <button className="pd-action-btn pd-action-btn-edit"
-                          onClick={() => onEdit(patrol, r)}>
-                          <EditIcon /> Edit
-                        </button>
+                        {isAdmin ? (
+                          <button className="pd-action-btn pd-action-btn-view"
+                            onClick={() => setViewingReport(r)}>
+                            <ViewIcon /> View
+                          </button>
+                        ) : (
+                          <button className="pd-action-btn pd-action-btn-edit"
+                            onClick={() => onEdit(patrol, r)}>
+                            <EditIcon /> Edit
+                          </button>
+                        )}
                         <button className="pd-action-btn pd-action-btn-delete"
                           disabled={deleting === r.report_id}
                           onClick={() => setConfirmDelete({ reportId: r.report_id, reportDate: formatDate(r.patrol_date) })}>
@@ -1420,13 +1969,78 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                       </div>
                     </div>
 
+                          <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      gap: 8, flexWrap: "wrap",
+                      padding: "10px 20px", background: "rgba(30,58,95,0.03)",
+                      borderBottom: "1px solid var(--gray-100)",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {r.must_dos && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, color: "#1e3a5f",
+                            background: "rgba(30,58,95,0.06)", borderRadius: 6, padding: "3px 10px",
+                          }}>
+                            MUST DOs logged
+                          </span>
+                        )}
+                        {r.incidents && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: "#92400e",
+                            background: "rgba(245,158,11,0.12)", border: "1px solid #fcd34d",
+                            borderRadius: 6, padding: "3px 10px",
+                          }}>
+                            Incident reported
+                          </span>
+                        )}
+                        {r.safety_concerns && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: "#b91c1c",
+                            background: "rgba(220,38,38,0.08)", border: "1px solid #fca5a5",
+                            borderRadius: 6, padding: "3px 10px",
+                          }}>
+                            Safety concern flagged
+                          </span>
+                        )}
+                        {(r.photo_urls || []).length > 0 && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, color: "#374151",
+                            background: "var(--gray-100)", borderRadius: 6, padding: "3px 10px",
+                          }}>
+                            {r.photo_urls.length} photo{r.photo_urls.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: 11, color: "var(--gray-500)", whiteSpace: "nowrap",
+                      }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/>
+                          <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                       <span>{formatDateTime(r.submitted_at)}</span>
+                        <span style={{ fontStyle: "italic" }}>&nbsp;by&nbsp;</span>
+                        <span style={{ fontWeight: 700, color: "var(--gray-600)" }}>
+                          {r.submitted_by_name
+                            || r.officer_name
+                            || getOfficerNameById(patrol, r.submitted_by)
+                            || "Unknown officer"}
+                        </span>
+                      </div>
+                    </div>
+
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
                       {[
-                        { label: "Sector / Beat",     value: r.sector_beat },
-                        { label: "Officials Visited", value: r.num_officials != null ? String(r.num_officials) : null },
-                        { label: "Signatures",        value: [r.sig_officer_1, r.sig_officer_2, r.sig_supervisor].filter(Boolean).join(", ") || null },
-                        { label: "Incidents",         value: r.incidents, full: true },
-                        { label: "Remarks",           value: r.remarks,   full: true },
+                        { label: "Officials Visited",   value: r.num_officials != null ? String(r.num_officials) : null },
+                        { label: "Gov't Officials",     value: r.num_govt_officials != null ? String(r.num_govt_officials) : null },
+                        { label: "Signatures",          value: [r.sig_officer_1, r.sig_officer_2, r.sig_supervisor].filter(Boolean).join(", ") || null },
+                        { label: "Pre-Deployment",      value: r.pre_deployment, full: true },
+                        { label: "Incidents",           value: r.incidents, full: true },
+                        { label: "Safety Concerns",     value: r.safety_concerns, full: true },
+                        { label: "Remarks",             value: r.remarks,   full: true },
                       ].map(({ label, value, full }, i) => (
                         <div key={i} style={{
                           padding: "10px 20px",
@@ -1437,11 +2051,30 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
                           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gray-400)", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 3 }}>
                             {label}
                           </div>
-                          <div style={{ fontSize: 13, color: value ? "var(--gray-900)" : "#9ca3af", fontStyle: value ? "normal" : "italic" }}>
+                          <div style={{
+                            fontSize: 13, color: value ? "var(--gray-900)" : "#9ca3af", fontStyle: value ? "normal" : "italic",
+                            overflow: "hidden", textOverflow: "ellipsis",
+                            display: "-webkit-box", WebkitLineClamp: full ? 2 : 1, WebkitBoxOrient: "vertical",
+                          }}>
                             {value || "—"}
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    <div style={{
+                      padding: "8px 20px", background: "rgba(30,58,95,0.02)",
+                      borderTop: "1px solid var(--gray-100)", textAlign: "right",
+                    }}>
+                      <button type="button"
+                        onClick={() => setViewingReport(r)}
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          fontSize: 11.5, fontWeight: 700, color: "#1e3a5f",
+                          fontFamily: "inherit", padding: 0,
+                        }}>
+                        View full report →
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1463,6 +2096,14 @@ const MyReportsModal = ({ patrol, onClose, onEdit, onShowToast }) => {
               handleDelete(id);
             }}
             onCancel={() => setConfirmDelete(null)}
+          />
+        )}
+
+        {viewingReport && (
+          <ViewAfterReportModal
+            patrol={patrol}
+            report={viewingReport}
+            onClose={() => setViewingReport(null)}
           />
         )}
       </div>
@@ -1689,7 +2330,7 @@ const AfterPatrol = () => {
       .catch((err) => console.error("GeoJSON load error:", err));
   }, []);
 
-  const handleSubmitReport = async (patrolId, formData, shift, images = []) => {
+ const handleSubmitReport = async (patrolId, formData, shift, images = []) => {
      setSubmitLoading(true); 
     try {
       const cleaned = {
@@ -1723,6 +2364,8 @@ const AfterPatrol = () => {
       }
     } catch {
       showToast("Server error while submitting report.", "error");
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
@@ -1746,25 +2389,29 @@ const AfterPatrol = () => {
       return;
     }
 
-    setSelectedReport({ patrol, existingReport: null, myShift });
+    // Open the form right away — no report is auto-loaded for editing.
+    // Once existing reports are fetched, the modal auto-selects the first
+    // unreported date (blank form), or shows "no reports to do" if every
+    // available date is already reported.
+    setSelectedReport({
+      patrol, existingReport: null, myShift,
+      existingReports: [], existingReportsLoaded: false,
+    });
 
     fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/after-reports/mine`, {
       headers: { Authorization: `Bearer ${token()}` },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (!data.success) return;
-        const todayStr = toInputDate(new Date());
-        const existing = data.data.find(
-          (r) => toInputDate(r.patrol_date) === todayStr &&
-                 (r.shift === myShift || !myShift)
+        setSelectedReport((prev) =>
+          prev
+            ? { ...prev, existingReports: data.success ? (data.data || []) : [], existingReportsLoaded: true }
+            : prev
         );
-        if (existing) {
-          setSelectedReport({ patrol, existingReport: existing, myShift });
-          showToast("A report for today already exists. Loaded for editing.", "info");
-        }
       })
-      .catch(() => {});
+      .catch(() => {
+        setSelectedReport((prev) => (prev ? { ...prev, existingReportsLoaded: true } : prev));
+      });
   };
 
   // ── Filter + paginate ────────────────────────────────────────────
@@ -1941,10 +2588,12 @@ const AfterPatrol = () => {
         )}
       </div>
 
-      {selectedReport && (
+    {selectedReport && (
         <AfterPatrolModal
           patrol={selectedReport.patrol}
           existingReport={selectedReport.existingReport}
+          existingReports={selectedReport.existingReports}
+          existingReportsLoaded={selectedReport.existingReportsLoaded}
           myShift={selectedReport.myShift}
           onClose={() => setSelectedReport(null)}
           onSubmit={handleSubmitReport}
