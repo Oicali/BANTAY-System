@@ -10,6 +10,15 @@ const {
   getResponderForReferral,
   notifyPatrolsForReferral,
 } = require("../../notifications/notificationService");
+const xlsx = require("xlsx");
+const {
+  normalizeOffense,
+  normalizeBarangay,
+  deriveFromDate,
+} = require("../utils/importUtils");
+const { VALID_BARANGAYS } = require("../utils/barangayList");
+const { v4: uuidv4 } = require("uuid");
+
 const autoCreateCase = async (client, blotterId, createdBy) => {
   const existing = await client.query(
     "SELECT id FROM cases WHERE blotter_id = $1",
@@ -63,13 +72,6 @@ const autoCreateCase = async (client, blotterId, createdBy) => {
     [blotterId, case_number, caseStatus, autoPriority, createdBy],
   );
 };
-const xlsx = require("xlsx");
-const {
-  normalizeOffense,
-  normalizeBarangay,
-  deriveFromDate,
-} = require("../utils/importUtils");
-const { v4: uuidv4 } = require("uuid");
 
 // ============================================================
 // VALIDATION HELPERS
@@ -124,7 +126,6 @@ const validatePhoneNumber = (phone, required = false) => {
 
   if (phone && phone.trim().length > 0) {
     const cleaned = phone.replace(/[\s-]/g, "");
-    // Auto-fix 10-digit numbers starting with 9
     const normalized =
       cleaned.length === 10 && cleaned.startsWith("9")
         ? "0" + cleaned
@@ -139,6 +140,7 @@ const validatePhoneNumber = (phone, required = false) => {
 
   return errors;
 };
+
 const validateComplainant = (complainant, index) => {
   const errors = [];
   const prefix = `Complainant #${index + 1}`;
@@ -153,10 +155,6 @@ const validateComplainant = (complainant, index) => {
     ...validateName(complainant.last_name, `${prefix} Last Name`, true),
   );
 
-  // if (!complainant.region) errors.push(`${prefix} Region is required`);
-  // if (!complainant.district_province) errors.push(`${prefix} District/Province is required`);
-  // if (!complainant.city_municipality) errors.push(`${prefix} City/Municipality is required`);
-  // if (!complainant.barangay) errors.push(`${prefix} Barangay is required`);
   if (!complainant.gender) errors.push(`${prefix} Gender is required`);
   if (!complainant.nationality)
     errors.push(`${prefix} Nationality is required`);
@@ -167,7 +165,6 @@ const validateComplainant = (complainant, index) => {
     errors.push(`${prefix} has an invalid role`);
   }
 
-  // Witness statement max length
   if (
     complainant.witness_statement &&
     complainant.witness_statement.length > 500
@@ -175,7 +172,6 @@ const validateComplainant = (complainant, index) => {
     errors.push(`${prefix} witness statement must be under 500 characters`);
   }
 
-  // relationship_to_victim max length
   if (
     complainant.relationship_to_victim &&
     complainant.relationship_to_victim.length > 100
@@ -209,7 +205,6 @@ const validateSuspect = (suspect, index) => {
   );
   errors.push(...validateName(suspect.last_name, `${prefix} Last Name`, false));
 
-  // gender, nationality, house_street are optional
   if (suspect.house_street && suspect.house_street.trim().length > 0) {
     if (
       suspect.house_street.trim().length < 2 ||
@@ -218,7 +213,6 @@ const validateSuspect = (suspect, index) => {
       errors.push(`${prefix} House/Street must be 2-200 characters`);
     }
   }
-  // Validate age if provided
   if (suspect.age) {
     const age = parseInt(suspect.age);
     if (age < 10 || age > 120) {
@@ -226,7 +220,6 @@ const validateSuspect = (suspect, index) => {
     }
   }
 
-  // Validate height if provided
   if (suspect.height_cm) {
     const height = parseInt(suspect.height_cm);
     if (height < 50 || height > 250) {
@@ -234,7 +227,6 @@ const validateSuspect = (suspect, index) => {
     }
   }
 
-  // Validate birthday if provided
   if (suspect.birthday) {
     const birthDate = new Date(suspect.birthday);
     const today = new Date();
@@ -248,11 +240,6 @@ const validateSuspect = (suspect, index) => {
       errors.push(`${prefix} Birthday cannot be in the future`);
     }
   }
-
-  // If arrested, location is required
-  // if ((suspect.status === 'Arrested' || suspect.status === 'In Custody') && !suspect.location_if_arrested) {
-  //   errors.push(`${prefix} Location is required when status is Arrested/In Custody`);
-  // }
 
   return errors;
 };
@@ -276,7 +263,6 @@ const validateOffense = (offense, index) => {
 const validateBlotterData = (blotterData) => {
   const errors = [];
 
-  // Case detail validations
   if (!blotterData.incident_type) errors.push("Incident Type is required");
   if (blotterData.cop && blotterData.cop.trim().length > 0) {
     if (
@@ -292,7 +278,6 @@ const validateBlotterData = (blotterData) => {
   if (!blotterData.date_time_reported)
     errors.push("Date & Time Reported is required");
 
-  // Validate dates
   if (blotterData.date_time_commission && blotterData.date_time_reported) {
     const commission = new Date(blotterData.date_time_commission);
     const reported = new Date(blotterData.date_time_reported);
@@ -312,7 +297,6 @@ const validateBlotterData = (blotterData) => {
     }
   }
 
-  // Place validations
   if (!blotterData.place_region)
     errors.push("Place of Commission - Region is required");
   if (!blotterData.place_district_province)
@@ -329,7 +313,6 @@ const validateBlotterData = (blotterData) => {
     errors.push("Street must be 2-200 characters");
   }
 
-  // Narrative validation
   if (!blotterData.narrative) {
     errors.push("Narrative is required");
   } else if (
@@ -339,7 +322,6 @@ const validateBlotterData = (blotterData) => {
     errors.push("Narrative must be 20-5000 characters");
   }
 
-  // Amount validation - OPTIONAL (validate only if provided)
   if (blotterData.amount_involved) {
     const amount = parseFloat(blotterData.amount_involved);
     if (isNaN(amount)) {
@@ -362,10 +344,8 @@ const createBlotter = async (req, res) => {
 
     let allErrors = [];
 
-    // Validate blotter data
     allErrors.push(...validateBlotterData(blotterData));
 
-    // Validate complainants
     if (!complainants || complainants.length === 0) {
       allErrors.push("At least one complainant is required");
     } else {
@@ -374,16 +354,13 @@ const createBlotter = async (req, res) => {
       });
     }
 
-    // Validate suspects
     if (suspects && suspects.length > 0) {
       suspects.forEach((suspect, index) => {
-        // skip validation for empty/removed suspects
         if (!suspect.first_name || suspect.first_name.trim() === "") return;
         allErrors.push(...validateSuspect(suspect, index));
       });
     }
 
-    // If there are validation errors, return them
     if (allErrors.length > 0) {
       return res.status(400).json({
         success: false,
@@ -391,7 +368,6 @@ const createBlotter = async (req, res) => {
       });
     }
 
-    // Create blotter
     const result = await Blotter.create(
       blotterData,
       complainants,
@@ -399,22 +375,6 @@ const createBlotter = async (req, res) => {
       offenses,
     );
 
-    // Auto-create case
-    // try {
-    //   const year = new Date(blotterData.date_time_commission).getFullYear();
-    //   const countResult = await pool.query(
-    //     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
-    //   );
-    //   const count = parseInt(countResult.rows[0].count) + 1;
-    //   const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
-    //   await pool.query(
-    //     `INSERT INTO cases (blotter_id, case_number, created_by) VALUES ($1, $2, $3)`,
-    //     [result.blotter_id, case_number, req.user.user_id]
-    //   );
-    // } catch (caseErr) {
-    //   console.error("Auto-case creation failed:", caseErr.message);
-    //   // Non-fatal — blotter still saved
-    // }
     await autoCreateCase(
       pool,
       result.blotter_id || result.id,
@@ -461,7 +421,6 @@ const getAllBlotters = async (req, res) => {
 
     const blotters = await Blotter.getAll(filters);
 
-    // Backend safety net: enforce referred flag strictly
     let results = blotters;
     if (req.query.referred === "false") {
       results = blotters.filter(
@@ -473,7 +432,6 @@ const getAllBlotters = async (req, res) => {
       );
     }
 
-    // Reminder-access: inject out-of-barangay referrals the patrol was reminded about
     if (req.query.barangay && req.user?.role === "Patrol") {
       const reminderResult = await pool.query(
         `SELECT link_to FROM notifications
@@ -525,6 +483,7 @@ const getAllBlotters = async (req, res) => {
     });
   }
 };
+
 const getBlotterById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -636,46 +595,46 @@ const deleteBlotter = async (req, res) => {
       ipAddress: getClientIp(req),
     });
     const deleted = await pool.query(
-  `SELECT submitted_by, incident_type, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
-  [id]
-);
+      `SELECT submitted_by, incident_type, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
+      [id]
+    );
 
-if (deleted.rows[0]?.submitted_by) {
-  await createNotification({
-    recipientId: deleted.rows[0].submitted_by,
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "REFERRAL_DELETED",
-    title: "Referral Removed",
-    message: `Your referral has been removed after thorough review.`,
-    linkTo: "/brgy-report",
-  });
-}
+    if (deleted.rows[0]?.submitted_by) {
+      await createNotification({
+        recipientId: deleted.rows[0].submitted_by,
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "REFERRAL_DELETED",
+        title: "Referral Removed",
+        message: `Your referral has been removed after thorough review.`,
+        linkTo: "/brgy-report",
+      });
+    }
 
-await notifyAllByRole(["Administrator", "Technical Administrator"], {
-  senderId: req.user.user_id,
-  senderName: req.user.username,
-  type: "REFERRAL_DELETED",
-  title: "Referral Removed",
-  message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} has been deleted by ${req.user.username}.`,
-  linkTo: "/e-blotter",
-}, req.user.user_id);
+    await notifyAllByRole(["Administrator", "Technical Administrator"], {
+      senderId: req.user.user_id,
+      senderName: req.user.username,
+      type: "REFERRAL_DELETED",
+      title: "Referral Removed",
+      message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} has been deleted by ${req.user.username}.`,
+      linkTo: "/e-blotter",
+    }, req.user.user_id);
 
-if (deleted.rows[0]?.place_barangay) {
-  await notifyPatrolsForReferral(deleted.rows[0].place_barangay, {
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "REFERRAL_DELETED",
-    title: "Referral Removed",
-    message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} in Brgy. ${deleted.rows[0].place_barangay} has been removed.`,
-    linkTo: "/e-blotter",
-  }, req.user.user_id);
-}
+    if (deleted.rows[0]?.place_barangay) {
+      await notifyPatrolsForReferral(deleted.rows[0].place_barangay, {
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "REFERRAL_DELETED",
+        title: "Referral Removed",
+        message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} in Brgy. ${deleted.rows[0].place_barangay} has been removed.`,
+        linkTo: "/e-blotter",
+      }, req.user.user_id);
+    }
 
-res.status(200).json({
-  success: true,
-  message: "Crime report deleted successfully",
-});
+    res.status(200).json({
+      success: true,
+      message: "Crime report deleted successfully",
+    });
   } catch (error) {
     console.error("Delete crime report error:", error);
     res.status(500).json({
@@ -691,7 +650,6 @@ const updateBlotter = async (req, res) => {
     const { id } = req.params;
     const { blotterData, complainants, suspects, offenses } = req.body;
 
-    // Same validation as createBlotter
     let allErrors = [];
     allErrors.push(...validateBlotterData(blotterData));
 
@@ -758,6 +716,7 @@ const updateBlotter = async (req, res) => {
     });
   }
 };
+
 const getModus = async (req, res) => {
   try {
     const { crime_type } = req.params;
@@ -803,24 +762,76 @@ const restoreBlotter = async (req, res) => {
   }
 };
 
+// ============================================================
+// IMPORT — VALID_CRIME_TYPES / OFFENSE_TO_CRIME_TYPE / BARANGAY MAP
+// ============================================================
+
+const VALID_CRIME_TYPES = [
+  "Carnapping - MC", "Carnapping - MV", "Homicide", "Murder",
+  "Physical Injury", "Rape", "Robbery", "Special Complex Crime", "Theft",
+];
+
+const OFFENSE_TO_CRIME_TYPE = {
+  Murder: "MURDER", Homicide: "HOMICIDE", "Physical Injury": "PHYSICAL INJURIES",
+  Rape: "RAPE", Robbery: "ROBBERY", Theft: "THEFT",
+  "Carnapping - MC": "CARNAPPING - MC", "Carnapping - MV": "CARNAPPING - MV",
+  "Special Complex Crime": "SPECIAL COMPLEX CRIME",
+};
+
+const BARANGAY_MIGRATION_MAP = {
+  ALIMA: "SINEGUELASAN", BANALO: "SINEGUELASAN", SINBANALI: "SINEGUELASAN",
+  CAMPOSANTO: "KAINGIN (POB.)", "DAANG BUKID": "KAINGIN (POB.)", "TABING DAGAT": "KAINGIN (POB.)",
+  DIGMAN: "KAINGIN DIGMAN", KAINGIN: "KAINGIN DIGMAN",
+  PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)", "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 2": "P.F. ESPIRITU II", "PANAPAAN 3": "P.F. ESPIRITU II",
+  "PANAPAAN 4": "P.F. ESPIRITU IV", "PANAPAAN 5": "P.F. ESPIRITU V", "PANAPAAN 6": "P.F. ESPIRITU VI",
+  "PANAPAAN I": "P.F. ESPIRITU I (PANAPAAN)", "PANAPAAN II": "P.F. ESPIRITU II",
+  "PANAPAAN III": "P.F. ESPIRITU II", "PANAPAAN IV": "P.F. ESPIRITU IV",
+  "PANAPAAN V": "P.F. ESPIRITU V", "PANAPAAN VI": "P.F. ESPIRITU VI",
+  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)", "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
+  "P.F. ESPIRITU 3": "P.F. ESPIRITU III", "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
+  "P.F. ESPIRITU 5": "P.F. ESPIRITU V", "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
+  "ANIBAN 1": "ANIBAN I", "ANIBAN 2": "ANIBAN II",
+  "HABAY 1": "HABAY I", "HABAY 2": "HABAY II",
+  "LIGAS 1": "LIGAS I", "LIGAS 2": "LIGAS II",
+  "MABOLO 1": "MABOLO", "MABOLO 2": "MABOLO", "MABOLO 3": "MABOLO",
+  "MABOLO I": "MABOLO", "MABOLO II": "MABOLO", "MABOLO III": "MABOLO",
+  "MALIKSI 1": "MALIKSI I", "MALIKSI 2": "MALIKSI II", "MALIKSI 3": "MALIKSI II", "MALIKSI III": "MALIKSI II",
+  "MAMBOG 1": "MAMBOG I", "MAMBOG 2": "MAMBOG II", "MAMBOG 3": "MAMBOG III",
+  "MAMBOG 4": "MAMBOG IV", "MAMBOG 5": "MAMBOG II", "MAMBOG V": "MAMBOG II",
+  "MOLINO 1": "MOLINO I", "MOLINO 2": "MOLINO II", "MOLINO 3": "MOLINO III",
+  "MOLINO 4": "MOLINO IV", "MOLINO 5": "MOLINO V", "MOLINO 6": "MOLINO VI", "MOLINO 7": "MOLINO VII",
+  "NIOG 1": "NIOG", "NIOG 2": "NIOG", "NIOG 3": "NIOG", "NIOG I": "NIOG", "NIOG II": "NIOG", "NIOG III": "NIOG",
+  "REAL 1": "REAL", "REAL 2": "REAL", "REAL I": "REAL", "REAL II": "REAL",
+  "SALINAS 1": "SALINAS I", "SALINAS 2": "SALINAS II", "SALINAS 3": "SALINAS II",
+  "SALINAS 4": "SALINAS II", "SALINAS III": "SALINAS II", "SALINAS IV": "SALINAS II",
+  "SAN NICOLAS 1": "SAN NICOLAS I", "SAN NICOLAS 2": "SAN NICOLAS II", "SAN NICOLAS 3": "SAN NICOLAS III",
+  "TALABA 1": "TALABA I", "TALABA 2": "TALABA II", "TALABA 3": "TALABA III",
+  "TALABA 4": "TALABA III", "TALABA 5": "TALABA III", "TALABA 6": "TALABA III", "TALABA 7": "TALABA I",
+  "TALABA IV": "TALABA III", "TALABA V": "TALABA III", "TALABA VI": "TALABA III", "TALABA VII": "TALABA I",
+  "ZAPOTE 1": "ZAPOTE I", "ZAPOTE 2": "ZAPOTE II", "ZAPOTE 3": "ZAPOTE III",
+  "ZAPOTE 4": "ZAPOTE II", "ZAPOTE IV": "ZAPOTE II",
+  "KAINGIN DIGMAN": "KAINGIN DIGMAN",
+};
+
+// ============================================================
+// IMPORT BLOTTERS (bulk / chunked — safe for 5,000+ rows)
+// ============================================================
+
 const importBlotters = async (req, res) => {
   if (!req.file) {
-    return res
-      .status(400)
-      .json({ success: false, message: "No file uploaded" });
+    return res.status(400).json({ success: false, message: "No file uploaded" });
   }
 
   try {
     const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
     const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
     if (rows.length === 0) {
       return res.status(400).json({ success: false, message: "File is empty" });
     }
 
-    // Validate it's the Bantay template
     const firstRow = rows[0];
     const hasRequiredColumns =
       "BLOTTER_ENTRY_NUMBER" in firstRow &&
@@ -831,8 +842,7 @@ const importBlotters = async (req, res) => {
     if (!hasRequiredColumns) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid file format. Please use the official Bantay System import template.",
+        message: "Invalid file format. Please use the official Bantay System import template.",
       });
     }
 
@@ -842,299 +852,113 @@ const importBlotters = async (req, res) => {
     const errors = [];
 
     // ── helpers ──────────────────────────────────────────
-    const str = (v) =>
-      v === null || v === undefined || v === "" ? null : String(v).trim();
-    const num = (v) => {
-      const n = parseFloat(v);
-      return isNaN(n) ? null : n;
-    };
-    const int = (v) => {
-      const n = parseInt(v);
-      return isNaN(n) ? 0 : n;
-    };
+    const str = (v) => (v === null || v === undefined || v === "" ? null : String(v).trim());
+    const num = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+    const int = (v) => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
     const bool = (v) => {
       if (v === null || v === undefined || v === "") return false;
       return String(v).trim().toUpperCase() === "YES" || v === true || v === 1;
     };
-   // NEW
-const parseDate = (v) => {
-  if (v === null || v === undefined || v === "") return null;
-  if (typeof v === "number") {
-    // Excel serial date is a calendar day count with no timezone of its own.
-    // Extract Y/M/D via UTC math (safe, no local-TZ drift), then build a
-    // LOCAL Date at midnight — this is what matters for pg's local getters.
-    const days = Math.floor(v);
-    const utcAnchor = new Date((days - 25569) * 86400 * 1000);
-    return new Date(
-      utcAnchor.getUTCFullYear(),
-      utcAnchor.getUTCMonth(),
-      utcAnchor.getUTCDate(),
+
+    const parseDate = (v) => {
+      if (v === null || v === undefined || v === "") return null;
+      if (typeof v === "number") {
+        const days = Math.floor(v);
+        const utcAnchor = new Date((days - 25569) * 86400 * 1000);
+        return new Date(utcAnchor.getUTCFullYear(), utcAnchor.getUTCMonth(), utcAnchor.getUTCDate());
+      }
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const excelFractionToHM = (frac) => {
+      const totalMinutes = Math.round(frac * 24 * 60);
+      return { hours: Math.floor(totalMinutes / 60) % 24, minutes: totalMinutes % 60 };
+    };
+
+    const parseDateTime = (dateVal, timeVal) => {
+      const d = parseDate(dateVal);
+      if (!d) return null;
+      let hours = 0, minutes = 0;
+      if (typeof timeVal === "number") {
+        ({ hours, minutes } = excelFractionToHM(timeVal));
+      } else if (timeVal && String(timeVal).includes(":")) {
+        const parts = String(timeVal).split(":");
+        hours = parseInt(parts[0]) || 0;
+        minutes = parseInt(parts[1]) || 0;
+      } else if (typeof dateVal === "number" && dateVal % 1 !== 0) {
+        ({ hours, minutes } = excelFractionToHM(dateVal % 1));
+      }
+      d.setHours(hours, minutes, 0, 0);
+      return d;
+    };
+
+    const deriveDayOfWeek = (d) => !d ? null : ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
+    const deriveMonth = (d) => !d ? null : ["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()];
+
+    // ── ONE upfront query to find existing Report IDs ──────
+    const allBlotterNos = rows.map(r => str(r["BLOTTER_ENTRY_NUMBER"])).filter(Boolean);
+    const existingResult = await pool.query(
+      `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_entry_number = ANY($1::text[])`,
+      [allBlotterNos]
     );
-  }
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
-};
+    const existingSet = new Set(existingResult.rows.map(r => r.blotter_entry_number));
+    const seenInFile = new Set();
 
-const excelFractionToHM = (frac) => {
-  const totalMinutes = Math.round(frac * 24 * 60);
-  return {
-    hours: Math.floor(totalMinutes / 60) % 24,
-    minutes: totalMinutes % 60,
-  };
-};
-
-const parseDateTime = (dateVal, timeVal) => {
-  const d = parseDate(dateVal);
-  if (!d) return null;
-
-  let hours = 0, minutes = 0;
-
-  if (typeof timeVal === "number") {
-    ({ hours, minutes } = excelFractionToHM(timeVal));
-  } else if (timeVal && String(timeVal).includes(":")) {
-    const parts = String(timeVal).split(":");
-    hours = parseInt(parts[0]) || 0;
-    minutes = parseInt(parts[1]) || 0;
-  } else if (typeof dateVal === "number" && dateVal % 1 !== 0) {
-    ({ hours, minutes } = excelFractionToHM(dateVal % 1));
-  }
-
-  // LOCAL setter — pg reads this back via local getters, so this is what
-  // actually ends up stored. Do NOT use setUTCHours here.
-  d.setHours(hours, minutes, 0, 0);
-  return d;
-};
-    const deriveQuarter = (d) => {
-      if (!d) return null;
-      return Math.ceil((d.getMonth() + 1) / 3);
-    };
-    const deriveDayOfWeek = (d) => {
-      if (!d) return null;
-      return [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ][d.getDay()];
-    };
-    const deriveMonth = (d) => {
-      if (!d) return null;
-      return [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-      ][d.getMonth()];
-    };
-
-    // ── process rows ─────────────────────────────────────
+    // ── process rows (validation only, no DB calls here) ───
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
       const rowNum = idx + 2;
 
       const blotterNo = str(row["BLOTTER_ENTRY_NUMBER"]);
       if (!blotterNo) {
-        const impYear = new Date().getFullYear();
-        const impCount = await pool.query(
-          `SELECT COUNT(*) FROM blotter_entries WHERE blotter_entry_number LIKE $1`,
-          [`IMP-${impYear}-%`],
-        );
-        const impSeq = (parseInt(impCount.rows[0].count) + 1)
-          .toString()
-          .padStart(6, "0");
-        row["BLOTTER_ENTRY_NUMBER"] = `IMP-${impYear}-${impSeq}`;
-        // re-assign blotterNo
-        continue; // still skip — require blotter number in Excel
+        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Missing Report ID" });
+        continue;
       }
+
+      if (existingSet.has(blotterNo)) {
+        duplicates.push({ row: rowNum, blotter_entry_number: blotterNo });
+        continue;
+      }
+      if (seenInFile.has(blotterNo)) {
+        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Duplicate Report ID in file" });
+        continue;
+      }
+      seenInFile.add(blotterNo);
 
       const incidentType = str(row["INCIDENT_TYPE"]);
       if (!incidentType) {
-        errors.push({
-          row: rowNum,
-          field: "INCIDENT_TYPE",
-          message: "Missing incident type",
-        });
+        errors.push({ row: rowNum, field: "INCIDENT_TYPE", message: "Missing incident type" });
+        continue;
+      }
+      if (!VALID_CRIME_TYPES.some(c => c.toLowerCase() === incidentType.toLowerCase())) {
+        errors.push({ row: rowNum, field: "INCIDENT_TYPE", message: `"${incidentType}" is not a valid PNP index crime` });
         continue;
       }
 
       const rawBarangay = str(row["PLACE_BARANGAY"]);
       if (!rawBarangay) {
-        errors.push({
-          row: rowNum,
-          field: "PLACE_BARANGAY",
-          message: "Missing barangay",
-        });
+        errors.push({ row: rowNum, field: "PLACE_BARANGAY", message: "Missing barangay" });
         continue;
       }
 
-      const BARANGAY_MIGRATION_MAP = {
-  ALIMA: "SINEGUELASAN",
-  BANALO: "SINEGUELASAN",
-  SINBANALI: "SINEGUELASAN",
-  CAMPOSANTO: "KAINGIN (POB.)",
-  "DAANG BUKID": "KAINGIN (POB.)",
-  "TABING DAGAT": "KAINGIN (POB.)",
-  DIGMAN: "KAINGIN DIGMAN",
-  KAINGIN: "KAINGIN DIGMAN",
- 
-  // ── PANAPAAN -> P.F. ESPIRITU (full rename family) ──
-  PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)",
-  "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
-  "PANAPAAN 2": "P.F. ESPIRITU II",
-  "PANAPAAN 3": "P.F. ESPIRITU II",
-  "PANAPAAN 4": "P.F. ESPIRITU IV",
-  "PANAPAAN 5": "P.F. ESPIRITU V",
-  "PANAPAAN 6": "P.F. ESPIRITU VI",
-  "PANAPAAN I": "P.F. ESPIRITU I (PANAPAAN)",       // <-- NEW
-  "PANAPAAN II": "P.F. ESPIRITU II",                 // <-- NEW
-  "PANAPAAN III": "P.F. ESPIRITU II",                // <-- NEW
-  "PANAPAAN IV": "P.F. ESPIRITU IV",                 // <-- NEW
-  "PANAPAAN V": "P.F. ESPIRITU V",                   // <-- NEW
-  "PANAPAAN VI": "P.F. ESPIRITU VI",                 // <-- NEW
- 
-  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
-  "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
-  "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
-  "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
-  "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
-  "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
- 
-  "ANIBAN 1": "ANIBAN I",
-  "ANIBAN 2": "ANIBAN II",
-  "HABAY 1": "HABAY I",
-  "HABAY 2": "HABAY II",
-  "LIGAS 1": "LIGAS I",
-  "LIGAS 2": "LIGAS II",
- 
-  // ── MABOLO (merges to unsuffixed canonical name) ──
-  "MABOLO 1": "MABOLO",
-  "MABOLO 2": "MABOLO",
-  "MABOLO 3": "MABOLO",
-  "MABOLO I": "MABOLO",     // <-- NEW
-  "MABOLO II": "MABOLO",    // <-- NEW
-  "MABOLO III": "MABOLO",   // <-- NEW
- 
-  // ── MALIKSI ──
-  "MALIKSI 1": "MALIKSI I",
-  "MALIKSI 2": "MALIKSI II",
-  "MALIKSI 3": "MALIKSI II",
-  "MALIKSI III": "MALIKSI II",   // <-- NEW (3 -> II mismatch)
- 
-  // ── MAMBOG ──
-  "MAMBOG 1": "MAMBOG I",
-  "MAMBOG 2": "MAMBOG II",
-  "MAMBOG 3": "MAMBOG III",
-  "MAMBOG 4": "MAMBOG IV",
-  "MAMBOG 5": "MAMBOG II",
-  "MAMBOG V": "MAMBOG II",       // <-- NEW (5 -> II mismatch)
- 
-  "MOLINO 1": "MOLINO I",
-  "MOLINO 2": "MOLINO II",
-  "MOLINO 3": "MOLINO III",
-  "MOLINO 4": "MOLINO IV",
-  "MOLINO 5": "MOLINO V",
-  "MOLINO 6": "MOLINO VI",
-  "MOLINO 7": "MOLINO VII",
- 
-  "NIOG 1": "NIOG",
-  "NIOG 2": "NIOG",
-  "NIOG 3": "NIOG",
-  "NIOG I": "NIOG",
-  "NIOG II": "NIOG",
-  "NIOG III": "NIOG",
- 
-  // ── REAL (merges to unsuffixed canonical name) ──
-  "REAL 1": "REAL",
-  "REAL 2": "REAL",
-  "REAL I": "REAL",    // <-- NEW
-  "REAL II": "REAL",   // <-- NEW
- 
-  // ── SALINAS ──
-  "SALINAS 1": "SALINAS I",
-  "SALINAS 2": "SALINAS II",
-  "SALINAS 3": "SALINAS II",
-  "SALINAS 4": "SALINAS II",
-  "SALINAS III": "SALINAS II",   // <-- NEW (3 -> II mismatch)
-  "SALINAS IV": "SALINAS II",    // <-- NEW (4 -> II mismatch)
- 
-  "SAN NICOLAS 1": "SAN NICOLAS I",
-  "SAN NICOLAS 2": "SAN NICOLAS II",
-  "SAN NICOLAS 3": "SAN NICOLAS III",
- 
-  // ── TALABA ──
-  "TALABA 1": "TALABA I",
-  "TALABA 2": "TALABA II",
-  "TALABA 3": "TALABA III",
-  "TALABA 4": "TALABA III",
-  "TALABA 5": "TALABA III",
-  "TALABA 6": "TALABA III",
-  "TALABA 7": "TALABA I",
-  "TALABA IV": "TALABA III",     // <-- NEW (4 -> III mismatch)
-  "TALABA V": "TALABA III",      // <-- NEW (5 -> III mismatch)
-  "TALABA VI": "TALABA III",     // <-- NEW (6 -> III mismatch)
-  "TALABA VII": "TALABA I",      // <-- NEW (7 -> I mismatch)
- 
-  // ── ZAPOTE ──
-  "ZAPOTE 1": "ZAPOTE I",
-  "ZAPOTE 2": "ZAPOTE II",
-  "ZAPOTE 3": "ZAPOTE III",
-  "ZAPOTE 4": "ZAPOTE II",
-  "ZAPOTE IV": "ZAPOTE II",      // <-- NEW (4 -> II mismatch)
- 
-  "KAINGIN DIGMAN": "KAINGIN DIGMAN",
-};
+      const barangay = BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] || rawBarangay.toUpperCase();
+      if (!VALID_BARANGAYS.includes(barangay)) {
+        errors.push({ row: rowNum, field: "PLACE_BARANGAY", message: `"${rawBarangay}" is not a recognized barangay` });
+        continue;
+      }
 
-      const barangay =
-        BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] || rawBarangay;
-
-      const dateCommitted = parseDateTime(
-        row["DATE_COMMITTED"],
-        row["TIME_COMMITTED"],
-      );
+      const dateCommitted = parseDateTime(row["DATE_COMMITTED"], row["TIME_COMMITTED"]);
       if (!dateCommitted) {
-        errors.push({
-          row: rowNum,
-          field: "DATE_COMMITTED",
-          message: "Missing or invalid date committed",
-        });
+        errors.push({ row: rowNum, field: "DATE_COMMITTED", message: "Missing or invalid date committed" });
         continue;
       }
 
-      // Duplicate check
-      const dup = await pool.query(
-        `SELECT 1 FROM blotter_entries WHERE blotter_entry_number = $1`,
-        [blotterNo],
-      );
-      if (dup.rows.length > 0) {
-        duplicates.push({ row: rowNum, blotter_entry_number: blotterNo });
-        continue;
-      }
-
-      const dateReported = parseDateTime(
-        row["DATE_REPORTED"],
-        row["TIME_REPORTED"],
-      );
+      const dateReported = parseDateTime(row["DATE_REPORTED"], row["TIME_REPORTED"]);
 
       inserted.push({
-        rowNum,
-        // ── blotter fields ──
-        blotterNo,
-        incidentType,
-        barangay,
-        dateCommitted,
+        rowNum, blotterNo, incidentType, barangay, dateCommitted,
         dateReported: dateReported || dateCommitted,
-        quarter: deriveQuarter(dateCommitted),
         dayOfWeek: deriveDayOfWeek(dateCommitted),
         monthName: deriveMonth(dateCommitted),
         placeStreet: str(row["PLACE_STREET"]) || "N/A",
@@ -1145,28 +969,9 @@ const parseDateTime = (dateVal, timeVal) => {
         narrative: str(row["NARRATIVE"]) || "Imported from Bantay template",
         caseStatus: str(row["CASE_STATUS"]) || "Under Investigation",
         caseSolveType: str(row["CASE_SOLVE_TYPE"]),
-        drugInvolved: bool(row["DRUG_INVOLVED"]),
         amount: num(row["AMOUNT"]),
         lat: num(row["LAT"]),
         lng: num(row["LNG"]),
-        // robbery
-        robEstablishmentType: str(row["ROB_ESTABLISHMENT_TYPE"]),
-        robEstablishmentName: str(row["ROB_ESTABLISHMENT_NAME"]),
-        // vehicle
-        vehiclePlateNo: str(row["VEHICLE_PLATE_NO"]),
-        vehicleKind: str(row["VEHICLE_KIND"]),
-        vehicleMake: str(row["VEHICLE_MAKE"]),
-        vehicleModel: str(row["VEHICLE_MODEL"]),
-        vehicleStatus: str(row["VEHICLE_STATUS"]),
-        // firearm
-        faCaliber: str(row["FA_CALIBER"]),
-        faKind: str(row["FA_KIND"]),
-        faMake: str(row["FA_MAKE"]),
-        faStatus: str(row["FA_STATUS"]),
-        // gambling
-        gamblingKind: str(row["GAMBLING_KIND"]),
-
-        // ── complainant fields ──
         complainant: {
           first_name: str(row["C_FIRST_NAME"]),
           middle_name: str(row["C_MIDDLE_NAME"]),
@@ -1176,11 +981,10 @@ const parseDateTime = (dateVal, timeVal) => {
           gender: str(row["C_GENDER"]) || "Male",
           nationality: str(row["C_NATIONALITY"]) || "FILIPINO",
           contact_number: (() => {
-            const num = str(row["C_CONTACT_NUMBER"]);
-            if (!num) return null;
-            const cleaned = num.replace(/\D/g, "");
-            if (cleaned.length === 10 && cleaned.startsWith("9"))
-              return "0" + cleaned;
+            const n = str(row["C_CONTACT_NUMBER"]);
+            if (!n) return null;
+            const cleaned = n.replace(/\D/g, "");
+            if (cleaned.length === 10 && cleaned.startsWith("9")) return "0" + cleaned;
             return cleaned;
           })(),
           region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
@@ -1198,8 +1002,6 @@ const parseDateTime = (dateVal, timeVal) => {
           relationship_to_victim: str(row["C_RELATIONSHIP_TO_VICTIM"]) || null,
           witness_statement: str(row["C_WITNESS_STATEMENT"]) || null,
         },
-
-        // ── suspect fields ──
         suspect: {
           first_name: str(row["S_FIRST_NAME"]) || "UNKNOWN",
           middle_name: str(row["S_MIDDLE_NAME"]),
@@ -1218,8 +1020,7 @@ const parseDateTime = (dateVal, timeVal) => {
           house_street: str(row["S_HOUSE_STREET"]) || "N/A",
           status: str(row["S_STATUS"]) || "At Large",
           location_if_arrested: str(row["S_LOCATION_IF_ARRESTED"]),
-          degree_participation:
-            str(row["S_DEGREE_PARTICIPATION"]) || "Principal",
+          degree_participation: str(row["S_DEGREE_PARTICIPATION"]) || "Principal",
           relation_to_victim: str(row["S_RELATION_TO_VICTIM"]),
           educational_attainment: str(row["S_EDUCATIONAL_ATTAINMENT"]),
           height_cm: int(row["S_HEIGHT_CM"]) || null,
@@ -1227,14 +1028,9 @@ const parseDateTime = (dateVal, timeVal) => {
           motive: str(row["S_MOTIVE"]),
           occupation: str(row["S_OCCUPATION"]),
         },
-
-        // ── offense fields ──
         offense: {
           offense_name: str(row["O_OFFENSE_NAME"]) || incidentType,
-          stage_of_felony:
-            str(row["O_STAGE_OF_FELONY"]) ||
-            str(row["STAGE_OF_FELONY"]) ||
-            "COMPLETED",
+          stage_of_felony: str(row["O_STAGE_OF_FELONY"]) || str(row["STAGE_OF_FELONY"]) || "COMPLETED",
           index_type: str(row["O_INDEX_TYPE"]) || "Index",
           is_principal_offense: true,
           investigator_on_case: str(row["O_INVESTIGATOR_ON_CASE"]) || "N/A",
@@ -1251,101 +1047,149 @@ const parseDateTime = (dateVal, timeVal) => {
     try {
       await client.query("BEGIN");
 
+      const CHUNK_SIZE = 500;
+      const caseRows = [];
+
+      // Resolve/create ALL unique modus entries ONCE, before chunking
+      const uniquePairs = new Map();
       for (const r of inserted) {
-        // 1. Insert blotter_entry
-        const blotterResult = await client.query(
+        const crimeType = OFFENSE_TO_CRIME_TYPE[r.offense.offense_name];
+        if (!crimeType || !r.offense.modus) continue;
+        const modusList = r.offense.modus.split(",").map(m => m.trim()).filter(Boolean);
+        for (const modusName of modusList) {
+          uniquePairs.set(`${crimeType}||${modusName.toLowerCase()}`, { crimeType, modusName });
+        }
+      }
+
+      const pairArr = [...uniquePairs.values()];
+      const modusIdMap = new Map();
+
+      if (pairArr.length > 0) {
+        const existing = await client.query(
+          `SELECT id, crime_type, modus_name FROM crime_modus_reference
+           WHERE (UPPER(crime_type), LOWER(modus_name)) IN (
+             SELECT UNNEST($1::text[]), UNNEST($2::text[])
+           )`,
+          [pairArr.map(p => p.crimeType), pairArr.map(p => p.modusName.toLowerCase())]
+        );
+        for (const row of existing.rows) {
+          modusIdMap.set(`${row.crime_type}||${row.modus_name.toLowerCase()}`, row.id);
+        }
+        const existingIds = existing.rows.map(r => r.id);
+        if (existingIds.length > 0) {
+          await client.query(`UPDATE crime_modus_reference SET is_active = true WHERE id = ANY($1::int[])`, [existingIds]);
+        }
+
+        const missing = pairArr.filter(p => !modusIdMap.has(`${p.crimeType}||${p.modusName.toLowerCase()}`));
+        if (missing.length > 0) {
+          const created = await client.query(
+            `INSERT INTO crime_modus_reference (crime_type, modus_name, is_active)
+             SELECT * FROM UNNEST($1::text[], $2::text[], $3::boolean[])
+             RETURNING id, crime_type, modus_name`,
+            [missing.map(p => p.crimeType), missing.map(p => p.modusName), missing.map(() => true)]
+          );
+          for (const row of created.rows) {
+            modusIdMap.set(`${row.crime_type}||${row.modus_name.toLowerCase()}`, row.id);
+          }
+        }
+      }
+
+      // ── chunk loop ──
+      for (let i = 0; i < inserted.length; i += CHUNK_SIZE) {
+        const chunk = inserted.slice(i, i + CHUNK_SIZE);
+
+        const blotterInsertResult = await client.query(
           `INSERT INTO blotter_entries (
-            blotter_entry_number, incident_type,
-            place_region, place_district_province, place_city_municipality,
-            place_barangay, place_street, type_of_place, place_commission,
-            narrative, stage_of_felony, modus,
-            date_time_commission, date_time_reported,
-            referred_by_barangay, referred_by_dilg,
-            day_of_incident, month_of_incident,
-            status, case_solve_type,
-            lat, lng, amount_involved,
-            victim, suspect_text,
-            data_source, import_batch_id, is_deleted
-          ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-            $11,$12,$13,$14,$15,$16,$17,$18,
-            $19,$20,$21,$22,$23,$24,$25,$26,$27,$28
-          ) RETURNING blotter_id`,
+            blotter_entry_number, incident_type, place_region, place_district_province,
+            place_city_municipality, place_barangay, place_street, type_of_place,
+            place_commission, narrative, stage_of_felony, modus,
+            date_time_commission, date_time_reported, referred_by_barangay, referred_by_dilg,
+            day_of_incident, month_of_incident, status, case_solve_type,
+            lat, lng, amount_involved, victim, suspect_text, data_source, import_batch_id, is_deleted
+          )
+          SELECT * FROM UNNEST(
+            $1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[],
+            $8::text[], $9::text[], $10::text[], $11::text[], $12::text[],
+            $13::timestamp[], $14::timestamp[], $15::boolean[], $16::boolean[],
+            $17::text[], $18::text[], $19::text[], $20::text[],
+            $21::numeric[], $22::numeric[], $23::numeric[], $24::text[], $25::text[],
+            $26::text[], $27::text[], $28::boolean[]
+          )
+          RETURNING blotter_id`,
           [
-            r.blotterNo,
-            r.incidentType,
-            "Region IV-A (CALABARZON)",
-            "Cavite",
-            "Bacoor City",
-            r.barangay,
-            r.placeStreet,
-            r.typeOfPlace,
-            r.placeCommission,
-            r.narrative,
-            r.stageOfFelony,
-            r.modus,
-            r.dateCommitted,
-            r.dateReported,
-            false,
-            false,
-            r.dayOfWeek,
-            r.monthName,
-            r.caseStatus,
-            r.caseSolveType,
-            r.lat,
-            r.lng,
-            r.amount,
-            r.complainant.first_name
-              ? `${r.complainant.first_name} ${r.complainant.last_name || ""}`.trim()
-              : null,
-            r.suspect.first_name
-              ? `${r.suspect.first_name} ${r.suspect.last_name || ""}`.trim()
-              : null,
-            "bantay_import",
-            r.batchId || batchId,
-            false,
-          ],
+            chunk.map(r => r.blotterNo),
+            chunk.map(r => r.incidentType),
+            chunk.map(() => "Region IV-A (CALABARZON)"),
+            chunk.map(() => "Cavite"),
+            chunk.map(() => "Bacoor City"),
+            chunk.map(r => r.barangay),
+            chunk.map(r => r.placeStreet),
+            chunk.map(r => r.typeOfPlace),
+            chunk.map(r => r.placeCommission),
+            chunk.map(r => r.narrative),
+            chunk.map(r => r.stageOfFelony),
+            chunk.map(r => r.modus),
+            chunk.map(r => r.dateCommitted),
+            chunk.map(r => r.dateReported),
+            chunk.map(() => false),
+            chunk.map(() => false),
+            chunk.map(r => r.dayOfWeek),
+            chunk.map(r => r.monthName),
+            chunk.map(r => r.caseStatus),
+            chunk.map(r => r.caseSolveType),
+            chunk.map(r => r.lat),
+            chunk.map(r => r.lng),
+            chunk.map(r => r.amount),
+            chunk.map(r => r.complainant.first_name ? `${r.complainant.first_name} ${r.complainant.last_name || ""}`.trim() : null),
+            chunk.map(r => r.suspect.first_name ? `${r.suspect.first_name} ${r.suspect.last_name || ""}`.trim() : null),
+            chunk.map(() => "bantay_import"),
+            chunk.map(() => batchId),
+            chunk.map(() => false),
+          ]
         );
 
-        const blotterId = blotterResult.rows[0].blotter_id;
-        await autoCreateCase(client, blotterId, req.user.user_id);
+        const blotterIds = blotterInsertResult.rows.map(r => r.blotter_id);
+        chunk.forEach((r, idx) => { r.blotterId = blotterIds[idx]; });
 
-        // 2. Insert complainant (only if first name exists)
-        if (r.complainant.first_name) {
+        const withComplainant = chunk.filter(r => r.complainant.first_name);
+        if (withComplainant.length > 0) {
           await client.query(
             `INSERT INTO complainants (
-    blotter_id, first_name, middle_name, last_name, qualifier, alias,
-    gender, nationality, contact_number,
-    region, district_province, city_municipality, barangay, house_street,
-    info_obtained, occupation, role, relationship_to_victim, witness_statement
-  ) VALUES (
-    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
-  )`,
+              blotter_id, first_name, middle_name, last_name, qualifier, alias,
+              gender, nationality, contact_number, region, district_province,
+              city_municipality, barangay, house_street, info_obtained, occupation,
+              role, relationship_to_victim, witness_statement
+            )
+            SELECT * FROM UNNEST(
+              $1::int[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[],
+              $7::text[], $8::text[], $9::text[], $10::text[], $11::text[],
+              $12::text[], $13::text[], $14::text[], $15::text[], $16::text[],
+              $17::text[], $18::text[], $19::text[]
+            )`,
             [
-              blotterId,
-              r.complainant.first_name || null,
-              r.complainant.middle_name || null,
-              r.complainant.last_name || null,
-              r.complainant.qualifier || null,
-              r.complainant.alias || null,
-              r.complainant.gender || "Male",
-              r.complainant.nationality || "FILIPINO",
-              r.complainant.contact_number || null,
-              r.complainant.region || null,
-              r.complainant.district_province || null,
-              r.complainant.city_municipality || null,
-              r.complainant.barangay || null,
-              r.complainant.house_street || null,
-              r.complainant.info_obtained || null,
-              r.complainant.occupation || null,
-              r.complainant.role || "Victim",
-              r.complainant.relationship_to_victim || null,
-              r.complainant.witness_statement || null,
-            ],
+              withComplainant.map(r => r.blotterId),
+              withComplainant.map(r => r.complainant.first_name),
+              withComplainant.map(r => r.complainant.middle_name),
+              withComplainant.map(r => r.complainant.last_name),
+              withComplainant.map(r => r.complainant.qualifier),
+              withComplainant.map(r => r.complainant.alias),
+              withComplainant.map(r => r.complainant.gender || "Male"),
+              withComplainant.map(r => r.complainant.nationality || "FILIPINO"),
+              withComplainant.map(r => r.complainant.contact_number),
+              withComplainant.map(r => r.complainant.region),
+              withComplainant.map(r => r.complainant.district_province),
+              withComplainant.map(r => r.complainant.city_municipality),
+              withComplainant.map(r => r.complainant.barangay),
+              withComplainant.map(r => r.complainant.house_street),
+              withComplainant.map(r => r.complainant.info_obtained),
+              withComplainant.map(r => r.complainant.occupation),
+              withComplainant.map(r => r.complainant.role || "Victim"),
+              withComplainant.map(r => r.complainant.relationship_to_victim),
+              withComplainant.map(r => r.complainant.witness_statement),
+            ]
           );
         }
 
-        // 3. Insert suspect
         await client.query(
           `INSERT INTO suspects (
             blotter_id, first_name, middle_name, last_name, qualifier, alias,
@@ -1354,142 +1198,147 @@ const parseDateTime = (dateVal, timeVal) => {
             status, location_if_arrested, degree_participation,
             relation_to_victim, educational_attainment,
             height_cm, drug_used, motive, occupation
-          ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-            $12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+          )
+          SELECT * FROM UNNEST(
+            $1::int[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[],
+            $7::text[], $8::date[], $9::int[], $10::text[], $11::text[],
+            $12::text[], $13::text[], $14::text[], $15::text[], $16::text[],
+            $17::text[], $18::text[], $19::text[],
+            $20::text[], $21::text[],
+            $22::int[], $23::boolean[], $24::text[], $25::text[]
           )`,
           [
-            blotterId,
-            r.suspect.first_name,
-            r.suspect.middle_name,
-            r.suspect.last_name,
-            r.suspect.qualifier,
-            r.suspect.alias,
-            r.suspect.gender,
-            r.suspect.birthday,
-            r.suspect.age || null,
-            r.suspect.birth_place,
-            r.suspect.nationality,
-            r.suspect.region,
-            r.suspect.district_province,
-            r.suspect.city_municipality,
-            r.suspect.barangay,
-            r.suspect.house_street,
-            r.suspect.status,
-            r.suspect.location_if_arrested,
-            r.suspect.degree_participation,
-            r.suspect.relation_to_victim,
-            r.suspect.educational_attainment,
-            r.suspect.height_cm || null,
-            r.suspect.drug_used,
-            r.suspect.motive,
-            r.suspect.occupation,
-          ],
+            chunk.map(r => r.blotterId),
+            chunk.map(r => r.suspect.first_name),
+            chunk.map(r => r.suspect.middle_name),
+            chunk.map(r => r.suspect.last_name),
+            chunk.map(r => r.suspect.qualifier),
+            chunk.map(r => r.suspect.alias),
+            chunk.map(r => r.suspect.gender),
+            chunk.map(r => r.suspect.birthday),
+            chunk.map(r => r.suspect.age),
+            chunk.map(r => r.suspect.birth_place),
+            chunk.map(r => r.suspect.nationality),
+            chunk.map(r => r.suspect.region),
+            chunk.map(r => r.suspect.district_province),
+            chunk.map(r => r.suspect.city_municipality),
+            chunk.map(r => r.suspect.barangay),
+            chunk.map(r => r.suspect.house_street),
+            chunk.map(r => r.suspect.status),
+            chunk.map(r => r.suspect.location_if_arrested),
+            chunk.map(r => r.suspect.degree_participation),
+            chunk.map(r => r.suspect.relation_to_victim),
+            chunk.map(r => r.suspect.educational_attainment),
+            chunk.map(r => r.suspect.height_cm),
+            chunk.map(r => r.suspect.drug_used),
+            chunk.map(r => r.suspect.motive),
+            chunk.map(r => r.suspect.occupation),
+          ]
         );
 
-        // 4. Insert offense
-        // 4. Insert offense
         await client.query(
           `INSERT INTO offenses (
             blotter_id, offense_name, stage_of_felony, index_type,
             is_principal_offense, investigator_on_case, most_investigator, modus
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          )
+          SELECT * FROM UNNEST(
+            $1::int[], $2::text[], $3::text[], $4::text[],
+            $5::boolean[], $6::text[], $7::text[], $8::text[]
+          )`,
           [
-            blotterId,
-            r.offense.offense_name,
-            r.offense.stage_of_felony,
-            r.offense.index_type,
-            r.offense.is_principal_offense,
-            r.offense.investigator_on_case,
-            r.offense.most_investigator,
-            r.offense.modus,
-          ],
+            chunk.map(r => r.blotterId),
+            chunk.map(r => r.offense.offense_name),
+            chunk.map(r => r.offense.stage_of_felony),
+            chunk.map(r => r.offense.index_type),
+            chunk.map(r => r.offense.is_principal_offense),
+            chunk.map(r => r.offense.investigator_on_case),
+            chunk.map(r => r.offense.most_investigator),
+            chunk.map(r => r.offense.modus),
+          ]
         );
 
-        // 5. Auto-link or auto-create modus in crime_modus_reference
-        if (r.offense.modus) {
-          const OFFENSE_TO_CRIME_TYPE = {
-            Murder: "MURDER",
-            Homicide: "HOMICIDE",
-            "Physical Injury": "PHYSICAL INJURIES",
-            Rape: "RAPE",
-            Robbery: "ROBBERY",
-            Theft: "THEFT",
-            "Carnapping - MC": "CARNAPPING - MC",
-            "Carnapping - MV": "CARNAPPING - MV",
-            "Special Complex Crime": "SPECIAL COMPLEX CRIME",
-            "CARNAPPING - MC": "CARNAPPING - MC",
-            "CARNAPPING - MV": "CARNAPPING - MV",
-          };
-
+        const modusPairs = [];
+        for (const r of chunk) {
           const crimeType = OFFENSE_TO_CRIME_TYPE[r.offense.offense_name];
-
-          if (crimeType) {
-            // Split modus by comma in case multiple are stored as one string
-            const modusList = r.offense.modus
-              .split(",")
-              .map((m) => m.trim())
-              .filter(Boolean);
-
-            for (const modusName of modusList) {
-              // Check if modus already exists for this crime type
-              const existing = await client.query(
-                `SELECT id FROM crime_modus_reference
-                 WHERE UPPER(crime_type) = $1 AND LOWER(modus_name) = LOWER($2)`,
-                [crimeType, modusName],
-              );
-
-              let modusRefId;
-
-              if (existing.rows.length > 0) {
-                // Already exists — use it
-                modusRefId = existing.rows[0].id;
-
-                // Make sure it's active
-                await client.query(
-                  `UPDATE crime_modus_reference SET is_active = true WHERE id = $1`,
-                  [modusRefId],
-                );
-              } else {
-                // Doesn't exist — auto-create it
-                const created = await client.query(
-                  `INSERT INTO crime_modus_reference (crime_type, modus_name, is_active)
-                   VALUES ($1, $2, true) RETURNING id`,
-                  [crimeType, modusName],
-                );
-                modusRefId = created.rows[0].id;
-              }
-
-              // Link to this blotter via crime_modus table
-              await client.query(
-                `INSERT INTO crime_modus (blotter_id, modus_reference_id)
-                 VALUES ($1, $2)
-                 ON CONFLICT DO NOTHING`,
-                [blotterId, modusRefId],
-              );
-            }
+          if (!crimeType || !r.offense.modus) continue;
+          const modusList = r.offense.modus.split(",").map(m => m.trim()).filter(Boolean);
+          for (const modusName of modusList) {
+            const modusRefId = modusIdMap.get(`${crimeType}||${modusName.toLowerCase()}`);
+            if (modusRefId) modusPairs.push({ blotterId: r.blotterId, modusRefId });
           }
         }
+        if (modusPairs.length > 0) {
+          await client.query(
+            `INSERT INTO crime_modus (blotter_id, modus_reference_id)
+             SELECT * FROM UNNEST($1::int[], $2::int[])
+             ON CONFLICT DO NOTHING`,
+            [modusPairs.map(p => p.blotterId), modusPairs.map(p => p.modusRefId)]
+          );
+        }
 
-        // Auto-create case for imported blotter
-        // try {
-        //   const year = new Date(r.dateCommitted).getFullYear();
-        //   const countResult = await client.query(
-        //     "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1", [year]
-        //   );
-        //   const caseCount = parseInt(countResult.rows[0].count) + 1;
-        //   const case_number = `CASE-${year}-${String(caseCount).padStart(4, "0")}`;
-        //   await client.query(
-        //     `INSERT INTO cases (blotter_id, case_number, created_by)
-        //      VALUES ($1, $2, $3)
-        //      ON CONFLICT DO NOTHING`,
-        //     [blotterId, case_number, req.user.user_id]
-        //   );
-        // } catch (caseErr) {
-        //   console.error("Auto-case (import) failed:", caseErr.message);
-        // }
+        chunk.forEach(r => {
+          caseRows.push({
+            blotterId: r.blotterId,
+            status: r.caseStatus,
+            incidentType: r.incidentType,
+            reportedDate: r.dateReported || r.dateCommitted,
+          });
+        });
 
-        actualInserted++;
+        actualInserted += chunk.length;
+      }
+
+      // ── bulk auto-create cases ──────────────────────────
+      if (caseRows.length > 0) {
+        const validStatuses = ["Under Investigation", "Solved", "Cleared"];
+        const currentYear = new Date().getFullYear();
+        const highCrimes = ["murder", "homicide", "rape", "special complex crime"];
+        const mediumCrimes = ["robbery", "carnapping - mc", "carnapping - mv"];
+
+        const byYear = new Map();
+        for (const cr of caseRows) {
+          const year = cr.reportedDate ? new Date(cr.reportedDate).getFullYear() : currentYear;
+          if (!byYear.has(year)) byYear.set(year, []);
+          byYear.get(year).push(cr);
+        }
+
+        const finalCaseNumbers = [];
+        for (const [year, group] of byYear.entries()) {
+          const seqResult = await client.query(
+            `INSERT INTO case_number_seq (year, seq) VALUES ($1, $2)
+             ON CONFLICT (year) DO UPDATE SET seq = case_number_seq.seq + $2
+             RETURNING seq`,
+            [year, group.length],
+          );
+          const endSeq = seqResult.rows[0].seq;
+          const startSeq = endSeq - group.length + 1;
+
+          group.forEach((cr, i) => {
+            const seq = startSeq + i;
+            const case_number = `CASE-${year}-${String(seq).padStart(4, "0")}`;
+            const caseStatus = validStatuses.includes(cr.status) ? cr.status : "Under Investigation";
+            const incidentType = (cr.incidentType || "").toLowerCase().trim();
+            let priority = "Low";
+            if (year === currentYear) {
+              if (highCrimes.includes(incidentType)) priority = "High";
+              else if (mediumCrimes.includes(incidentType)) priority = "Medium";
+            }
+            finalCaseNumbers.push({ blotterId: cr.blotterId, case_number, status: caseStatus, priority });
+          });
+        }
+
+        await client.query(
+          `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
+           SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::int[])
+           ON CONFLICT DO NOTHING`,
+          [
+            finalCaseNumbers.map(c => c.blotterId),
+            finalCaseNumbers.map(c => c.case_number),
+            finalCaseNumbers.map(c => c.status),
+            finalCaseNumbers.map(c => c.priority),
+            finalCaseNumbers.map(() => req.user.user_id),
+          ]
+        );
       }
 
       await client.query("COMMIT");
@@ -1552,7 +1401,6 @@ const acceptReferral = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check blotter exists and is a brgy referral
     const blotter = await pool.query(
       `SELECT * FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
       [id],
@@ -1573,18 +1421,15 @@ const acceptReferral = async (req, res) => {
         .json({ success: false, message: "Already accepted" });
     }
 
-    // Use transaction
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Update status to Under Investigation
       await client.query(
         `UPDATE blotter_entries SET status = 'Under Investigation', updated_at = NOW() WHERE blotter_id = $1`,
         [id],
       );
 
-      // Auto-create case
       await autoCreateCase(client, parseInt(id), req.user.user_id);
 
       await client.query("COMMIT");
@@ -1605,7 +1450,6 @@ const acceptReferral = async (req, res) => {
         [id]
       );
 
-      // Notify barangay submitter
       if (referralRow.rows[0]?.submitted_by) {
         await createNotification({
           recipientId: referralRow.rows[0].submitted_by,
@@ -1618,7 +1462,6 @@ const acceptReferral = async (req, res) => {
         });
       }
 
-      // Notify admins
       await notifyAllByRole(["Administrator", "Technical Administrator"], {
         senderId: req.user.user_id,
         senderName: req.user.username,
@@ -1628,7 +1471,6 @@ const acceptReferral = async (req, res) => {
         linkTo: "/e-blotter",
       }, req.user.user_id);
 
-      // Notify patrols assigned to the referral's barangay
       if (referralRow.rows[0]?.place_barangay) {
         await notifyPatrolsForReferral(referralRow.rows[0].place_barangay, {
           senderId: req.user.user_id,
@@ -1656,7 +1498,6 @@ const acceptReferral = async (req, res) => {
       .json({ success: false, message: "Error accepting referral" });
   }
 };
-
 
 const createBrgyReport = async (req, res) => {
   try {
@@ -1835,7 +1676,6 @@ const createBrgyReport = async (req, res) => {
 
 const getBrgyReports = async (req, res) => {
   try {
-    // Get all reports for this user
     const result = await pool.query(
       `SELECT 
         b.blotter_id, 
@@ -1855,19 +1695,16 @@ const getBrgyReports = async (req, res) => {
       [req.user.user_id],
     );
 
-    // Get responder info for each blotter from notifications
     const blotterIds = result.rows.map((row) => row.blotter_id);
 
     let respondersMap = {};
     if (blotterIds.length > 0) {
-      // Import the notification service function
       const {
         getRespondersForReferrals,
       } = require("../../notifications/notificationService");
       respondersMap = await getRespondersForReferrals(blotterIds);
     }
 
-    // Merge responder data into each report
     const reportsWithResponders = result.rows.map((row) => ({
       ...row,
       responder: respondersMap[row.blotter_id] || null,
@@ -1916,7 +1753,7 @@ const detectCrimeType = async (req, res) => {
     });
   }
 
-  const VALID_CRIME_TYPES = [
+  const CRIME_TYPES_FOR_AI = [
     "Carnapping - MC",
     "Carnapping - MV",
     "Homicide",
@@ -1931,7 +1768,7 @@ const detectCrimeType = async (req, res) => {
   const prompt = `You are a PNP crime classifier. Given an incident narrative, classify it into exactly one of these crime types, OR respond with NOT_AN_INDEX_CRIME if it does not describe a valid criminal offense against a human person.
 
 Valid crime types:
-${VALID_CRIME_TYPES.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+${CRIME_TYPES_FOR_AI.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
 Crime type definitions:
 - Carnapping - MC: theft or taking of a motorcycle without owner's consent
@@ -1978,7 +1815,6 @@ Reply with ONLY the exact crime type name from the list above, OR the exact text
     if (raw && typeof raw !== "string") raw = JSON.stringify(raw);
     raw = (raw || "").trim();
 
-    // Check for explicit non-crime response
     if (raw.toUpperCase() === "NOT_AN_INDEX_CRIME") {
       return res.json({
         success: true,
@@ -1989,7 +1825,7 @@ Reply with ONLY the exact crime type name from the list above, OR the exact text
       });
     }
 
-    const matched = VALID_CRIME_TYPES.find(
+    const matched = CRIME_TYPES_FOR_AI.find(
       (c) => c.toLowerCase() === raw.toLowerCase(),
     );
 
@@ -2070,7 +1906,6 @@ const respondToReferral = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Already accepted" });
 
-    // Check if someone already claimed this via notifications
     const existing = await getResponderForReferral(id);
     if (existing) {
       return res.status(409).json({
@@ -2080,10 +1915,8 @@ const respondToReferral = async (req, res) => {
     }
 
     const responderName = req.user.username;
-    const linkTo = `/e-blotter?referral=${id}`;
     const blotterNumber = blotter.rows[0].blotter_entry_number;
 
-    // Notify admins + tech admins (exclude self)
     await notifyAllByRole(
       ["Administrator", "Technical Administrator"],
       {
@@ -2096,7 +1929,6 @@ const respondToReferral = async (req, res) => {
       },
       req.user.user_id,
     );
-    // Notify other patrols assigned to this barangay so they know not to go
     await notifyPatrolsForReferral(
       blotter.rows[0].place_barangay,
       {
@@ -2110,7 +1942,6 @@ const respondToReferral = async (req, res) => {
       req.user.user_id,
     );
 
-    // Notify the barangay submitter
     if (blotter.rows[0].submitted_by) {
       await createNotification({
         recipientId: blotter.rows[0].submitted_by,
@@ -2149,7 +1980,6 @@ const respondToReferral = async (req, res) => {
 
 const remindPatrols = async (req, res) => {
   try {
-    // Role check - only Administrators and Technical Administrators can send reminders
     const userRole = req.user?.role;
     if (
       userRole !== "Administrator" &&
@@ -2171,7 +2001,6 @@ const remindPatrols = async (req, res) => {
       });
     }
 
-    // Check blotter exists and is a brgy referral without responder
     const blotter = await pool.query(
       `SELECT * FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
       [id],
@@ -2189,7 +2018,6 @@ const remindPatrols = async (req, res) => {
         .json({ success: false, message: "Not a barangay referral" });
     }
 
-    // Check if someone already responded
     const existing = await getResponderForReferral(id);
     if (existing) {
       return res.status(409).json({
@@ -2199,9 +2027,7 @@ const remindPatrols = async (req, res) => {
     }
 
     const blotterNumber = blotter.rows[0].blotter_entry_number;
-    const linkTo = `/e-blotter?referral=${id}`;
 
-    // Send reminders to selected patrols
     let successCount = 0;
     for (const patrolId of patrol_ids) {
       await createNotification({
@@ -2240,7 +2066,6 @@ const remindPatrols = async (req, res) => {
   }
 };
 
-// Add this function to get patrol users for the modal
 const getPatrolUsers = async (req, res) => {
   try {
     const result = await pool.query(
