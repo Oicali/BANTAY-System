@@ -12,8 +12,8 @@ function ImportBlotterModal({ onClose, onSuccess }) {
   const [toast, setToast] = useState(false);
   const handleFile = (f) => {
     if (!f) return;
-    if (!f.name.match(/\.(xlsx|csv)$/i)) {
-      alert("Only .xlsx or .csv files allowed");
+    if (!f.name.match(/\.xlsx$/i)) {
+      alert("Only .xlsx files allowed");
       return;
     }
     setFile(f);
@@ -160,9 +160,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
             <div className="im-header">
               <div>
                 <h2 className="im-title">Import CIRAS Data</h2>
-                <p className="im-subtitle">
-                  Upload .xlsx or .csv exported from CIRAS
-                </p>
+                <p className="im-subtitle">Upload .xlsx exported from CIRAS</p>
               </div>
               <span className="im-close" onClick={onClose}>
                 &times;
@@ -185,7 +183,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                     <input
                       ref={fileRef}
                       type="file"
-                      accept=".xlsx,.csv"
+                      accept=".xlsx"
                       style={{ display: "none" }}
                       onChange={(e) => handleFile(e.target.files[0])}
                     />
@@ -235,7 +233,7 @@ function ImportBlotterModal({ onClose, onSuccess }) {
                           Drag & drop your file here
                         </p>
                         <p className="im-file-hint">
-                          or click to browse — .xlsx, .csv only
+                          or click to browse — .xlsx only
                         </p>
                       </>
                     )}

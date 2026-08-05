@@ -9,11 +9,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     const allowed = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "text/csv",
-    ];
-    if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|csv)$/i)) {
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+];
+if (allowed.includes(file.mimetype) || file.originalname.match(/\.xlsx$/i)) {
       cb(null, true);
     } else {
       cb(new Error("Only .xlsx and .csv files are allowed"), false);
