@@ -7,7 +7,9 @@ import EditPatrolModal from "../modals/EditPatrolModal";
 import Notification from "../modals/Notification";
 import LoadingModal from "../modals/LoadingModal";
 import PdfPreviewModal from "../modals/PdfPreviewModal";
+import DeletedSchedulesModal from "../modals/DeletedSchedulesModal";
 import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
+
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -153,6 +155,11 @@ const PatrolScheduling = () => {
   const [editingPatrol, setEditingPatrol] = useState(null);
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
 
+  const [showDeletedModal, setShowDeletedModal] = useState(false);
+const [deletedPatrols, setDeletedPatrols] = useState([]);
+const [deletedLoading, setDeletedLoading] = useState(false);
+const [restoringId, setRestoringId] = useState(null);
+
   // PDF list preview state
   const [listPdfPreview, setListPdfPreview] = useState(null);
 
@@ -196,6 +203,47 @@ const PatrolScheduling = () => {
       console.error("Mobile units error:", err);
     }
   };
+
+  const fetchDeletedPatrols = async () => {
+  setDeletedLoading(true);
+  try {
+    const res = await fetch(`${API_BASE}/patrol/patrols/deleted`, {
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    const data = await res.json();
+    if (data.success) setDeletedPatrols(data.data);
+  } catch (err) {
+    console.error("Deleted patrols error:", err);
+  } finally {
+    setDeletedLoading(false);
+  }
+};
+
+const openDeletedModal = () => {
+  setShowDeletedModal(true);
+  fetchDeletedPatrols();
+};
+
+const handleRestore = async (id) => {
+  setRestoringId(id);
+  try {
+    const res = await fetch(`${API_BASE}/patrol/patrols/${id}/restore`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    const data = await res.json();
+    if (data.success) {
+      await Promise.all([fetchDeletedPatrols(), fetchPatrols()]);
+      setNotif({ message: "Schedule restored successfully.", type: "success" });
+    } else {
+      setNotif({ message: data.message || "Something went wrong.", type: "error" });
+    }
+  } catch (err) {
+    setNotif({ message: "Server error.", type: "error" });
+  } finally {
+    setRestoringId(null);
+  }
+};
 
   useEffect(() => {
     fetchPatrols();
@@ -515,7 +563,30 @@ const PatrolScheduling = () => {
                   Export PDF
                 </>
               )}
+             
             </button>
+            {isAdmin && (
+              <button
+                className="psch-btn psch-btn-outline"
+                onClick={openDeletedModal}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="psch-btn-icon"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Deleted Schedules
+              </button>
+            )}
             {isAdmin && (
               <button
                 className="psch-btn psch-btn-primary"
@@ -921,6 +992,16 @@ const PatrolScheduling = () => {
           onDelete={() => handleDelete(beatCardPatrol.patrol_id)}
           hideEdit={!isAdmin}
           hideDelete={!isAdmin}
+        />
+      )}
+
+      {showDeletedModal && (
+        <DeletedSchedulesModal
+          patrols={deletedPatrols}
+          loading={deletedLoading}
+          restoringId={restoringId}
+          onRestore={handleRestore}
+          onClose={() => setShowDeletedModal(false)}
         />
       )}
 

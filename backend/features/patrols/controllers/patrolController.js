@@ -38,6 +38,7 @@ const getPatrolStats = async (req, res) => {
       SELECT COUNT(*) AS active_patrols_today
       FROM patrol_assignment
       WHERE start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE
+        AND deleted_at IS NULL
     `);
     const mobileUnits = await pool.query(
       `SELECT COUNT(*) AS mobile_units FROM mobile_unit`,
@@ -176,6 +177,7 @@ const getAvailablePatrollers = async (req, res) => {
               WHERE pa.start_date <= $2
                 AND pa.end_date   >= $1
                 AND pa.patrol_id  != $3
+                AND pa.deleted_at IS NULL
             )
           ORDER BY officer_name ASC
         `,
@@ -198,6 +200,7 @@ const getAvailablePatrollers = async (req, res) => {
               JOIN patrol_assignment pa ON pap.patrol_id = pa.patrol_id
               WHERE pa.start_date <= $2
                 AND pa.end_date   >= $1
+                AND pa.deleted_at IS NULL
             )
           ORDER BY officer_name ASC
         `,
@@ -240,6 +243,7 @@ const getAvailableMobileUnits = async (req, res) => {
              WHERE start_date <= $2
                AND end_date   >= $1
                AND patrol_id  != $3
+               AND deleted_at IS NULL
            )
            ORDER BY mobile_unit_name`,
           [start, end, parseInt(exclude_patrol_id)]
@@ -253,6 +257,7 @@ WHERE NOT EXISTS (
   WHERE pa.mobile_unit_id = mu.mobile_unit_id
     AND pa.start_date <= $2
     AND pa.end_date   >= $1
+    AND pa.deleted_at IS NULL
 )
            ORDER BY mobile_unit_name`,
           [start, end]
@@ -516,6 +521,7 @@ const getPatrols = async (req, res) => {
 
       FROM patrol_assignment pa
 LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+      WHERE pa.deleted_at IS NULL
       ORDER BY pa.start_date DESC, pa.patrol_id DESC
     `);
     const data = result.rows.map((p) => ({
@@ -526,6 +532,78 @@ LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
     res.json({ success: true, data });
   } catch (error) {
     console.error("Get patrols error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET /patrol/patrols/deleted
+// ─────────────────────────────────────────────
+const getDeletedPatrols = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        pa.patrol_id,
+        pa.patrol_name,
+        pa.start_date,
+        pa.end_date,
+        pa.deleted_at,
+        pa.deleted_unit_name,
+        mu.mobile_unit_name,
+        TRIM(CONCAT(u.first_name, ' ', u.middle_name, ' ', u.last_name)) AS deleted_by_name,
+        (
+          SELECT COUNT(*) FROM after_patrol_reports apr
+          WHERE apr.patrol_id = pa.patrol_id
+        ) AS report_count
+      FROM patrol_assignment pa
+      LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
+      LEFT JOIN users u ON pa.deleted_by = u.user_id
+      WHERE pa.deleted_at IS NOT NULL
+      ORDER BY pa.deleted_at DESC
+    `);
+    const data = result.rows.map((p) => ({
+      ...p,
+      start_date: formatDateOnly(p.start_date),
+      end_date: formatDateOnly(p.end_date),
+      report_count: parseInt(p.report_count, 10),
+    }));
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error("getDeletedPatrols error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ─────────────────────────────────────────────
+// PATCH /patrol/patrols/:id/restore
+// ─────────────────────────────────────────────
+const restorePatrol = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `UPDATE patrol_assignment
+       SET deleted_at = NULL, deleted_by = NULL
+       WHERE patrol_id = $1 AND deleted_at IS NOT NULL`,
+      [id],
+    );
+    if (result.rowCount === 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "Deleted patrol not found." });
+
+    await logAudit({
+      userId: req.user?.user_id,
+      username: req.user?.username,
+      eventName: "Patrol Restored",
+      description: `Restored patrol ID ${id}`,
+      action: "UPDATE",
+      status: "success",
+      source: "Web Portal",
+      ipAddress: getClientIp(req),
+    });
+    res.json({ success: true, message: "Patrol restored." });
+  } catch (error) {
+    console.error("restorePatrol error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -557,6 +635,7 @@ const checkPatrollerConflicts = async (
     WHERE pap.active_patroller_id = ANY($1::int[])
       AND pa.start_date <= $2
       AND pa.end_date   >= $3
+      AND pa.deleted_at IS NULL
       ${excludeClause}
     LIMIT 1
   `,
@@ -620,6 +699,7 @@ const mobileConflict = await client.query(
    WHERE mobile_unit_id = $1
      AND start_date <= $2
      AND end_date   >= $3
+     AND deleted_at IS NULL
    LIMIT 1`,
   [mobile_unit_id, end_date, start_date]
 );
@@ -771,6 +851,7 @@ try {
        AND pa.start_date <= $2
        AND pa.end_date   >= $3
        AND pa.patrol_id  != $4
+       AND pa.deleted_at IS NULL
      LIMIT 1`,
     [mobile_unit_id, end_date, start_date, id]
   );
@@ -991,14 +1072,16 @@ const updatePatrollersForDate = async (req, res) => {
   }
 };
 // ─────────────────────────────────────────────
-// DELETE /patrol/patrols/:id
+// DELETE /patrol/patrols/:id   (soft delete)
 // ─────────────────────────────────────────────
 const deletePatrol = async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `DELETE FROM patrol_assignment WHERE patrol_id=$1`,
-      [id],
+      `UPDATE patrol_assignment
+       SET deleted_at = NOW(), deleted_by = $2
+       WHERE patrol_id = $1 AND deleted_at IS NULL`,
+      [id, req.user?.user_id || null],
     );
     if (result.rowCount === 0)
       return res
@@ -1009,7 +1092,7 @@ const deletePatrol = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Patrol Deleted",
-      description: `Deleted patrol ID ${id}`,
+      description: `Soft-deleted patrol ID ${id}`,
       action: "DELETE",
       status: "success",
       source: "Web Portal",
@@ -1017,6 +1100,7 @@ const deletePatrol = async (req, res) => {
     });
     res.json({ success: true, message: "Patrol deleted." });
   } catch (error) {
+    console.error("Delete patrol error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -1195,7 +1279,8 @@ const getMyPatrols = async (req, res) => {
 
       FROM patrol_assignment pa
 LEFT JOIN mobile_unit mu ON pa.mobile_unit_id = mu.mobile_unit_id
-      WHERE pa.patrol_id IN (
+      WHERE pa.deleted_at IS NULL
+        AND pa.patrol_id IN (
         SELECT DISTINCT pap.patrol_id
         FROM patrol_assignment_patroller pap
         JOIN active_patroller ap ON pap.active_patroller_id = ap.active_patroller_id
@@ -1479,7 +1564,9 @@ const getAfterPatrolReports = async (req, res) => {
       FROM after_patrol_reports apr
       JOIN active_patroller ap ON apr.submitted_by = ap.active_patroller_id
       JOIN users u ON ap.officer_id = u.user_id
+      JOIN patrol_assignment pa ON apr.patrol_id = pa.patrol_id
       WHERE apr.patrol_id = $1
+        AND pa.deleted_at IS NULL
       ORDER BY apr.patrol_date DESC, apr.submitted_at DESC`,
       [patrol_id],
     );
@@ -1518,9 +1605,11 @@ const getMyAfterPatrolReports = async (req, res) => {
      ) AS submitted_by_name,
      u.phone AS submitted_by_contact
    FROM after_patrol_reports apr
+   JOIN patrol_assignment pa ON apr.patrol_id = pa.patrol_id
    LEFT JOIN active_patroller ap ON apr.submitted_by = ap.active_patroller_id
    LEFT JOIN users u ON ap.officer_id = u.user_id
    WHERE apr.patrol_id = $1
+     AND pa.deleted_at IS NULL
      AND (
        apr.shift IN (
          SELECT DISTINCT pap.shift
@@ -1794,6 +1883,8 @@ module.exports = {
   updatePatrol,
   updatePatrollersForDate,
   deletePatrol,
+  getDeletedPatrols,
+  restorePatrol,
   updateRouteNotes,
   updateRouteTask,
   addRouteTask,
