@@ -1924,7 +1924,7 @@ const respondToReferral = async (req, res) => {
         type: "REFERRAL_RESPONDED",
         title: "Response to Referral",
         message: `${responderName} will respond to referral ${blotterNumber}`,
-        linkTo: "/e-blotter",
+        linkTo: `/e-blotter?referral=${id}`,
       },
       req.user.user_id,
     );
@@ -1936,7 +1936,7 @@ const respondToReferral = async (req, res) => {
         type: "REFERRAL_RESPONDED",
         title: "Referral Already Responded",
         message: `${responderName} is responding to ${blotterNumber}. No need to respond.`,
-        linkTo: "/e-blotter",
+        linkTo: `/e-blotter?referral=${id}`,
       },
       req.user.user_id,
     );
