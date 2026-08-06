@@ -1924,7 +1924,7 @@ const respondToReferral = async (req, res) => {
         type: "REFERRAL_RESPONDED",
         title: "Response to Referral",
         message: `${responderName} will respond to referral ${blotterNumber}`,
-        linkTo,
+        linkTo: "/e-blotter",
       },
       req.user.user_id,
     );
@@ -1936,7 +1936,7 @@ const respondToReferral = async (req, res) => {
         type: "REFERRAL_RESPONDED",
         title: "Referral Already Responded",
         message: `${responderName} is responding to ${blotterNumber}. No need to respond.`,
-        linkTo,
+        linkTo: "/e-blotter",
       },
       req.user.user_id,
     );
@@ -2036,7 +2036,7 @@ const remindPatrols = async (req, res) => {
         type: "REFERRAL_REMINDER",
         title: "Referral Reminder",
         message: `${req.user.username} is reminding you to respond to referral #${blotterNumber}`,
-        linkTo,
+        linkTo: "/e-blotter",
       });
       successCount++;
     }
