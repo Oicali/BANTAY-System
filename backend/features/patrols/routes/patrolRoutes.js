@@ -1,4 +1,3 @@
-
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -16,19 +15,21 @@ const {
   createMobileUnit,
   submitAfterPatrolReport,
   updateMobileUnit,
-deleteAfterPatrolReport,
+  deleteAfterPatrolReport,
   deleteMobileUnit,
   getPatrols,
   createPatrol,
   updatePatrol,
   updatePatrollersForDate,
   deletePatrol,
+  getDeletedPatrols,
+  restorePatrol,
   updateRouteNotes,
   updateRouteTask,
   addRouteTask,
   removeRouteTask,
   updateOfficerLocation,
-   uploadAfterPatrolPhotos,
+  uploadAfterPatrolPhotos,
   deleteAfterPatrolPhoto,
 } = require("../controllers/patrolController");
 
@@ -50,6 +51,11 @@ router.delete("/mobile-units/:id", authenticate, deleteMobileUnit);
 
 // Patrols
 router.get("/my-patrols", authenticate, getMyPatrols);
+
+// ── Deleted patrols — MUST come before "/patrols/:id" routes ──
+router.get   ("/patrols/deleted",         authenticate, getDeletedPatrols);
+router.patch ("/patrols/:id/restore",     authenticate, restorePatrol);
+
 router.get   ("/patrols",     authenticate, getPatrols);
 router.post  ("/patrols",     authenticate, createPatrol);
 router.put   ("/patrols/:id", authenticate, updatePatrol);
@@ -72,14 +78,13 @@ router.post("/export/list",   authenticate, exportPatrolList);
 router.post("/export/detail", authenticate, exportPatrolDetail);
 
 //
- router.post("/patrols/:id/after-report", authenticate, submitAfterPatrolReport);
+router.post("/patrols/:id/after-report", authenticate, submitAfterPatrolReport);
 router.get( "/patrols/:id/after-reports", authenticate, getAfterPatrolReports);
 router.get( "/patrols/:id/after-reports/mine", authenticate, getMyAfterPatrolReports);
 router.delete("/after-reports/:reportId", authenticate, deleteAfterPatrolReport)
 
 //
 router.post("/location", authenticate, updateOfficerLocation);
-module.exports = router;
 
 //picture
 router.post(
@@ -93,3 +98,5 @@ router.delete(
   authenticate,
   deleteAfterPatrolPhoto
 );
+
+module.exports = router;
