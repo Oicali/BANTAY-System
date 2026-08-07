@@ -26,6 +26,18 @@
 /* ── BODY ── */
 .bc-body { display: grid; grid-template-columns: 1fr 420px; flex: 1; min-height: 0; overflow: hidden; }
 .bc-map-panel { position: relative; overflow: hidden; border-right: 1px solid #dee2e6; }
+.bc-map-panel:fullscreen,
+.bc-map-panel:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  border-right: none;
+  background: #fff;
+}
+.bc-map-panel:fullscreen .mapboxgl-map,
+.bc-map-panel:-webkit-full-screen .mapboxgl-map {
+  width: 100% !important;
+  height: 100% !important;
+}
 .bc-info-panel { display: flex; flex-direction: column; overflow: hidden; }
 
 /* ── SECTIONS ── */

@@ -60,6 +60,16 @@
       if (dateRange.length > 0) setActiveDate(dateRange[0]);
     }, [patrol]);
 
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        setTimeout(() => {
+          mapRef.current?.getMap?.()?.resize();
+        }, 100);
+      };
+      document.addEventListener("fullscreenchange", handleFullscreenChange);
+      return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    }, []);
+
     // Clean up blob URL when preview is closed
     const closePreview = () => {
       pdfPreview?.revoke();
@@ -233,7 +243,7 @@
                 <div className="pm-map-ctrl-divider"/>
                 <button className="pm-map-ctrl-btn" title="Fullscreen"
                 onClick={() => {
-                  const el = document.querySelector(".apm-map-panel");
+                  const el = document.querySelector(".bc-map-panel");
                   if (!document.fullscreenElement) el?.requestFullscreen();
                   else document.exitFullscreen();
                 }}>
