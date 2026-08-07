@@ -40,6 +40,7 @@
 
   const BeatCard = ({ patrol, geoJSONData, onClose, onEdit, onDelete, hideEdit = false, hideDelete = false }) => {
     const mapRef = useRef(null);
+    const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
 
     const dateRange = generateDateRange(patrol?.start_date, patrol?.end_date);
     const [activeDate, setActiveDate]   = useState(dateRange[0] || null);
@@ -313,44 +314,45 @@
       const paged    = currentPatrollers.slice((safePP - 1) * PER_PAGE, safePP * PER_PAGE);
       return (
         <>
-          <div className="bc-patroller-table-wrap">
-            <table className="bc-patroller-table">
-              <thead>
-                <tr>
-                  <th>Rank &amp; Name</th>
-                  <th>Contact Number</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((p) => (
-                  <tr key={p.active_patroller_id}>
-                    <td
-                      className="bc-pt-name"
-                      onMouseEnter={(e) => { setHoveredPatroller(p); setHoverAnchor(e.currentTarget); }}
-                      onMouseLeave={() => { setHoveredPatroller(null); setHoverAnchor(null); }}
-                      style={{ cursor: "default" }}
-                    >
-                      {p.rank ? `${p.rank} ${p.officer_name}` : p.officer_name}
-                    </td>
-                    <td className="bc-pt-contact">{p.contact_number || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="epm-checklist">
+            {paged.map((p) => (
+              <div
+                key={p.active_patroller_id}
+                className="epm-check-item"
+                style={{ cursor: "default" }}
+                onMouseEnter={(e) => { setHoveredPatroller(p); setHoverAnchor(e.currentTarget); }}
+                onMouseLeave={() => { setHoveredPatroller(null); setHoverAnchor(null); }}
+              >
+                <div className="epm-avatar" style={{ overflow: "hidden", padding: 0 }}>
+                  {p.profile_picture ? (
+                    <img src={p.profile_picture} alt={p.officer_name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                  ) : getInitials(p.officer_name)}
+                </div>
+                <div className="epm-officer-info">
+                  <span className="epm-officer-name">
+                    {p.rank ? `${p.rank} ${p.officer_name}` : p.officer_name}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, PER_PAGE - paged.length) }).map((_, i) => (
+              <div key={`ghost-${i}`} className="epm-checklist-ghost" />
+            ))}
           </div>
           {totalPP > 1 && (
-            <div className="bc-patroller-pagination">
+            <div className="apm-pg-inline">
               <button
-                className="bc-pg-btn"
+                className="apm-pg-arrow"
                 onClick={() => setPatrollerPage((p) => Math.max(1, p - 1))}
                 disabled={safePP === 1}
-              >‹ Prev</button>
-              <span className="bc-pg-label">Page {safePP} of {totalPP}</span>
+              >‹</button>
+              <span className="apm-pg-label">{safePP} / {totalPP}</span>
               <button
-                className="bc-pg-btn"
+                className="apm-pg-arrow"
                 onClick={() => setPatrollerPage((p) => Math.min(totalPP, p + 1))}
                 disabled={safePP === totalPP}
-              >Next ›</button>
+              >›</button>
             </div>
           )}
         </>

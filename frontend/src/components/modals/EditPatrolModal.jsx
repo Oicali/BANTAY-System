@@ -134,6 +134,8 @@ const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) 
   const mapRef          = useRef(null);
   const deletedRouteIds = useRef(new Set());
   const tasksDirty      = useRef(false);
+  const pendingRemovedTempIds = useRef(new Set());
+  const [addingTask, setAddingTask] = useState(false);
 
   const [loading, setLoading]                 = useState(false);
   const [notif, setNotif]                     = useState(null);
@@ -330,9 +332,11 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     });
   };
 
-  // ── Add task (mirrors AddPatrolModal logic) ──────────────────────
+  // ── Add task (optimistic — updates UI immediately, reconciles after API call) ──
   const addTask = async () => {
-    const existing = localRoutes
+    if (addingTask) return; // prevent double submits from producing duplicate times
+
+    const existing = localRoutesRef.current
       .filter((r) => toDateStr(r.route_date) === activeDate && r.shift === activeShift)
       .slice()
       .sort((a, b) =>
@@ -383,6 +387,26 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     const defaultEnd = `${String(Math.floor(endTotal / 60) % 24).padStart(2, "0")}:${String(endTotal % 60).padStart(2, "0")}`;
 
     const newStopOrder = existing.length + 1;
+    const tempId = `temp-${Date.now()}`;
+
+    const optimisticTask = {
+      route_id:   tempId,
+      route_date: activeDate,
+      shift:      activeShift,
+      time_start: defaultStart,
+      time_end:   defaultEnd,
+      notes:      "",
+      stop_order: newStopOrder,
+    };
+
+    tasksDirty.current = true;
+    setAddingTask(true);
+    setLocalRoutes((prev) => {
+      const next = [...prev, optimisticTask];
+      localRoutesRef.current = next;
+      return next;
+    });
+
     try {
       const res  = await fetch(`${API_BASE}/patrol/routes/add`, {
         method:  "POST",
@@ -398,28 +422,49 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
         }),
       });
       const data = await res.json();
+
       if (data.success) {
-        tasksDirty.current = true;
+        if (pendingRemovedTempIds.current.has(tempId)) {
+          // user already removed this row while the request was in flight
+          pendingRemovedTempIds.current.delete(tempId);
+          deletedRouteIds.current.add(data.route_id);
+        } else {
+          setLocalRoutes((prev) => {
+            const next = prev.map((r) => r.route_id === tempId ? { ...r, route_id: data.route_id } : r);
+            localRoutesRef.current = next;
+            return next;
+          });
+        }
+      } else {
+        pendingRemovedTempIds.current.delete(tempId);
         setLocalRoutes((prev) => {
-          const next = [...prev, {
-            route_id:   data.route_id,
-            route_date: activeDate,
-            shift:      activeShift,
-            time_start: defaultStart,
-            time_end:   defaultEnd,
-            notes:      "",
-            stop_order: newStopOrder,
-          }];
+          const next = prev.filter((r) => r.route_id !== tempId);
           localRoutesRef.current = next;
           return next;
         });
+        setNotif({ message: data.message || "Failed to add task.", type: "warning" });
       }
-    } catch (err) { console.error("Add task error:", err); }
+    } catch (err) {
+      console.error("Add task error:", err);
+      pendingRemovedTempIds.current.delete(tempId);
+      setLocalRoutes((prev) => {
+        const next = prev.filter((r) => r.route_id !== tempId);
+        localRoutesRef.current = next;
+        return next;
+      });
+      setNotif({ message: "Failed to add task. Please try again.", type: "error" });
+    } finally {
+      setAddingTask(false);
+    }
   };
 
   const removeTask = (routeId) => {
     tasksDirty.current = true;
-    deletedRouteIds.current.add(routeId);
+    if (typeof routeId === "string" && routeId.startsWith("temp-")) {
+      pendingRemovedTempIds.current.add(routeId);
+    } else {
+      deletedRouteIds.current.add(routeId);
+    }
     setLocalRoutes((prev) => {
       const next = prev.filter((r) => r.route_id !== routeId);
       localRoutesRef.current = next;
@@ -1074,7 +1119,7 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
                   </table>
                 </div>
               )}
-              <button className="epm-add-task-btn" onClick={addTask}>+ Add Task</button>
+              <button className="epm-add-task-btn" onClick={addTask} disabled={addingTask}>+ Add Task</button>
             </div>
           </div>
         </div>
