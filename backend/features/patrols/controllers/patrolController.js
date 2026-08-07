@@ -169,7 +169,7 @@ const getAvailablePatrollers = async (req, res) => {
           FROM active_patroller ap
           JOIN users u ON ap.officer_id = u.user_id
           WHERE u.role_id = 3
-           AND u.status = 'active'
+           AND u.status != 'deactivated'
             AND ap.active_patroller_id NOT IN (
               SELECT DISTINCT pap.active_patroller_id
               FROM patrol_assignment_patroller pap
