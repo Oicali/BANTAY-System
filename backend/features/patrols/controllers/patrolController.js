@@ -237,13 +237,14 @@ const getAvailableMobileUnits = async (req, res) => {
       if (exclude_patrol_id) {
         result = await pool.query(
           `SELECT mobile_unit_id, mobile_unit_name, vehicle_type, plate_number
-           FROM mobile_unit
-           WHERE mobile_unit_id NOT IN (
-             SELECT mobile_unit_id FROM patrol_assignment
-             WHERE start_date <= $2
-               AND end_date   >= $1
-               AND patrol_id  != $3
-               AND deleted_at IS NULL
+           FROM mobile_unit mu
+           WHERE NOT EXISTS (
+             SELECT 1 FROM patrol_assignment pa
+             WHERE pa.mobile_unit_id = mu.mobile_unit_id
+               AND pa.start_date <= $2
+               AND pa.end_date   >= $1
+               AND pa.patrol_id  != $3
+               AND pa.deleted_at IS NULL
            )
            ORDER BY mobile_unit_name`,
           [start, end, parseInt(exclude_patrol_id)]

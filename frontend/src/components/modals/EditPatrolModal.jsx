@@ -851,7 +851,7 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
               <div className="pm-map-ctrl-divider"/>
              <button className="pm-map-ctrl-btn" title="Fullscreen"
                 onClick={() => {
-                  const el = document.querySelector(".apm-map-panel");
+                  const el = document.querySelector(".epm-map-panel");
                   if (!document.fullscreenElement) el?.requestFullscreen();
                   else document.exitFullscreen();
                 }}>
