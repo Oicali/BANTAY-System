@@ -957,6 +957,17 @@ const handleVehicleTypeChange = (e) => {
             <div className="modal-body">
               <div className="form-group">
                 <label>
+                  Vehicle Type <span className="required">*</span>
+                </label>
+               <select name="vehicle_type" value={form.vehicle_type} onChange={handleVehicleTypeChange}>
+                  <option value="">— Select Vehicle Type —</option>
+                  {VEHICLE_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+               <div className="form-group">
+                <label>
                   Mobile Unit Name <span className="required">*</span>
                 </label>
                 <input
@@ -966,17 +977,6 @@ const handleVehicleTypeChange = (e) => {
                   onChange={handleFormChange}
                   placeholder="e.g. Mobile 1"
                 />
-              </div>
-              <div className="form-group">
-                <label>
-                  Vehicle Type <span className="required">*</span>
-                </label>
-               <select name="vehicle_type" value={form.vehicle_type} onChange={handleVehicleTypeChange}>
-                  <option value="">— Select Vehicle Type —</option>
-                  {VEHICLE_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
               </div>
               <div className="form-group">
                 <label>
