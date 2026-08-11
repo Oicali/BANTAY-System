@@ -635,11 +635,7 @@ function buildBarangayRiskTable(barangayForecast) {
                         ? "ca8a04"
                         : "6b7280",
               }),
-              dCell(
-                `${row.last_incident} (${row.days_since_last}d ago)`,
-                COL[3],
-                { alt: i % 2 === 1, size: 16 },
-              ),
+              dCell(row.last_incident, COL[3], { alt: i % 2 === 1, size: 16 }),
               dCell(row.why_flagged || "-", COL[4], {
                 alt: i % 2 === 1,
                 size: 16,

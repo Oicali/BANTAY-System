@@ -2319,12 +2319,7 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
     return                  { num: "cd-score-low",      fill: "cd-fill-low" };
   };
 
-  const getRecency = (days) => {
-    if (days <= 3)  return { color: "#dc2626", weight: 700 };
-    if (days <= 7)  return { color: "#ea580c", weight: 700 };
-    if (days <= 30) return { color: "#ca8a04", weight: 600 };
-    return                 { color: "var(--gray-600)", weight: 400 };
-  };
+  
 
   
 
@@ -2505,7 +2500,6 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
           <tbody>
             {rows.map((row) => {
               const sc       = getScoreClass(row.risk_score);
-              const rec      = getRecency(row.days_since_last);
               const isExpanded = expandedRow === row.rank;
 
               return (
@@ -2552,12 +2546,9 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                     </td>
 
                     <td>
-                      <span style={{ fontSize: 12, fontWeight: rec.weight, color: rec.color }}>
+                      <span style={{ fontSize: 12, color: "var(--gray-700)" }}>
                         {row.last_incident}
                       </span>
-                      <div style={{ fontSize: 10, color: rec.color, opacity: 0.8 }}>
-                        {row.days_since_last}d ago
-                      </div>
                     </td>
 
                     
@@ -2583,7 +2574,6 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                               { label: "Total Incidents", value: row.total },
                               { label: "Active Weeks",    value: row.nonzero_weeks },
                               { label: "Avg Interval",    value: row.avg_interval_days ? `~${Math.round(row.avg_interval_days)}d` : "N/A" },
-                              { label: "Days Since Last", value: `${row.days_since_last}d` },
                               { label: "Model Tier",      value: row.tier },
                             ].map((s, i) => (
                               <div key={i} className="cd-risk-detail-stat">
