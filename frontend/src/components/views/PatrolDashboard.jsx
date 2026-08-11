@@ -819,7 +819,7 @@ const handleVehicleTypeChange = (e) => {
                                     }
                                   })()
                                 ) : (
-                                  <span className="unassigned-badge">No signal</span>
+                                  <span className="unassigned-badge">No location</span>
                                 )}
                               </span>
                             </td>
