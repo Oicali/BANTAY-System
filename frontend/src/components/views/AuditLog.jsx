@@ -1,6 +1,7 @@
 // frontend\src\components\views\AuditLog.jsx
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import "./AuditLog.css";
 import LoadingModal from "../modals/LoadingModal";
 
@@ -69,6 +70,309 @@ const RefreshIcon = () => (
 );
 
 // =====================================================
+// EXPORT PREVIEW MODAL (matches PdfPreviewModal styling)
+// =====================================================
+const ExportPreviewModal = ({ preview, onDownload, onClose, formatDate }) => {
+  const PREVIEW_LIMIT = 20;
+  const previewRows = preview.rows.slice(0, PREVIEW_LIMIT);
+
+  // Keyboard dismiss
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1400,
+        background: "rgba(10,22,40,0.72)",
+        backdropFilter: "blur(4px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+      onClick={onClose}
+    >
+      {/* Modal shell */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "14px",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
+          display: "flex",
+          flexDirection: "column",
+          width: "min(1100px, 96vw)",
+          height: "min(94vh, 1000px)",
+          overflow: "hidden",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Toolbar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "12px",
+            padding: "20px 20px 16px",
+            background: "linear-gradient(135deg, #1e3a5f 0%, #0a1628 100%)",
+            color: "#fff",
+            flexShrink: 0,
+          }}
+        >
+          {/* Icon badge */}
+          <div
+            style={{
+              width: "38px",
+              height: "38px",
+              background: "rgba(255,255,255,0.15)",
+              borderRadius: "9px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          </div>
+
+          {/* Title + subtitle */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                margin: "0 0 3px",
+                fontSize: "17px",
+                fontWeight: 700,
+                color: "#fff",
+                lineHeight: 1.3,
+              }}
+            >
+              Export Preview
+            </div>
+            <div
+              style={{
+                margin: 0,
+                fontSize: "12.5px",
+                color: "rgba(255,255,255,0.72)",
+                lineHeight: 1.4,
+              }}
+            >
+              {preview.filename} · {preview.total} record
+              {preview.total !== 1 ? "s" : ""} total
+              {preview.total > PREVIEW_LIMIT &&
+                ` · showing first ${PREVIEW_LIMIT}`}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={onDownload}
+              disabled={preview.total === 0}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "9px 20px",
+                background: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                border: "1.5px solid rgba(255,255,255,0.3)",
+                borderRadius: "8px",
+                fontSize: "13.5px",
+                fontWeight: 600,
+                cursor: preview.total === 0 ? "not-allowed" : "pointer",
+                opacity: preview.total === 0 ? 0.5 : 1,
+                fontFamily: "inherit",
+                transition: "background 0.15s",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                if (preview.total !== 0)
+                  e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+              }}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255,255,255,0.15)")
+              }
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(255,255,255,0.12)",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                color: "rgba(255,255,255,0.85)",
+                fontSize: "14px",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(255,255,255,0.22)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255,255,255,0.12)")
+              }
+              title="Close preview"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Table body */}
+        <div
+          style={{
+            flex: 1,
+            background: "#e9ecef",
+            overflow: "auto",
+            position: "relative",
+          }}
+        >
+          <div style={{ background: "#fff", minHeight: "100%" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 12.5,
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    background: "#f8fafc",
+                    zIndex: 1,
+                  }}
+                >
+                  {["User", "Event", "Description", "Status", "IP", "Timestamp"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: "left",
+                          padding: "10px 14px",
+                          borderBottom: "1px solid #e5e7eb",
+                          color: "#475569",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {previewRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}
+                    >
+                      No records to export.
+                    </td>
+                  </tr>
+                ) : (
+                  previewRows.map((r) => (
+                    <tr key={r.log_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: "9px 14px" }}>
+                        {r.display_name || r.username || "—"}
+                      </td>
+                      <td style={{ padding: "9px 14px" }}>{r.event_name}</td>
+                      <td
+                        style={{
+                          padding: "9px 14px",
+                          maxWidth: 260,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {r.description}
+                      </td>
+                      <td style={{ padding: "9px 14px" }}>
+                        <span
+                          style={{
+                            color: r.status === "success" ? "#15803d" : "#b91c1c",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: "9px 14px" }}>{r.ip_address || "—"}</td>
+                      <td style={{ padding: "9px 14px" }}>
+                        {formatDate(r.created_at)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Dismiss hint */}
+      <p
+        style={{
+          marginTop: "14px",
+          color: "rgba(255,255,255,0.55)",
+          fontSize: "12px",
+        }}
+      >
+        Click outside or press Esc to close
+      </p>
+    </div>,
+    document.body,
+  );
+};
+
+// =====================================================
 // MAIN COMPONENT
 // =====================================================
 const AuditLog = () => {
@@ -89,6 +393,7 @@ const AuditLog = () => {
     failed: 0,
   });
   const [isExporting, setIsExporting] = useState(false);
+  const [exportPreview, setExportPreview] = useState(null);
 
   const [draft, setDraft] = useState({ ...DEFAULT_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState({ ...DEFAULT_FILTERS });
@@ -105,6 +410,11 @@ const AuditLog = () => {
     "Patrol",
   ];
   const isRestricted = RESTRICTED_ROLES.includes(currentUser?.role);
+
+  const closeExportPreview = () => {
+    exportPreview?.revoke();
+    setExportPreview(null);
+  };
 
   // ===================================================
   // FETCH LOGS
@@ -186,7 +496,7 @@ const AuditLog = () => {
   };
 
   // ===================================================
-  // EXPORT CSV
+  // EXPORT CSV (build + preview, download on confirm)
   // ===================================================
   const handleExportCSV = async () => {
     setIsExporting(true);
@@ -248,10 +558,26 @@ const AuditLog = () => {
         ].join(","),
       );
       const csv = [cols.join(","), ...rows].join("\n");
-      const a = document.createElement("a");
-      a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-      a.download = `audit_log_${appliedFilters.dateFrom || "all"}_to_${appliedFilters.dateTo || "all"}.csv`;
-      a.click();
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const blobUrl = URL.createObjectURL(blob);
+      const filename = `audit_log_${appliedFilters.dateFrom || "all"}_to_${appliedFilters.dateTo || "all"}.csv`;
+
+      setExportPreview({
+        rows: all,
+        total: all.length,
+        filename,
+        blobUrl,
+        download: () => {
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        },
+        revoke: () => URL.revokeObjectURL(blobUrl),
+      });
     } catch (err) {
       console.error("Export error:", err);
       setError("Failed to export audit logs.");
@@ -367,62 +693,63 @@ const AuditLog = () => {
           <div className="al-filter-group">
             <label className="al-filter-label">Date from</label>
             <input
-  type="date"
-  className="al-filter-input"
-  value={draft.dateFrom}
-  max={(() => {
-    if (!draft.dateTo) return getToday();
-    return addDays(draft.dateTo, -1);
-  })()}
-  min={draft.dateTo ? addDays(draft.dateTo, -364) : undefined}
-  onChange={(e) => {
-    const from = e.target.value;
-    let autoTo = draft.dateTo && draft.dateTo > from ? draft.dateTo : getToday();
-    // clamp autoTo so range never exceeds 364 days
-    const maxAllowedTo = addDays(from, 364);
-    if (autoTo > maxAllowedTo) autoTo = maxAllowedTo;
-    if (autoTo > getToday()) autoTo = getToday();
-    setDraft((f) => ({ ...f, dateFrom: from, dateTo: autoTo }));
-  }}
-  onKeyDown={(e) => e.preventDefault()}
-  onPaste={(e) => e.preventDefault()}
-  onClick={(e) => {
-    if (e.target.showPicker) {
-      try {
-        e.target.showPicker();
-      } catch {}
-    }
-  }}
-/>
+              type="date"
+              className="al-filter-input"
+              value={draft.dateFrom}
+              max={(() => {
+                if (!draft.dateTo) return getToday();
+                return addDays(draft.dateTo, -1);
+              })()}
+              min={draft.dateTo ? addDays(draft.dateTo, -364) : undefined}
+              onChange={(e) => {
+                const from = e.target.value;
+                let autoTo =
+                  draft.dateTo && draft.dateTo > from ? draft.dateTo : getToday();
+                // clamp autoTo so range never exceeds 364 days
+                const maxAllowedTo = addDays(from, 364);
+                if (autoTo > maxAllowedTo) autoTo = maxAllowedTo;
+                if (autoTo > getToday()) autoTo = getToday();
+                setDraft((f) => ({ ...f, dateFrom: from, dateTo: autoTo }));
+              }}
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
+            />
           </div>
 
           <div className="al-filter-group">
             <label className="al-filter-label">Date to</label>
             <input
-  type="date"
-  className="al-filter-input"
-  value={draft.dateTo}
-  min={(() => {
-    if (!draft.dateFrom) return undefined;
-    return addDays(draft.dateFrom, 1);
-  })()}
-  max={(() => {
-    const today = getToday();
-    if (!draft.dateFrom) return today;
-    const rangeMax = addDays(draft.dateFrom, 364);
-    return rangeMax < today ? rangeMax : today;
-  })()}
-  onChange={(e) => setDraft((f) => ({ ...f, dateTo: e.target.value }))}
-  onKeyDown={(e) => e.preventDefault()}
-  onPaste={(e) => e.preventDefault()}
-  onClick={(e) => {
-    if (e.target.showPicker) {
-      try {
-        e.target.showPicker();
-      } catch {}
-    }
-  }}
-/>
+              type="date"
+              className="al-filter-input"
+              value={draft.dateTo}
+              min={(() => {
+                if (!draft.dateFrom) return undefined;
+                return addDays(draft.dateFrom, 1);
+              })()}
+              max={(() => {
+                const today = getToday();
+                if (!draft.dateFrom) return today;
+                const rangeMax = addDays(draft.dateFrom, 364);
+                return rangeMax < today ? rangeMax : today;
+              })()}
+              onChange={(e) => setDraft((f) => ({ ...f, dateTo: e.target.value }))}
+              onKeyDown={(e) => e.preventDefault()}
+              onPaste={(e) => e.preventDefault()}
+              onClick={(e) => {
+                if (e.target.showPicker) {
+                  try {
+                    e.target.showPicker();
+                  } catch {}
+                }
+              }}
+            />
           </div>
         </div>
 
@@ -445,7 +772,17 @@ const AuditLog = () => {
 
       <LoadingModal isOpen={isExporting} message={"Exporting audit logs..."} />
 
-      <LoadingModal isOpen={isExporting} message={"Exporting audit logs..."} />
+      {exportPreview && (
+        <ExportPreviewModal
+          preview={exportPreview}
+          formatDate={formatDate}
+          onDownload={() => {
+            exportPreview.download();
+            closeExportPreview();
+          }}
+          onClose={closeExportPreview}
+        />
+      )}
 
       {/* Table */}
       <div className="al-table-card">
@@ -485,8 +822,6 @@ const AuditLog = () => {
                   ) : (
                     logs.map((log) => (
                       <tr key={log.log_id}>
-                        
-
                         {/* User — plain text, no avatar */}
                         {/* User — rank + full name, role underneath */}
                         {!isRestricted && (
