@@ -913,14 +913,29 @@ def compute_barangay_risk(
     reference_date:  str | None = None,
 ) -> dict[str, Any]:
     if incidents_df.empty:
-        return {"barangay_risk": [], "backtest": None, "decay_window_used": decay_window}
+        return {
+            "barangay_risk": [],
+            "backtest": None,
+            "decay_window_used": decay_window,
+            "as_of_date": date_to,
+            "is_retrospective": pd.Timestamp(date_to).normalize() < pd.Timestamp.now().normalize(),
+        }
 
     ref_date = (
-    pd.Timestamp(reference_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-    if reference_date
-    else pd.Timestamp(date_to).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
-)
+        pd.Timestamp(reference_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        if reference_date
+        else pd.Timestamp(date_to).normalize() + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    )
     total_weeks = max((pd.Timestamp(date_to) - pd.Timestamp(date_from)).days / 7, 1)
+
+    # "Last Incident" / "Why Flagged" recency is always anchored to date_to,
+    # not wall-clock time. When date_to is today (the common case for live
+    # presets), this is indistinguishable from real-time recency. When
+    # date_to is in the past (a historical filter), recency describes risk
+    # "as of the end of the selected period" — flag that explicitly so the
+    # frontend can label it correctly instead of implying "days ago from now."
+    today_anchor   = reference_date or date_to
+    is_retrospective = pd.Timestamp(today_anchor).normalize() < pd.Timestamp.now().normalize()
 
     # ── Per-barangay aggregation ──────────────────────────────────────────────
     brgy_group = incidents_df.groupby("place_barangay")
@@ -1031,10 +1046,14 @@ def compute_barangay_risk(
         top_drivers = [d[0] for d in drivers if d[1] > 0.01][:2]
 
         extras = []
+        recency_suffix = f" (as of {pd.Timestamp(date_to).strftime('%b %d, %Y')})" if is_retrospective else ""
+
         if r["overdue"]:
-            extras.append(f"overdue by {r['days_since_last'] - int(r['avg_interval_days'] or 0)} days")
+            extras.append(
+                f"overdue by {r['days_since_last'] - int(r['avg_interval_days'] or 0)} days{recency_suffix}"
+            )
         if r["days_since_last"] <= 7:
-            extras.append(f"last crime {r['days_since_last']} day(s) ago")
+            extras.append(f"last crime {r['days_since_last']} day/s ago{recency_suffix}")
 
         why_parts = top_drivers + extras
         r["why_flagged"] = " + ".join(why_parts) if why_parts else "Historical frequency"
@@ -1053,6 +1072,8 @@ def compute_barangay_risk(
         "backtest":          backtest,
         "decay_window_used": decay_window,
         "total_barangays":   len(results),
+        "as_of_date":        date_to,
+        "is_retrospective":  bool(is_retrospective),
     }
 
 
