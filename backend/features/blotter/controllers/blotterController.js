@@ -1682,8 +1682,8 @@ const getBrgyReports = async (req, res) => {
         b.incident_type,
         b.place_barangay, 
         b.place_street, 
-        b.date_time_commission,
-        b.date_time_reported, 
+       TO_CHAR(b.date_time_commission, 'YYYY-MM-DD"T"HH24:MI') as date_time_commission,
+TO_CHAR(b.date_time_reported, 'YYYY-MM-DD"T"HH24:MI') as date_time_reported,
         b.status, 
         b.created_at
       FROM blotter_entries b
