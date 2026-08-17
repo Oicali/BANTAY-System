@@ -3,7 +3,9 @@
 const Blotter = require("../models/Blotter");
 const pool = require("../../../config/database");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-const { scheduleReferralReminders } = require("../../../jobs/referralReminderJob");
+const {
+  scheduleReferralReminders,
+} = require("../../../jobs/referralReminderJob");
 const {
   createNotification,
   notifyAllByRole,
@@ -424,11 +426,11 @@ const getAllBlotters = async (req, res) => {
     let results = blotters;
     if (req.query.referred === "false") {
       results = blotters.filter(
-        (b) => !b.referred_by_barangay || b.status !== "Pending"
+        (b) => !b.referred_by_barangay || b.status !== "Pending",
       );
     } else if (req.query.referred === "true") {
       results = blotters.filter(
-        (b) => b.referred_by_barangay === true && b.status === "Pending"
+        (b) => b.referred_by_barangay === true && b.status === "Pending",
       );
     }
 
@@ -438,19 +440,19 @@ const getAllBlotters = async (req, res) => {
          WHERE recipient_user_id = $1
            AND type = 'REFERRAL_REMINDER'
          ORDER BY created_at DESC`,
-        [req.user.user_id]
+        [req.user.user_id],
       );
 
       const reminderIds = reminderResult.rows
-        .map(r => {
+        .map((r) => {
           const match = r.link_to?.match(/referral=(\d+)$/);
           return match ? parseInt(match[1]) : null;
         })
         .filter(Boolean);
 
       if (reminderIds.length > 0) {
-        const alreadyIncluded = new Set(results.map(b => b.blotter_id));
-        const missingIds = reminderIds.filter(id => !alreadyIncluded.has(id));
+        const alreadyIncluded = new Set(results.map((b) => b.blotter_id));
+        const missingIds = reminderIds.filter((id) => !alreadyIncluded.has(id));
 
         if (missingIds.length > 0) {
           const extraBlotters = await pool.query(
@@ -458,9 +460,9 @@ const getAllBlotters = async (req, res) => {
              WHERE blotter_id = ANY($1::int[])
                AND is_deleted = false
                AND referred_by_barangay = true`,
-            [missingIds]
+            [missingIds],
           );
-          const tagged = extraBlotters.rows.map(b => ({
+          const tagged = extraBlotters.rows.map((b) => ({
             ...b,
             _reminder_access: true,
           }));
@@ -489,7 +491,9 @@ const getBlotterById = async (req, res) => {
     const { id } = req.params;
     const parsedId = parseInt(id, 10);
     if (isNaN(parsedId)) {
-      return res.status(400).json({ success: false, message: "Invalid crime report ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid crime report ID" });
     }
     const blotter = await Blotter.getByIdRaw(parsedId);
 
@@ -596,7 +600,7 @@ const deleteBlotter = async (req, res) => {
     });
     const deleted = await pool.query(
       `SELECT submitted_by, incident_type, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
-      [id]
+      [id],
     );
 
     if (deleted.rows[0]?.submitted_by) {
@@ -611,24 +615,32 @@ const deleteBlotter = async (req, res) => {
       });
     }
 
-    await notifyAllByRole(["Administrator", "Technical Administrator"], {
-      senderId: req.user.user_id,
-      senderName: req.user.username,
-      type: "REFERRAL_DELETED",
-      title: "Referral Removed",
-      message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} has been deleted by ${req.user.username}.`,
-      linkTo: "/e-blotter",
-    }, req.user.user_id);
-
-    if (deleted.rows[0]?.place_barangay) {
-      await notifyPatrolsForReferral(deleted.rows[0].place_barangay, {
+    await notifyAllByRole(
+      ["Administrator", "Technical Administrator"],
+      {
         senderId: req.user.user_id,
         senderName: req.user.username,
         type: "REFERRAL_DELETED",
         title: "Referral Removed",
-        message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} in Brgy. ${deleted.rows[0].place_barangay} has been removed.`,
+        message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} has been deleted by ${req.user.username}.`,
         linkTo: "/e-blotter",
-      }, req.user.user_id);
+      },
+      req.user.user_id,
+    );
+
+    if (deleted.rows[0]?.place_barangay) {
+      await notifyPatrolsForReferral(
+        deleted.rows[0].place_barangay,
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "REFERRAL_DELETED",
+          title: "Referral Removed",
+          message: `Referral ${deleted.rows[0]?.blotter_entry_number || id} in Brgy. ${deleted.rows[0].place_barangay} has been removed.`,
+          linkTo: "/e-blotter",
+        },
+        req.user.user_id,
+      );
     }
 
     res.status(200).json({
@@ -767,50 +779,121 @@ const restoreBlotter = async (req, res) => {
 // ============================================================
 
 const VALID_CRIME_TYPES = [
-  "Carnapping - MC", "Carnapping - MV", "Homicide", "Murder",
-  "Physical Injury", "Rape", "Robbery", "Special Complex Crime", "Theft",
+  "Carnapping - MC",
+  "Carnapping - MV",
+  "Homicide",
+  "Murder",
+  "Physical Injury",
+  "Rape",
+  "Robbery",
+  "Special Complex Crime",
+  "Theft",
 ];
 
 const OFFENSE_TO_CRIME_TYPE = {
-  Murder: "MURDER", Homicide: "HOMICIDE", "Physical Injury": "PHYSICAL INJURIES",
-  Rape: "RAPE", Robbery: "ROBBERY", Theft: "THEFT",
-  "Carnapping - MC": "CARNAPPING - MC", "Carnapping - MV": "CARNAPPING - MV",
+  Murder: "MURDER",
+  Homicide: "HOMICIDE",
+  "Physical Injury": "PHYSICAL INJURIES",
+  Rape: "RAPE",
+  Robbery: "ROBBERY",
+  Theft: "THEFT",
+  "Carnapping - MC": "CARNAPPING - MC",
+  "Carnapping - MV": "CARNAPPING - MV",
   "Special Complex Crime": "SPECIAL COMPLEX CRIME",
 };
 
 const BARANGAY_MIGRATION_MAP = {
-  ALIMA: "SINEGUELASAN", BANALO: "SINEGUELASAN", SINBANALI: "SINEGUELASAN",
-  CAMPOSANTO: "KAINGIN (POB.)", "DAANG BUKID": "KAINGIN (POB.)", "TABING DAGAT": "KAINGIN (POB.)",
-  DIGMAN: "KAINGIN DIGMAN", KAINGIN: "KAINGIN DIGMAN",
-  PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)", "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
-  "PANAPAAN 2": "P.F. ESPIRITU II", "PANAPAAN 3": "P.F. ESPIRITU II",
-  "PANAPAAN 4": "P.F. ESPIRITU IV", "PANAPAAN 5": "P.F. ESPIRITU V", "PANAPAAN 6": "P.F. ESPIRITU VI",
-  "PANAPAAN I": "P.F. ESPIRITU I (PANAPAAN)", "PANAPAAN II": "P.F. ESPIRITU II",
-  "PANAPAAN III": "P.F. ESPIRITU II", "PANAPAAN IV": "P.F. ESPIRITU IV",
-  "PANAPAAN V": "P.F. ESPIRITU V", "PANAPAAN VI": "P.F. ESPIRITU VI",
-  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)", "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
-  "P.F. ESPIRITU 3": "P.F. ESPIRITU III", "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
-  "P.F. ESPIRITU 5": "P.F. ESPIRITU V", "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
-  "ANIBAN 1": "ANIBAN I", "ANIBAN 2": "ANIBAN II",
-  "HABAY 1": "HABAY I", "HABAY 2": "HABAY II",
-  "LIGAS 1": "LIGAS I", "LIGAS 2": "LIGAS II",
-  "MABOLO 1": "MABOLO", "MABOLO 2": "MABOLO", "MABOLO 3": "MABOLO",
-  "MABOLO I": "MABOLO", "MABOLO II": "MABOLO", "MABOLO III": "MABOLO",
-  "MALIKSI 1": "MALIKSI I", "MALIKSI 2": "MALIKSI II", "MALIKSI 3": "MALIKSI II", "MALIKSI III": "MALIKSI II",
-  "MAMBOG 1": "MAMBOG I", "MAMBOG 2": "MAMBOG II", "MAMBOG 3": "MAMBOG III",
-  "MAMBOG 4": "MAMBOG IV", "MAMBOG 5": "MAMBOG II", "MAMBOG V": "MAMBOG II",
-  "MOLINO 1": "MOLINO I", "MOLINO 2": "MOLINO II", "MOLINO 3": "MOLINO III",
-  "MOLINO 4": "MOLINO IV", "MOLINO 5": "MOLINO V", "MOLINO 6": "MOLINO VI", "MOLINO 7": "MOLINO VII",
-  "NIOG 1": "NIOG", "NIOG 2": "NIOG", "NIOG 3": "NIOG", "NIOG I": "NIOG", "NIOG II": "NIOG", "NIOG III": "NIOG",
-  "REAL 1": "REAL", "REAL 2": "REAL", "REAL I": "REAL", "REAL II": "REAL",
-  "SALINAS 1": "SALINAS I", "SALINAS 2": "SALINAS II", "SALINAS 3": "SALINAS II",
-  "SALINAS 4": "SALINAS II", "SALINAS III": "SALINAS II", "SALINAS IV": "SALINAS II",
-  "SAN NICOLAS 1": "SAN NICOLAS I", "SAN NICOLAS 2": "SAN NICOLAS II", "SAN NICOLAS 3": "SAN NICOLAS III",
-  "TALABA 1": "TALABA I", "TALABA 2": "TALABA II", "TALABA 3": "TALABA III",
-  "TALABA 4": "TALABA III", "TALABA 5": "TALABA III", "TALABA 6": "TALABA III", "TALABA 7": "TALABA I",
-  "TALABA IV": "TALABA III", "TALABA V": "TALABA III", "TALABA VI": "TALABA III", "TALABA VII": "TALABA I",
-  "ZAPOTE 1": "ZAPOTE I", "ZAPOTE 2": "ZAPOTE II", "ZAPOTE 3": "ZAPOTE III",
-  "ZAPOTE 4": "ZAPOTE II", "ZAPOTE IV": "ZAPOTE II",
+  ALIMA: "SINEGUELASAN",
+  BANALO: "SINEGUELASAN",
+  SINBANALI: "SINEGUELASAN",
+  CAMPOSANTO: "KAINGIN (POB.)",
+  "DAANG BUKID": "KAINGIN (POB.)",
+  "TABING DAGAT": "KAINGIN (POB.)",
+  DIGMAN: "KAINGIN DIGMAN",
+  KAINGIN: "KAINGIN DIGMAN",
+  PANAPAAN: "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 1": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN 2": "P.F. ESPIRITU II",
+  "PANAPAAN 3": "P.F. ESPIRITU II",
+  "PANAPAAN 4": "P.F. ESPIRITU IV",
+  "PANAPAAN 5": "P.F. ESPIRITU V",
+  "PANAPAAN 6": "P.F. ESPIRITU VI",
+  "PANAPAAN I": "P.F. ESPIRITU I (PANAPAAN)",
+  "PANAPAAN II": "P.F. ESPIRITU II",
+  "PANAPAAN III": "P.F. ESPIRITU II",
+  "PANAPAAN IV": "P.F. ESPIRITU IV",
+  "PANAPAAN V": "P.F. ESPIRITU V",
+  "PANAPAAN VI": "P.F. ESPIRITU VI",
+  "P.F. ESPIRITU 1 (PANAPAAN)": "P.F. ESPIRITU I (PANAPAAN)",
+  "P.F. ESPIRITU 2": "P.F. ESPIRITU II",
+  "P.F. ESPIRITU 3": "P.F. ESPIRITU III",
+  "P.F. ESPIRITU 4": "P.F. ESPIRITU IV",
+  "P.F. ESPIRITU 5": "P.F. ESPIRITU V",
+  "P.F. ESPIRITU 6": "P.F. ESPIRITU VI",
+  "ANIBAN 1": "ANIBAN I",
+  "ANIBAN 2": "ANIBAN II",
+  "HABAY 1": "HABAY I",
+  "HABAY 2": "HABAY II",
+  "LIGAS 1": "LIGAS I",
+  "LIGAS 2": "LIGAS II",
+  "MABOLO 1": "MABOLO",
+  "MABOLO 2": "MABOLO",
+  "MABOLO 3": "MABOLO",
+  "MABOLO I": "MABOLO",
+  "MABOLO II": "MABOLO",
+  "MABOLO III": "MABOLO",
+  "MALIKSI 1": "MALIKSI I",
+  "MALIKSI 2": "MALIKSI II",
+  "MALIKSI 3": "MALIKSI II",
+  "MALIKSI III": "MALIKSI II",
+  "MAMBOG 1": "MAMBOG I",
+  "MAMBOG 2": "MAMBOG II",
+  "MAMBOG 3": "MAMBOG III",
+  "MAMBOG 4": "MAMBOG IV",
+  "MAMBOG 5": "MAMBOG II",
+  "MAMBOG V": "MAMBOG II",
+  "MOLINO 1": "MOLINO I",
+  "MOLINO 2": "MOLINO II",
+  "MOLINO 3": "MOLINO III",
+  "MOLINO 4": "MOLINO IV",
+  "MOLINO 5": "MOLINO V",
+  "MOLINO 6": "MOLINO VI",
+  "MOLINO 7": "MOLINO VII",
+  "NIOG 1": "NIOG",
+  "NIOG 2": "NIOG",
+  "NIOG 3": "NIOG",
+  "NIOG I": "NIOG",
+  "NIOG II": "NIOG",
+  "NIOG III": "NIOG",
+  "REAL 1": "REAL",
+  "REAL 2": "REAL",
+  "REAL I": "REAL",
+  "REAL II": "REAL",
+  "SALINAS 1": "SALINAS I",
+  "SALINAS 2": "SALINAS II",
+  "SALINAS 3": "SALINAS II",
+  "SALINAS 4": "SALINAS II",
+  "SALINAS III": "SALINAS II",
+  "SALINAS IV": "SALINAS II",
+  "SAN NICOLAS 1": "SAN NICOLAS I",
+  "SAN NICOLAS 2": "SAN NICOLAS II",
+  "SAN NICOLAS 3": "SAN NICOLAS III",
+  "TALABA 1": "TALABA I",
+  "TALABA 2": "TALABA II",
+  "TALABA 3": "TALABA III",
+  "TALABA 4": "TALABA III",
+  "TALABA 5": "TALABA III",
+  "TALABA 6": "TALABA III",
+  "TALABA 7": "TALABA I",
+  "TALABA IV": "TALABA III",
+  "TALABA V": "TALABA III",
+  "TALABA VI": "TALABA III",
+  "TALABA VII": "TALABA I",
+  "ZAPOTE 1": "ZAPOTE I",
+  "ZAPOTE 2": "ZAPOTE II",
+  "ZAPOTE 3": "ZAPOTE III",
+  "ZAPOTE 4": "ZAPOTE II",
+  "ZAPOTE IV": "ZAPOTE II",
   "KAINGIN DIGMAN": "KAINGIN DIGMAN",
 };
 
@@ -820,7 +903,9 @@ const BARANGAY_MIGRATION_MAP = {
 
 const importBlotters = async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ success: false, message: "No file uploaded" });
+    return res
+      .status(400)
+      .json({ success: false, message: "No file uploaded" });
   }
 
   try {
@@ -842,7 +927,8 @@ const importBlotters = async (req, res) => {
     if (!hasRequiredColumns) {
       return res.status(400).json({
         success: false,
-        message: "Invalid file format. Please use the official Bantay System import template.",
+        message:
+          "Invalid file format. Please use the official Bantay System import template.",
       });
     }
 
@@ -852,9 +938,16 @@ const importBlotters = async (req, res) => {
     const errors = [];
 
     // ── helpers ──────────────────────────────────────────
-    const str = (v) => (v === null || v === undefined || v === "" ? null : String(v).trim());
-    const num = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
-    const int = (v) => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
+    const str = (v) =>
+      v === null || v === undefined || v === "" ? null : String(v).trim();
+    const num = (v) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+    const int = (v) => {
+      const n = parseInt(v);
+      return isNaN(n) ? 0 : n;
+    };
     const bool = (v) => {
       if (v === null || v === undefined || v === "") return false;
       return String(v).trim().toUpperCase() === "YES" || v === true || v === 1;
@@ -865,7 +958,11 @@ const importBlotters = async (req, res) => {
       if (typeof v === "number") {
         const days = Math.floor(v);
         const utcAnchor = new Date((days - 25569) * 86400 * 1000);
-        return new Date(utcAnchor.getUTCFullYear(), utcAnchor.getUTCMonth(), utcAnchor.getUTCDate());
+        return new Date(
+          utcAnchor.getUTCFullYear(),
+          utcAnchor.getUTCMonth(),
+          utcAnchor.getUTCDate(),
+        );
       }
       const d = new Date(v);
       return isNaN(d.getTime()) ? null : d;
@@ -873,13 +970,17 @@ const importBlotters = async (req, res) => {
 
     const excelFractionToHM = (frac) => {
       const totalMinutes = Math.round(frac * 24 * 60);
-      return { hours: Math.floor(totalMinutes / 60) % 24, minutes: totalMinutes % 60 };
+      return {
+        hours: Math.floor(totalMinutes / 60) % 24,
+        minutes: totalMinutes % 60,
+      };
     };
 
     const parseDateTime = (dateVal, timeVal) => {
       const d = parseDate(dateVal);
       if (!d) return null;
-      let hours = 0, minutes = 0;
+      let hours = 0,
+        minutes = 0;
       if (typeof timeVal === "number") {
         ({ hours, minutes } = excelFractionToHM(timeVal));
       } else if (timeVal && String(timeVal).includes(":")) {
@@ -893,16 +994,47 @@ const importBlotters = async (req, res) => {
       return d;
     };
 
-    const deriveDayOfWeek = (d) => !d ? null : ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
-    const deriveMonth = (d) => !d ? null : ["January","February","March","April","May","June","July","August","September","October","November","December"][d.getMonth()];
+    const deriveDayOfWeek = (d) =>
+      !d
+        ? null
+        : [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+          ][d.getDay()];
+    const deriveMonth = (d) =>
+      !d
+        ? null
+        : [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ][d.getMonth()];
 
     // ── ONE upfront query to find existing Report IDs ──────
-    const allBlotterNos = rows.map(r => str(r["BLOTTER_ENTRY_NUMBER"])).filter(Boolean);
+    const allBlotterNos = rows
+      .map((r) => str(r["BLOTTER_ENTRY_NUMBER"]))
+      .filter(Boolean);
     const existingResult = await pool.query(
       `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_entry_number = ANY($1::text[])`,
-      [allBlotterNos]
+      [allBlotterNos],
     );
-    const existingSet = new Set(existingResult.rows.map(r => r.blotter_entry_number));
+    const existingSet = new Set(
+      existingResult.rows.map((r) => r.blotter_entry_number),
+    );
     const seenInFile = new Set();
 
     // ── process rows (validation only, no DB calls here) ───
@@ -912,7 +1044,11 @@ const importBlotters = async (req, res) => {
 
       const blotterNo = str(row["BLOTTER_ENTRY_NUMBER"]);
       if (!blotterNo) {
-        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Missing Report ID" });
+        errors.push({
+          row: rowNum,
+          field: "BLOTTER_ENTRY_NUMBER",
+          message: "Missing Report ID",
+        });
         continue;
       }
 
@@ -921,43 +1057,83 @@ const importBlotters = async (req, res) => {
         continue;
       }
       if (seenInFile.has(blotterNo)) {
-        errors.push({ row: rowNum, field: "BLOTTER_ENTRY_NUMBER", message: "Duplicate Report ID in file" });
+        errors.push({
+          row: rowNum,
+          field: "BLOTTER_ENTRY_NUMBER",
+          message: "Duplicate Report ID in file",
+        });
         continue;
       }
       seenInFile.add(blotterNo);
 
       const incidentType = str(row["INCIDENT_TYPE"]);
       if (!incidentType) {
-        errors.push({ row: rowNum, field: "INCIDENT_TYPE", message: "Missing incident type" });
+        errors.push({
+          row: rowNum,
+          field: "INCIDENT_TYPE",
+          message: "Missing incident type",
+        });
         continue;
       }
-      if (!VALID_CRIME_TYPES.some(c => c.toLowerCase() === incidentType.toLowerCase())) {
-        errors.push({ row: rowNum, field: "INCIDENT_TYPE", message: `"${incidentType}" is not a valid PNP index crime` });
+      if (
+        !VALID_CRIME_TYPES.some(
+          (c) => c.toLowerCase() === incidentType.toLowerCase(),
+        )
+      ) {
+        errors.push({
+          row: rowNum,
+          field: "INCIDENT_TYPE",
+          message: `"${incidentType}" is not a valid PNP index crime`,
+        });
         continue;
       }
 
       const rawBarangay = str(row["PLACE_BARANGAY"]);
       if (!rawBarangay) {
-        errors.push({ row: rowNum, field: "PLACE_BARANGAY", message: "Missing barangay" });
+        errors.push({
+          row: rowNum,
+          field: "PLACE_BARANGAY",
+          message: "Missing barangay",
+        });
         continue;
       }
 
-      const barangay = BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] || rawBarangay.toUpperCase();
+      const barangay =
+        BARANGAY_MIGRATION_MAP[rawBarangay.toUpperCase()] ||
+        rawBarangay.toUpperCase();
       if (!VALID_BARANGAYS.includes(barangay)) {
-        errors.push({ row: rowNum, field: "PLACE_BARANGAY", message: `"${rawBarangay}" is not a recognized barangay` });
+        errors.push({
+          row: rowNum,
+          field: "PLACE_BARANGAY",
+          message: `"${rawBarangay}" is not a recognized barangay`,
+        });
         continue;
       }
 
-      const dateCommitted = parseDateTime(row["DATE_COMMITTED"], row["TIME_COMMITTED"]);
+      const dateCommitted = parseDateTime(
+        row["DATE_COMMITTED"],
+        row["TIME_COMMITTED"],
+      );
       if (!dateCommitted) {
-        errors.push({ row: rowNum, field: "DATE_COMMITTED", message: "Missing or invalid date committed" });
+        errors.push({
+          row: rowNum,
+          field: "DATE_COMMITTED",
+          message: "Missing or invalid date committed",
+        });
         continue;
       }
 
-      const dateReported = parseDateTime(row["DATE_REPORTED"], row["TIME_REPORTED"]);
+      const dateReported = parseDateTime(
+        row["DATE_REPORTED"],
+        row["TIME_REPORTED"],
+      );
 
       inserted.push({
-        rowNum, blotterNo, incidentType, barangay, dateCommitted,
+        rowNum,
+        blotterNo,
+        incidentType,
+        barangay,
+        dateCommitted,
         dateReported: dateReported || dateCommitted,
         dayOfWeek: deriveDayOfWeek(dateCommitted),
         monthName: deriveMonth(dateCommitted),
@@ -984,7 +1160,8 @@ const importBlotters = async (req, res) => {
             const n = str(row["C_CONTACT_NUMBER"]);
             if (!n) return null;
             const cleaned = n.replace(/\D/g, "");
-            if (cleaned.length === 10 && cleaned.startsWith("9")) return "0" + cleaned;
+            if (cleaned.length === 10 && cleaned.startsWith("9"))
+              return "0" + cleaned;
             return cleaned;
           })(),
           region: str(row["C_REGION"]) || "Region IV-A (CALABARZON)",
@@ -1020,7 +1197,8 @@ const importBlotters = async (req, res) => {
           house_street: str(row["S_HOUSE_STREET"]) || "N/A",
           status: str(row["S_STATUS"]) || "At Large",
           location_if_arrested: str(row["S_LOCATION_IF_ARRESTED"]),
-          degree_participation: str(row["S_DEGREE_PARTICIPATION"]) || "Principal",
+          degree_participation:
+            str(row["S_DEGREE_PARTICIPATION"]) || "Principal",
           relation_to_victim: str(row["S_RELATION_TO_VICTIM"]),
           educational_attainment: str(row["S_EDUCATIONAL_ATTAINMENT"]),
           height_cm: int(row["S_HEIGHT_CM"]) || null,
@@ -1030,7 +1208,10 @@ const importBlotters = async (req, res) => {
         },
         offense: {
           offense_name: str(row["O_OFFENSE_NAME"]) || incidentType,
-          stage_of_felony: str(row["O_STAGE_OF_FELONY"]) || str(row["STAGE_OF_FELONY"]) || "COMPLETED",
+          stage_of_felony:
+            str(row["O_STAGE_OF_FELONY"]) ||
+            str(row["STAGE_OF_FELONY"]) ||
+            "COMPLETED",
           index_type: str(row["O_INDEX_TYPE"]) || "Index",
           is_principal_offense: true,
           investigator_on_case: str(row["O_INVESTIGATOR_ON_CASE"]) || "N/A",
@@ -1055,9 +1236,15 @@ const importBlotters = async (req, res) => {
       for (const r of inserted) {
         const crimeType = OFFENSE_TO_CRIME_TYPE[r.offense.offense_name];
         if (!crimeType || !r.offense.modus) continue;
-        const modusList = r.offense.modus.split(",").map(m => m.trim()).filter(Boolean);
+        const modusList = r.offense.modus
+          .split(",")
+          .map((m) => m.trim())
+          .filter(Boolean);
         for (const modusName of modusList) {
-          uniquePairs.set(`${crimeType}||${modusName.toLowerCase()}`, { crimeType, modusName });
+          uniquePairs.set(`${crimeType}||${modusName.toLowerCase()}`, {
+            crimeType,
+            modusName,
+          });
         }
       }
 
@@ -1070,26 +1257,45 @@ const importBlotters = async (req, res) => {
            WHERE (UPPER(crime_type), LOWER(modus_name)) IN (
              SELECT UNNEST($1::text[]), UNNEST($2::text[])
            )`,
-          [pairArr.map(p => p.crimeType), pairArr.map(p => p.modusName.toLowerCase())]
+          [
+            pairArr.map((p) => p.crimeType),
+            pairArr.map((p) => p.modusName.toLowerCase()),
+          ],
         );
         for (const row of existing.rows) {
-          modusIdMap.set(`${row.crime_type}||${row.modus_name.toLowerCase()}`, row.id);
+          modusIdMap.set(
+            `${row.crime_type}||${row.modus_name.toLowerCase()}`,
+            row.id,
+          );
         }
-        const existingIds = existing.rows.map(r => r.id);
+        const existingIds = existing.rows.map((r) => r.id);
         if (existingIds.length > 0) {
-          await client.query(`UPDATE crime_modus_reference SET is_active = true WHERE id = ANY($1::int[])`, [existingIds]);
+          await client.query(
+            `UPDATE crime_modus_reference SET is_active = true WHERE id = ANY($1::int[])`,
+            [existingIds],
+          );
         }
 
-        const missing = pairArr.filter(p => !modusIdMap.has(`${p.crimeType}||${p.modusName.toLowerCase()}`));
+        const missing = pairArr.filter(
+          (p) =>
+            !modusIdMap.has(`${p.crimeType}||${p.modusName.toLowerCase()}`),
+        );
         if (missing.length > 0) {
           const created = await client.query(
             `INSERT INTO crime_modus_reference (crime_type, modus_name, is_active)
              SELECT * FROM UNNEST($1::text[], $2::text[], $3::boolean[])
              RETURNING id, crime_type, modus_name`,
-            [missing.map(p => p.crimeType), missing.map(p => p.modusName), missing.map(() => true)]
+            [
+              missing.map((p) => p.crimeType),
+              missing.map((p) => p.modusName),
+              missing.map(() => true),
+            ],
           );
           for (const row of created.rows) {
-            modusIdMap.set(`${row.crime_type}||${row.modus_name.toLowerCase()}`, row.id);
+            modusIdMap.set(
+              `${row.crime_type}||${row.modus_name.toLowerCase()}`,
+              row.id,
+            );
           }
         }
       }
@@ -1117,41 +1323,51 @@ const importBlotters = async (req, res) => {
           )
           RETURNING blotter_id`,
           [
-            chunk.map(r => r.blotterNo),
-            chunk.map(r => r.incidentType),
+            chunk.map((r) => r.blotterNo),
+            chunk.map((r) => r.incidentType),
             chunk.map(() => "Region IV-A (CALABARZON)"),
             chunk.map(() => "Cavite"),
             chunk.map(() => "Bacoor City"),
-            chunk.map(r => r.barangay),
-            chunk.map(r => r.placeStreet),
-            chunk.map(r => r.typeOfPlace),
-            chunk.map(r => r.placeCommission),
-            chunk.map(r => r.narrative),
-            chunk.map(r => r.stageOfFelony),
-            chunk.map(r => r.modus),
-            chunk.map(r => r.dateCommitted),
-            chunk.map(r => r.dateReported),
+            chunk.map((r) => r.barangay),
+            chunk.map((r) => r.placeStreet),
+            chunk.map((r) => r.typeOfPlace),
+            chunk.map((r) => r.placeCommission),
+            chunk.map((r) => r.narrative),
+            chunk.map((r) => r.stageOfFelony),
+            chunk.map((r) => r.modus),
+            chunk.map((r) => r.dateCommitted),
+            chunk.map((r) => r.dateReported),
             chunk.map(() => false),
             chunk.map(() => false),
-            chunk.map(r => r.dayOfWeek),
-            chunk.map(r => r.monthName),
-            chunk.map(r => r.caseStatus),
-            chunk.map(r => r.caseSolveType),
-            chunk.map(r => r.lat),
-            chunk.map(r => r.lng),
-            chunk.map(r => r.amount),
-            chunk.map(r => r.complainant.first_name ? `${r.complainant.first_name} ${r.complainant.last_name || ""}`.trim() : null),
-            chunk.map(r => r.suspect.first_name ? `${r.suspect.first_name} ${r.suspect.last_name || ""}`.trim() : null),
+            chunk.map((r) => r.dayOfWeek),
+            chunk.map((r) => r.monthName),
+            chunk.map((r) => r.caseStatus),
+            chunk.map((r) => r.caseSolveType),
+            chunk.map((r) => r.lat),
+            chunk.map((r) => r.lng),
+            chunk.map((r) => r.amount),
+            chunk.map((r) =>
+              r.complainant.first_name
+                ? `${r.complainant.first_name} ${r.complainant.last_name || ""}`.trim()
+                : null,
+            ),
+            chunk.map((r) =>
+              r.suspect.first_name
+                ? `${r.suspect.first_name} ${r.suspect.last_name || ""}`.trim()
+                : null,
+            ),
             chunk.map(() => "bantay_import"),
             chunk.map(() => batchId),
             chunk.map(() => false),
-          ]
+          ],
         );
 
-        const blotterIds = blotterInsertResult.rows.map(r => r.blotter_id);
-        chunk.forEach((r, idx) => { r.blotterId = blotterIds[idx]; });
+        const blotterIds = blotterInsertResult.rows.map((r) => r.blotter_id);
+        chunk.forEach((r, idx) => {
+          r.blotterId = blotterIds[idx];
+        });
 
-        const withComplainant = chunk.filter(r => r.complainant.first_name);
+        const withComplainant = chunk.filter((r) => r.complainant.first_name);
         if (withComplainant.length > 0) {
           await client.query(
             `INSERT INTO complainants (
@@ -1167,26 +1383,28 @@ const importBlotters = async (req, res) => {
               $17::text[], $18::text[], $19::text[]
             )`,
             [
-              withComplainant.map(r => r.blotterId),
-              withComplainant.map(r => r.complainant.first_name),
-              withComplainant.map(r => r.complainant.middle_name),
-              withComplainant.map(r => r.complainant.last_name),
-              withComplainant.map(r => r.complainant.qualifier),
-              withComplainant.map(r => r.complainant.alias),
-              withComplainant.map(r => r.complainant.gender || "Male"),
-              withComplainant.map(r => r.complainant.nationality || "FILIPINO"),
-              withComplainant.map(r => r.complainant.contact_number),
-              withComplainant.map(r => r.complainant.region),
-              withComplainant.map(r => r.complainant.district_province),
-              withComplainant.map(r => r.complainant.city_municipality),
-              withComplainant.map(r => r.complainant.barangay),
-              withComplainant.map(r => r.complainant.house_street),
-              withComplainant.map(r => r.complainant.info_obtained),
-              withComplainant.map(r => r.complainant.occupation),
-              withComplainant.map(r => r.complainant.role || "Victim"),
-              withComplainant.map(r => r.complainant.relationship_to_victim),
-              withComplainant.map(r => r.complainant.witness_statement),
-            ]
+              withComplainant.map((r) => r.blotterId),
+              withComplainant.map((r) => r.complainant.first_name),
+              withComplainant.map((r) => r.complainant.middle_name),
+              withComplainant.map((r) => r.complainant.last_name),
+              withComplainant.map((r) => r.complainant.qualifier),
+              withComplainant.map((r) => r.complainant.alias),
+              withComplainant.map((r) => r.complainant.gender || "Male"),
+              withComplainant.map(
+                (r) => r.complainant.nationality || "FILIPINO",
+              ),
+              withComplainant.map((r) => r.complainant.contact_number),
+              withComplainant.map((r) => r.complainant.region),
+              withComplainant.map((r) => r.complainant.district_province),
+              withComplainant.map((r) => r.complainant.city_municipality),
+              withComplainant.map((r) => r.complainant.barangay),
+              withComplainant.map((r) => r.complainant.house_street),
+              withComplainant.map((r) => r.complainant.info_obtained),
+              withComplainant.map((r) => r.complainant.occupation),
+              withComplainant.map((r) => r.complainant.role || "Victim"),
+              withComplainant.map((r) => r.complainant.relationship_to_victim),
+              withComplainant.map((r) => r.complainant.witness_statement),
+            ],
           );
         }
 
@@ -1208,32 +1426,32 @@ const importBlotters = async (req, res) => {
             $22::int[], $23::boolean[], $24::text[], $25::text[]
           )`,
           [
-            chunk.map(r => r.blotterId),
-            chunk.map(r => r.suspect.first_name),
-            chunk.map(r => r.suspect.middle_name),
-            chunk.map(r => r.suspect.last_name),
-            chunk.map(r => r.suspect.qualifier),
-            chunk.map(r => r.suspect.alias),
-            chunk.map(r => r.suspect.gender),
-            chunk.map(r => r.suspect.birthday),
-            chunk.map(r => r.suspect.age),
-            chunk.map(r => r.suspect.birth_place),
-            chunk.map(r => r.suspect.nationality),
-            chunk.map(r => r.suspect.region),
-            chunk.map(r => r.suspect.district_province),
-            chunk.map(r => r.suspect.city_municipality),
-            chunk.map(r => r.suspect.barangay),
-            chunk.map(r => r.suspect.house_street),
-            chunk.map(r => r.suspect.status),
-            chunk.map(r => r.suspect.location_if_arrested),
-            chunk.map(r => r.suspect.degree_participation),
-            chunk.map(r => r.suspect.relation_to_victim),
-            chunk.map(r => r.suspect.educational_attainment),
-            chunk.map(r => r.suspect.height_cm),
-            chunk.map(r => r.suspect.drug_used),
-            chunk.map(r => r.suspect.motive),
-            chunk.map(r => r.suspect.occupation),
-          ]
+            chunk.map((r) => r.blotterId),
+            chunk.map((r) => r.suspect.first_name),
+            chunk.map((r) => r.suspect.middle_name),
+            chunk.map((r) => r.suspect.last_name),
+            chunk.map((r) => r.suspect.qualifier),
+            chunk.map((r) => r.suspect.alias),
+            chunk.map((r) => r.suspect.gender),
+            chunk.map((r) => r.suspect.birthday),
+            chunk.map((r) => r.suspect.age),
+            chunk.map((r) => r.suspect.birth_place),
+            chunk.map((r) => r.suspect.nationality),
+            chunk.map((r) => r.suspect.region),
+            chunk.map((r) => r.suspect.district_province),
+            chunk.map((r) => r.suspect.city_municipality),
+            chunk.map((r) => r.suspect.barangay),
+            chunk.map((r) => r.suspect.house_street),
+            chunk.map((r) => r.suspect.status),
+            chunk.map((r) => r.suspect.location_if_arrested),
+            chunk.map((r) => r.suspect.degree_participation),
+            chunk.map((r) => r.suspect.relation_to_victim),
+            chunk.map((r) => r.suspect.educational_attainment),
+            chunk.map((r) => r.suspect.height_cm),
+            chunk.map((r) => r.suspect.drug_used),
+            chunk.map((r) => r.suspect.motive),
+            chunk.map((r) => r.suspect.occupation),
+          ],
         );
 
         await client.query(
@@ -1246,25 +1464,31 @@ const importBlotters = async (req, res) => {
             $5::boolean[], $6::text[], $7::text[], $8::text[]
           )`,
           [
-            chunk.map(r => r.blotterId),
-            chunk.map(r => r.offense.offense_name),
-            chunk.map(r => r.offense.stage_of_felony),
-            chunk.map(r => r.offense.index_type),
-            chunk.map(r => r.offense.is_principal_offense),
-            chunk.map(r => r.offense.investigator_on_case),
-            chunk.map(r => r.offense.most_investigator),
-            chunk.map(r => r.offense.modus),
-          ]
+            chunk.map((r) => r.blotterId),
+            chunk.map((r) => r.offense.offense_name),
+            chunk.map((r) => r.offense.stage_of_felony),
+            chunk.map((r) => r.offense.index_type),
+            chunk.map((r) => r.offense.is_principal_offense),
+            chunk.map((r) => r.offense.investigator_on_case),
+            chunk.map((r) => r.offense.most_investigator),
+            chunk.map((r) => r.offense.modus),
+          ],
         );
 
         const modusPairs = [];
         for (const r of chunk) {
           const crimeType = OFFENSE_TO_CRIME_TYPE[r.offense.offense_name];
           if (!crimeType || !r.offense.modus) continue;
-          const modusList = r.offense.modus.split(",").map(m => m.trim()).filter(Boolean);
+          const modusList = r.offense.modus
+            .split(",")
+            .map((m) => m.trim())
+            .filter(Boolean);
           for (const modusName of modusList) {
-            const modusRefId = modusIdMap.get(`${crimeType}||${modusName.toLowerCase()}`);
-            if (modusRefId) modusPairs.push({ blotterId: r.blotterId, modusRefId });
+            const modusRefId = modusIdMap.get(
+              `${crimeType}||${modusName.toLowerCase()}`,
+            );
+            if (modusRefId)
+              modusPairs.push({ blotterId: r.blotterId, modusRefId });
           }
         }
         if (modusPairs.length > 0) {
@@ -1272,11 +1496,14 @@ const importBlotters = async (req, res) => {
             `INSERT INTO crime_modus (blotter_id, modus_reference_id)
              SELECT * FROM UNNEST($1::int[], $2::int[])
              ON CONFLICT DO NOTHING`,
-            [modusPairs.map(p => p.blotterId), modusPairs.map(p => p.modusRefId)]
+            [
+              modusPairs.map((p) => p.blotterId),
+              modusPairs.map((p) => p.modusRefId),
+            ],
           );
         }
 
-        chunk.forEach(r => {
+        chunk.forEach((r) => {
           caseRows.push({
             blotterId: r.blotterId,
             status: r.caseStatus,
@@ -1292,12 +1519,19 @@ const importBlotters = async (req, res) => {
       if (caseRows.length > 0) {
         const validStatuses = ["Under Investigation", "Solved", "Cleared"];
         const currentYear = new Date().getFullYear();
-        const highCrimes = ["murder", "homicide", "rape", "special complex crime"];
+        const highCrimes = [
+          "murder",
+          "homicide",
+          "rape",
+          "special complex crime",
+        ];
         const mediumCrimes = ["robbery", "carnapping - mc", "carnapping - mv"];
 
         const byYear = new Map();
         for (const cr of caseRows) {
-          const year = cr.reportedDate ? new Date(cr.reportedDate).getFullYear() : currentYear;
+          const year = cr.reportedDate
+            ? new Date(cr.reportedDate).getFullYear()
+            : currentYear;
           if (!byYear.has(year)) byYear.set(year, []);
           byYear.get(year).push(cr);
         }
@@ -1316,28 +1550,35 @@ const importBlotters = async (req, res) => {
           group.forEach((cr, i) => {
             const seq = startSeq + i;
             const case_number = `CASE-${year}-${String(seq).padStart(4, "0")}`;
-            const caseStatus = validStatuses.includes(cr.status) ? cr.status : "Under Investigation";
+            const caseStatus = validStatuses.includes(cr.status)
+              ? cr.status
+              : "Under Investigation";
             const incidentType = (cr.incidentType || "").toLowerCase().trim();
             let priority = "Low";
             if (year === currentYear) {
               if (highCrimes.includes(incidentType)) priority = "High";
               else if (mediumCrimes.includes(incidentType)) priority = "Medium";
             }
-            finalCaseNumbers.push({ blotterId: cr.blotterId, case_number, status: caseStatus, priority });
+            finalCaseNumbers.push({
+              blotterId: cr.blotterId,
+              case_number,
+              status: caseStatus,
+              priority,
+            });
           });
         }
-await client.query(
-  `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
+        await client.query(
+          `INSERT INTO cases (blotter_id, case_number, status, priority, created_by)
    SELECT * FROM UNNEST($1::int[], $2::text[], $3::text[], $4::text[], $5::uuid[])
    ON CONFLICT DO NOTHING`,
-  [
-    finalCaseNumbers.map(c => c.blotterId),
-    finalCaseNumbers.map(c => c.case_number),
-    finalCaseNumbers.map(c => c.status),
-    finalCaseNumbers.map(c => c.priority),
-    finalCaseNumbers.map(() => req.user.user_id),
-  ]
-);
+          [
+            finalCaseNumbers.map((c) => c.blotterId),
+            finalCaseNumbers.map((c) => c.case_number),
+            finalCaseNumbers.map((c) => c.status),
+            finalCaseNumbers.map((c) => c.priority),
+            finalCaseNumbers.map(() => req.user.user_id),
+          ],
+        );
       }
 
       await client.query("COMMIT");
@@ -1446,7 +1687,7 @@ const acceptReferral = async (req, res) => {
 
       const referralRow = await pool.query(
         `SELECT submitted_by, place_barangay, blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
-        [id]
+        [id],
       );
 
       if (referralRow.rows[0]?.submitted_by) {
@@ -1461,24 +1702,32 @@ const acceptReferral = async (req, res) => {
         });
       }
 
-      await notifyAllByRole(["Administrator", "Technical Administrator"], {
-        senderId: req.user.user_id,
-        senderName: req.user.username,
-        type: "REFERRAL_ACCEPTED",
-        title: "Referral Accepted",
-        message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} (Brgy. ${referralRow.rows[0]?.place_barangay}).`,
-        linkTo: "/e-blotter",
-      }, req.user.user_id);
-
-      if (referralRow.rows[0]?.place_barangay) {
-        await notifyPatrolsForReferral(referralRow.rows[0].place_barangay, {
+      await notifyAllByRole(
+        ["Administrator", "Technical Administrator"],
+        {
           senderId: req.user.user_id,
           senderName: req.user.username,
           type: "REFERRAL_ACCEPTED",
           title: "Referral Accepted",
-          message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} in Brgy. ${referralRow.rows[0].place_barangay}.`,
+          message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} (Brgy. ${referralRow.rows[0]?.place_barangay}).`,
           linkTo: "/e-blotter",
-        }, req.user.user_id);
+        },
+        req.user.user_id,
+      );
+
+      if (referralRow.rows[0]?.place_barangay) {
+        await notifyPatrolsForReferral(
+          referralRow.rows[0].place_barangay,
+          {
+            senderId: req.user.user_id,
+            senderName: req.user.username,
+            type: "REFERRAL_ACCEPTED",
+            title: "Referral Accepted",
+            message: `${req.user.username} accepted referral ${blotter.rows[0].blotter_entry_number} in Brgy. ${referralRow.rows[0].place_barangay}.`,
+            linkTo: "/e-blotter",
+          },
+          req.user.user_id,
+        );
       }
 
       return res
@@ -1866,7 +2115,9 @@ const checkReminderAccess = async (req, res) => {
     const { id } = req.params;
     const parsedId = parseInt(id, 10);
     if (isNaN(parsedId)) {
-      return res.status(400).json({ success: false, message: "Invalid crime report ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid crime report ID" });
     }
 
     const result = await pool.query(
@@ -1875,7 +2126,7 @@ const checkReminderAccess = async (req, res) => {
          AND type = 'REFERRAL_REMINDER'
          AND link_to LIKE $2
        LIMIT 1`,
-      [req.user.user_id, `%referral=${parsedId}`]
+      [req.user.user_id, `%referral=${parsedId}`],
     );
 
     res.json({ success: true, has_access: result.rows.length > 0 });
@@ -2036,7 +2287,7 @@ const remindPatrols = async (req, res) => {
         type: "REFERRAL_REMINDER",
         title: "Referral Reminder",
         message: `${req.user.username} is reminding you to respond to referral #${blotterNumber}`,
-        linkTo: "/e-blotter",
+        linkTo: `/e-blotter?referral=${id}`,
       });
       successCount++;
     }
@@ -2090,11 +2341,11 @@ const getReminderBlotterIds = async (req, res) => {
        WHERE recipient_user_id = $1
          AND type = 'REFERRAL_REMINDER'
        ORDER BY created_at DESC`,
-      [req.user.user_id]
+      [req.user.user_id],
     );
 
     const ids = result.rows
-      .map(r => {
+      .map((r) => {
         const match = r.link_to?.match(/referral=(\d+)$/);
         return match ? parseInt(match[1]) : null;
       })
