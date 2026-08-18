@@ -155,6 +155,7 @@ const DeletedSchedulesModal = ({ patrols, loading, restoringId, onRestore, onClo
                           style={{
                             display: "inline-block", padding: "2px 9px", borderRadius: "999px",
                             background: "#fff3cd", color: "#856404", fontSize: "11.5px", fontWeight: 600,
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {p.report_count} report{p.report_count !== 1 ? "s" : ""}
@@ -225,7 +226,7 @@ const DeletedSchedulesModal = ({ patrols, loading, restoringId, onRestore, onClo
 };
 
 const thStyle = {
-  textAlign: "left", padding: "10px 16px", fontSize: "11.5px", fontWeight: 700,
+  textAlign: "left", padding: "10px 18px", fontSize: "11.5px", fontWeight: 700,
   color: "#6c757d", textTransform: "uppercase", letterSpacing: "0.03em",
 };
 
