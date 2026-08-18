@@ -432,37 +432,45 @@ const handleRestore = async (id) => {
 
  
 
-  const filteredPatrols = patrols.filter((p) => {
-  const { search: s, status: st, dateFrom: df, dateTo: dt, barangay: bg } = appliedFilters;
+  const matchesNonStatusFilters = (p) => {
+    const { search: s, dateFrom: df, dateTo: dt, barangay: bg } = appliedFilters;
 
-  if (
-    s &&
-    !(
-      (p.patrol_name || "").toLowerCase().includes(s.toLowerCase()) ||
-      (p.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase())
+    if (
+      s &&
+      !(
+        (p.patrol_name || "").toLowerCase().includes(s.toLowerCase()) ||
+        (p.mobile_unit_name || "").toLowerCase().includes(s.toLowerCase())
+      )
     )
-  )
-    return false;
+      return false;
 
-  if (st !== "all" && getPatrolStatus(p) !== st) return false;
+    if (df) {
+      const start = parseLocalDate(p.start_date);
+      if (start && start < parseLocalDate(df)) return false;
+    }
+    if (dt) {
+      const end = parseLocalDate(p.end_date);
+      if (end && end > parseLocalDate(dt)) return false;
+    }
+    if (bg) {
+      const barangays = getUniqueBarangays(p.routes);
+      const hasMatch = barangays.some((b) =>
+        b.toLowerCase().includes(bg.toLowerCase()),
+      );
+      if (!hasMatch) return false;
+    }
+    return true;
+  };
 
-  if (df) {
-    const start = parseLocalDate(p.start_date);
-    if (start && start < parseLocalDate(df)) return false;
-  }
-  if (dt) {
-    const end = parseLocalDate(p.end_date);
-    if (end && end > parseLocalDate(dt)) return false;
-  }
-  if (bg) {
-    const barangays = getUniqueBarangays(p.routes);
-    const hasMatch = barangays.some((b) =>
-      b.toLowerCase().includes(bg.toLowerCase()),
-    );
-    if (!hasMatch) return false;
-  }
-  return true;
-});
+  // Everything matching search/date/barangay, ignoring status — feeds the stat cards
+  const baseFilteredPatrols = patrols.filter(matchesNonStatusFilters);
+
+  // Table rows: base set narrowed further by the selected status
+  const filteredPatrols = baseFilteredPatrols.filter((p) => {
+    const { status: st } = appliedFilters;
+    if (st !== "all" && getPatrolStatus(p) !== st) return false;
+    return true;
+  });
 
   // Sort — default date ascending only (no sort dropdown)
   const STATUS_ORDER = { active: 0, upcoming: 1, completed: 2, unknown: 3 };
@@ -495,10 +503,10 @@ const handleRestore = async (id) => {
   );
 
   const counts = {
-    all: patrols.length,
-    active: patrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming: patrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
-    completed: patrols.filter((p) => getPatrolStatus(p) === "completed").length,
+    all: filteredPatrols.length,
+    active: filteredPatrols.filter((p) => getPatrolStatus(p) === "active").length,
+    upcoming: filteredPatrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
+    completed: filteredPatrols.filter((p) => getPatrolStatus(p) === "completed").length,
   };
 
   const statusConfig = {
