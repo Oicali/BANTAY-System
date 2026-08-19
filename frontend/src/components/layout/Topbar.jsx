@@ -343,8 +343,11 @@ const TopBar = ({ onMenuClick }) => {
 
   const handleNotifClick = (notif) => {
     markOneRead(notif);
-    if (notif.link_to && LINK_MAP[notif.link_to]) {
-      window.location.href = LINK_MAP[notif.link_to];
+    if (notif.link_to) {
+      const basePath = notif.link_to.split("?")[0];
+      if (LINK_MAP[basePath]) {
+        window.location.href = notif.link_to;
+      }
     }
     setNotifOpen(false);
   };
