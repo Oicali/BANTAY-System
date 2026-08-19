@@ -640,22 +640,27 @@ const LoginSystem = () => {
       {/* Left Side - Branding */}
       <div className="branding-side">
         <div className="logo-container">
-          <img
-            src="/images/Bantay-logo.png"
-            alt="PNP Logo"
-            className="logo-image"
-          />
-        </div>
+  <img
+    src="/images/Bantay-logo.webp"
+    alt="PNP Logo"
+    className="logo-image"
+    width="126"
+    height="126"
+  />
+</div>
 
         <div className="red-line"></div>
 
         <div className="bantay-logo-box">
-          <img
-            src="/images/Long-logo.png"
-            alt="BANTAY System"
-            className="bantay-logo-image"
-          />
-        </div>
+  <img
+    src="/images/Long-logo.webp"
+    alt="BANTAY System"
+    className="bantay-logo-image"
+    width="455"
+    height="155"
+    fetchpriority="high"
+  />
+</div>
         <div className="title-section">
           <h1 className="main-title">
             Bacoor Anti-criminality Network for Targeted Actions and Yields{" "}
@@ -759,6 +764,7 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="eye-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
                       <Eye size={20} />
@@ -1150,6 +1156,7 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="eye-toggle"
+                    aria-label={showNewPassword ? "Hide password" : "Show password"}
                   >
                     {showNewPassword ? (
                       <Eye size={20} />
@@ -1180,6 +1187,7 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="eye-toggle"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
                     {showConfirmPassword ? (
                       <Eye size={20} />

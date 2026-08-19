@@ -13,7 +13,7 @@ export default function PageLayout() {
     navItems.reduce((acc, group) => {
       acc[group.section] = true;
       return acc;
-    }, {})
+    }, {}),
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -29,9 +29,9 @@ export default function PageLayout() {
 
     try {
       await fetch(`${API_URL}/auth/logout`, {
-        method:  "POST",
+        method: "POST",
         headers: {
-          Authorization:  `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
@@ -69,9 +69,9 @@ export default function PageLayout() {
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
 
         {/* CONTENT AREA - This is where views change */}
-        <div className="content-wrapper">
+        <main className="content-wrapper">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );
