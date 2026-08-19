@@ -245,8 +245,8 @@ const updateStatus = async (req, res) => {
 
     const result = await pool.query(
       `UPDATE cases
-       SET status = $1,
-           priority = CASE WHEN $1 = 'Solved' THEN 'Low' ELSE priority END,
+       SET status = $1::varchar,
+           priority = CASE WHEN $1::varchar IN ('Solved', 'Cleared') THEN 'Low' ELSE priority END,
            updated_at = NOW()
        WHERE id = $2
        RETURNING id, case_number, status, priority, updated_at, blotter_id`,
