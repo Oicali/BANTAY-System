@@ -2,7 +2,10 @@
 
 const pool = require("../../../config/database");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-const { createNotification, notifyAllByRole } = require("../../notifications/notificationService");
+const {
+  createNotification,
+  notifyAllByRole,
+} = require("../../notifications/notificationService");
 // POST /cases — Admin only
 const createCase = async (req, res) => {
   try {
@@ -119,21 +122,21 @@ const assignInvestigator = async (req, res) => {
         [id],
       );
 
-    await logAudit({
-  userId: req.user?.user_id,
-  username: req.user?.username,
-  eventName: "Investigator Unassigned",
-  description: `Unassigned investigator from case ID ${id}`,
-  action: "UPDATE",
-  status: "success",
-  source: "Web Portal",
-  ipAddress: getClientIp(req),
-});
-return res.status(200).json({
-  success: true,
-  message: "Investigator unassigned successfully",
-  data: { ...result.rows[0], assigned_io_name: null },
-});
+      await logAudit({
+        userId: req.user?.user_id,
+        username: req.user?.username,
+        eventName: "Investigator Unassigned",
+        description: `Unassigned investigator from case ID ${id}`,
+        action: "UPDATE",
+        status: "success",
+        source: "Web Portal",
+        ipAddress: getClientIp(req),
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Investigator unassigned successfully",
+        data: { ...result.rows[0], assigned_io_name: null },
+      });
     }
 
     const user = await pool.query(
@@ -160,13 +163,14 @@ return res.status(200).json({
        WHERE id = $2 RETURNING id, case_number, assigned_io_id, updated_at`,
       [assigned_io_id, id],
     );
-const blotterRef = await pool.query(
-  `SELECT b.blotter_entry_number FROM cases c 
+    const blotterRef = await pool.query(
+      `SELECT b.blotter_entry_number FROM cases c 
    JOIN blotter_entries b ON c.blotter_id = b.blotter_id 
    WHERE c.id = $1`,
-  [id]
-);
-const blotterEntryNumber = blotterRef.rows[0]?.blotter_entry_number || result.rows[0].case_number;
+      [id],
+    );
+    const blotterEntryNumber =
+      blotterRef.rows[0]?.blotter_entry_number || result.rows[0].case_number;
 
     const io = user.rows[0];
     await logAudit({
@@ -179,8 +183,13 @@ const blotterEntryNumber = blotterRef.rows[0]?.blotter_entry_number || result.ro
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    console.log("Sending notif to:", assigned_io_id, "type:", typeof assigned_io_id);
-      await createNotification({
+    console.log(
+      "Sending notif to:",
+      assigned_io_id,
+      "type:",
+      typeof assigned_io_id,
+    );
+    await createNotification({
       recipientId: assigned_io_id,
       senderId: req.user.user_id,
       senderName: req.user.username,
@@ -197,7 +206,6 @@ const blotterEntryNumber = blotterRef.rows[0]?.blotter_entry_number || result.ro
         assigned_io_name: `${io.first_name} ${io.last_name}`,
       },
     });
-    
   } catch (error) {
     console.error("Assign investigator error:", error);
     res
@@ -236,7 +244,12 @@ const updateStatus = async (req, res) => {
     }
 
     const result = await pool.query(
-      `UPDATE cases SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, case_number, status, updated_at, blotter_id`,
+      `UPDATE cases
+       SET status = $1,
+           priority = CASE WHEN $1 = 'Solved' THEN 'Low' ELSE priority END,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, case_number, status, priority, updated_at, blotter_id`,
       [status, id],
     );
 
@@ -246,11 +259,12 @@ const updateStatus = async (req, res) => {
       Cleared: "Cleared",
     };
     const blotterUpdate = await pool.query(
-  `UPDATE blotter_entries SET status = $1 WHERE blotter_id = $2 
+      `UPDATE blotter_entries SET status = $1 WHERE blotter_id = $2 
    RETURNING blotter_entry_number`,
-  [blotterStatusMap[status], result.rows[0].blotter_id],
-);
-const blotterEntryNumber = blotterUpdate.rows[0]?.blotter_entry_number || result.rows[0].case_number;
+      [blotterStatusMap[status], result.rows[0].blotter_id],
+    );
+    const blotterEntryNumber =
+      blotterUpdate.rows[0]?.blotter_entry_number || result.rows[0].case_number;
     await logAudit({
       userId: req.user?.user_id,
       username: req.user?.username,
@@ -262,11 +276,11 @@ const blotterEntryNumber = blotterUpdate.rows[0]?.blotter_entry_number || result
       ipAddress: getClientIp(req),
     });
 
-// Notify barangay who submitted the referral (only if it's a brgy referral)
+    // Notify barangay who submitted the referral (only if it's a brgy referral)
     const referralInfo = await pool.query(
       `SELECT submitted_by FROM blotter_entries 
        WHERE blotter_id = $1 AND referred_by_barangay = true`,
-      [result.rows[0].blotter_id]
+      [result.rows[0].blotter_id],
     );
     if (referralInfo.rows[0]?.submitted_by) {
       await createNotification({
@@ -280,29 +294,33 @@ const blotterEntryNumber = blotterUpdate.rows[0]?.blotter_entry_number || result
       });
     }
     // Notify the assigned investigator (only if someone is assigned)
-const assignedIoId = caseResult.rows[0].assigned_io_id;
-if (assignedIoId && assignedIoId !== req.user.user_id) {
-  await createNotification({
-    recipientId: assignedIoId,
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "CASE_ASSIGNED",
-    title: "Case Status Updated",
-    message: `${blotterEntryNumber} status changed to "${status}"`,
-    linkTo: "/case-management",
-  });
-}
-// Notify admins only when investigator changes it (exclude self)
-if (req.user.role === "Investigator") {
-  await notifyAllByRole(["Administrator", "Technical Administrator"], {
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "CASE_ASSIGNED",
-    title: "Case Status Updated",
-    message: `${req.user.username} updated ${blotterEntryNumber} to "${status}"`,
-    linkTo: "/case-management",
-  }, req.user.user_id);
-}
+    const assignedIoId = caseResult.rows[0].assigned_io_id;
+    if (assignedIoId && assignedIoId !== req.user.user_id) {
+      await createNotification({
+        recipientId: assignedIoId,
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "CASE_ASSIGNED",
+        title: "Case Status Updated",
+        message: `${blotterEntryNumber} status changed to "${status}"`,
+        linkTo: "/case-management",
+      });
+    }
+    // Notify admins only when investigator changes it (exclude self)
+    if (req.user.role === "Investigator") {
+      await notifyAllByRole(
+        ["Administrator", "Technical Administrator"],
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "CASE_ASSIGNED",
+          title: "Case Status Updated",
+          message: `${req.user.username} updated ${blotterEntryNumber} to "${status}"`,
+          linkTo: "/case-management",
+        },
+        req.user.user_id,
+      );
+    }
     return res.status(200).json({
       success: true,
       message: "Case status updated successfully",
@@ -496,8 +514,10 @@ const getCaseById = async (req, res) => {
     }
 
     // Get notes
-    const isAdmin = req.user.role === "Administrator" || req.user.role === "Technical Administrator";
-     const notes = await pool.query(
+    const isAdmin =
+      req.user.role === "Administrator" ||
+      req.user.role === "Technical Administrator";
+    const notes = await pool.query(
       `SELECT cn.id, cn.note, cn.note_date,
 to_char(cn.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
 to_char(cn.edited_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS edited_at,
@@ -568,37 +588,42 @@ const addNote = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-const theCase = caseResult.rows[0];
-const blotterRow = await pool.query(
-  `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
-  [theCase.blotter_id]
-);
-const blotterEntryNumber = blotterRow.rows[0]?.blotter_entry_number || theCase.case_number;
-const assignedIoId = theCase.assigned_io_id;
+    const theCase = caseResult.rows[0];
+    const blotterRow = await pool.query(
+      `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
+      [theCase.blotter_id],
+    );
+    const blotterEntryNumber =
+      blotterRow.rows[0]?.blotter_entry_number || theCase.case_number;
+    const assignedIoId = theCase.assigned_io_id;
 
-// Notify investigator if someone else added the note
-if (assignedIoId && assignedIoId !== req.user.user_id) {
-  await createNotification({
-    recipientId: assignedIoId,
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "CASE_ASSIGNED",
-    title: "New Note Added",
-    message: `${req.user.username} added a note to ${blotterEntryNumber}`,
-    linkTo: "/case-management",
-  });
-}
-// Notify admins if investigator added the note
-if (req.user.role === "Investigator") {
-  await notifyAllByRole(["Administrator", "Technical Administrator"], {
-    senderId: req.user.user_id,
-    senderName: req.user.username,
-    type: "CASE_ASSIGNED",
-    title: "New Note Added",
-    message: `${req.user.username} added a note to ${blotterEntryNumber}`,
-    linkTo: "/case-management",
-  }, req.user.user_id);
-}
+    // Notify investigator if someone else added the note
+    if (assignedIoId && assignedIoId !== req.user.user_id) {
+      await createNotification({
+        recipientId: assignedIoId,
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "CASE_ASSIGNED",
+        title: "New Note Added",
+        message: `${req.user.username} added a note to ${blotterEntryNumber}`,
+        linkTo: "/case-management",
+      });
+    }
+    // Notify admins if investigator added the note
+    if (req.user.role === "Investigator") {
+      await notifyAllByRole(
+        ["Administrator", "Technical Administrator"],
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "CASE_ASSIGNED",
+          title: "New Note Added",
+          message: `${req.user.username} added a note to ${blotterEntryNumber}`,
+          linkTo: "/case-management",
+        },
+        req.user.user_id,
+      );
+    }
     return res.status(201).json({
       success: true,
       message: "Note added",
@@ -649,6 +674,41 @@ const updatePriority = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
+
+    const blotterRow = await pool.query(
+      `SELECT blotter_entry_number FROM blotter_entries WHERE blotter_id = $1`,
+      [caseResult.rows[0].blotter_id],
+    );
+    const blotterEntryNumber =
+      blotterRow.rows[0]?.blotter_entry_number || result.rows[0].case_number;
+
+    const assignedIoId = caseResult.rows[0].assigned_io_id;
+    if (assignedIoId && assignedIoId !== req.user.user_id) {
+      await createNotification({
+        recipientId: assignedIoId,
+        senderId: req.user.user_id,
+        senderName: req.user.username,
+        type: "CASE_ASSIGNED",
+        title: "Case Priority Updated",
+        message: `${blotterEntryNumber} priority changed to "${priority}"`,
+        linkTo: "/case-management",
+      });
+    }
+    if (req.user.role === "Investigator") {
+      await notifyAllByRole(
+        ["Administrator", "Technical Administrator"],
+        {
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "CASE_ASSIGNED",
+          title: "Case Priority Updated",
+          message: `${req.user.username} updated ${blotterEntryNumber} priority to "${priority}"`,
+          linkTo: "/case-management",
+        },
+        req.user.user_id,
+      );
+    }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

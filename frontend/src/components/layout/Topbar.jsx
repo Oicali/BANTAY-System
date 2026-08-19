@@ -20,6 +20,7 @@ const LINK_MAP = {
   "/case-management": "/case-management",
   "/patrol-scheduling": "/patrol-scheduling",
   "/crime-dashboard": "/crime-dashboard",
+  "/user-management": "/user-management",
 };
 
 // ── Notification Toast ──────────────────────────────────────────────────────
