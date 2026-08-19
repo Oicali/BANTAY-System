@@ -69,9 +69,9 @@ export default function PageLayout() {
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
 
         {/* CONTENT AREA - This is where views change */}
-        <div className="content-wrapper">
+        <main className="content-wrapper">
           <Outlet />
-        </div>
+        </main>
       </div>
     </div>
   );

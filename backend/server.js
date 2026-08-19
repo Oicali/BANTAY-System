@@ -15,6 +15,7 @@ app.set("trust proxy", 1);
 const allowedOrigins = [
   ...(process.env.FRONTEND_URL || "").split(",").map(url => url.trim()),
   "http://localhost:5173", // Vite dev server
+  "http://localhost:4173",// Vite preview server
   "http://localhost:8081"  // React Native Android emulator
 ].filter(Boolean);
 
