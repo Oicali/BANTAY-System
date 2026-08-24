@@ -35,6 +35,7 @@ import PdfPreviewModal from "../modals/PdfPreviewModal";
 // ─── FEATURE FLAGS ────────────────────────────────────────────────────────────
 const SHOW_MONTHLY_DELTAS = false; // Set to false to hide all "vs last month" deltas
 const SHOW_BACKTEST_REPORT = true;
+const SHOW_UI_ALERT_BLINK = true; // Set to false to disable the red blink on "Under Investigation" when count >= 1
 
 // ─── DEFAULT DATE RANGE ────────────────────────────────────────────────────
 // Change this to "this_month" to switch the default range back — every
@@ -127,7 +128,7 @@ const CRIME_LABEL = {
 };
 
 const CRIME_COLORS = {
-  Total: "#0a1628",
+  Total: "#1e3a5f",
   MURDER: "#ef4444",
   HOMICIDE: "#f97316",
   "PHYSICAL INJURY": "#eab308",
@@ -867,6 +868,8 @@ const SummaryCards = ({ data, prevSummary, isThisMonth }) => {
         }
       : null;
 
+  const isUIAlert = SHOW_UI_ALERT_BLINK && t.ui >= 1;
+
   const currCCE = parseFloat(pct(t.cleared + t.solved, t.total));
   const prevCCE = prev
     ? parseFloat(pct(prev.cleared + prev.solved, prev.total))
@@ -906,6 +909,7 @@ const SummaryCards = ({ data, prevSummary, isThisMonth }) => {
       color: "amber",
       sub: "Pending resolution",
       delta: <Delta curr={t.ui} prevVal={prev?.ui} goodWhenUp={false} />,
+      alert: isUIAlert,
     },
   ];
 
@@ -914,14 +918,19 @@ const SummaryCards = ({ data, prevSummary, isThisMonth }) => {
       {cards.map((c, i) => {
         const Icon = CARD_ICONS[c.color];
         return (
-          <div key={i} className={`cd-summary-card cd-card-${c.color}`}>
+          <div
+            key={i}
+            className={`cd-summary-card cd-card-${c.color} ${c.alert ? "cd-card-alert-blink" : ""}`}
+          >
             <div className="cd-summary-card-top">
               <div className="cd-summary-icon-wrap">
                 <Icon size={20} strokeWidth={2} />
               </div>
               <span className="cd-summary-sub">{c.sub}</span>
             </div>
-            <div className="cd-summary-value">{c.value}</div>
+            <div className={`cd-summary-value ${c.alert ? "cd-value-alert-blink" : ""}`}>
+              {c.value}
+            </div>
             <div className="cd-summary-label">{c.label}</div>
             {isThisMonth && SHOW_MONTHLY_DELTAS && (
               <div className="cd-delta-row">
@@ -1456,7 +1465,7 @@ const CrimeTrends = ({ appliedFilters, data }) => {
         >
           <LineChart
             data={chartData}
-            margin={{ top: 10, right: 24, left: 0, bottom: 10 }}
+            margin={{ top: 28, right: 24, left: 0, bottom: 10 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
@@ -1467,6 +1476,7 @@ const CrimeTrends = ({ appliedFilters, data }) => {
             <YAxis
               tick={{ fontSize: 11, fill: "#6b7280" }}
               allowDecimals={false}
+              domain={[0, (dataMax) => Math.ceil(dataMax * 1.25) || 1]}
             />
             <Tooltip content={<TrendsTooltip />} />
 
@@ -1481,7 +1491,17 @@ const CrimeTrends = ({ appliedFilters, data }) => {
                   : false
               }
               activeDot={{ r: 5, fill: CRIME_COLORS.Total }}
-            />
+            >
+              {data.length <= 24 && (
+                <LabelList
+                  dataKey="Total"
+                  position="top"
+                  offset={12}
+                  style={{ fontSize: 11, fontWeight: 700, fill: "#1e3a5f" }}
+                  formatter={(v) => (v ? v : "")}
+                />
+              )}
+            </Line>
 
             {activeCrimes.map((key) => (
               <Line
@@ -1572,7 +1592,7 @@ const CrimeClock = ({ data }) => (
     <ResponsiveContainer width="100%" height={240}>
       <LineChart
         data={data}
-        margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+        margin={{ top: 28, right: 20, left: 0, bottom: 10 }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis
@@ -1613,7 +1633,15 @@ const CrimeClock = ({ data }) => (
           }}
           activeDot={{ r: 5 }}
           connectNulls={true}
-        />
+        >
+          <LabelList
+            dataKey="count"
+            position="top"
+            offset={12}
+            style={{ fontSize: 10, fontWeight: 700, fill: "#1e3a5f" }}
+            formatter={(v) => (v ? v : "")}
+          />
+        </Line>
       </LineChart>
     </ResponsiveContainer>
   </div>
