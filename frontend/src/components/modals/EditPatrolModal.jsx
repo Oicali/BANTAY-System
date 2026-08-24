@@ -649,6 +649,30 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
         return;
       }
 
+      // ── Aggregate newly-added patrollers across all saved dates into ONE notification per officer ──
+      const assignmentMap = {};
+      patrollerDatestoSave.forEach((date, idx) => {
+        const { am = [], pm = [] } = patrollerResults[idx]?.newlyAdded || {};
+        am.forEach((pid) => {
+          (assignmentMap[pid] ??= { dates: [], shifts: [] });
+          assignmentMap[pid].dates.push(date);
+          assignmentMap[pid].shifts.push("AM");
+        });
+        pm.forEach((pid) => {
+          (assignmentMap[pid] ??= { dates: [], shifts: [] });
+          assignmentMap[pid].dates.push(date);
+          assignmentMap[pid].shifts.push("PM");
+        });
+      });
+
+      if (Object.keys(assignmentMap).length > 0) {
+        fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/notify-assignments`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+          body:    JSON.stringify({ assignments: assignmentMap }),
+        }).catch((err) => console.error("notify-assignments error:", err));
+      }
+
       clearDirty();
 
       // 4. Save patrol info + barangays

@@ -1056,6 +1056,24 @@ body {
   background: linear-gradient(135deg, #92400e, #f59e0b);
 }
 
+@keyframes cd-value-blink {
+  0%, 100% {
+    color: #ffffff;
+    text-shadow: none;
+    transform: scale(1);
+  }
+  50% {
+    color: #ff1a1a;
+    text-shadow: 0 0 12px rgba(255, 26, 26, 0.9), 0 0 22px rgba(255, 26, 26, 0.6);
+    transform: scale(1.08);
+  }
+}
+
+.cd-value-alert-blink {
+  display: inline-block;
+  animation: cd-value-blink 0.7s steps(1, end) infinite;
+}
+
 .cd-summary-card-top {
   display: flex;
   justify-content: space-between;

@@ -1025,43 +1025,15 @@ const updatePatrollersForDate = async (req, res) => {
       ipAddress: getClientIp(req),
     });
 
-    // ── Notify only NEWLY added patrollers (not ones already on this date) ──
+    // ── Just compute what's newly added; notification is sent once, later, by the caller ──
     const newlyAddedAM = (patroller_ids_am || []).filter((pid) => !existingAM.has(pid));
     const newlyAddedPM = (patroller_ids_pm || []).filter((pid) => !existingPM.has(pid));
-    const newlyAddedIds = [...new Set([...newlyAddedAM, ...newlyAddedPM])];
 
-    if (newlyAddedIds.length > 0) {
-      const patrolInfo = await pool.query(
-        `SELECT patrol_name FROM patrol_assignment WHERE patrol_id=$1`,
-        [id],
-      );
-      const patrolName = patrolInfo.rows[0]?.patrol_name || `Patrol #${id}`;
-
-      const officerResult = await pool.query(
-        `SELECT ap.active_patroller_id, ap.officer_id FROM active_patroller ap
-         WHERE ap.active_patroller_id = ANY($1::int[])`,
-        [newlyAddedIds],
-      );
-
-      await Promise.all(
-        officerResult.rows.map((row) => {
-          const shiftLabel = newlyAddedAM.includes(row.active_patroller_id)
-            ? "AM"
-            : "PM";
-          return createNotification({
-            recipientId: row.officer_id,
-            senderId: req.user.user_id,
-            senderName: req.user.username,
-            type: "PATROL_ASSIGNED",
-            title: "Added to Patrol Schedule",
-            message: `You have been added to patrol "${patrolName}" (${shiftLabel} shift) on ${date}`,
-            linkTo: "/patrol-scheduling",
-          });
-        }),
-      );
-    }
-
-    res.json({ success: true, message: "Patrollers updated for date." });
+    res.json({
+      success: true,
+      message: "Patrollers updated for date.",
+      newlyAdded: { am: newlyAddedAM, pm: newlyAddedPM },
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Update patrollers for date error:", error);
@@ -1072,6 +1044,60 @@ const updatePatrollersForDate = async (req, res) => {
     client.release();
   }
 };
+
+// ─────────────────────────────────────────────
+// POST /patrol/patrols/:id/notify-assignments
+// Sends ONE consolidated notification per officer, aggregating
+// all dates/shifts they were newly added to in a single save.
+// ─────────────────────────────────────────────
+const notifyNewPatrolAssignments = async (req, res) => {
+  const { id } = req.params;
+  const { assignments } = req.body; // { [active_patroller_id]: { dates: string[], shifts: string[] } }
+  const ids = Object.keys(assignments || {}).map(Number);
+  if (ids.length === 0) return res.json({ success: true });
+
+  try {
+    const patrolInfo = await pool.query(
+      `SELECT patrol_name FROM patrol_assignment WHERE patrol_id=$1`,
+      [id],
+    );
+    const patrolName = patrolInfo.rows[0]?.patrol_name || `Patrol #${id}`;
+
+    const officerResult = await pool.query(
+      `SELECT active_patroller_id, officer_id FROM active_patroller
+       WHERE active_patroller_id = ANY($1::int[])`,
+      [ids],
+    );
+
+    await Promise.all(
+      officerResult.rows.map((row) => {
+        const info = assignments[row.active_patroller_id];
+        const dates = [...info.dates].sort();
+        const dateLabel = dates.length > 2
+          ? `${dates[0]} – ${dates[dates.length - 1]} (${dates.length} days)`
+          : dates.join(", ");
+        const shiftLabel = [...new Set(info.shifts)].join(" & ");
+
+        return createNotification({
+          recipientId: row.officer_id,
+          senderId: req.user.user_id,
+          senderName: req.user.username,
+          type: "PATROL_ASSIGNED",
+          title: "Added to Patrol Schedule",
+          message: `You've been added to patrol "${patrolName}" (${shiftLabel} shift) on ${dateLabel}`,
+          linkTo: "/patrol-scheduling",
+        });
+      }),
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("notifyNewPatrolAssignments error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
 // ─────────────────────────────────────────────
 // DELETE /patrol/patrols/:id   (soft delete)
 // ─────────────────────────────────────────────
@@ -1883,6 +1909,7 @@ module.exports = {
   createPatrol,
   updatePatrol,
   updatePatrollersForDate,
+  notifyNewPatrolAssignments,
   deletePatrol,
   getDeletedPatrols,
   restorePatrol,

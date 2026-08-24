@@ -21,6 +21,7 @@ const {
   createPatrol,
   updatePatrol,
   updatePatrollersForDate,
+  notifyNewPatrolAssignments,
   deletePatrol,
   getDeletedPatrols,
   restorePatrol,
@@ -66,6 +67,10 @@ router.delete("/patrols/:id", authenticate, deletePatrol);
 // PATCH /patrol/patrols/:id/patrollers/:date
 // Replace all patrollers for a specific patrol date
 router.patch("/patrols/:id/patrollers/:date", authenticate, updatePatrollersForDate);
+
+// POST /patrol/patrols/:id/notify-assignments
+// Send one consolidated notification per officer after a multi-date save
+router.post("/patrols/:id/notify-assignments", authenticate, notifyNewPatrolAssignments);
 
 // Routes / tasks
 router.patch ("/routes/:routeId/notes", authenticate, updateRouteNotes);
