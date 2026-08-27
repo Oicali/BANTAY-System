@@ -12,7 +12,7 @@
         { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://api.mapbox.com; img-src 'self' data: blob: https://res.cloudinary.com https://api.mapbox.com; font-src 'self' data:; connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://bantay-system-production.up.railway.app; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://api.mapbox.com; img-src 'self' data: blob: https://res.cloudinary.com https://api.mapbox.com; font-src 'self' data:; connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://bantay-system-production.up.railway.app; frame-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     }
