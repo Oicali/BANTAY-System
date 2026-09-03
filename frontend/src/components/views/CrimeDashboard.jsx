@@ -3143,14 +3143,7 @@ const handleGenerateAssessment = () => {
             <p className="cd-ai-helper-text">
               Generates an AI-powered EMPO QUAD assessment based on current
               filters.{" "}
-              <b>
-                More historical data improves forecast confidence and trend
-                accuracy.
-              </b>
-              <br />
-              <span className="cd-ai-forecast-note">
-                ⓘ Barangay risk scores use all available historical data regardless of the selected date filter.
-              </span>
+              
             </p>
           </div>
         )}
