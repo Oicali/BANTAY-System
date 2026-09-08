@@ -2875,7 +2875,18 @@ function EBlotter() {
       if (file.size > LIMITS.VIDEO_MAX_MB * 1024 * 1024) {
         return reject(`Video must be under ${LIMITS.VIDEO_MAX_MB}MB.`);
       }
-      resolve();
+      const url = URL.createObjectURL(file);
+      const vid = document.createElement("video");
+      vid.preload = "metadata";
+      vid.onloadedmetadata = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      vid.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject("Could not read video file.");
+      };
+      vid.src = url;
     });
 
   const validatePhotoFile = (file) => {
