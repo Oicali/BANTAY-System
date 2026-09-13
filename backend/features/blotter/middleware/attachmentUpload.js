@@ -19,6 +19,8 @@ const attachmentUpload = multer({
     "video/mp4",
     "video/webm",
     "video/quicktime",
+     "video/mov",      
+  "video/x-quicktime",
   ];
 
   const allowed = [...allowedImages, ...allowedVideos];
