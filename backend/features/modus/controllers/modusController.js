@@ -58,21 +58,22 @@ const createModus = async (req, res) => {
       .status(400)
       .json({ success: false, message: "Invalid crime type" });
 
-  const dup = await pool.query(
-    `SELECT id FROM crime_modus_reference WHERE UPPER(crime_type) = $1 AND LOWER(modus_name) = LOWER($2)`,
-    [crime_type.toUpperCase(), modus_name],
-  );
-  if (dup.rows.length > 0)
-    return res.status(400).json({
-      success: false,
-      message: "Modus already exists for this crime type",
-    });
-
-  const result = await pool.query(
+  let result;
+try {
+  result = await pool.query(
     `INSERT INTO crime_modus_reference (crime_type, modus_name, description, is_active)
      VALUES ($1, $2, $3, true) RETURNING *`,
     [crime_type.toUpperCase(), modus_name, description || null],
   );
+} catch (err) {
+  if (err.code === "23505") {
+    return res.status(409).json({
+      success: false,
+      message: "Modus already exists for this crime type",
+    });
+  }
+  throw err;
+}
 
   await logAudit({
     userId: req.user?.user_id,

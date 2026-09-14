@@ -35,12 +35,13 @@ const createCase = async (req, res) => {
       });
 
     const year = new Date().getFullYear();
-    const countResult = await pool.query(
-      "SELECT COUNT(*) FROM cases WHERE EXTRACT(YEAR FROM created_at) = $1",
-      [year],
-    );
-    const count = parseInt(countResult.rows[0].count) + 1;
-    const case_number = `CASE-${year}-${String(count).padStart(4, "0")}`;
+const seqResult = await pool.query(
+  `INSERT INTO case_number_seq (year, seq) VALUES ($1, 1)
+   ON CONFLICT (year) DO UPDATE SET seq = case_number_seq.seq + 1
+   RETURNING seq`,
+  [year]
+);
+const case_number = `CASE-${year}-${String(seqResult.rows[0].seq).padStart(4, "0")}`;
 
     const reportedDate =
       blotter.rows[0].date_time_reported ||

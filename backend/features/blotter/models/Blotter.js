@@ -7,24 +7,17 @@ const {
 
 class Blotter {
   // Generate blotter entry number
-  static async generateBlotterNumber(incidentDate) {
-    const year = incidentDate
-      ? new Date(incidentDate).getFullYear()
-      : new Date().getFullYear();
-
-    const result = await pool.query(
-      `SELECT COUNT(*) as count FROM blotter_entries 
-     WHERE EXTRACT(YEAR FROM created_at) = $1
-     AND blotter_entry_number NOT LIKE 'SEED-%'
-     AND blotter_entry_number NOT LIKE 'IMP-%'`,
-      [year],
-    );
-
-    const count = parseInt(result.rows[0].count) + 1;
-    const sequencePart = count.toString().padStart(6, "0");
-
-    return `${year}-${sequencePart}`;
-  }
+  static async generateBlotterNumber(incidentDate, client = pool) {
+  const year = incidentDate ? new Date(incidentDate).getFullYear() : new Date().getFullYear();
+  const seqResult = await client.query(
+    `INSERT INTO blotter_number_seq (year, seq) VALUES ($1, 1)
+     ON CONFLICT (year) DO UPDATE SET seq = blotter_number_seq.seq + 1
+     RETURNING seq`,
+    [year]
+  );
+  const seq = seqResult.rows[0].seq;
+  return `${year}-${seq.toString().padStart(6, "0")}`;
+}
   static async generateImportNumber(year) {
     const importYear = year || new Date().getFullYear();
 
@@ -46,9 +39,7 @@ class Blotter {
       await client.query("BEGIN");
 
       // Generate blotter number
-      const blotterNumber = await this.generateBlotterNumber(
-        blotterData.date_time_commission,
-      );
+     const blotterNumber = await this.generateBlotterNumber(blotterData.date_time_commission, client);
 
       console.log("date_time_commission:", blotterData.date_time_commission);
 

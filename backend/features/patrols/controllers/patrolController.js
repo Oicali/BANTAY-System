@@ -668,8 +668,11 @@ const createPatrol = async (req, res) => {
     });
   }
 
-  const client = await pool.connect();
+ const client = await pool.connect();
   try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [mobile_unit_id]);
+
     const allIds = [
       ...new Set([...(patroller_ids_am || []), ...(patroller_ids_pm || [])]),
     ];
@@ -718,7 +721,6 @@ if (mobileConflict.rows.length > 0) {
   });
 }
 
-await client.query("BEGIN");
 
     const patrolResult = await client.query(
       `INSERT INTO patrol_assignment (patrol_name, mobile_unit_id, start_date, end_date, created_by)

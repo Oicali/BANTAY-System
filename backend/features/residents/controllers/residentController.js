@@ -127,7 +127,7 @@ const importResidents = async (req, res) => {
           skipped++;
           continue; // ← old record untouched, this row not inserted
         }
-
+try {
         await client.query(
           `INSERT INTO barangay_residents
             (barangay_code, first_name, middle_name, last_name, qualifier,
@@ -150,8 +150,15 @@ const importResidents = async (req, res) => {
           ],
         );
         inserted++;
+      }catch (err) {
+  if (err.code === "23505") {
+    errors.push({ row: i + 2, message: `${firstName} ${lastName} already exists — kept existing record` });
+    skipped++;
+    continue;
+  }
+  throw err;
+}
       }
-
       await client.query("COMMIT");
       await logAudit({
         userId: req.user?.user_id,

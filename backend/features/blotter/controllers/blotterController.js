@@ -1582,17 +1582,23 @@ const importBlotters = async (req, res) => {
       }
 
       await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      console.error("Import transaction error:", err);
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-        detail: err.detail || null,
-        column: err.column || null,
-        table: err.table || null,
-      });
-    } finally {
+   } catch (err) {
+  await client.query("ROLLBACK");
+  console.error("Import transaction error:", err);
+
+  if (err.code === "23505") {
+    return res.status(409).json({
+      success: false,
+      message: "Import conflicted with another import happening at the same time. Please try again.",
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: "Import failed due to a server error. Please try again.",
+    detail: err.detail || null,
+  });
+}finally {
       client.release();
     }
 
