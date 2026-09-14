@@ -789,7 +789,9 @@ function EBlotter() {
       try {
         const response = await fetch(`${API_URL}/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          },
         });
         const data = await response.json();
         if (data.success) {
@@ -811,7 +813,9 @@ function EBlotter() {
       try {
         const response = await fetch(`${API_URL}/${id}/restore`, {
           method: "PUT",
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          },
         });
         const data = await response.json();
         if (data.success) {
@@ -844,7 +848,9 @@ function EBlotter() {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
         {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          },
         },
       );
       const data = await res.json();
@@ -8733,17 +8739,19 @@ function EBlotter() {
           </span>
         </div>
         <div className="eb-filter-single-row">
-          <div className="eb-filter-group">
-            <label className="eb-filter-label">Search</label>
-            <input
-              type="text"
-              className="eb-filter-input"
-              placeholder="Search by Report ID"
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-            />
-          </div>
+          {activeReportTab !== "referred" && (
+            <div className="eb-filter-group">
+              <label className="eb-filter-label">Search</label>
+              <input
+                type="text"
+                className="eb-filter-input"
+                placeholder="Search by Report ID"
+                name="search"
+                value={filters.search}
+                onChange={handleFilterChange}
+              />
+            </div>
+          )}
           {activeReportTab !== "referred" && (
             <div className="eb-filter-group">
               <label className="eb-filter-label">Status</label>
