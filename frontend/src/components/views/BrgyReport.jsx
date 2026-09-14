@@ -91,7 +91,7 @@ function BrgyReport() {
     fetchMyReports();
     setLoadingProfile(true);
     fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
     })
       .then((res) => res.json())
       .then((data) => {
@@ -121,7 +121,7 @@ function BrgyReport() {
     try {
       setLoadingReports(true);
       const res = await fetch(`${API_URL}/brgy-reports/mine`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       });
       const data = await res.json();
       if (data.success) setReports(data.data);
@@ -139,7 +139,7 @@ function BrgyReport() {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/residents?${params}`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
         },
       );
       const data = await res.json();
@@ -234,7 +234,7 @@ function BrgyReport() {
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
             body: formData,
           },
@@ -273,7 +273,7 @@ function BrgyReport() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
           body: JSON.stringify({ narrative: narrativeText }),
         },
@@ -423,7 +423,7 @@ function BrgyReport() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
         body: JSON.stringify({
           ...form,

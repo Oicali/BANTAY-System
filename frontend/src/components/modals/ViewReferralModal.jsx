@@ -108,7 +108,7 @@ export default function ViewReferralModal({
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const [detailRes, attRes] = await Promise.all([
           fetch(`${API_URL}/${blotterId}`, {
             headers: { Authorization: `Bearer ${token}` },

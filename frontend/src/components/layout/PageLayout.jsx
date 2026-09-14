@@ -25,7 +25,7 @@ export default function PageLayout() {
   };
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
 
     try {
       await fetch(`${API_URL}/auth/logout`, {

@@ -2,31 +2,29 @@
 export const API_URL = import.meta.env.VITE_API_URL;
 export const logout = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem("token");
 
-    
-    
     if (token) {
       // Call backend logout to revoke token
       await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
     }
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error("Logout error:", error);
   } finally {
     // Always clear local storage
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
-    localStorage.removeItem('profilePicture');
-    
-    window.location.href = '/login';
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("role");
+    sessionStorage.removeItem("userType");
+    sessionStorage.removeItem("userId");
+    sessionStorage.removeItem("username");
+    sessionStorage.removeItem("profilePicture");
+
+    window.location.href = "/login";
   }
 };
 
@@ -39,7 +37,7 @@ export const logout = async () => {
 // ⚠️ WEAK SECURITY PRACTICE: Using window.location instead of React Router
 
 export const isAuthenticated = () => {
-  return !!localStorage.getItem('token');
+  return !!sessionStorage.getItem("token");
 };
 
 // ✅ Check if user is logged in
@@ -53,7 +51,7 @@ export const isAuthenticated = () => {
 //    Better: Verify token with backend or check expiration
 
 export const getToken = () => {
-  return localStorage.getItem('token');
+  return sessionStorage.getItem("token");
 };
 
 // 🎫 Retrieve the JWT token
@@ -66,16 +64,16 @@ export const getToken = () => {
 //    })
 
 export const getUserFromToken = () => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem("token");
   if (!token) return null;
 
   // 🎫 Extract user information from JWT token
   // 📝 Retrieves token from localStorage
   // 🔗 If no token: Returns null
   // 🔗 If token exists: Decodes below
-  
+
   try {
-    const base64Url = token.split('.')[1];
+    const base64Url = token.split(".")[1];
 
     // 🔍 Extract payload from JWT token
     // 📝 JWT Structure: header.payload.signature
@@ -88,7 +86,7 @@ export const getUserFromToken = () => {
     //
     // 🔗 Next Step: Decode base64 → Continue below
 
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
 
     // 🔄 Convert URL-safe base64 to standard base64
     // 📝 JWT uses URL-safe base64 (- instead of +, _ instead of /)
@@ -96,9 +94,9 @@ export const getUserFromToken = () => {
 
     const jsonPayload = decodeURIComponent(
       atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
     );
 
     // 🔓 Decode base64 to JSON string
@@ -121,7 +119,7 @@ export const getUserFromToken = () => {
     //
     // 🔗 Next Step: Return user data → Continue below
 
-    return decoded.user || decoded;  
+    return decoded.user || decoded;
 
     // 👤 Return the user object
     // 📝 Returns decoded.user if exists (old format) or decoded (current format)
@@ -129,9 +127,8 @@ export const getUserFromToken = () => {
     // 📊 Returned data: { user_id, username, email, role }
     // 🔗 Used by: Dashboard, Profile page, Navigation
     // 🔗 Also used by: roleAccess checks → STEP 30
-    
   } catch (error) {
-    console.error('Error decoding token:', error);
+    console.error("Error decoding token:", error);
     return null;
 
     // ❌ Handle token decoding errors

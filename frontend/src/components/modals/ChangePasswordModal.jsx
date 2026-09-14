@@ -153,7 +153,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -249,7 +249,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
             "cpm_session_locked",
             JSON.stringify({ until: lockUntil }),
           );
-          const token = localStorage.getItem("token");
+          const token = sessionStorage.getItem("token");
           fetch(`${API_URL}/users/password/force-lock`, {
             method: "POST",
             headers: {
@@ -325,7 +325,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setIsVerifying(true);
     setCurrentPwError("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/verify-current`, {
         method: "POST",
         headers: {
@@ -397,7 +397,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setPasswordErrors({});
     setRateLimitMsg("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: {
@@ -468,7 +468,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpLoading(true);
     setOtpError("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/verify-otp`, {
         method: "POST",
         headers: {
@@ -529,7 +529,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpBoxes(["", "", "", "", "", ""]);
     setIsSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: {

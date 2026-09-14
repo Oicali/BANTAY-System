@@ -235,7 +235,7 @@ const TopBar = ({ onMenuClick }) => {
 
   const fetchProfileData = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const cached = localStorage.getItem("cachedProfile");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -260,7 +260,7 @@ const TopBar = ({ onMenuClick }) => {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) return;
       const res = await fetch(`${API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -319,7 +319,7 @@ const TopBar = ({ onMenuClick }) => {
     setUnread(0);
     prevUnreadRef.current = 0;
     // API in background
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     fetch(`${API_URL}/notifications/read-all`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
@@ -335,7 +335,7 @@ const TopBar = ({ onMenuClick }) => {
     setUnread((prev) => Math.max(0, prev - 1));
     prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
     // API in background
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     fetch(`${API_URL}/notifications/${notif.id}/read`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },

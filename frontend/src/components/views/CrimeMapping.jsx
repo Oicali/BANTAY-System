@@ -10,7 +10,7 @@ import {
 import LoadingModal from "../modals/LoadingModal";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-map`;
-const getToken = () => localStorage.getItem("token");
+const getToken = () => sessionStorage.getItem("token");
 
 const INCIDENT_COLORS = {
   ROBBERY: "#ef4444",
@@ -778,7 +778,7 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
   );
 };
 function CrimeMapping() {
-  const rawUser = localStorage.getItem("user");
+  const rawUser = sessionStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
   const isInvestigator =

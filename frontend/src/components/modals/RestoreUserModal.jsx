@@ -94,7 +94,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     // Source of truth: ask the backend
     (async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}/user-management/reauth-status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -149,7 +149,7 @@ const RestoreUserModal = ({ isOpen, onClose, user, onUserRestored }) => {
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
 
       const response = await fetch(
         `${API_URL}/user-management/users/${user.user_id}/restore`,

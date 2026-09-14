@@ -399,7 +399,7 @@ function EBlotter() {
 
   useEffect(() => {
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (token) {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.user_id);
@@ -417,7 +417,7 @@ function EBlotter() {
     const res = await fetch(
       `${import.meta.env.VITE_API_URL}/blotters/referred/count`,
       {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       },
     );
     const data = await res.json();
@@ -430,7 +430,7 @@ function EBlotter() {
     setShowExportModal(false);
     setIsExportLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters?date_from=${dateFrom}&date_to=${dateTo}&referred=false`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -470,7 +470,7 @@ function EBlotter() {
     const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min client-side cap
 
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters/export`,
         {
@@ -547,7 +547,7 @@ function EBlotter() {
 
     const skipCount = (() => {
       try {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         if (!token) return false;
         const payload = JSON.parse(atob(token.split(".")[1]));
         return payload.role === "Patrol";
@@ -559,7 +559,7 @@ function EBlotter() {
 
     const interval = setInterval(() => {
       try {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         if (!token) return;
         const payload = JSON.parse(atob(token.split(".")[1]));
         const role = payload.role;
@@ -570,7 +570,7 @@ function EBlotter() {
           // Refresh reminder IDs so admin-sent reminders show up within 30s
           fetch(`${import.meta.env.VITE_API_URL}/blotters/reminder-ids`, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           })
             .then((r) => r.json())
@@ -650,7 +650,7 @@ function EBlotter() {
 
       const rawResponse = await fetch(`${API_URL}?${queryParams}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
         signal: controller.signal,
       });
@@ -757,7 +757,7 @@ function EBlotter() {
     try {
       setTrashLoading(true);
       const response = await fetch(`${API_URL}/deleted/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       });
       const data = await response.json();
       if (data.success) setDeletedBlotters(data.data);
@@ -789,7 +789,7 @@ function EBlotter() {
       try {
         const response = await fetch(`${API_URL}/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
         });
         const data = await response.json();
         if (data.success) {
@@ -811,7 +811,7 @@ function EBlotter() {
       try {
         const response = await fetch(`${API_URL}/${id}/restore`, {
           method: "PUT",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
         });
         const data = await response.json();
         if (data.success) {
@@ -844,7 +844,7 @@ function EBlotter() {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
         },
       );
       const data = await res.json();
@@ -968,7 +968,7 @@ function EBlotter() {
           `${import.meta.env.VITE_API_URL}/patrol/my-patrols`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           },
         );
@@ -995,7 +995,7 @@ function EBlotter() {
               `${import.meta.env.VITE_API_URL}/blotters/reminder-ids`,
               {
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                 },
               },
             );
@@ -1024,7 +1024,7 @@ function EBlotter() {
           const queryParams = new URLSearchParams({ referred: "true" });
           fetch(`${import.meta.env.VITE_API_URL}/blotters?${queryParams}`, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           })
             .then((r) => r.json())
@@ -1061,7 +1061,7 @@ function EBlotter() {
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
       });
       const data = await response.json();
@@ -1107,7 +1107,7 @@ function EBlotter() {
               `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
               {
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                 },
               },
             );
@@ -1291,7 +1291,7 @@ function EBlotter() {
         try {
           const attRes = await fetch(`${API_URL}/${blotterId}/attachments`, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
             },
           });
           const attData = await attRes.json();
@@ -1313,7 +1313,7 @@ function EBlotter() {
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
       });
       const data = await response.json();
@@ -1354,7 +1354,7 @@ function EBlotter() {
               `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
               {
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                 },
               },
             );
@@ -1417,7 +1417,7 @@ function EBlotter() {
             `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/attachments`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${sessionStorage.getItem("token")}`,
               },
             },
           );
@@ -1440,7 +1440,7 @@ function EBlotter() {
     try {
       const response = await fetch(`${API_URL}/${blotterId}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
       });
       const data = await response.json();
@@ -1472,7 +1472,7 @@ function EBlotter() {
               `${import.meta.env.VITE_API_URL}/blotters/modus/${encodeURIComponent(crimeType)}`,
               {
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                 },
               },
             );
@@ -1625,7 +1625,7 @@ function EBlotter() {
             `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/attachments`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${sessionStorage.getItem("token")}`,
               },
             },
           );
@@ -1646,7 +1646,7 @@ function EBlotter() {
   const handleApiResponse = (response) => {
     if (response.status === 401) {
       alert("Your session has expired. Please log in again.");
-      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       window.location.href = "/login";
       return null;
     }
@@ -2523,7 +2523,7 @@ function EBlotter() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             blotterData: finalCaseDetail,
@@ -2547,7 +2547,7 @@ function EBlotter() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
           },
         });
         const data = await res.json();
@@ -2559,7 +2559,7 @@ function EBlotter() {
                 {
                   method: "DELETE",
                   headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                   },
                 },
               );
@@ -2575,7 +2575,7 @@ function EBlotter() {
               await fetch(`${API_URL}/${editingBlotterId}/attachments`, {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                 },
                 body: formData,
               });
@@ -2595,7 +2595,7 @@ function EBlotter() {
                 await fetch(`${API_URL}/${data.data.blotter_id}/attachments`, {
                   method: "POST",
                   headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                   },
                   body: formData,
                 });
@@ -2704,7 +2704,7 @@ function EBlotter() {
         method: method,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
         body: JSON.stringify(payload),
       });
@@ -2723,7 +2723,7 @@ function EBlotter() {
                 {
                   method: "DELETE",
                   headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    Authorization: `Bearer ${sessionStorage.getItem("token")}`,
                   },
                 },
               );
@@ -2740,7 +2740,7 @@ function EBlotter() {
             await fetch(`${API_URL}/${targetBlotterId}/attachments`, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                Authorization: `Bearer ${sessionStorage.getItem("token")}`,
               },
               body: formData,
             });
@@ -2776,7 +2776,7 @@ function EBlotter() {
     try {
       const response = await fetch(`${API_URL}/${blotterId}/respond`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       });
       const data = await response.json();
       if (data.success) {

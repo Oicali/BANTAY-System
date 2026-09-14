@@ -12,7 +12,7 @@ export default function Sidebar({
   sidebarOpen,
   onClose,
 }) {
-  const role = localStorage.getItem("role");
+  const role = sessionStorage.getItem("role");
   const isAdmin = role === "Administrator" || role === "Technical Administrator";
   const allowedTabs = roleAccess[role] || [];
   const [showLogoutModal, setShowLogoutModal] = useState(false);

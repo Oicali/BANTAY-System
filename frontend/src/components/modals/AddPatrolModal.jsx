@@ -89,7 +89,7 @@
 
       setLoadingPatrollers(true);
       fetch(`${API_BASE}/patrol/available-patrollers?start=${form.start_date}&end=${form.end_date}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       })
         .then((r) => r.json())
         .then((data) => { if (data.success) setAvailableForDates(data.data); })
@@ -104,7 +104,7 @@
     setLoadingMobileUnits(true);
     fetch(
       `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}`,
-      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      { headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` } }
     )
       .then((r) => r.json())
       .then((data) => { if (data.success) setAvailableMobileUnits(data.data); })

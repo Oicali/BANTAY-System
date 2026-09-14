@@ -38,10 +38,10 @@ const labelLayer = {
 };
 
 // ── Helpers ───────────────────────────────────────────────
-const token = () => localStorage.getItem("token");
+const token = () => sessionStorage.getItem("token");
 
 const getMyUserId = () => {
-  const raw = localStorage.getItem("token");
+  const raw = sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -53,7 +53,7 @@ const getMyUserId = () => {
 };
 
 const getMyRole = () => {
-  const raw = localStorage.getItem("token");
+  const raw = sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");

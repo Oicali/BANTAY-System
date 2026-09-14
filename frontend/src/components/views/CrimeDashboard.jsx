@@ -45,7 +45,7 @@ const DEFAULT_PRESET = "365d";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
-const getToken = () => localStorage.getItem("token");
+const getToken = () => sessionStorage.getItem("token");
 
 const STATUS_COLORS = {
   solved: "#22c55e",
@@ -2638,14 +2638,14 @@ const isCacheValid = (filters) =>
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const CrimeDashboard = () => {
-  const rawUser = localStorage.getItem("user");
+  const rawUser = sessionStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
   const isPatrol =
     currentUser?.role_name === "Patrol" || currentUser?.role === "Patrol";
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
-  const role = localStorage.getItem("role");
+  const role = sessionStorage.getItem("role");
   const isAdmin =
     role === "Administrator" || role === "Technical Administrator";
 

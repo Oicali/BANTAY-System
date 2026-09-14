@@ -13,7 +13,6 @@ import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import DataPrivacyModal from "../modals/DataPrivacyModal";
 
-
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Countdown helper (same format as ChangePasswordModal) ─────────────────
@@ -291,13 +290,12 @@ const LoginSystem = () => {
         return;
       }
 
-      localStorage.setItem("token", data.token);
+      sessionStorage.setItem("token", data.token);
       const decoded = jwtDecode(data.token);
-      console.log("Decoded JWT:", decoded);
-      localStorage.setItem("role", decoded.role);
-      localStorage.setItem("userId", decoded.user_id);
-      localStorage.setItem("username", decoded.username);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      sessionStorage.setItem("role", decoded.role);
+      sessionStorage.setItem("userId", decoded.user_id);
+      sessionStorage.setItem("username", decoded.username);
+      sessionStorage.setItem("user", JSON.stringify(data.user));
 
       setSuccess("Login successful!");
       setFormData((prev) => ({
@@ -767,7 +765,9 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="eye-toggle"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? (
                       <Eye size={20} />
@@ -804,18 +804,18 @@ const LoginSystem = () => {
                 <p>
                   <span className="notice-bold">Security Notice:</span> This
                   system is restricted to authorized personnel only. All access
-                  attempts are logged and monitored for security purposes. <span>
-<button
-                  type="button"
-                  onClick={() => setShowPrivacyModal(true)}
-                  className="link-button"
-                  style={{ fontSize: 13 }}
-                >
-                  View Data Privacy Statement
-                </button>
+                  attempts are logged and monitored for security purposes.{" "}
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivacyModal(true)}
+                      className="link-button"
+                      style={{ fontSize: 13 }}
+                    >
+                      View Data Privacy Statement
+                    </button>
                   </span>
                 </p>
-                
               </div>
             </div>
           )}
@@ -1169,7 +1169,9 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="eye-toggle"
-                    aria-label={showNewPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showNewPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showNewPassword ? (
                       <Eye size={20} />
@@ -1200,7 +1202,9 @@ const LoginSystem = () => {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="eye-toggle"
-                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showConfirmPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showConfirmPassword ? (
                       <Eye size={20} />

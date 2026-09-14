@@ -23,7 +23,7 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
   try {
     const response = await fetch(`${import.meta.env.VITE_API_URL}/blotters/patrols`, {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
       },
     });
     const data = await response.json();
@@ -74,7 +74,7 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
         },
         body: JSON.stringify({ patrol_ids: selectedPatrols }),
       });

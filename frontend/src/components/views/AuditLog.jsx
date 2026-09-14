@@ -401,7 +401,7 @@ const AuditLog = () => {
   const isDirty = JSON.stringify(draft) !== JSON.stringify(appliedFilters);
 
   // Near the top of the AuditLog component, after the state declarations
-  const rawUser = localStorage.getItem("user");
+  const rawUser = sessionStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const RESTRICTED_ROLES = [
     "Brgy. Captain",
@@ -423,7 +423,7 @@ const AuditLog = () => {
     async (page = 1) => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const params = new URLSearchParams();
         params.set("page", page);
         params.set("limit", ITEMS_PER_PAGE);
@@ -501,7 +501,7 @@ const AuditLog = () => {
   const handleExportCSV = async () => {
     setIsExporting(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       let all = [];
       let page = 1;
       const limit = 100; // backend max

@@ -107,11 +107,11 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 };
 
 const PatrolScheduling = () => {
-  const token = () => localStorage.getItem("token");
+  const token = () => sessionStorage.getItem("token");
   const [isAdmin] = useState(
     () =>
-      localStorage.getItem("role") === "Administrator" ||
-      localStorage.getItem("role") === "Technical Administrator",
+      sessionStorage.getItem("role") === "Administrator" ||
+      sessionStorage.getItem("role") === "Technical Administrator",
   );
 
   const [patrols, setPatrols] = useState([]);
@@ -395,7 +395,7 @@ const handleRestore = async (id) => {
   const handleExportListClick = async () => {
     if (isExporting) return;
     try {
-      const authToken = localStorage.getItem("token");
+      const authToken = sessionStorage.getItem("token");
       const response = await fetch(`${API_BASE}/patrol/export/list`, {
         method: "POST",
         headers: {

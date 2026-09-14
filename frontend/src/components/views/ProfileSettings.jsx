@@ -418,7 +418,7 @@ export default function ProfileSettings() {
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) {
         setLoading(false);
         return;
@@ -470,7 +470,7 @@ export default function ProfileSettings() {
   const silentRefresh = useCallback(async () => {
     if (isEditingRef.current) return;
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) return;
       const res = await fetch(`${API_URL}/users/profile`, {
         headers: {
@@ -642,7 +642,7 @@ export default function ProfileSettings() {
     setIsUploadingPhoto(true);
     setErrorMessage("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const fd = new FormData();
       fd.append("profilePicture", croppedFile);
       const res = await fetch(`${API_URL}/users/profile/picture`, {
@@ -769,7 +769,7 @@ export default function ProfileSettings() {
     if (!clean.startsWith("9")) return `${fieldName} must start with 9`;
     if (origPhone && clean === origPhone.replace(/\D/g, "")) return null;
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/check-phone`, {
         method: "POST",
         headers: {
@@ -1001,7 +1001,7 @@ const handlePhoneInput = (e) => {
           setEmailSessionLockedCountdown(fmtCountdown(lockUntil - Date.now()));
           writeEmailLock(EMAIL_LOCK_KEYS.session, lockUntil);
           // FIX: Persist lock to backend so it survives logout/re-login
-          const token = localStorage.getItem("token");
+          const token = sessionStorage.getItem("token");
           fetch(`${API_URL}/users/email/force-lock`, {
             method: "POST",
             headers: {
@@ -1102,7 +1102,7 @@ const handlePhoneInput = (e) => {
     // The in-memory session store on the backend survives logout/re-login
     // because it is keyed by userId, not by browser session.
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1195,7 +1195,7 @@ const handlePhoneInput = (e) => {
     setEmailModalErr("");
     setEmailPasswordErr("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-password`, {
         method: "POST",
         headers: {
@@ -1258,7 +1258,7 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/request-old-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -1316,7 +1316,7 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-old-otp`, {
         method: "POST",
         headers: {
@@ -1381,7 +1381,7 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/request-new-otp`, {
         method: "POST",
         headers: {
@@ -1444,7 +1444,7 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-new-otp`, {
         method: "POST",
         headers: {
@@ -1515,7 +1515,7 @@ const handlePhoneInput = (e) => {
     setSuccessMessage("");
     setErrorMessage("");
     try {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
       if (!token) {
         setErrorMessage("Authentication token not found.");
         setIsSaving(false);

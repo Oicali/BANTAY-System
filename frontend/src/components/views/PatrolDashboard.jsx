@@ -270,7 +270,7 @@ const DeleteConfirmDialog = ({ itemName, onConfirm, onCancel }) =>
 
 // ─────────────────────────────────────────────────────────────────────────────
 const PatrollerDashboard = () => {
-  const token = () => localStorage.getItem("token");
+  const token = () => sessionStorage.getItem("token");
 
   // ── State ──────────────────────────────────────────────
   const [loading, setLoading] = useState(true);

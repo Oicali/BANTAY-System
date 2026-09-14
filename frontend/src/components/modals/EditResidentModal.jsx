@@ -138,7 +138,7 @@ function EditResidentModal({ resident, onClose, onSuccess }) {
         `${import.meta.env.VITE_API_URL}/residents/${resident.resident_id}`,
         {
           method: "PUT",
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
           body: fd,
         },
       );

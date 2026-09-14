@@ -25,7 +25,7 @@ import ResidentManagement from "./components/views/ResidentManagement";
 import AuditLog from "./components/views/AuditLog";
 
 const getRole = () => {
-  const raw = localStorage.getItem("token");
+  const raw = sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");

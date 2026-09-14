@@ -6,11 +6,11 @@ import LoadingModal from "../modals/LoadingModal";
 
 const API_URL = `${import.meta.env.VITE_API_URL}/cases`;
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => sessionStorage.getItem("token");
 const getUser = () => ({
-  role: localStorage.getItem("role"),
-  user_id: localStorage.getItem("userId"),
-  username: localStorage.getItem("username"),
+  role: sessionStorage.getItem("role"),
+  user_id: sessionStorage.getItem("userId"),
+  username: sessionStorage.getItem("username"),
 });
 
 function CaseManagement() {

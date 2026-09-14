@@ -178,7 +178,7 @@ const UserManagement = () => {
   // ===================================================
   const fetchFilterOptions = async () => {
   try {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
     const res = await fetch(`${API_URL}/user-management/filter-options`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -209,7 +209,7 @@ const UserManagement = () => {
     async (page = 1) => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
 
         const params = new URLSearchParams();
         params.set("userType", activeTab === "police" ? "police" : "barangay");

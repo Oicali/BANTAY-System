@@ -130,7 +130,7 @@ const ApplyDatesDialog = ({ dateRange, activeDate, onConfirm, onCancel }) => {
 
 // ── Main Component ─────────────────────────────────────────────────
 const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) => {
-  const token           = () => localStorage.getItem("token");
+  const token           = () => sessionStorage.getItem("token");
   const mapRef          = useRef(null);
   const deletedRouteIds = useRef(new Set());
   const tasksDirty      = useRef(false);
