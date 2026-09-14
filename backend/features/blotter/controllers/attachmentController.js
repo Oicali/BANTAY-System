@@ -8,22 +8,17 @@ const MAX_VIDEOS = 3;
 // Upload to Cloudinary via stream
 const uploadToCloudinary = (buffer, folder, publicId, resourceType = "image") => {
   return new Promise((resolve, reject) => {
-   const uploadOpts = {
-  folder,
-  public_id: publicId,
-  resource_type: resourceType,
-  ...(resourceType === "image" && {
-    quality: "auto",
-    fetch_format: "auto",
-  }),
-};
+    const uploadOpts = {
+      folder,
+      public_id: publicId,
+      resource_type: resourceType,
+      ...(resourceType === "image" && {
+        quality: "auto",
+        fetch_format: "auto",
+      }),
+    };
 
-const stream = resourceType === "video"
-  ? cloudinary.uploader.upload_large_stream(
-      { ...uploadOpts, chunk_size: 6000000 }, // required for files >100MB
-      (error, result) => { if (error) reject(error); else resolve(result); }
-    )
-  : cloudinary.uploader.upload_stream(
+    const stream = cloudinary.uploader.upload_stream(
       uploadOpts,
       (error, result) => { if (error) reject(error); else resolve(result); }
     );
