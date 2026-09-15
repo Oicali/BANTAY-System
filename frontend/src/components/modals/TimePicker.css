@@ -20,9 +20,14 @@
   white-space: nowrap;
   min-width: 100px;
 }
-.tp-trigger:hover { border-color: #1e3a5f; }
+.tp-trigger:hover {
+  border-color: #1e3a5f;
+}
 
-.tp-value { font-weight: 600; letter-spacing: 0.5px; }
+.tp-value {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
 
 .tp-period-badge {
   font-size: 10px;
@@ -40,8 +45,6 @@
   color: #6c757d;
   flex-shrink: 0;
 }
-
-
 
 /* ── DROPDOWN ── */
 .tp-dropdown {
@@ -72,7 +75,9 @@
   flex-direction: column;
   flex: 1;
 }
-.tp-col-period { flex: 0 0 56px; }
+.tp-col-period {
+  flex: 0 0 56px;
+}
 
 .tp-col-label {
   font-size: 9px;
@@ -102,9 +107,16 @@
   scrollbar-width: thin;
   scrollbar-color: #dee2e6 transparent;
 }
-.tp-list::-webkit-scrollbar { width: 4px; }
-.tp-list::-webkit-scrollbar-track { background: transparent; }
-.tp-list::-webkit-scrollbar-thumb { background: #dee2e6; border-radius: 2px; }
+.tp-list::-webkit-scrollbar {
+  width: 4px;
+}
+.tp-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tp-list::-webkit-scrollbar-thumb {
+  background: #dee2e6;
+  border-radius: 2px;
+}
 
 /* ── LIST ITEMS ── */
 .tp-item {
@@ -116,18 +128,26 @@
   font-weight: 500;
   color: #495057;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   user-select: none;
   font-family: "Courier New", monospace;
 }
-.tp-item:hover { background: rgba(30, 58, 95, 0.06); color: #1e3a5f; }
+.tp-item:hover {
+  background: rgba(30, 58, 95, 0.06);
+  color: #1e3a5f;
+}
 .tp-item-active {
   background: #1e3a5f;
   color: #ffffff;
   font-weight: 700;
   border-radius: 0;
 }
-.tp-item-active:hover { background: #0a1628; color: #ffffff; }
+.tp-item-active:hover {
+  background: #0a1628;
+  color: #ffffff;
+}
 
 /* ── SEPARATOR ── */
 .tp-sep {
@@ -136,6 +156,12 @@
   color: #6c757d;
   padding-top: 44px;
   flex-shrink: 0;
+}
+
+.tp-trigger-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.03);
 }
 
 /* ── AM/PM COLUMN ── */
@@ -163,36 +189,42 @@
   user-select: none;
   letter-spacing: 0.3px;
 }
-.tp-period-item:hover { border-color: #1e3a5f; color: #1e3a5f; }
+.tp-period-item:hover {
+  border-color: #1e3a5f;
+  color: #1e3a5f;
+}
 .tp-period-active {
   background: #1e3a5f !important;
   color: #ffffff !important;
   border-color: #1e3a5f;
 }
-.tp-period-active:hover { background: #0a1628 !important; border-color: #0a1628; color: #ffffff !important; }
+.tp-period-active:hover {
+  background: #0a1628 !important;
+  border-color: #0a1628;
+  color: #ffffff !important;
+}
 
 @media (max-width: 600px) {
-
   /* ── DISABLED STATE OVERRIDES ──
    Must win over .tp-item/.tp-period-item's own color+hover rules
    regardless of source order, since a disabled item always carries
    both classes at once. */
-.tp-item.tp-item-disabled,
-.tp-item.tp-item-disabled:hover {
-  background: transparent;
-  color: #ced4da;
-  text-decoration: line-through;
-  cursor: not-allowed;
-}
+  .tp-item.tp-item-disabled,
+  .tp-item.tp-item-disabled:hover {
+    background: transparent;
+    color: #ced4da;
+    text-decoration: line-through;
+    cursor: not-allowed;
+  }
 
-.tp-period-item.tp-item-disabled,
-.tp-period-item.tp-item-disabled:hover {
-  background: transparent;
-  color: #ced4da;
-  border-color: #e9ecef;
-  text-decoration: line-through;
-  cursor: not-allowed;
-}
+  .tp-period-item.tp-item-disabled,
+  .tp-period-item.tp-item-disabled:hover {
+    background: transparent;
+    color: #ced4da;
+    border-color: #e9ecef;
+    text-decoration: line-through;
+    cursor: not-allowed;
+  }
 
   .tp-trigger {
     min-width: 88px;
@@ -221,18 +253,28 @@
     margin-bottom: 0;
   }
 
-  .tp-col { flex: 0 0 80px; }
+  .tp-col {
+    flex: 0 0 80px;
+  }
 
-  .tp-col-period { flex: 0 0 64px; }
+  .tp-col-period {
+    flex: 0 0 64px;
+  }
 
-  .tp-list { height: 200px; }
+  .tp-list {
+    height: 200px;
+  }
 
-  .tp-period-list { height: 200px; }
+  .tp-period-list {
+    height: 200px;
+  }
 
   .tp-item {
     height: 44px; /* larger tap target */
     font-size: 15px;
   }
 
-  .tp-period-item { height: 52px; }
+  .tp-period-item {
+    height: 52px;
+  }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import "./TimePicker.css";
 
-const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
+const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const ref = useRef(null);
@@ -47,7 +47,8 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
   }, [open, onBlur]);
 
   // Detect if dropdown should open upward
-  const handleOpen = () => {
+   const handleOpen = () => {
+    if (disabled) return;
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
@@ -90,10 +91,11 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
 
   return (
     <div className="tp-root" ref={ref}>
-      <button
+    <button
         type="button"
-        className="tp-trigger"
+        className={`tp-trigger ${disabled ? "tp-trigger-disabled" : ""}`}
         onClick={handleOpen}
+        disabled={disabled}
       >
         <span className="tp-value">{displayH}:{displayM}</span>
         <span className="tp-period-badge">{period}</span>
