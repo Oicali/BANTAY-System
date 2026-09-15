@@ -32,8 +32,18 @@ router.get("/", authenticate, async (req, res) => {
        LIMIT 50`,
       [req.user.user_id]
     );
-    const unread = result.rows.filter((n) => !n.is_read).length;
-    res.json({ success: true, data: result.rows, unread });
+    // Count unread across the whole table, not just the 50 fetched rows
+    const unreadResult = await pool.query(
+      `SELECT COUNT(*)::int AS unread
+       FROM notifications
+       WHERE recipient_user_id = $1 AND is_read = FALSE`,
+      [req.user.user_id]
+    );
+    res.json({
+      success: true,
+      data: result.rows,
+      unread: unreadResult.rows[0].unread,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -42,12 +52,13 @@ router.get("/", authenticate, async (req, res) => {
 // PATCH /notifications/:id/read — mark one read
 router.patch("/:id/read", authenticate, async (req, res) => {
   try {
-    await pool.query(
+    // rowCount = 0 means wrong ID, wrong owner, or already read
+    const result = await pool.query(
       `UPDATE notifications SET is_read = TRUE
        WHERE id = $1 AND recipient_user_id = $2`,
       [req.params.id, req.user.user_id]
     );
-    res.json({ success: true });
+    res.json({ success: true, updated: result.rowCount });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
