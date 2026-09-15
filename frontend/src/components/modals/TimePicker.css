@@ -172,6 +172,28 @@
 .tp-period-active:hover { background: #0a1628 !important; border-color: #0a1628; color: #ffffff !important; }
 
 @media (max-width: 600px) {
+
+  /* ── DISABLED STATE OVERRIDES ──
+   Must win over .tp-item/.tp-period-item's own color+hover rules
+   regardless of source order, since a disabled item always carries
+   both classes at once. */
+.tp-item.tp-item-disabled,
+.tp-item.tp-item-disabled:hover {
+  background: transparent;
+  color: #ced4da;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.tp-period-item.tp-item-disabled,
+.tp-period-item.tp-item-disabled:hover {
+  background: transparent;
+  color: #ced4da;
+  border-color: #e9ecef;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
   .tp-trigger {
     min-width: 88px;
     padding: 4px 8px;

@@ -7,7 +7,15 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
   const ref = useRef(null);
 
   const parse = (v) => {
-    if (!v) return { h: baseHour ?? 8, m: 0, period: "AM" };
+    if (!v) {
+      // baseHour is a 24h hint (e.g. 8 for AM shift, 20 for PM shift) —
+      // convert it the same way a real value would be, so an empty/blank
+      // field never displays something like "20:00 AM".
+      const bh = baseHour ?? 8;
+      const period = bh < 12 ? "AM" : "PM";
+      const h12 = bh % 12 === 0 ? 12 : bh % 12;
+      return { h: h12, m: 0, period };
+    }
     const [hh, mm] = v.split(":").map(Number);
     const period = hh < 12 ? "AM" : "PM";
     const h12 = hh % 12 === 0 ? 12 : hh % 12;
@@ -144,16 +152,19 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift }) => {
             <div className="tp-col-label">‎</div>
             <div className="tp-period-list">
              {["AM", "PM"].map((p) => {
-  // AM shift: only AM hours (8–11) and PM hours (12–7) allowed — block PM after 8pm
-  // PM shift: only PM hours (8–11pm) and AM hours (12–7am) allowed — block AM after 8am
-  const isDisabled =
-    (shift === "AM" && p === "AM" && false) ? false  // AM period always ok in AM shift
-    : false; // we handle via hour disabling below
+  // Same boundary rule as the hour list — switching AM/PM must not be able
+  // to produce a time outside the current shift's allowed window.
+  let hh24 = h % 12;
+  if (p === "PM") hh24 += 12;
+  const outOfRange =
+    shift === "AM" ? (hh24 < 8 || hh24 >= 20)
+    : shift === "PM" ? (hh24 >= 8 && hh24 < 20)
+    : false;
   return (
     <div
       key={p}
-      className={`tp-period-item ${p === period ? "tp-period-active" : ""}`}
-      onClick={() => emit(h, m, p)}
+      className={`tp-period-item ${p === period ? "tp-period-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
+      onClick={() => { if (!outOfRange) emit(h, m, p); }}
     >
       {p}
     </div>

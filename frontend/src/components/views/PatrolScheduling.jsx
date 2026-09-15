@@ -503,10 +503,10 @@ const handleRestore = async (id) => {
   );
 
   const counts = {
-    all: filteredPatrols.length,
-    active: filteredPatrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming: filteredPatrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
-    completed: filteredPatrols.filter((p) => getPatrolStatus(p) === "completed").length,
+    all: baseFilteredPatrols.length,
+    active: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "active").length,
+    upcoming: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
+    completed: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "completed").length,
   };
 
   const statusConfig = {

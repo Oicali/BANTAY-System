@@ -152,7 +152,7 @@
     if (!patrol) return null;
 
     return (
-      <div className="bc-overlay" onClick={onClose}>
+      <div className="bc-overlay">
         <div className="bc-modal" onClick={(e) => e.stopPropagation()}>
 
           {/* HEADER */}
@@ -430,14 +430,13 @@
   };
 
   const DeleteConfirmDialog = ({ patrolName, onConfirm, onCancel }) => {
-    return createPortal(
-      <div
-        style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
-        }}
-        onClick={onCancel}
-      >
+  return createPortal(
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+      }}
+    >
         <div
           style={{
             background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",

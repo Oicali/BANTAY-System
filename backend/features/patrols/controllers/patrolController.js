@@ -861,12 +861,28 @@ try {
   if (mobileConflict.rows.length > 0) {
     const c = mobileConflict.rows[0];
     const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-    client.release();
     return res.status(400).json({
       success: false,
       message: `This mobile unit is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
     });
   }
+
+  await client.query("BEGIN");
+
+  // ── Clean up rows left outside the new date range BEFORE checking
+  // conflicts — otherwise a patroller assigned on a date that no longer
+  // belongs to this patrol stays in the DB invisibly and can trip a
+  // false conflict against an unrelated patrol. ──
+  await client.query(
+    `DELETE FROM patrol_assignment_patroller
+     WHERE patrol_id = $1 AND (route_date < $2 OR route_date > $3)`,
+    [id, start_date, end_date],
+  );
+  await client.query(
+    `DELETE FROM patrol_assignment_route
+     WHERE patrol_id = $1 AND route_date IS NOT NULL AND (route_date < $2 OR route_date > $3)`,
+    [id, start_date, end_date],
+  );
 
   // Check patroller conflicts — exclude current patrol
   const allPatrollerIds = await client.query(
@@ -877,17 +893,15 @@ try {
   if (patrollerIds.length > 0) {
     const conflicts = await checkPatrollerConflicts(client, patrollerIds, start_date, end_date, parseInt(id));
     if (conflicts.length > 0) {
+      await client.query("ROLLBACK");
       const c = conflicts[0];
       const fmt = (d) => new Date(d).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-      client.release();
       return res.status(400).json({
         success: false,
         message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) during this period.`,
       });
     }
   }
-
-  await client.query("BEGIN");
 
   await client.query(
     `UPDATE patrol_assignment
@@ -968,9 +982,10 @@ const updatePatrollersForDate = async (req, res) => {
           year: "numeric",
         });
       };
-      client.release();
       return res.status(400).json({
         success: false,
+        conflict: true,
+        conflicting_patroller_id: c.active_patroller_id,
         message: `${c.officer_name} is already assigned to "${c.patrol_name}" (${fmt(c.start_date)} – ${fmt(c.end_date)}) on this date.`,
       });
     }
@@ -995,23 +1010,19 @@ const updatePatrollersForDate = async (req, res) => {
     );
 
     if (patroller_ids_am?.length > 0) {
-      for (const active_patroller_id of patroller_ids_am) {
-        await client.query(
-          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
-           VALUES ($1, $2, 'AM', $3)`,
-          [id, active_patroller_id, date],
-        );
-      }
+      await client.query(
+        `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+         SELECT $1, unnest($2::int[]), 'AM', $3`,
+        [id, patroller_ids_am, date],
+      );
     }
 
     if (patroller_ids_pm?.length > 0) {
-      for (const active_patroller_id of patroller_ids_pm) {
-        await client.query(
-          `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
-           VALUES ($1, $2, 'PM', $3)`,
-          [id, active_patroller_id, date],
-        );
-      }
+      await client.query(
+        `INSERT INTO patrol_assignment_patroller (patrol_id, active_patroller_id, shift, route_date)
+         SELECT $1, unnest($2::int[]), 'PM', $3`,
+        [id, patroller_ids_pm, date],
+      );
     }
 
     await client.query("COMMIT");
@@ -1041,7 +1052,7 @@ const updatePatrollersForDate = async (req, res) => {
     console.error("Update patrollers for date error:", error);
     res
       .status(500)
-      .json({ success: false, message: "Server error: " + error.message });
+      .json({ success: false, conflict: false, message: "Server error: " + error.message });
   } finally {
     client.release();
   }
