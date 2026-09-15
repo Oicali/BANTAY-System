@@ -1,0 +1,682 @@
+/* frontend/src/components/views/Overview.css
+   Full-screen, no-page-scroll command-center overview.
+   Individual panels may internally scroll (tables/lists) — the outer
+   page (.ov-fullscreen) never does. */
+
+.ov-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(1400px 900px at 10% -10%, #0a2248 0%, transparent 55%),
+    linear-gradient(180deg, #06152f 0%, #071a35 100%);
+  color: #eaf2fb;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-variant-numeric: tabular-nums;
+  z-index: 5000;
+}
+
+/* ── header ── */
+.ov-header {
+  flex: 0 0 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(90deg, #0b2447 0%, #123a68 100%);
+  border-bottom: 1px solid rgba(25, 167, 224, 0.35);
+}
+
+.ov-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ov-header-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #19a7e0;
+}
+
+.ov-header-left h1 {
+  font-family: "Inter", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0;
+  color: #fff;
+}
+
+.ov-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ov-header-range {
+  font-size: 11px;
+  color: #9fb8d9;
+}
+
+.ov-exit-btn {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(25, 167, 224, 0.45);
+  background: rgba(25, 167, 224, 0.12);
+  color: #19a7e0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ov-exit-btn:hover {
+  background: #19a7e0;
+  color: #06152f;
+}
+
+.ov-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #9fb8d9;
+}
+
+/* ── main grid ── */
+/* ── main grid ── */
+.ov-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+
+  grid-template-columns: 1.8fr 1.8fr 2.4fr 2.1fr 2.1fr 1.7fr 1.7fr;
+
+  grid-template-rows: 0.62fr 0.72fr 0.86fr 0.55fr;
+
+  grid-template-areas:
+    "kpi     kpi     focus   focusdonut  mode      status  status"
+    "brgy    trends  trends  clock       clock     map     map"
+    "brgy    place   modus   proneday    proneday  map     map"
+    "blotter blotter blotter blotter     blotter   map     map";
+
+  gap: 6px;
+  padding: 6px;
+}
+
+.ov-area-kpi { grid-area: kpi; }
+.ov-area-focus { grid-area: focus; }
+.ov-area-status { grid-area: status; }
+.ov-area-mode { grid-area: mode; }
+.ov-area-brgy { grid-area: brgy; }
+.ov-area-trends { grid-area: trends; }
+.ov-area-clock { grid-area: clock; }
+.ov-area-proneday { grid-area: proneday; }
+.ov-area-modus { grid-area: modus; }
+.ov-area-place { grid-area: place; }
+.ov-area-map { grid-area: map; }
+.ov-area-blotter { grid-area: blotter; }
+
+/* ── panel shell ── */
+.ov-panel {
+  background: linear-gradient(180deg, #0b2447 0%, #081c3a 100%);
+  border: 1px solid rgba(25, 167, 224, 0.28);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ov-panel-head {
+  flex: 0 0 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #eaf2fb;
+  background: linear-gradient(90deg, #0b2a52 0%, #123a68 100%);
+  border-bottom: 1px solid rgba(25, 167, 224, 0.28);
+  white-space: nowrap;
+}
+
+.ov-tag-sample {
+  font-size: 8px;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
+  padding: 1px 5px;
+}
+
+.ov-count-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #19a7e0;
+  background: rgba(25, 167, 224, 0.12);
+  border: 1px solid rgba(25, 167, 224, 0.3);
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.ov-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 8px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(25, 167, 224, 0.35) transparent;
+}
+.ov-panel-scroll::-webkit-scrollbar { width: 4px; }
+.ov-panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(25, 167, 224, 0.35);
+  border-radius: 4px;
+}
+
+/* ── KPI ── */
+.ov-kpi-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 24px;
+  padding: 4px 20px;
+}
+.ov-kpi-value {
+  font-family: "Inter", sans-serif;
+  font-size: clamp(32px, 5vh, 52px);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(25, 167, 224, 0.5);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ov-kpi-mini-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 0;
+}
+.ov-kpi-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.ov-kpi-mini-val {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ov-kpi-mini-lbl {
+  font-size: 7.5px;
+  color: #9fb8d9;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── horizontal bars (Focus Crime / Prone Day) ── */
+.ov-hbars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: flex-start;
+  height: auto;
+  min-height: 100%;
+}
+.ov-hbar-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 26px;
+  align-items: center;
+  gap: 6px;
+}
+.ov-hbar-label {
+  font-size: 9.5px;
+  color: #9fb8d9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-hbar-track {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.ov-hbar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.ov-hbar-val {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #eaf2fb;
+  text-align: right;
+}
+
+/* ── donuts ── */
+.ov-donut-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  min-height: 0;
+}
+.ov-donut-legend {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 3px 10px;
+  flex: 1;
+  min-width: 0;
+}
+.ov-donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  color: #9fb8d9;
+  white-space: nowrap;
+}
+.ov-donut-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ov-donut-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ov-donut-legend-val {
+  margin-left: auto;
+  font-weight: 700;
+  color: #eaf2fb;
+  flex-shrink: 0;
+}
+
+/* ── case status vertical bars ── */
+.ov-vbars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 10px;
+  padding: 10px 10px 6px;
+  min-height: 0;
+}
+.ov-vbar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+  justify-content: flex-end;
+  flex: 1;
+}
+.ov-vbar-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: #eaf2fb;
+}
+.ov-vbar-track {
+  width: 20px;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
+  min-height: 0;
+}
+.ov-vbar-fill {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+}
+.ov-vbar-label {
+  font-size: 8px;
+  color: #9fb8d9;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── tables ── */
+.ov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+}
+.ov-table thead tr {
+  position: sticky;
+  top: 0;
+  background: #123a68;
+  color: #19a7e0;
+  z-index: 1;
+}
+.ov-table th {
+  padding: 3px 6px;
+  text-align: left;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ov-table td {
+  padding: 3px 6px;
+  color: #cdd9ea;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.ov-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+.ov-rank {
+  color: #5f7fa6;
+  font-weight: 700;
+  width: 20px;
+}
+.ov-name {
+  color: #19a7e0;
+  font-weight: 600;
+}
+.ov-num {
+  text-align: right;
+  font-weight: 700;
+  color: #ec4899;
+}
+.ov-empty-row {
+  text-align: center;
+  color: #5f7fa6;
+  padding: 10px !important;
+}
+.ov-empty-mini {
+  font-size: 10px;
+  color: #5f7fa6;
+  text-align: center;
+  padding: 8px;
+}
+
+.ov-count-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+
+/* ── map ──
+   CrimeMapping.jsx's own CSS gives `.crmap-map-wrap` a hard height
+   (calc(100vh - 240px)); inside this panel we need it to fill whatever
+   space is actually available instead. The whole chain has to be
+   flex-based (not percentage heights) because `.crmap-body` never had
+   an explicit height of its own — `height: 100%` on a child of an
+   auto-height parent resolves to nothing, which is what was collapsing
+   the map to 0px and leaving only the filter bar visible. */
+.ov-map-inner {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+.ov-map-inner .crmap-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 4px;
+  gap: 4px;
+  background: transparent;
+}
+.ov-map-inner .crmap-header,
+.ov-map-inner .crmap-stat-pills {
+  display: none;
+}
+.ov-map-inner .crmap-filterbar {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-left-color: #19a7e0;
+}
+.ov-map-inner .crmap-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.ov-map-inner .crmap-map-wrap {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  border-color: rgba(25, 167, 224, 0.28);
+}
+.ov-map-inner .crmap-map-inner {
+   position: relative;
+}
+/* Legend/incidence/recent sidebar — kept visible (not hidden), just
+   narrowed to fit the smaller panel. The toggle button's inline `right`
+   offset assumes the default 320px sidebar width, so it needs the same
+   180px adjustment here or the collapse/expand arrow ends up floating
+   in the wrong spot. */
+.ov-map-inner .crmap-sidebar {
+  width: 170px;
+  top: 6px;
+  right: 6px;
+  bottom: 6px;
+}
+.ov-map-inner .crmap-sidebar-toggle {
+  top: 6px;
+  right: 6px !important;
+}
+.ov-map-inner .crmap-sidebar:not(.hidden) ~ .crmap-sidebar-toggle {
+  right: 182px !important;
+}
+.ov-map-inner .crmap-tab {
+  font-size: 8px;
+  padding: 6px 0;
+}
+.ov-map-inner .crmap-panel-body {
+  padding: 8px 8px;
+}
+.ov-map-inner .crmap-legend-name,
+.ov-map-inner .crmap-hotspot-name,
+.ov-map-inner .crmap-recent-type {
+  font-size: 11px;
+}
+.ov-map-inner .crmap-filterbar-inner {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.ov-map-inner .crmap-multisel-trigger input {
+  font-size: 10px !important;
+}
+
+.ov-map-inner .crmap-multisel-trigger input::placeholder {
+  font-size: 10px;
+  color: #6b8bab;
+}
+
+/* Drop the funnel icon — reclaims space for the two dropdowns */
+.ov-map-inner .crmap-filter-icon {
+  display: none;
+}
+
+/* Removed overflow:hidden here — it was clipping the dropdown menus,
+   which render as siblings of the trigger, not inside it. */
+
+/* Crime-type and Barangay multiselects — sized as % shares of the row
+   so they always fit, instead of fixed px that can exceed the panel. */
+.ov-map-inner .crmap-multisel-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.ov-map-inner .crmap-multisel-wrap:nth-of-type(2) {
+  flex: 1.3 1 0; /* Crime Types gets a bit more room */
+}
+
+.ov-map-inner .crmap-multisel-wrap:nth-of-type(3) {
+  flex: 1 1 0; /* Barangay */
+}
+
+.ov-map-inner .crmap-multisel-trigger {
+  box-sizing: border-box;
+  overflow: hidden;
+  gap: 4px;
+  width: 100%;
+}
+
+.ov-map-inner .crmap-multisel-trigger > div {
+  overflow: hidden;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.ov-map-inner .crmap-multisel-trigger input {
+  min-width: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ov-map-inner .crmap-fsel,
+.ov-map-inner .crmap-fsel-date,
+.ov-map-inner .crmap-multisel-trigger {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ov-map-inner .crmap-multisel-trigger span {
+  font-size: 10px !important;
+}
+
+.ov-map-inner .crmap-fsel-locked {
+  height: 22px;
+  font-size: 10px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+}
+.ov-map-inner .crmap-controls {
+  transform: scale(0.85);
+  transform-origin: bottom left;
+}
+.ov-map-inner .crmap-heatmap-toggle {
+  font-size: 11px;
+  padding: 5px 10px;
+}
+
+
+/* ── blotter (bottom wide) ── */
+.ov-panel-head:has(.ov-page-controls) {
+  justify-content: space-between;
+}
+.ov-page-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #9fb8d9;
+}
+.ov-page-controls button {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eaf2fb;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ov-page-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.ov-blotter-table th,
+.ov-blotter-table td {
+  max-width: 220px;
+}
+.ov-area-blotter .ov-table td,
+.ov-area-blotter .ov-table th {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+.ov-crime-cell {
+  color: #ec4899 !important;
+  font-weight: 600;
+}
+.ov-narrative-cell {
+  max-width: 260px !important;
+}
+
+/* ── responsiveness: below ~1150px the fixed grid gets too cramped to be
+   legible, so we relax to a scrollable layout rather than render
+   illegibly-small panels. Desktop command-center monitors are the
+   primary target per the brief. ── */
+@media (max-width: 1150px) {
+  .ov-fullscreen {
+    position: static;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .ov-grid {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+  .ov-panel {
+    min-height: 220px;
+  }
+}
+
+.ov-linechart-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.ov-linechart-wrap svg {
+  width: 100%;
+  height: 100%;
+}

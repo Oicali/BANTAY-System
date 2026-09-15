@@ -105,8 +105,10 @@ const isAdminRole = (role) =>
 
 const getOfficerNameById = (patrol, id) => {
   if (id == null) return null;
+  // submitted_by stores an active_patroller_id, not an officer_id — match
+  // on the right field or this fallback silently fails to find anyone.
   const match = (patrol?.patrollers || []).find(
-    (p) => String(p.officer_id) === String(id)
+    (p) => String(p.active_patroller_id) === String(id)
   );
   return match?.officer_name || null;
 };
@@ -405,7 +407,6 @@ const DeleteConfirmDialog = ({ reportDate, onConfirm, onCancel }) => {
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
       }}
-      onClick={onCancel}
     >
       <div
         style={{
@@ -457,7 +458,6 @@ const DateReportConfirmDialog = ({ date, onConfirm, onCancel }) => {
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
       }}
-      onClick={onCancel}
     >
       <div
         style={{
@@ -508,7 +508,6 @@ const SaveChangesConfirmDialog = ({ onConfirm, onCancel }) => {
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
       }}
-      onClick={onCancel}
     >
       <div
         style={{
@@ -596,6 +595,7 @@ const AfterPatrolModal = ({ patrol, existingReport, myShift, existingReports = [
  
 const [submitting, setSubmitting] = useState(false);
 const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+const [showDateReportConfirm, setShowDateReportConfirm] = useState(false);
   const patrolDates = getPatrolDateRange(patrol?.start_date, patrol?.end_date);
   const minDate     = toInputDate(patrol?.start_date);
   const maxDate     = toInputDate(patrol?.end_date);
@@ -676,16 +676,20 @@ const [deletingPhotoConfirm, setDeletingPhotoConfirm] = useState(null); // ← a
   };
 
   const handleFileSelect = (files) => {
+    // Cap against existingPhotos + images together — matching the dropzone's
+    // own visibility check — not just images.length, or an officer with
+    // several existing photos can stage more than fits under the 10 limit.
+    const remainingSlots = Math.max(0, 10 - existingPhotos.length - images.length);
     const newFiles = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
-      .slice(0, 10 - images.length)
+      .slice(0, remainingSlots)
       .map((file) => ({
         id: Math.random().toString(36).slice(2),
         file,
         preview: URL.createObjectURL(file),
         name: file.name,
       }));
-    setImages((prev) => [...prev, ...newFiles].slice(0, 10));
+    setImages((prev) => [...prev, ...newFiles].slice(0, remainingSlots + prev.length));
   };
 
   const handleDrop = (e) => {
@@ -792,10 +796,8 @@ const confirmDeletePhoto = async () => {
       if (data.success) {
         const existing = data.data.find((r) => toInputDate(r.patrol_date) === form.date);
         if (existing) {
-          const confirmed = window.confirm(
-            `A report has already been submitted for this date (${formatDate(form.date)}) by your shift.\n\nDo you want to overwrite it with your new entries?`
-          );
-          if (!confirmed) return;
+          setShowDateReportConfirm(true);
+          return;
         }
       }
     } catch {
@@ -809,6 +811,14 @@ const confirmDeletePhoto = async () => {
     setSubmitting(true);
     await onSubmit(patrol.patrol_id, form, myShift, images);
     setSubmitting(false);
+    handleClose();
+  };
+
+  // Revoke any pending photo preview blob URLs before closing — otherwise
+  // cancelling (or a successful submit) leaks memory for every image that
+  // was staged but never explicitly removed via the × button.
+  const handleClose = () => {
+    images.forEach((img) => URL.revokeObjectURL(img.preview));
     onClose();
   };
 
@@ -855,7 +865,7 @@ const isEditing = !!activeReport;
               </div>
             </div>
           </div>
-          <span className="pd-modal-close" onClick={onClose}>&times;</span>
+          <span className="pd-modal-close" onClick={handleClose}>&times;</span>
         </div>
 
         <div className="pd-modal-body">
@@ -912,6 +922,12 @@ const isEditing = !!activeReport;
                   <button key={key} type="button"
                     onClick={() => {
                       if (isFuture) return;
+
+                      // Revoke any staged (unsaved) photo previews from the
+                      // date being left before swapping to the new one —
+                      // otherwise those blob URLs leak every time an
+                      // officer browses between date pills.
+                      images.forEach((img) => URL.revokeObjectURL(img.preview));
 
                       if (existingForDate) {
                         // Load the real submitted report for this date directly.
@@ -1465,7 +1481,7 @@ const isEditing = !!activeReport;
         </div>
 
         <div className="pd-modal-footer">
-          <button type="button" className="pd-btn pd-btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="pd-btn pd-btn-secondary" onClick={handleClose}>Cancel</button>
           {form && (
             <button type="button" className="pd-btn pd-btn-navy" onClick={handleSubmit}
               disabled={submitting} style={{ minWidth: 200 }}>
@@ -1486,7 +1502,14 @@ const isEditing = !!activeReport;
           onCancel={() => setShowSaveConfirm(false)}
         />
       )}
-        
+      {showDateReportConfirm && (
+        <DateReportConfirmDialog
+          date={form?.date}
+          onConfirm={() => { setShowDateReportConfirm(false); doSubmit(); }}
+          onCancel={() => setShowDateReportConfirm(false)}
+        />
+      )}
+
       </div>
     </div>
   );
@@ -2349,16 +2372,30 @@ const AfterPatrol = () => {
       const data = await res.json();
 
       if (data.success) {
+        let photoWarning = null;
         if (images.length > 0) {
-          const formDataImg = new FormData();
-          images.forEach((img) => formDataImg.append("photos", img.file));
-          await fetch(`${API_BASE}/patrol/after-reports/${data.report_id}/photos`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token()}` },
-            body: formDataImg,
-          });
+          try {
+            const formDataImg = new FormData();
+            images.forEach((img) => formDataImg.append("photos", img.file));
+            const photoRes  = await fetch(`${API_BASE}/patrol/after-reports/${data.report_id}/photos`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token()}` },
+              body: formDataImg,
+            });
+            const photoData = await photoRes.json();
+            if (!photoData.success) {
+              photoWarning = photoData.message || "Report saved, but photos failed to upload. Please try attaching them again.";
+            }
+          } catch (photoErr) {
+            console.error("Photo upload error:", photoErr);
+            photoWarning = "Report saved, but photos failed to upload. Please try attaching them again.";
+          }
         }
-        showToast(data.message || "After Patrol Report submitted successfully!", "success");
+        if (photoWarning) {
+          showToast(photoWarning, "warning");
+        } else {
+          showToast(data.message || "After Patrol Report submitted successfully!", "success");
+        }
       } else {
         showToast(data.message || "Something went wrong.", "error");
       }

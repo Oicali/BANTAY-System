@@ -777,7 +777,7 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
     </div>
   );
 };
-function CrimeMapping() {
+function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange = null }) {
   const rawUser = sessionStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
@@ -796,6 +796,13 @@ function CrimeMapping() {
   const [geoJSONData, setGeoJSONData] = useState(null);
 
   const [heatmapMode, setHeatmapMode] = useState(false);
+  // Overview always opens in heatmap mode
+  useEffect(() => {
+    if (minimal) {
+      setHeatmapMode(true);
+    }
+  }, [minimal]);
+
   const [heatGeoJSON, setHeatGeoJSON] = useState(null);
   const [clusterGeoJSON, setClusterGeoJSON] = useState(null);
   const [heatLoading, setHeatLoading] = useState(false);
@@ -841,26 +848,87 @@ function CrimeMapping() {
 
   // Single state
   // Single state
-  const [filters, setFilters] = useState({
-    incident_types: [],
-    date_from: defaultDateFrom,
-    date_to: defaultDateTo,
-    // Start with empty array for patrol - will be overridden after check
-    barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+  const [filters, setFilters] = useState(() => {
+    if (minimal && externalFilters) {
+      return {
+        incident_types: externalFilters.incident_types ?? [],
+        date_from: externalFilters.date_from ?? defaultDateFrom,
+        date_to: externalFilters.date_to ?? defaultDateTo,
+        barangays:
+          isBarangayUser && userBarangay ? [userBarangay] : externalFilters.barangays ?? [],
+      };
+    }
+    return {
+      incident_types: [],
+      date_from: defaultDateFrom,
+      date_to: defaultDateTo,
+      // Start with empty array for patrol - will be overridden after check
+      barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+    };
   });
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    incident_types: [],
-    date_from: defaultDateFrom,
-    date_to: defaultDateTo,
-    barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+  const [appliedFilters, setAppliedFilters] = useState(() => {
+    if (minimal && externalFilters) {
+      return {
+        incident_types: externalFilters.incident_types ?? [],
+        date_from: externalFilters.date_from ?? defaultDateFrom,
+        date_to: externalFilters.date_to ?? defaultDateTo,
+        barangays:
+          isBarangayUser && userBarangay ? [userBarangay] : externalFilters.barangays ?? [],
+      };
+    }
+    return {
+      incident_types: [],
+      date_from: defaultDateFrom,
+      date_to: defaultDateTo,
+      barangays: isBarangayUser && userBarangay ? [userBarangay] : [],
+    };
   });
 
   // Fetch trigger — only runs when this ref changes
   const [fetchTrigger, setFetchTrigger] = useState(0);
 
+  // ── Keep in sync with the parent's (Overview) filters when embedded ──
+  const appliedFiltersRef = useRef(appliedFilters);
+  useEffect(() => {
+    appliedFiltersRef.current = appliedFilters;
+  }, [appliedFilters]);
+
+  const externalFiltersKey =
+    minimal && externalFilters ? JSON.stringify(externalFilters) : null;
+  const didInitFromExternalRef = useRef(false);
+
+  useEffect(() => {
+    if (!minimal || !externalFilters) return;
+
+    if (!didInitFromExternalRef.current) {
+      didInitFromExternalRef.current = true; // initial values already set above
+      return;
+    }
+
+    const lockedBarangays =
+      isPatrol && hasPatrolAssignment
+        ? patrolAssignedBarangays
+        : isBarangayUser && userBarangay
+          ? [userBarangay]
+          : externalFilters.barangays ?? [];
+
+    const next = {
+      incident_types: externalFilters.incident_types ?? [],
+      date_from: externalFilters.date_from ?? defaultDateFrom,
+      date_to: externalFilters.date_to ?? defaultDateTo,
+      barangays: lockedBarangays,
+    };
+
+    if (JSON.stringify(next) === JSON.stringify(appliedFiltersRef.current)) return;
+
+    setFilters(next);
+    setAppliedFilters(next);
+    setFetchTrigger((t) => t + 1);
+  }, [externalFiltersKey, isPatrol, hasPatrolAssignment, isBarangayUser, userBarangay]);
+
   const [activeTab, setActiveTab] = useState("legend");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(!minimal);
   const [showMorePopup, setShowMorePopup] = useState(false);
   const [hoveredBarangay, setHoveredBarangay] = useState(null);
   const [showBrgyTooltip, setShowBrgyTooltip] = useState(true);
@@ -1596,9 +1664,17 @@ function CrimeMapping() {
 
           <CrimeTypeMultiSelect
             selected={filters.incident_types}
-            onChange={(val) =>
-              setFilters((f) => ({ ...f, incident_types: val }))
-            }
+            onChange={(val) => {
+              if (minimal) {
+                const next = { ...appliedFilters, incident_types: val };
+                setFilters(next);
+                setAppliedFilters(next);
+                setFetchTrigger((t) => t + 1);
+                onFilterChange?.({ crimeTypes: val });
+              } else {
+                setFilters((f) => ({ ...f, incident_types: val }));
+              }
+            }}
           />
 
           {isPatrol && hasPatrolAssignment ? (
@@ -1619,10 +1695,22 @@ function CrimeMapping() {
           ) : (
             <BarangayMultiSelect
               selected={filters.barangays}
-              onChange={(val) => setFilters((f) => ({ ...f, barangays: val }))}
+              onChange={(val) => {
+                if (minimal) {
+                  const next = { ...appliedFilters, barangays: val };
+                  setFilters(next);
+                  setAppliedFilters(next);
+                  setFetchTrigger((t) => t + 1);
+                  onFilterChange?.({ barangays: val });
+                } else {
+                  setFilters((f) => ({ ...f, barangays: val }));
+                }
+              }}
             />
           )}
 
+          {!minimal && (
+          <>
           <div className="crmap-date-range">
             <input
               type="date"
@@ -1759,6 +1847,8 @@ function CrimeMapping() {
           >
             ↺
           </button>
+          </>
+          )}
         </div>
       </div>
 
@@ -1834,9 +1924,9 @@ function CrimeMapping() {
               initialViewState={{
                 longitude: 120.964,
                 latitude: 14.4341,
-                zoom: 12,
+                zoom: minimal ? 11 : 12,
               }}
-              minZoom={11.5}
+              minZoom={minimal ? 11 : 11.5}
               maxZoom={18}
               style={{ width: "100%", height: "100%" }}
               mapStyle={
