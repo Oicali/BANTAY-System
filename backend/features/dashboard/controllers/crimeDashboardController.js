@@ -175,13 +175,13 @@ const queryTrends = async (
   dateTo,
 ) => {
   const dateTrunc =
-  granularity === "daily"
-    ? "day"
-    : granularity === "weekly"
-      ? "week"
-      : granularity === "quarterly"
-        ? "quarter"
-        : "month";
+    granularity === "daily"
+      ? "day"
+      : granularity === "weekly"
+        ? "week"
+        : granularity === "quarterly"
+          ? "quarter"
+          : "month";
 
   const result = await pool.query(
     `SELECT
@@ -235,12 +235,12 @@ const queryTrends = async (
   // ── Build skeleton end — extend to include the period containing dateTo ────
   const end = new Date(dateTo + "T00:00:00");
   if (dateTrunc === "week") {
-  end.setDate(end.getDate() + 6);
-} else if (dateTrunc === "month") {
-  end.setDate(end.getDate() + 31);
-} else if (dateTrunc === "quarter") {
-  end.setMonth(end.getMonth() + 3);
-}
+    end.setDate(end.getDate() + 6);
+  } else if (dateTrunc === "month") {
+    end.setDate(end.getDate() + 31);
+  } else if (dateTrunc === "quarter") {
+    end.setMonth(end.getMonth() + 3);
+  }
 
   // ── Walk cursor and build skeleton ─────────────────────────────────────────
   const skeleton = {};
@@ -256,9 +256,11 @@ const queryTrends = async (
     skeletonKeys.push(label);
 
     if (dateTrunc === "day") cursorClone.setDate(cursorClone.getDate() + 1);
-else if (dateTrunc === "week") cursorClone.setDate(cursorClone.getDate() + 7);
-else if (dateTrunc === "quarter") cursorClone.setMonth(cursorClone.getMonth() + 3);
-else cursorClone.setMonth(cursorClone.getMonth() + 1);
+    else if (dateTrunc === "week")
+      cursorClone.setDate(cursorClone.getDate() + 7);
+    else if (dateTrunc === "quarter")
+      cursorClone.setMonth(cursorClone.getMonth() + 3);
+    else cursorClone.setMonth(cursorClone.getMonth() + 1);
   }
 
   // ── Merge DB data into skeleton ────────────────────────────────────────────
@@ -296,13 +298,13 @@ else cursorClone.setMonth(cursorClone.getMonth() + 1);
   // Keep a bucket if its label (period start) is <= dateTo, since it may
   // contain data up to dateTo.
   const trimmed = Object.values(skeleton)
-  .filter((row) => {
-    if (dateTrunc === "week" || dateTrunc === "quarter") {
-      return row.label >= dateFrom && row.label <= dateTo;
-    }
-    return row.label <= dateTo;
-  })
-  .sort((a, b) => a.label.localeCompare(b.label));
+    .filter((row) => {
+      if (dateTrunc === "week" || dateTrunc === "quarter") {
+        return row.label >= dateFrom && row.label <= dateTo;
+      }
+      return row.label <= dateTo;
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   return trimmed;
 };
@@ -334,7 +336,10 @@ const queryHourly = async (where, params, nextP) => {
     return {
       hour: `${displayH}${period}`,
       count: map[h]?.total || 0,
-      ...INDEX_CRIMES.reduce((acc, c) => ({ ...acc, [c]: map[h]?.[c] || 0 }), {}),
+      ...INDEX_CRIMES.reduce(
+        (acc, c) => ({ ...acc, [c]: map[h]?.[c] || 0 }),
+        {},
+      ),
     };
   });
 };
@@ -364,7 +369,10 @@ const queryByDay = async (where, params, nextP) => {
   return DAYS_OF_WEEK.map((day) => ({
     day,
     count: map[day]?.total || 0,
-    ...INDEX_CRIMES.reduce((acc, c) => ({ ...acc, [c]: map[day]?.[c] || 0 }), {}),
+    ...INDEX_CRIMES.reduce(
+      (acc, c) => ({ ...acc, [c]: map[day]?.[c] || 0 }),
+      {},
+    ),
   }));
 };
 
@@ -471,6 +479,7 @@ const queryModus = async (where, params, nextP) => {
 const queryCompleteData = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
+      be.blotter_entry_number      AS report_number,
       TRIM(be.place_barangay)      AS barangay,
       TRIM(be.type_of_place)       AS type_of_place,
       TO_CHAR(be.date_time_commission, 'MM/DD/YYYY') AS date,
@@ -494,6 +503,7 @@ const queryCompleteData = async (where, params, nextP) => {
   );
 
   return result.rows.map((r) => ({
+    reportNumber: r.report_number || "",
     barangay: r.barangay || "",
     typeOfPlace: r.type_of_place || "",
     date: r.date || "",
@@ -508,7 +518,8 @@ const queryCompleteData = async (where, params, nextP) => {
 // HELPER: Get assigned barangays for a patrol user's ongoing schedule
 const getPatrolUserBarangays = async (userId) => {
   try {
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT DISTINCT par.barangay
       FROM patrol_assignment pa
       JOIN patrol_assignment_patroller pap ON pa.patrol_id = pap.patrol_id
@@ -519,8 +530,10 @@ const getPatrolUserBarangays = async (userId) => {
         AND pa.end_date >= CURRENT_DATE
         AND par.stop_order <= 0
         AND par.barangay IS NOT NULL
-    `, [userId]);
-    return result.rows.map(r => r.barangay.toUpperCase());
+    `,
+      [userId],
+    );
+    return result.rows.map((r) => r.barangay.toUpperCase());
   } catch (error) {
     console.error("getPatrolUserBarangays error:", error);
     return [];
@@ -540,7 +553,7 @@ const getOverview = async (req, res) => {
         // Override with patrol assigned barangays
         where = where.replace(
           /UPPER\(TRIM\(be\.place_barangay\)\) = ANY\(\$\d+::text\[\]\)/,
-          ""
+          "",
         );
         params = params.filter((_, i) => {
           // Remove old barangay params by checking if value is an array
@@ -553,65 +566,71 @@ const getOverview = async (req, res) => {
       }
     }
 
-     const [
-  summary,
-  trends,
-  hourly,
-  byDay,
-  place,
-  barangay,
-  modus,
-  completeData,
-  modeOfReporting,
-] = await Promise.all([
-  querySummary(where, params, nextP),
-  queryTrends(where, params, nextP, granularity, date_from, date_to),
-  queryHourly(where, params, nextP),
-  queryByDay(where, params, nextP),
-  queryPlace(where, params, nextP),
-  queryBarangay(where, params, nextP),
-  queryModus(where, params, nextP),
-  queryCompleteData(where, params, nextP),
-  queryModeOfReporting(where, params, nextP),
-]);
+    const [
+      summary,
+      trends,
+      hourly,
+      byDay,
+      place,
+      barangay,
+      modus,
+      completeData,
+      modeOfReporting,
+    ] = await Promise.all([
+      querySummary(where, params, nextP),
+      queryTrends(where, params, nextP, granularity, date_from, date_to),
+      queryHourly(where, params, nextP),
+      queryByDay(where, params, nextP),
+      queryPlace(where, params, nextP),
+      queryBarangay(where, params, nextP),
+      queryModus(where, params, nextP),
+      queryCompleteData(where, params, nextP),
+      queryModeOfReporting(where, params, nextP),
+    ]);
 
+    // ── Previous month summary for "this_month" delta ─────────────────────────
+    let prevSummary = null;
+    if (preset === "this_month") {
+      const now = new Date();
+      const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
+      const pht = new Date(phtMs);
 
-// ── Previous month summary for "this_month" delta ─────────────────────────
-let prevSummary = null;
-if (preset === "this_month") {
-  const now = new Date();
-  const phtMs = now.getTime() + 8 * 60 * 60 * 1000;
-  const pht = new Date(phtMs);
+      // Previous month: full month (1st to last day)
+      const prevMonthDate = new Date(pht.getFullYear(), pht.getMonth() - 1, 1);
+      const prevFrom = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+      const prevLastDay = new Date(
+        pht.getFullYear(),
+        pht.getMonth(),
+        0,
+      ).getDate();
+      const prevTo = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`;
 
-  // Previous month: full month (1st to last day)
-  const prevMonthDate = new Date(pht.getFullYear(), pht.getMonth() - 1, 1);
-  const prevFrom = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
-  const prevLastDay = new Date(pht.getFullYear(), pht.getMonth(), 0).getDate();
-  const prevTo = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, "0")}-${String(prevLastDay).padStart(2, "0")}`;
+      const {
+        where: prevWhere,
+        params: prevParams,
+        nextP: prevNextP,
+      } = buildWhere({
+        ...req.query,
+        date_from: prevFrom,
+        date_to: prevTo,
+      });
 
-  const { where: prevWhere, params: prevParams, nextP: prevNextP } = buildWhere({
-    ...req.query,
-    date_from: prevFrom,
-    date_to: prevTo,
-  });
+      prevSummary = await querySummary(prevWhere, prevParams, prevNextP);
+    }
 
-  prevSummary = await querySummary(prevWhere, prevParams, prevNextP);
-}
-
-
-res.json({
-  success: true,
-  summary,
-  trends,
-  hourly,
-  byDay,
-  place,
-  barangay,
-  modus,
-  completeData,
-  prevSummary,
-  modeOfReporting,
-});
+    res.json({
+      success: true,
+      summary,
+      trends,
+      hourly,
+      byDay,
+      place,
+      barangay,
+      modus,
+      completeData,
+      prevSummary,
+      modeOfReporting,
+    });
   } catch (err) {
     console.error("getOverview error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -725,5 +744,5 @@ module.exports = {
   getByBarangay,
   getByModus,
   getCompleteData,
-  getPatrolUserBarangays,  // ADD THIS
+  getPatrolUserBarangays, // ADD THIS
 };

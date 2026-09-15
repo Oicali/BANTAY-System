@@ -67,7 +67,20 @@ const STATUS_COLORS = {
 
 const formatBarangayLabel = (name) => {
   if (!name) return "";
-  const ROMAN = new Set(["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]);
+  const ROMAN = new Set([
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+  ]);
   return name.toLowerCase().replace(/\b\w+/g, (word) => {
     const upper = word.toUpperCase();
     if (ROMAN.has(upper)) return upper;
@@ -95,7 +108,9 @@ const rankShade = (rank, totalRows) => {
 
 const getPhtToday = () => {
   const now = new Date();
-  return new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 };
 
 const getDefaultRange = () => {
@@ -124,9 +139,17 @@ const EMPTY = () => ({
    every panel scales exactly to its fixed-height grid cell with no
    surprise overflow) ─────────────────────────────────────────────────── */
 
-const LineChartLabeled = ({ data, labels = [], color = "#19a7e0", height = 100 }) => {
+const LineChartLabeled = ({
+  data,
+  labels = [],
+  color = "#19a7e0",
+  height = 100,
+}) => {
   const width = 300;
-  const padL = 26, padR = 8, padT = 10, padB = 18;
+  const padL = 26,
+    padR = 8,
+    padT = 10,
+    padB = 18;
   const plotW = width - padL - padR;
   const plotH = height - padT - padB;
   if (!data.length) return <div className="ov-empty-mini">No data</div>;
@@ -138,30 +161,75 @@ const LineChartLabeled = ({ data, labels = [], color = "#19a7e0", height = 100 }
   const labelEvery = Math.max(1, Math.ceil(labels.length / 8));
 
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+    >
       {gridSteps.map((t, i) => {
         const y = padT + plotH * t;
         return (
           <g key={i}>
-            <line x1={padL} x2={width - padR} y1={y} y2={y} stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-            <text x={padL - 4} y={y + 3} fontSize="7" fill="#9fb8d9" textAnchor="end">
+            <line
+              x1={padL}
+              x2={width - padR}
+              y1={y}
+              y2={y}
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth="1"
+            />
+            <text
+              x={padL - 4}
+              y={y + 3}
+              fontSize="7"
+              fill="#9fb8d9"
+              textAnchor="end"
+            >
               {Math.round(max * (1 - t))}
             </text>
           </g>
         );
       })}
-      <line x1={padL} x2={padL} y1={padT} y2={height - padB} stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
-      <line x1={padL} x2={width - padR} y1={height - padB} y2={height - padB} stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      <line
+        x1={padL}
+        x2={padL}
+        y1={padT}
+        y2={height - padB}
+        stroke="rgba(255,255,255,0.25)"
+        strokeWidth="1"
+      />
+      <line
+        x1={padL}
+        x2={width - padR}
+        y1={height - padB}
+        y2={height - padB}
+        stroke="rgba(255,255,255,0.25)"
+        strokeWidth="1"
+      />
       <polyline points={points} fill="none" stroke={color} strokeWidth="2" />
       {data.map((v, i) => (
-        <circle key={i} cx={padL + i * stepX} cy={yFor(v)} r="2.2" fill={color} />
+        <circle
+          key={i}
+          cx={padL + i * stepX}
+          cy={yFor(v)}
+          r="2.2"
+          fill={color}
+        />
       ))}
       {labels.map((lab, i) =>
         lab && i % labelEvery === 0 ? (
-          <text key={i} x={padL + i * stepX} y={height - 5} fontSize="7" fill="#9fb8d9" textAnchor="middle">
+          <text
+            key={i}
+            x={padL + i * stepX}
+            y={height - 5}
+            fontSize="7"
+            fill="#9fb8d9"
+            textAnchor="middle"
+          >
             {lab}
           </text>
-        ) : null
+        ) : null,
       )}
     </svg>
   );
@@ -196,8 +264,20 @@ const Donut = ({ segments, size = 74, thickness = 12 }) => {
   const c = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} flexShrink={0}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={thickness} />
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      flexShrink={0}
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.08)"
+        strokeWidth={thickness}
+      />
       {segments.map((seg, i) => {
         const frac = seg.value / total;
         const dash = frac * c;
@@ -222,8 +302,6 @@ const Donut = ({ segments, size = 74, thickness = 12 }) => {
   );
 };
 
-
-
 const VBars = ({ segments }) => {
   const max = Math.max(...segments.map((s) => s.value), 1);
   return (
@@ -234,7 +312,10 @@ const VBars = ({ segments }) => {
           <div className="ov-vbar-track">
             <div
               className="ov-vbar-fill"
-              style={{ height: `${(s.value / max) * 100}%`, background: s.color }}
+              style={{
+                height: `${(s.value / max) * 100}%`,
+                background: s.color,
+              }}
             />
           </div>
           <span className="ov-vbar-label">{s.label}</span>
@@ -263,8 +344,6 @@ const DonutPanel = ({ segments }) => {
     </div>
   );
 };
-
-
 
 export default function Overview() {
   const navigate = useNavigate();
@@ -297,9 +376,12 @@ export default function Overview() {
       granularity: "monthly",
       preset: "custom",
     });
-    if (filters.crimeTypes.length) params.set("crime_types", filters.crimeTypes.join(","));
-    if (filters.barangays.length) params.set("barangays", filters.barangays.join(","));
-    if (filters.mobileUnits.length) params.set("mobile_units", filters.mobileUnits.join(","));
+    if (filters.crimeTypes.length)
+      params.set("crime_types", filters.crimeTypes.join(","));
+    if (filters.barangays.length)
+      params.set("barangays", filters.barangays.join(","));
+    if (filters.mobileUnits.length)
+      params.set("mobile_units", filters.mobileUnits.join(","));
 
     setLoading(true);
 
@@ -309,6 +391,12 @@ export default function Overview() {
       .then((r) => r.json())
       .then((json) => {
         if (json.success) {
+          // TEMP DEBUG: raw record straight from the API response, before
+          // any frontend mapping/fallback logic touches it
+          console.log(
+            "[Overview] raw completeData[0]:",
+            json.completeData?.[0],
+          );
           setDashData({
             summary: json.summary ?? [],
             trends: json.trends ?? [],
@@ -343,21 +431,24 @@ export default function Overview() {
     () =>
       [...dashData.summary]
         .sort((a, b) => b.total - a.total)
-        .map((d) => ({ label: CRIME_DISPLAY[d.crime] || d.crime, value: d.total })),
+        .map((d) => ({
+          label: CRIME_DISPLAY[d.crime] || d.crime,
+          value: d.total,
+        })),
     [dashData.summary],
   );
 
   const focusCrimeDonut = useMemo(
-  () =>
-    [...dashData.summary]
-      .sort((a, b) => b.total - a.total)
-      .map((d) => ({
-        label: CRIME_DISPLAY[d.crime] || d.crime,
-        value: d.total,
-        color: CRIME_COLORS[d.crime] || "#19a7e0",
-      })),
-  [dashData.summary],
-);
+    () =>
+      [...dashData.summary]
+        .sort((a, b) => b.total - a.total)
+        .map((d) => ({
+          label: CRIME_DISPLAY[d.crime] || d.crime,
+          value: d.total,
+          color: CRIME_COLORS[d.crime] || "#19a7e0",
+        })),
+    [dashData.summary],
+  );
 
   const barangayRanked = useMemo(
     () => [...dashData.barangay].sort((a, b) => b.count - a.count),
@@ -380,7 +471,14 @@ export default function Overview() {
       .map(([label, value], i) => ({
         label,
         value,
-        color: ["#19a7e0", "#ec4899", "#22c55e", "#f59e0b", "#a855f7", "#6366f1"][i % 6],
+        color: [
+          "#19a7e0",
+          "#ec4899",
+          "#22c55e",
+          "#f59e0b",
+          "#a855f7",
+          "#6366f1",
+        ][i % 6],
       }));
   }, [dashData.modus]);
 
@@ -392,7 +490,14 @@ export default function Overview() {
       .map((m, i) => ({
         label: m.mode,
         value: m.count,
-        color: ["#19a7e0", "#ec4899", "#22c55e", "#f59e0b", "#a855f7", "#6366f1"][i % 6],
+        color: [
+          "#19a7e0",
+          "#ec4899",
+          "#22c55e",
+          "#f59e0b",
+          "#a855f7",
+          "#6366f1",
+        ][i % 6],
       }));
   }, [dashData.modeOfReporting]);
 
@@ -406,14 +511,32 @@ export default function Overview() {
         const raw = t.month || t.label || t.period || "";
         const [y, m] = raw.split("-");
         if (!y || !m) return raw;
-        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const monthNames = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
         return `${monthNames[parseInt(m, 10) - 1]} '${y.slice(2)}`;
       }),
     [dashData.trends],
   );
   console.log("trends sample:", dashData.trends[0]);
   console.log("hourly sample:", dashData.hourly[0]);
-  console.log("completeData keys:", dashData.completeData[0] ? Object.keys(dashData.completeData[0]) : "empty array");
+  console.log(
+    "completeData keys:",
+    dashData.completeData[0]
+      ? Object.keys(dashData.completeData[0])
+      : "empty array",
+  );
   const hourlySpark = useMemo(
     () => dashData.hourly.map((h) => h.count || 0),
     [dashData.hourly],
@@ -440,10 +563,17 @@ export default function Overview() {
   const caseStatusSegments = [
     { label: "Solved", value: totals.solved, color: STATUS_COLORS.solved },
     { label: "Cleared", value: totals.cleared, color: STATUS_COLORS.cleared },
-    { label: "Under Inv.", value: totals.ui, color: STATUS_COLORS.underInvestigation },
+    {
+      label: "Under Inv.",
+      value: totals.ui,
+      color: STATUS_COLORS.underInvestigation,
+    },
   ];
 
-  const totalPages = Math.max(1, Math.ceil(dashData.completeData.length / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(dashData.completeData.length / PAGE_SIZE),
+  );
   const safePage = Math.min(page, totalPages - 1);
   const pageRecords = dashData.completeData.slice(
     safePage * PAGE_SIZE,
@@ -458,9 +588,12 @@ export default function Overview() {
         </div>
         <div className="ov-header-right">
           <span className="ov-header-range">
-  {fmtDate(filters.dateFrom)} — {fmtDate(filters.dateTo)}
-</span>
-          <button className="ov-exit-btn" onClick={() => navigate("/crime-dashboard")}>
+            {fmtDate(filters.dateFrom)} — {fmtDate(filters.dateTo)}
+          </span>
+          <button
+            className="ov-exit-btn"
+            onClick={() => navigate("/crime-dashboard")}
+          >
             ✕ Exit Overview
           </button>
         </div>
@@ -477,15 +610,30 @@ export default function Overview() {
               <div className="ov-kpi-value">{totals.total}</div>
               <div className="ov-kpi-mini-row">
                 <div className="ov-kpi-mini">
-                  <span className="ov-kpi-mini-val" style={{ color: STATUS_COLORS.solved }}>{totals.solved}</span>
+                  <span
+                    className="ov-kpi-mini-val"
+                    style={{ color: STATUS_COLORS.solved }}
+                  >
+                    {totals.solved}
+                  </span>
                   <span className="ov-kpi-mini-lbl">Solved</span>
                 </div>
                 <div className="ov-kpi-mini">
-                  <span className="ov-kpi-mini-val" style={{ color: STATUS_COLORS.cleared }}>{totals.cleared}</span>
+                  <span
+                    className="ov-kpi-mini-val"
+                    style={{ color: STATUS_COLORS.cleared }}
+                  >
+                    {totals.cleared}
+                  </span>
                   <span className="ov-kpi-mini-lbl">Cleared</span>
                 </div>
                 <div className="ov-kpi-mini">
-                  <span className="ov-kpi-mini-val" style={{ color: STATUS_COLORS.underInvestigation }}>{totals.ui}</span>
+                  <span
+                    className="ov-kpi-mini-val"
+                    style={{ color: STATUS_COLORS.underInvestigation }}
+                  >
+                    {totals.ui}
+                  </span>
                   <span className="ov-kpi-mini-lbl">Under Inv.</span>
                 </div>
               </div>
@@ -496,17 +644,22 @@ export default function Overview() {
           <div className="ov-panel ov-area-focus">
             <div className="ov-panel-head">Focus Crime</div>
             <div className="ov-panel-scroll">
-              <HBars rows={focusCrimeRows} colorFor={(label) => {
-                const key = Object.keys(CRIME_DISPLAY).find((k) => CRIME_DISPLAY[k] === label);
-                return CRIME_COLORS[key] || "#19a7e0";
-              }} />
+              <HBars
+                rows={focusCrimeRows}
+                colorFor={(label) => {
+                  const key = Object.keys(CRIME_DISPLAY).find(
+                    (k) => CRIME_DISPLAY[k] === label,
+                  );
+                  return CRIME_COLORS[key] || "#19a7e0";
+                }}
+              />
             </div>
           </div>
 
           <div className="ov-panel ov-area-focusdonut">
-  <div className="ov-panel-head">Focus Crime</div>
-  <DonutPanel segments={focusCrimeDonut} />
-</div>
+            <div className="ov-panel-head">Focus Crime</div>
+            <DonutPanel segments={focusCrimeDonut} />
+          </div>
 
           {/* Case status donut */}
           <div className="ov-panel ov-area-status">
@@ -523,33 +676,44 @@ export default function Overview() {
           {/* Barangay ranking */}
           <div className="ov-panel ov-area-brgy">
             <div className="ov-panel-head">
-              Barangay Ranking <span className="ov-count-tag">{barangayRanked.length}</span>
+              Barangay Ranking{" "}
+              <span className="ov-count-tag">{barangayRanked.length}</span>
             </div>
             <div className="ov-panel-scroll">
               <table className="ov-table">
                 <thead>
-                  <tr><th>#</th><th>Barangay</th><th>Count</th></tr>
+                  <tr>
+                    <th>#</th>
+                    <th>Barangay</th>
+                    <th>Count</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {barangayRanked.map((b, i) => {
-  const shade = rankShade(i + 1, barangayRanked.length);
-  return (
-    <tr key={b.barangay}>
-      <td className="ov-rank">{i + 1}</td>
-      <td className="ov-name">{formatBarangayLabel(b.barangay)}</td>
-      <td className="ov-num">
-        <span
-          className="ov-count-badge"
-          style={{ background: shade.bg, color: shade.text }}
-        >
-          {b.count}
-        </span>
-      </td>
-    </tr>
-  );
-})}
+                    const shade = rankShade(i + 1, barangayRanked.length);
+                    return (
+                      <tr key={b.barangay}>
+                        <td className="ov-rank">{i + 1}</td>
+                        <td className="ov-name">
+                          {formatBarangayLabel(b.barangay)}
+                        </td>
+                        <td className="ov-num">
+                          <span
+                            className="ov-count-badge"
+                            style={{ background: shade.bg, color: shade.text }}
+                          >
+                            {b.count}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {barangayRanked.length === 0 && (
-                    <tr><td colSpan={3} className="ov-empty-row">No data</td></tr>
+                    <tr>
+                      <td colSpan={3} className="ov-empty-row">
+                        No data
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -560,18 +724,28 @@ export default function Overview() {
           <div className="ov-panel ov-area-trends">
             <div className="ov-panel-head">Crime Trends</div>
             <div className="ov-linechart-wrap">
-              <LineChartLabeled data={trendSpark} labels={trendLabels} color="#19a7e0" />
+              <LineChartLabeled
+                data={trendSpark}
+                labels={trendLabels}
+                color="#19a7e0"
+              />
             </div>
           </div>
           <div className="ov-panel ov-area-clock">
             <div className="ov-panel-head">Crime Clock</div>
             <div className="ov-linechart-wrap">
-              <LineChartLabeled data={hourlySpark} labels={hourlyLabels} color="#ec4899" />
+              <LineChartLabeled
+                data={hourlySpark}
+                labels={hourlyLabels}
+                color="#ec4899"
+              />
             </div>
           </div>
           <div className="ov-panel ov-area-proneday">
             <div className="ov-panel-head">Prone Day</div>
-            <VBars segments={byDayRows.map((d) => ({ ...d, color: "#f59e0b" }))} />
+            <VBars
+              segments={byDayRows.map((d) => ({ ...d, color: "#f59e0b" }))}
+            />
           </div>
 
           {/* Modus donut */}
@@ -586,64 +760,75 @@ export default function Overview() {
             <div className="ov-panel-scroll">
               <table className="ov-table">
                 <thead>
-                  <tr><th>Location</th><th>Count</th></tr>
+                  <tr>
+                    <th>Location</th>
+                    <th>Count</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {placeRanked.map((p, i) => {
-  const shade = rankShade(i + 1, placeRanked.length);
-  return (
-    <tr key={p.place}>
-      <td className="ov-name">{p.place}</td>
-      <td className="ov-num">
-        <span
-          className="ov-count-badge"
-          style={{ background: shade.bg, color: shade.text }}
-        >
-          {p.count}
-        </span>
-      </td>
-    </tr>
-  );
-})}
+                    const shade = rankShade(i + 1, placeRanked.length);
+                    return (
+                      <tr key={p.place}>
+                        <td className="ov-name">{p.place}</td>
+                        <td className="ov-num">
+                          <span
+                            className="ov-count-badge"
+                            style={{ background: shade.bg, color: shade.text }}
+                          >
+                            {p.count}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {placeRanked.length === 0 && (
-                    <tr><td colSpan={2} className="ov-empty-row">No data</td></tr>
+                    <tr>
+                      <td colSpan={2} className="ov-empty-row">
+                        No data
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
 
-        
-
           {/* Map */}
           {/* Map */}
-<div className="ov-panel ov-area-map">
-  <div className="ov-panel-head">Crime Map</div>
-  <div className="ov-map-inner">
-    <CrimeMapping
-      minimal
-      externalFilters={{
-        incident_types: filters.crimeTypes,
-        barangays: filters.barangays,
-        date_from: filters.dateFrom,
-        date_to: filters.dateTo,
-      }}
-      onFilterChange={(partial) =>
-        setFilters((f) => ({
-          ...f,
-          ...(partial.crimeTypes !== undefined && { crimeTypes: partial.crimeTypes }),
-          ...(partial.barangays !== undefined && { barangays: partial.barangays }),
-        }))
-      }
-    />
-  </div>
-</div>
+          <div className="ov-panel ov-area-map">
+            <div className="ov-panel-head">Crime Map</div>
+            <div className="ov-map-inner">
+              <CrimeMapping
+                minimal
+                externalFilters={{
+                  incident_types: filters.crimeTypes,
+                  barangays: filters.barangays,
+                  date_from: filters.dateFrom,
+                  date_to: filters.dateTo,
+                }}
+                onFilterChange={(partial) =>
+                  setFilters((f) => ({
+                    ...f,
+                    ...(partial.crimeTypes !== undefined && {
+                      crimeTypes: partial.crimeTypes,
+                    }),
+                    ...(partial.barangays !== undefined && {
+                      barangays: partial.barangays,
+                    }),
+                  }))
+                }
+              />
+            </div>
+          </div>
 
           {/* Bottom wide blotter table */}
           <div className="ov-panel ov-area-blotter">
             <div className="ov-panel-head">
               Detailed Crime Records
-              <span className="ov-count-tag">{dashData.completeData.length}</span>
+              <span className="ov-count-tag">
+                {dashData.completeData.length}
+              </span>
               <div className="ov-page-controls">
                 <button
                   disabled={safePage === 0}
@@ -651,7 +836,9 @@ export default function Overview() {
                 >
                   ‹
                 </button>
-                <span>{safePage + 1}/{totalPages}</span>
+                <span>
+                  {safePage + 1}/{totalPages}
+                </span>
                 <button
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage((p) => p + 1)}
@@ -664,10 +851,8 @@ export default function Overview() {
               <table className="ov-table ov-blotter-table">
                 <thead>
                   <tr>
-                    <th>Blotter No.</th>
                     <th>Crime</th>
                     <th>Barangay</th>
-                    <th>Narrative</th>
                     <th>Place</th>
                     <th>Modus</th>
                     <th>Date Committed</th>
@@ -675,20 +860,26 @@ export default function Overview() {
                 </thead>
                 <tbody>
                   {pageRecords.map((r, i) => (
-                    <tr key={r.report_id || r.blotter_id || i}>
-                      <td>{r.report_number || r.blotter_entry_number || "—"}</td>
+                    <tr key={i}>
                       <td className="ov-crime-cell">
-                        {CRIME_DISPLAY[r.crime_type] || r.crime_type || "—"}
+                        {CRIME_DISPLAY[r.crimeOffense] || r.crimeOffense || "—"}
                       </td>
-                      <td>{r.place_barangay ? formatBarangayLabel(r.place_barangay) : "—"}</td>
-                      <td className="ov-narrative-cell">{r.narrative || "—"}</td>
-                      <td>{r.type_of_place || r.place_street || "—"}</td>
-                      <td>{r.modus || r.modus_name || "—"}</td>
-                      <td>{fmtDate((r.date_time_commission || "").slice(0, 10))}</td>
+                      <td>
+                        {r.barangay ? formatBarangayLabel(r.barangay) : "—"}
+                      </td>
+                      <td>{r.typeOfPlace || "—"}</td>
+                      <td>{r.modus || "—"}</td>
+                      <td>
+                        {r.date || "—"} {r.time ? `· ${r.time}` : ""}
+                      </td>
                     </tr>
                   ))}
                   {pageRecords.length === 0 && (
-                    <tr><td colSpan={7} className="ov-empty-row">No records for this range.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="ov-empty-row">
+                        No records for this range.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -699,4 +890,3 @@ export default function Overview() {
     </div>
   );
 }
-
