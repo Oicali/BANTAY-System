@@ -1,8 +1,13 @@
+import { createPortal } from "react-dom";
+
 const LoadingModal = ({ isOpen, message = "Loading...", zIndex = 9999 }) => {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onKeyDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
       style={{
         position: "fixed",
         inset: 0,
@@ -13,6 +18,8 @@ const LoadingModal = ({ isOpen, message = "Loading...", zIndex = 9999 }) => {
         alignItems: "center",
         justifyContent: "center",
         gap: 16,
+        cursor: "wait",
+        pointerEvents: "auto",
       }}
     >
       <div
@@ -50,7 +57,8 @@ const LoadingModal = ({ isOpen, message = "Loading...", zIndex = 9999 }) => {
       </div>
 
       <style>{`@keyframes loading-spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
 

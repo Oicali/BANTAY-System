@@ -87,29 +87,58 @@
       setSelectedPMIds([]);
       if (!form.start_date || !form.end_date || form.end_date < form.start_date) return;
 
+      let cancelled = false;
       setLoadingPatrollers(true);
       fetch(`${API_BASE}/patrol/available-patrollers?start=${form.start_date}&end=${form.end_date}`, {
         headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
       })
         .then((r) => r.json())
-        .then((data) => { if (data.success) setAvailableForDates(data.data); })
-        .catch(console.error)
-        .finally(() => setLoadingPatrollers(false));
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.success) {
+            setNotif({ message: "Could not check patroller availability. Please retry.", type: "error" });
+            return;
+          }
+          setAvailableForDates(data.data);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error(err);
+          setNotif({ message: "Could not check patroller availability. Please retry.", type: "error" });
+        })
+        .finally(() => { if (!cancelled) setLoadingPatrollers(false); });
+
+      return () => { cancelled = true; };
     }, [form.start_date, form.end_date]);
+    
     useEffect(() => {
     setAvailableMobileUnits(null);
     setForm((p) => ({ ...p, mobile_unit_id: "" }));
     if (!form.start_date || !form.end_date || form.end_date < form.start_date) return;
 
+    let cancelled = false;
     setLoadingMobileUnits(true);
     fetch(
       `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}`,
       { headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` } }
     )
       .then((r) => r.json())
-      .then((data) => { if (data.success) setAvailableMobileUnits(data.data); })
-      .catch(console.error)
-      .finally(() => setLoadingMobileUnits(false));
+      .then((data) => {
+        if (cancelled) return;
+        if (!data.success) {
+          setNotif({ message: "Could not check mobile unit availability. Please retry.", type: "error" });
+          return;
+        }
+        setAvailableMobileUnits(data.data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        setNotif({ message: "Could not check mobile unit availability. Please retry.", type: "error" });
+      })
+      .finally(() => { if (!cancelled) setLoadingMobileUnits(false); });
+
+    return () => { cancelled = true; };
   }, [form.start_date, form.end_date]);
 
     const amTasks      = tasks.filter((t) => t.shift === "AM");
@@ -295,7 +324,7 @@
     const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
 
     const handleSave = () => {
-      if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
+      if (!form.patrol_name.trim() || !form.mobile_unit_id || !form.start_date || !form.end_date) {
         setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
       }
     if (parseLocalDate(form.end_date) < parseLocalDate(form.start_date)) {
@@ -386,7 +415,7 @@
     };
 
     return (
-      <div className="apm-overlay" onClick={onClose}>
+      <div className="apm-overlay">
         <div className="apm-modal" onClick={(e) => e.stopPropagation()}>
 
           {/* TOP BAR */}
@@ -402,7 +431,7 @@
     <label>Mobile Unit <span className="apm-req">*</span></label>
     <select
       value={form.mobile_unit_id}
-      onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}
+      onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value ? Number(e.target.value) : "" }))}
       disabled={!form.start_date || !form.end_date || loadingMobileUnits}
     >
       {!form.start_date || !form.end_date
@@ -761,8 +790,6 @@
     onChange={(v) => updateTask(task._id, "time_start", v)}
     onBlur={sortCurrentShift}
     baseHour={activeShift === "AM" ? 8 : 20}
-    allowedPeriods={activeShift === "AM" ? ["AM", "PM"] : ["PM", "AM"]}
-    maxPeriod={activeShift === "AM" ? "PM" : null}
     shift={activeShift}
   />
   <span>—</span>
@@ -771,8 +798,6 @@
     onChange={(v) => updateTask(task._id, "time_end", v)}
     onBlur={sortCurrentShift}
     baseHour={task.time_start ? parseInt(task.time_start.split(":")[0]) % 12 || 12 : 8}
-    allowedPeriods={activeShift === "AM" ? ["AM", "PM"] : ["PM", "AM"]}
-    maxPeriod={activeShift === "AM" ? "PM" : null}
     shift={activeShift}
   />
                               </div>

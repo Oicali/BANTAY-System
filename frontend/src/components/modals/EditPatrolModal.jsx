@@ -79,6 +79,23 @@ const formatTabDate = (d) => {
   return new Date(y, m - 1, day).toLocaleDateString("en-PH", { month: "short", day: "numeric" });
 };
 
+// Runs `worker` over `items` with at most `limit` in flight at once —
+// prevents flooding the DB connection pool when saving many dates at once.
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runNext() {
+    const i = nextIndex++;
+    if (i >= items.length) return;
+    results[i] = await worker(items[i], i);
+    return runNext();
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+  return results;
+}
+
 // ── Apply Dates Dialog ─────────────────────────────────────────────
 const ApplyDatesDialog = ({ dateRange, activeDate, onConfirm, onCancel }) => {
   const [selected, setSelected] = useState([activeDate]);
@@ -128,6 +145,90 @@ const ApplyDatesDialog = ({ dateRange, activeDate, onConfirm, onCancel }) => {
   );
 };
 
+// ── Reset Confirm Dialog ─────────────────────────────────────────
+const ResetDateConfirmDialog = ({ onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1250 }}
+    >
+      <div
+        style={{ background: "#fff", borderRadius: "12px", padding: "28px 28px 22px", width: "380px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "12px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Change Patrol Dates?</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          Changing the start or end date will <strong style={{ color: "#212529" }}>clear all existing tasks and patroller assignments</strong> for this patrol. You'll need to re-assign patrollers and re-add tasks for the new dates.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button onClick={onCancel} style={{ padding: "8px 18px", background: "transparent", border: "1px solid #ced4da", borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057", cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} style={{ padding: "8px 20px", background: "#dc2626", border: "none", borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+            Change Dates &amp; Reset
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ── Confirm Apply-All Dialog (used after a date-range change/reset) ─────
+const ConfirmApplyAllDialog = ({ activeDateLabel, onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1250 }}
+    >
+      <div
+        style={{ background: "#fff", borderRadius: "12px", padding: "28px 28px 22px", width: "380px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "12px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Save Changes?</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          Since the patrol dates were changed, <strong style={{ color: "#212529" }}>{activeDateLabel}'s tasks and patroller assignments will be applied to every date</strong> in the new range. Are you sure you want to save?
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button onClick={onCancel} style={{ padding: "8px 18px", background: "transparent", border: "1px solid #ced4da", borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057", cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} style={{ padding: "8px 20px", background: "#1e3a5f", border: "none", borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+            Yes, Save
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ── Exit Confirm Dialog ──────────────────────────────────────────
+const ExitConfirmDialog = ({ onConfirm, onCancel }) => {
+  return createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1260 }}
+    >
+      <div
+        style={{ background: "#fff", borderRadius: "12px", padding: "28px 28px 22px", width: "380px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "12px" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Discard Changes?</div>
+        <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
+          You have unsaved changes. Exiting now will <strong style={{ color: "#212529" }}>discard everything you've edited</strong> in this patrol.
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+          <button onClick={onCancel} style={{ padding: "8px 18px", background: "transparent", border: "1px solid #ced4da", borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057", cursor: "pointer", fontFamily: "inherit" }}>
+            Keep Editing
+          </button>
+          <button onClick={onConfirm} style={{ padding: "8px 20px", background: "#dc2626", border: "none", borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>
+            Discard &amp; Exit
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // ── Main Component ─────────────────────────────────────────────────
 const EditPatrolModal = ({ patrol, mobileUnits, geoJSONData, onClose, onSave }) => {
   const token           = () => sessionStorage.getItem("token");
@@ -151,6 +252,9 @@ const [loadingMobileUnits, setLoadingMobileUnits]     = useState(false);
 
 const [hoveredPatroller, setHoveredPatroller] = useState(null);
 const [hoverAnchor, setHoverAnchor]           = useState(null);
+const [pendingDateChange, setPendingDateChange] = useState(null); // { apply: fn } | null
+const [dateRangeChanged, setDateRangeChanged] = useState(false);
+const [showConfirmAllDialog, setShowConfirmAllDialog] = useState(false);
 
   // The full list shown in the checklist (available + already assigned to this patrol)
   const [patrollerList, setPatrollerList]         = useState([]);
@@ -159,7 +263,30 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
   // routes ref for stale closure fix (mirrors localRoutes)
   const localRoutesRef = useRef([]);
 
+  // live snapshot of patrollersByDate, so the patroller-list fetch can check
+  // who's *currently* assigned instead of relying on the stale patrol prop
+  const patrollersByDateRef = useRef({});
+
+  // The patrol's original date range exactly as loaded from the server —
+  // fixed at mount. Used to detect dates that fell OUT of range after an
+  // edit, so their leftover patrol_assignment_patroller rows get cleared
+  // on save instead of silently orphaned (they'd otherwise keep showing
+  // up in AfterPatrol's "my patrols" list for officers no longer really
+  // assigned to any current date).
+  const originalDateRangeRef = useRef(
+    generateDateRange(toDateStr(patrol?.start_date), toDateStr(patrol?.end_date))
+  );
+
   const [form, setForm] = useState({
+    patrol_name:    patrol?.patrol_name    || "",
+    mobile_unit_id: patrol?.mobile_unit_id || "",
+    start_date:     toDateStr(patrol?.start_date) || "",
+    end_date:       toDateStr(patrol?.end_date)   || "",
+  });
+
+  // Snapshot of the original values, taken once on open — used only to
+  // detect "did anything actually change" when the admin tries to exit.
+  const initialFormRef = useRef({
     patrol_name:    patrol?.patrol_name    || "",
     mobile_unit_id: patrol?.mobile_unit_id || "",
     start_date:     toDateStr(patrol?.start_date) || "",
@@ -170,6 +297,12 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     [...new Set((patrol?.routes || []).filter((r) => (r.stop_order || 0) <= 0 && r.barangay).map((r) => r.barangay))]
   );
 
+  const initialBarangaysRef = useRef(
+    [...new Set((patrol?.routes || []).filter((r) => (r.stop_order || 0) <= 0 && r.barangay).map((r) => r.barangay))]
+  );
+
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
   const [localRoutes, setLocalRoutes] = useState(() => {
     const routes = (patrol?.routes || []).filter((r) => (r.stop_order || 0) > 0);
     localRoutesRef.current = routes;
@@ -177,6 +310,7 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
   });
 
   const dateRange = generateDateRange(toDateStr(form.start_date), toDateStr(form.end_date));
+  const datesReady = dateRange.length > 0 && form.start_date && form.end_date;
 
   const [activeDate, setActiveDate] = useState(() => {
     const dates = generateDateRange(toDateStr(patrol?.start_date), toDateStr(patrol?.end_date));
@@ -197,6 +331,8 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     return map;
   });
 
+  useEffect(() => { patrollersByDateRef.current = patrollersByDate; }, [patrollersByDate]);
+
   // ── Dirty dates ──────────────────────────────────────────────────
   const [dirtyDates, setDirtyDates] = useState(new Set());
   const markDirty  = (date) => setDirtyDates((prev) => { const n = new Set(prev); n.add(date); return n; });
@@ -206,10 +342,18 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
   useEffect(() => {
     if (!patrol?.patrol_id) return;
 
-    const start = toDateStr(patrol.start_date);
-    const end   = toDateStr(patrol.end_date);
-    if (!start || !end) return;
+    const start = toDateStr(form.start_date);
+    const end   = toDateStr(form.end_date);
+    if (!start || !end || end < start) {
+      // Dates aren't a valid range right now — the previously fetched list
+      // no longer corresponds to anything selectable. Clear it instead of
+      // leaving stale, clickable entries on screen.
+      setPatrollerList([]);
+      setLoadingPatrollers(false);
+      return;
+    }
 
+    let cancelled = false;
     setLoadingPatrollers(true);
 
     fetch(
@@ -218,15 +362,29 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
     )
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         const available = data.success ? data.data : [];
+
+        // Only patch in officers still referenced in the *live* in-modal
+        // state — not the original patrol prop, which goes stale after
+        // date changes/resets (it still lists whoever was assigned when
+        // the modal first opened).
+        const currentlyAssignedIds = new Set(
+          Object.values(patrollersByDateRef.current || {})
+            .flatMap((d) => [...(d.am || []), ...(d.pm || [])])
+        );
+
         const assignedSource = patrol?.patrollers_detail || patrol?.patrollers || [];
         const merged = [...available];
         for (const p of assignedSource) {
+          if (!currentlyAssignedIds.has(p.active_patroller_id)) continue; // stale — skip
           if (!merged.find((m) => m.active_patroller_id === p.active_patroller_id)) {
             merged.push({
               active_patroller_id: p.active_patroller_id,
               officer_name:        p.officer_name,
               contact_number:      p.contact_number || null,
+              profile_picture:     p.profile_picture || null,
+              rank:                p.rank || null,
             });
           }
         }
@@ -234,8 +392,14 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
         setPatrollerList(merged);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Load patrollers error:", err);
-        const assignedSource = patrol?.patrollers_detail || patrol?.patrollers || [];
+        const currentlyAssignedIds = new Set(
+          Object.values(patrollersByDateRef.current || {})
+            .flatMap((d) => [...(d.am || []), ...(d.pm || [])])
+        );
+        const assignedSource = (patrol?.patrollers_detail || patrol?.patrollers || [])
+          .filter((p) => currentlyAssignedIds.has(p.active_patroller_id));
         const seen   = new Set(assignedSource.map((p) => p.active_patroller_id));
         const unique = assignedSource.filter((p) => {
           if (seen.has(p.active_patroller_id)) { seen.delete(p.active_patroller_id); return true; }
@@ -243,32 +407,54 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
         });
         setPatrollerList(unique.sort((a, b) => (a.officer_name || "").localeCompare(b.officer_name || "")));
       })
-      .finally(() => setLoadingPatrollers(false));
-  }, [patrol?.patrol_id]);
+      .finally(() => { if (!cancelled) setLoadingPatrollers(false); });
+
+    return () => { cancelled = true; };
+  }, [patrol?.patrol_id, form.start_date, form.end_date]);
 
   useEffect(() => {
-  if (!form.start_date || !form.end_date) return;
+  if (!form.start_date || !form.end_date || form.end_date < form.start_date) return;
 
+  let cancelled = false;
   setLoadingMobileUnits(true);
-  fetch(
-    `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}&exclude_patrol_id=${patrol.patrol_id}`,
-    { headers: { Authorization: `Bearer ${token()}` } }
-  )
+  setAvailableMobileUnits(null); // clear stale list immediately so UI can't fall back to it on error
+
+  const debugUrl = `${API_BASE}/patrol/available-mobile-units?start=${form.start_date}&end=${form.end_date}&exclude_patrol_id=${patrol.patrol_id}`;
+ 
+
+  fetch(debugUrl, { headers: { Authorization: `Bearer ${token()}` } })
     .then((r) => r.json())
     .then((data) => {
-      if (data.success) {
-        // Always include the currently assigned unit even if it conflicts with itself
-        const list = data.data;
-        const alreadyIn = list.find((u) => u.mobile_unit_id === patrol.mobile_unit_id);
-        if (!alreadyIn && patrol.mobile_unit_id) {
-          const current = mobileUnits.find((u) => u.mobile_unit_id === patrol.mobile_unit_id);
-          if (current) list.unshift({ ...current, _isCurrent: true });
-        }
-        setAvailableMobileUnits(list);
+      if (cancelled) return;
+      if (!data.success) {
+        setNotif({ message: "Could not check mobile unit availability. Please retry before saving.", type: "error" });
+        return;
       }
+
+      const list = data.data;
+      setAvailableMobileUnits(list);
+
+      // If the currently selected unit isn't in the available list for this
+      // date range anymore, clear it — same pattern as AddPatrolModal.
+      setForm((p) => {
+        if (!p.mobile_unit_id) return p;
+        const stillAvailable = list.some((u) => Number(u.mobile_unit_id) === Number(p.mobile_unit_id));
+        if (stillAvailable) return p;
+        setNotif({
+          message: "The selected mobile unit is unavailable for these dates. Please select a different unit.",
+          type: "warning",
+        });
+        return { ...p, mobile_unit_id: "" };
+      });
     })
-    .catch(console.error)
-    .finally(() => setLoadingMobileUnits(false));
+    .catch((err) => {
+      if (cancelled) return;
+      console.error("Mobile unit availability error:", err);
+      setNotif({ message: "Could not check mobile unit availability. Please retry before saving.", type: "error" });
+    })
+    .finally(() => { if (!cancelled) setLoadingMobileUnits(false); });
+
+  return () => { cancelled = true; };
 }, [form.start_date, form.end_date]);
 
   // Derived for current date + shift
@@ -277,6 +463,7 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
   const otherShiftIds        = activeShift === "AM" ? activeDatePatrollers.pm : activeDatePatrollers.am;
 
   const togglePatroller = (id) => {
+    if (!activeDate) return; // no valid date selected yet — nothing to assign to
     if (otherShiftIds.includes(id)) {
       setNotif({
         message: `This patroller is already assigned to the ${activeShift === "AM" ? "PM" : "AM"} shift on this date.`,
@@ -347,7 +534,7 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
 
     // Limit check
     const AM_END   = 20 * 60;
-    const AM_START = 8 * 60;
+
 
     if (existing.length > 0) {
       const last = existing[existing.length - 1];
@@ -473,9 +660,21 @@ const [hoverAnchor, setHoverAnchor]           = useState(null);
   };
 
   // ── Validation ───────────────────────────────────────────────────
-  const handleSave = () => {
-    if (!form.patrol_name || !form.mobile_unit_id || !form.start_date || !form.end_date) {
+      const handleSave = () => {
+    if (!form.patrol_name.trim() || !form.mobile_unit_id || !form.start_date || !form.end_date) {
       setNotif({ message: "Please fill in all required fields.", type: "warning" }); return;
+    }
+    if (loadingMobileUnits) {
+      setNotif({ message: "Please wait while we check mobile unit availability.", type: "warning" }); return;
+    }
+    if (availableMobileUnits === null) {
+      setNotif({ message: "Mobile unit availability hasn't loaded yet. Please retry.", type: "warning" }); return;
+    }
+    {
+      const selectedEntry = availableMobileUnits.find((u) => Number(u.mobile_unit_id) === Number(form.mobile_unit_id));
+      if (!selectedEntry) {
+        setNotif({ message: "The selected mobile unit is unavailable for these dates. Please select a different unit.", type: "warning" }); return;
+      }
     }
 if (toDateStr(form.end_date) < toDateStr(form.start_date)) {
   setNotif({ message: "End date must be on or after start date.", type: "warning" }); return;
@@ -535,7 +734,12 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
       }
     }
 
-    if (tasksDirty.current || dirtyDates.size > 0) {
+    if (dateRangeChanged) {
+      setShowConfirmAllDialog(true);
+      return;
+    }
+
+    if (dateRange.length > 1 && (tasksDirty.current || dirtyDates.size > 0)) {
       setShowApplyDialog(true);
     } else {
       executeSave([activeDate]);
@@ -544,108 +748,191 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
 
   // ── Execute save ────────────────────────────────────────────────
   const executeSave = async (selectedDates) => {
+    // Every date about to receive a patroller update must end up staffed.
+    // A date unchecked in the Apply Dates dialog keeps its own individual
+    // state — which, right after a date-range reset, is still empty unless
+    // the admin visited that tab directly. Catch that here instead of
+    // silently saving an unstaffed date.
+    const patrollerDatesToCheck = [...new Set([...selectedDates, ...dirtyDates])].filter((d) => dateRange.includes(d));
+
+    // If any date is set to inherit the active date's roster, the active
+    // date's own assignment must be non-empty first — everything else
+    // downstream depends on it.
+    const activeDateWillBeCopied = patrollerDatesToCheck.some((d) => selectedDates.includes(d));
+    if (activeDateWillBeCopied) {
+      const activeDp = patrollersByDate[activeDate] || { am: [], pm: [] };
+      const activeIsEmpty = (activeDp.am?.length || 0) === 0 && (activeDp.pm?.length || 0) === 0;
+      if (activeIsEmpty) {
+        setNotif({
+          message: `Assign at least one patroller to ${formatTabDate(activeDate)} before saving — it will be copied to the other checked dates.`,
+          type: "warning",
+        });
+        return;
+      }
+    }
+
+    for (const date of patrollerDatesToCheck) {
+      if (selectedDates.includes(date)) continue; // already validated via activeDate above
+      const dp = patrollersByDate[date] || { am: [], pm: [] };
+      const isEmpty = (dp.am?.length || 0) === 0 && (dp.pm?.length || 0) === 0;
+      if (isEmpty) {
+        setNotif({
+          message: `${formatTabDate(date)} has no patrollers assigned. Assign at least one patroller on that date, or check it in the Apply Dates dialog to copy ${formatTabDate(activeDate)}'s assignments.`,
+          type: "warning",
+        });
+        return;
+      }
+    }
+
     setShowApplyDialog(false);
     tasksDirty.current = false;
     setLoading(true);
 
     try {
-      // 1. Delete removed tasks + propagate to other selected dates
-      const idsToDelete        = [...deletedRouteIds.current];
-      const deletedTaskDetails = idsToDelete
-        .map((rid) => patrol.routes.find((r) => r.route_id === rid))
-        .filter(Boolean);
-      const allIdsToDelete = new Set(idsToDelete);
+      // Routes work (delete removed tasks, then patch/create the rest) and
+      // patroller work touch different tables with no dependency on each
+      // other, so run them concurrently instead of awaiting one before
+      // starting the other — roughly halves save time when both changed.
+      const routesWork = (async () => {
+        // 1. Delete removed tasks + propagate to other selected dates
+        const idsToDelete        = [...deletedRouteIds.current];
+        const deletedTaskDetails = idsToDelete
+          .map((rid) => patrol.routes.find((r) => r.route_id === rid))
+          .filter(Boolean);
+        const allIdsToDelete = new Set(idsToDelete);
 
-      for (const deletedTask of deletedTaskDetails) {
-        for (const date of selectedDates) {
-          if (date === activeDate) continue;
-          const match = localRoutes.find(
-            (r) => toDateStr(r.route_date) === toDateStr(date) &&
-                   r.shift === deletedTask.shift &&
-                   Number(r.stop_order) === Number(deletedTask.stop_order)
-          );
-          if (match) allIdsToDelete.add(match.route_id);
-        }
-      }
-
-      await Promise.all(
-        [...allIdsToDelete].map((rid) =>
-          fetch(`${API_BASE}/patrol/routes/${rid}`, {
-            method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
-          })
-        )
-      );
-      deletedRouteIds.current.clear();
-
-      // 2. Patch / create tasks across selected dates
-      const activeTasks   = localRoutes.filter(
-        (r) => (r.stop_order || 0) > 0 && toDateStr(r.route_date) === activeDate
-      );
-      const patchRequests = [];
-
-      for (const date of selectedDates) {
-        if (date === activeDate) {
-          for (const r of activeTasks) {
-            patchRequests.push(
-              fetch(`${API_BASE}/patrol/routes/${r.route_id}/task`, {
-                method:  "PATCH",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-                body:    JSON.stringify({ time_start: r.time_start || null, time_end: r.time_end || null, notes: r.notes || null }),
-              })
-            );
-          }
-        } else {
-          for (const activeTask of activeTasks) {
+        for (const deletedTask of deletedTaskDetails) {
+          for (const date of selectedDates) {
+            if (date === activeDate) continue;
             const match = localRoutes.find(
               (r) => toDateStr(r.route_date) === toDateStr(date) &&
-                     r.shift === activeTask.shift &&
-                     Number(r.stop_order) === Number(activeTask.stop_order)
+                     r.shift === deletedTask.shift &&
+                     Number(r.stop_order) === Number(deletedTask.stop_order)
             );
-            patchRequests.push(match
-              ? fetch(`${API_BASE}/patrol/routes/${match.route_id}/task`, {
-                  method:  "PATCH",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-                  body:    JSON.stringify({ time_start: activeTask.time_start || null, time_end: activeTask.time_end || null, notes: activeTask.notes || null }),
-                })
-              : fetch(`${API_BASE}/patrol/routes/add`, {
-                  method:  "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-                  body:    JSON.stringify({
-                    patrol_id: patrol.patrol_id, route_date: date, shift: activeTask.shift,
-                    time_start: activeTask.time_start || null, time_end: activeTask.time_end || null,
-                    notes: activeTask.notes || null, stop_order: activeTask.stop_order,
-                  }),
-                })
-            );
+            if (match) allIdsToDelete.add(match.route_id);
           }
         }
-      }
-      await Promise.all(patchRequests);
 
-      // 3. Save patrollers
-      const patrollerDatestoSave = dirtyDates.has(activeDate)
-        ? [...new Set([...selectedDates, ...dirtyDates])]
-        : [...dirtyDates];
+        await Promise.all(
+          [...allIdsToDelete].map((rid) =>
+            fetch(`${API_BASE}/patrol/routes/${rid}`, {
+              method: "DELETE", headers: { Authorization: `Bearer ${token()}` },
+            })
+          )
+        );
+        deletedRouteIds.current.clear();
+
+        // 2. Patch / create tasks across selected dates
+        const activeTasks   = localRoutes.filter(
+          (r) => (r.stop_order || 0) > 0 && toDateStr(r.route_date) === activeDate
+        );
+        const patchRequests = [];
+
+        for (const date of selectedDates) {
+          if (date === activeDate) {
+            for (const r of activeTasks) {
+              patchRequests.push(
+                fetch(`${API_BASE}/patrol/routes/${r.route_id}/task`, {
+                  method:  "PATCH",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+                  body:    JSON.stringify({ time_start: r.time_start || null, time_end: r.time_end || null, notes: r.notes || null }),
+                })
+              );
+            }
+          } else {
+            for (const activeTask of activeTasks) {
+              const match = localRoutes.find(
+                (r) => toDateStr(r.route_date) === toDateStr(date) &&
+                       r.shift === activeTask.shift &&
+                       Number(r.stop_order) === Number(activeTask.stop_order)
+              );
+              patchRequests.push(match
+                ? fetch(`${API_BASE}/patrol/routes/${match.route_id}/task`, {
+                    method:  "PATCH",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+                    body:    JSON.stringify({ time_start: activeTask.time_start || null, time_end: activeTask.time_end || null, notes: activeTask.notes || null }),
+                  })
+                : fetch(`${API_BASE}/patrol/routes/add`, {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+                    body:    JSON.stringify({
+                      patrol_id: patrol.patrol_id, route_date: date, shift: activeTask.shift,
+                      time_start: activeTask.time_start || null, time_end: activeTask.time_end || null,
+                      notes: activeTask.notes || null, stop_order: activeTask.stop_order,
+                    }),
+                  })
+              );
+            }
+          }
+        }
+        await Promise.all(patchRequests);
+      })();
+
+      // 3. Save patrollers — dates checked in the Apply Dates dialog mirror
+      // the active date's assignments; unchecked (but still dirty) dates
+      // keep whatever was set for them individually — a reset-to-empty
+      // state, or a manually customized assignment made on that date's tab.
+      // Dates that were in the patrol's original range but fell out after
+      // this edit — clear their assignments server-side (empty am/pm),
+      // rather than leaving orphaned rows a former patroller is still
+      // linked to.
+      const datesToClear = originalDateRangeRef.current.filter((d) => !dateRange.includes(d));
+
+      const patrollerDatestoSave = [...new Set([...selectedDates, ...dirtyDates, ...datesToClear])]
+        .filter((d) => dateRange.includes(d) || datesToClear.includes(d));
 
       const activeDatePatrollerState = patrollersByDate[activeDate] || { am: [], pm: [] };
 
-      const patrollerResults = await Promise.all(
-        patrollerDatestoSave.map((date) => {
-          const dp = selectedDates.includes(date)
-            ? activeDatePatrollerState
-            : (patrollersByDate[date] || { am: [], pm: [] });
-          return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
-            method:  "PATCH",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-            body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
-          }).then((r) => r.json());
-        })
-      );
+      const patrollerWork = mapWithConcurrency(patrollerDatestoSave, 3, (date) => {
+        const dp = selectedDates.includes(date)
+          ? activeDatePatrollerState
+          : (patrollersByDate[date] || { am: [], pm: [] });
+        return fetch(`${API_BASE}/patrol/patrols/${patrol.patrol_id}/patrollers/${date}`, {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+          body:    JSON.stringify({ patroller_ids_am: dp.am, patroller_ids_pm: dp.pm }),
+        }).then((r) => r.json().then((data) => ({ ...data, __date: date })));
+      });
 
-      const conflict = patrollerResults.find((r) => !r.success);
-      if (conflict) {
+      const [, patrollerResults] = await Promise.all([routesWork, patrollerWork]);
+
+      const failure = patrollerResults.find((r) => !r.success);
+      if (failure) {
         setLoading(false);
-        setNotif({ message: conflict.message, type: "warning" });
+        if (failure.conflict) {
+          // Real double-booking conflict — jump straight to the exact
+          // date AND shift holding the conflicting patroller, since it's
+          // almost always a leftover assignment on a tab the admin never
+          // opened this session (otherwise invisible).
+          const dp = patrollersByDate[failure.__date] || { am: [], pm: [] };
+          const conflictId = failure.conflicting_patroller_id;
+          const shiftWithConflict =
+            conflictId != null && dp.pm.includes(conflictId) && !dp.am.includes(conflictId)
+              ? "PM"
+              : "AM";
+
+          setActiveDate(failure.__date);
+          setActiveShift(shiftWithConflict);
+          activeShiftRef.current = shiftWithConflict;
+          setShowPatrollers(true);
+
+          // Pull the officer's name out of the message so the search box
+          // filters straight down to them.
+          const nameMatch = failure.message?.match(/^(.+?) is already assigned/);
+          setPatrollerSearch(nameMatch ? nameMatch[1] : "");
+
+          setNotif({
+            message: `${failure.message} You've been switched to ${formatTabDate(failure.__date)} (${shiftWithConflict} shift) — remove them, then save again.`,
+            type: "warning",
+          });
+        } else {
+          // Generic server/network failure (timeout, DB error, etc.) —
+          // don't imply it's a patroller assignment problem.
+          setNotif({
+            message: failure.message || "Failed to save patrollers. Please try again.",
+            type: "error",
+          });
+        }
         return;
       }
 
@@ -674,9 +961,11 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
       }
 
       clearDirty();
+      setDateRangeChanged(false);
 
       // 4. Save patrol info + barangays
-      onSave({ ...form, barangays });
+      await onSave({ ...form, patrol_name: form.patrol_name.trim(), barangays });
+      setLoading(false);
     } catch (err) {
       console.error("Save error:", err);
       setLoading(false);
@@ -726,13 +1015,154 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
 
   const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : "NA";
 
+  // Anything that would be lost by closing without saving.
+  const hasUnsavedChanges = () => {
+    if (tasksDirty.current) return true;
+    if (dirtyDates.size > 0) return true;
+    if (dateRangeChanged) return true;
+
+    const orig = initialFormRef.current;
+    if (form.patrol_name !== orig.patrol_name) return true;
+    if (Number(form.mobile_unit_id) !== Number(orig.mobile_unit_id)) return true;
+    if (form.start_date !== orig.start_date) return true;
+    if (form.end_date !== orig.end_date) return true;
+
+    const origB = initialBarangaysRef.current;
+    if (barangays.length !== origB.length || barangays.some((b) => !origB.includes(b))) return true;
+
+    return false;
+  };
+
+  const handleCloseAttempt = () => {
+    if (hasUnsavedChanges()) {
+      setShowExitConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
+  // Clamp activeDate back into range if a date change ever leaves it dangling.
+  // While dateRangeChanged is true, force it to the first date — that's the
+  // one "template" day being edited before it gets stamped across the range,
+  // so there's nothing meaningful to switch between yet.
+  useEffect(() => {
+    if (dateRange.length === 0) { if (activeDate !== null) setActiveDate(null); return; }
+    if (dateRangeChanged) {
+      if (activeDate !== dateRange[0]) setActiveDate(dateRange[0]);
+      return;
+    }
+    if (!dateRange.includes(activeDate)) setActiveDate(dateRange[0]);
+  }, [dateRange, activeDate, dateRangeChanged]);
+
+  // Prune any dirty/patroller-state entries that fall outside the current
+  // date range — e.g. after changing start/end date, old dates like Sep 10
+  // must not linger as "dirty" once they're no longer part of the patrol.
+  useEffect(() => {
+    const rangeSet = new Set(dateRange);
+
+    setDirtyDates((prev) => {
+      const filtered = [...prev].filter((d) => rangeSet.has(d));
+      return filtered.length === prev.size ? prev : new Set(filtered);
+    });
+
+    setPatrollersByDate((prev) => {
+      const keys = Object.keys(prev);
+      const staleKeys = keys.filter((d) => !rangeSet.has(d));
+      if (staleKeys.length === 0) return prev;
+      const next = { ...prev };
+      staleKeys.forEach((d) => delete next[d]);
+      return next;
+    });
+  }, [dateRange]);
+
+  const hasExistingWork = () =>
+    localRoutes.some((r) => (r.stop_order || 0) > 0) ||
+    Object.values(patrollersByDate).some((d) => (d.am?.length || 0) > 0 || (d.pm?.length || 0) > 0);
+
+  const applyStartDateChange = (newStart) => {
+    setDateRangeChanged(true);
+    setForm((p) => {
+      if (p.end_date && diffDaysInclusive(newStart, p.end_date) > MAX_PATROL_DAYS) {
+        setNotif({ message: `Patrol duration is limited to ${MAX_PATROL_DAYS} days. Please re-select the end date.`, type: "warning" });
+        return { ...p, start_date: newStart, end_date: "" };
+      }
+      if (p.end_date && p.end_date < newStart) {
+        return { ...p, start_date: newStart, end_date: "" };
+      }
+      return { ...p, start_date: newStart };
+    });
+  };
+
+  const applyEndDateChange = (newEnd) => {
+    setDateRangeChanged(true);
+    setForm((p) => ({ ...p, end_date: newEnd }));
+  };
+
+  const resetTasksAndPatrollers = () => {
+    // Queue every real (non-temp) task route for deletion on save
+    localRoutes
+      .filter((r) => (r.stop_order || 0) > 0 && !String(r.route_id).startsWith("temp-"))
+      .forEach((r) => deletedRouteIds.current.add(r.route_id));
+    pendingRemovedTempIds.current.clear();
+    setLocalRoutes([]);
+    localRoutesRef.current = [];
+    tasksDirty.current = true;
+
+    // Mark every date that currently has patroller assignments dirty so the
+    // clear propagates to the server on save
+    const datesWithPatrollers = Object.keys(patrollersByDate);
+    setDirtyDates((prev) => {
+      const next = new Set(prev);
+      datesWithPatrollers.forEach((d) => next.add(d));
+      return next;
+    });
+    setPatrollersByDate({});
+  };
+
+  const handleStartDateChange = (e) => {
+    const newStart = e.target.value;
+    if (!newStart) { setForm((p) => ({ ...p, start_date: "" })); return; }
+    if (newStart === form.start_date) return;
+
+    if (hasExistingWork()) {
+      setPendingDateChange({ apply: () => applyStartDateChange(newStart) });
+      return;
+    }
+    applyStartDateChange(newStart);
+  };
+
+  const handleEndDateChange = (e) => {
+    const newEnd = e.target.value;
+    if (!newEnd) { setForm((p) => ({ ...p, end_date: "" })); return; }
+
+    if (!form.start_date) {
+      setNotif({ message: "Please select a start date first.", type: "warning" });
+      return;
+    }
+    if (newEnd < form.start_date) {
+      setNotif({ message: "End date cannot be before start date.", type: "warning" });
+      return;
+    }
+    if (diffDaysInclusive(form.start_date, newEnd) > MAX_PATROL_DAYS) {
+      setNotif({ message: `Patrol duration cannot exceed ${MAX_PATROL_DAYS} days (max: ${maxEndDate(form.start_date)}).`, type: "warning" });
+      return;
+    }
+    if (newEnd === form.end_date) return;
+
+    if (hasExistingWork()) {
+      setPendingDateChange({ apply: () => applyEndDateChange(newEnd) });
+      return;
+    }
+    applyEndDateChange(newEnd);
+  };
+
   const filteredPatrollers = patrollerList
     .filter((p) => (p.officer_name || "").toLowerCase().includes(patrollerSearch.toLowerCase()));
 
   if (!patrol) return null;
 
   return (
-    <div className="epm-overlay" onClick={onClose}>
+    <div className="epm-overlay">
       <div className="epm-modal" onClick={(e) => e.stopPropagation()}>
 
         {/* TOP BAR */}
@@ -748,25 +1178,22 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
   <label>Mobile Unit <span className="epm-req">*</span></label>
   <select
     value={form.mobile_unit_id}
-    onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value }))}
+    onChange={(e) => setForm((p) => ({ ...p, mobile_unit_id: e.target.value ? Number(e.target.value) : "" }))}
     disabled={loadingMobileUnits}
   >
     {loadingMobileUnits
       ? <option value="">Loading...</option>
+      : availableMobileUnits === null
+      ? <option value="">— Select —</option>
+      : availableMobileUnits.length === 0
+      ? <option value="">No units available</option>
       : <>
-          <option value="">— Select —</option>
-          {(availableMobileUnits || mobileUnits).map((mu) => {
-            const isConflict = mu._isCurrent;
-            return (
-              <option
-                key={mu.mobile_unit_id}
-                value={mu.mobile_unit_id}
-                disabled={isConflict}
-              >
-                {mu.mobile_unit_name} ({mu.plate_number}){isConflict ? " — Unavailable" : ""}
-              </option>
-            );
-          })}
+          <option value="">— Select Mobile Unit —</option>
+          {availableMobileUnits.map((mu) => (
+            <option key={mu.mobile_unit_id} value={mu.mobile_unit_id}>
+              {mu.mobile_unit_name} ({mu.plate_number})
+            </option>
+          ))}
         </>
     }
   </select>
@@ -776,21 +1203,7 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
   <input
     type="date"
     value={form.start_date}
-    onChange={(e) => {
-      const newStart = e.target.value;
-      if (!newStart) { setForm((p) => ({ ...p, start_date: "" })); return; }
-
-      setForm((p) => {
-        if (p.end_date && diffDaysInclusive(newStart, p.end_date) > MAX_PATROL_DAYS) {
-          setNotif({ message: `Patrol duration is limited to ${MAX_PATROL_DAYS} days. Please re-select the end date.`, type: "warning" });
-          return { ...p, start_date: newStart, end_date: "" };
-        }
-        if (p.end_date && p.end_date < newStart) {
-          return { ...p, start_date: newStart, end_date: "" };
-        }
-        return { ...p, start_date: newStart };
-      });
-    }}
+    onChange={handleStartDateChange}
   />
 </div>
 <div className="epm-field">
@@ -800,31 +1213,14 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
     value={form.end_date}
     min={form.start_date}
     max={maxEndDate(form.start_date)}
-    onChange={(e) => {
-      const newEnd = e.target.value;
-      if (!newEnd) { setForm((p) => ({ ...p, end_date: "" })); return; }
-
-      if (!form.start_date) {
-        setNotif({ message: "Please select a start date first.", type: "warning" });
-        return;
-      }
-      if (newEnd < form.start_date) {
-        setNotif({ message: "End date cannot be before start date.", type: "warning" });
-        return;
-      }
-      if (diffDaysInclusive(form.start_date, newEnd) > MAX_PATROL_DAYS) {
-        setNotif({ message: `Patrol duration cannot exceed ${MAX_PATROL_DAYS} days (max: ${maxEndDate(form.start_date)}).`, type: "warning" });
-        return;
-      }
-      setForm((p) => ({ ...p, end_date: newEnd }));
-    }}
+    onChange={handleEndDateChange}
   />
 </div>
           </div>
           <div className="epm-topbar-actions">
-           <button className="epm-btn-cancel epm-btn-cancel-desktop" onClick={onClose}>Cancel</button>
+           <button className="epm-btn-cancel epm-btn-cancel-desktop" onClick={handleCloseAttempt}>Cancel</button>
 <button className="epm-btn-save"   onClick={handleSave}>Save Changes</button>
-<button className="epm-btn-x"      onClick={onClose}>✕</button>
+<button className="epm-btn-x"      onClick={handleCloseAttempt}>✕</button>
           </div>
         </div>
 
@@ -934,8 +1330,32 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
           {/* RIGHT panel */}
           <div className="epm-info-panel">
 
-            {/* ── Date tabs ── */}
-            {dateRange.length > 0 && (
+            {dateRangeChanged && (
+              <div style={{
+                background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "8px",
+                padding: "10px 14px", fontSize: "12.5px", color: "#856404", marginBottom: "10px",
+                lineHeight: 1.5,
+              }}>
+                <strong>Dates were changed.</strong> The next save will copy{" "}
+                <strong>{formatTabDate(activeDate)}'s</strong> tasks and patrollers to every date in
+                the new range — set up {formatTabDate(activeDate)} the way you want first, then save.
+                Edits made on other date tabs before that first save will not be kept.
+              </div>
+            )}
+
+            {/* ── Date tabs — hidden while a date change is pending; only
+                 the active/template date matters until the first save ── */}
+            {dateRangeChanged ? (
+              <div style={{
+                background: "#fff3cd", border: "1px solid #ffc107", borderRadius: "8px",
+                padding: "10px 14px", fontSize: "12.5px", color: "#856404", marginBottom: "10px",
+                lineHeight: 1.5,
+              }}>
+                <strong>Setting up template for {formatTabDate(activeDate)}.</strong> Whatever
+                tasks and patrollers you assign here will be copied to all {dateRange.length} date
+                {dateRange.length !== 1 ? "s" : ""} in the new range when you save.
+              </div>
+            ) : dateRange.length > 0 && (
               <div className="epm-date-tabs">
                 {dateRange.map((date) => (
                   <button key={date}
@@ -979,7 +1399,7 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
                     <span className="epm-shift-badge" style={{ marginLeft: 6 }}>{currentPatrollerIds.length}</span>
                   )}
                 </span>
-                {!loadingPatrollers && (
+                {datesReady && !loadingPatrollers && (
                   showPatrollers ? (
                     <button className="epm-toggle-btn epm-toggle-hide" onClick={() => { setShowPatrollers(false); setPatrollerPage(1); }}>
                       Hide
@@ -992,7 +1412,11 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
                 )}
               </div>
 
-              {loadingPatrollers ? (
+              {!datesReady ? (
+                <p className="epm-empty" style={{ fontStyle: "normal", color: "#6c757d" }}>
+                  Please select a start and end date to manage patrollers.
+                </p>
+              ) : loadingPatrollers ? (
                 <div className="epm-empty">Loading patrollers...</div>
               ) : (
                 <>
@@ -1143,7 +1567,7 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
                   </table>
                 </div>
               )}
-              <button className="epm-add-task-btn" onClick={addTask} disabled={addingTask}>+ Add Task</button>
+              <button className="epm-add-task-btn" onClick={addTask} disabled={addingTask || !datesReady}>+ Add Task</button>
             </div>
           </div>
         </div>
@@ -1156,6 +1580,35 @@ if (diffDaysInclusive(form.start_date, form.end_date) > MAX_PATROL_DAYS) {
           activeDate={activeDate}
           onConfirm={(selectedDates) => executeSave(selectedDates)}
           onCancel={() => setShowApplyDialog(false)}
+        />
+      )}
+
+      {showConfirmAllDialog && (
+        <ConfirmApplyAllDialog
+          activeDateLabel={formatTabDate(activeDate)}
+          onConfirm={() => {
+            setShowConfirmAllDialog(false);
+            executeSave(dateRange);
+          }}
+          onCancel={() => setShowConfirmAllDialog(false)}
+        />
+      )}
+
+      {pendingDateChange && (
+        <ResetDateConfirmDialog
+          onConfirm={() => {
+            resetTasksAndPatrollers();
+            pendingDateChange.apply();
+            setPendingDateChange(null);
+          }}
+          onCancel={() => setPendingDateChange(null)}
+        />
+      )}
+
+      {showExitConfirm && (
+        <ExitConfirmDialog
+          onConfirm={() => { setShowExitConfirm(false); onClose(); }}
+          onCancel={() => setShowExitConfirm(false)}
         />
       )}
 
