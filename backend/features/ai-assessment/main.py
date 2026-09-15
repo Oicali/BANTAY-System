@@ -1202,8 +1202,9 @@ def _run_backtest(
             i + 1 for i, b in enumerate(ranked_brgys)
             if b in actual_barangays
         ]
+        # Whole-number rank — decimals don't mean anything to the end user here
         mean_rank = round(
-            sum(actual_ranks) / len(actual_ranks), 1
+            sum(actual_ranks) / len(actual_ranks)
         ) if actual_ranks else None
 
         fold_results.append({
@@ -1235,7 +1236,7 @@ def _run_backtest(
         "hit_rate_top5":  round(hit5  / n * 100),
         "hit_rate_top10": round(hit10 / n * 100),
         "hit_rate_top15": round(hit15 / n * 100),
-        "mean_rank":      round(sum(valid_ranks) / len(valid_ranks), 1) if valid_ranks else None,
+        "mean_rank":      round(sum(valid_ranks) / len(valid_ranks)) if valid_ranks else None,
         "per_fold":       fold_results,
         "model_verdict":  (
             "trustworthy" if hit10 / n >= 0.7

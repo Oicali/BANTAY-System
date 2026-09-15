@@ -1,5 +1,7 @@
 // frontend\src\components\layout\Topbar.jsx
+// Router hook for client-side navigation (no full page unload)
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { getUserFromToken } from "../../utils/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -175,6 +177,7 @@ const formatBarangayLabel = (name) => {
 // ────────────────────────────────────────────────────────────────────────────
 
 const TopBar = ({ onMenuClick }) => {
+  const navigate = useNavigate(); // client-side route transitions
   const [user, setUser] = useState(null);
   const [profileData, setProfileData] = useState(() => {
     const cached = localStorage.getItem("cachedProfile");
@@ -320,9 +323,11 @@ const TopBar = ({ onMenuClick }) => {
     prevUnreadRef.current = 0;
     // API in background
     const token = sessionStorage.getItem("token");
+    // Same keepalive guard for the bulk mark-read
     fetch(`${API_URL}/notifications/read-all`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
     }).catch(console.error);
   };
 
@@ -334,20 +339,22 @@ const TopBar = ({ onMenuClick }) => {
     );
     setUnread((prev) => Math.max(0, prev - 1));
     prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
-    // API in background
+    // API in background — keepalive lets it finish even if the page unloads
     const token = sessionStorage.getItem("token");
     fetch(`${API_URL}/notifications/${notif.id}/read`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
     }).catch(console.error);
   };
 
+  // Navigate in-app so the component stays mounted and the PATCH completes
   const handleNotifClick = (notif) => {
     markOneRead(notif);
     if (notif.link_to) {
       const basePath = notif.link_to.split("?")[0];
       if (LINK_MAP[basePath]) {
-        window.location.href = notif.link_to;
+        navigate(notif.link_to);
       }
     }
     setNotifOpen(false);
