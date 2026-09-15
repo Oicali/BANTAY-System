@@ -23,6 +23,7 @@ import PageLayout from "./components/layout/PageLayout.jsx";
 import PatrollerDashboard from "./components/views/PatrolDashboard";
 import ResidentManagement from "./components/views/ResidentManagement";
 import AuditLog from "./components/views/AuditLog";
+import Overview from "./components/views/Overview";
 
 const getRole = () => {
   const raw = sessionStorage.getItem("token");
@@ -52,6 +53,16 @@ function App() {
         <Route path="/login" element={<LoginSystem />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/verification-success" element={<VerificationSuccess />} />
+        {/* Full-screen Overview — outside PageLayout so Sidebar/TopBar don't mount */}
+        <Route
+          path="/overview"
+          element={
+            <ProtectedRoute>
+              <Overview />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Protected Layout */}
         <Route
           element={

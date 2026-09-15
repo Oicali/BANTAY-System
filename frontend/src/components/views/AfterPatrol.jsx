@@ -676,16 +676,20 @@ const [deletingPhotoConfirm, setDeletingPhotoConfirm] = useState(null); // ← a
   };
 
   const handleFileSelect = (files) => {
+    // Cap against existingPhotos + images together — matching the dropzone's
+    // own visibility check — not just images.length, or an officer with
+    // several existing photos can stage more than fits under the 10 limit.
+    const remainingSlots = Math.max(0, 10 - existingPhotos.length - images.length);
     const newFiles = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
-      .slice(0, 10 - images.length)
+      .slice(0, remainingSlots)
       .map((file) => ({
         id: Math.random().toString(36).slice(2),
         file,
         preview: URL.createObjectURL(file),
         name: file.name,
       }));
-    setImages((prev) => [...prev, ...newFiles].slice(0, 10));
+    setImages((prev) => [...prev, ...newFiles].slice(0, remainingSlots + prev.length));
   };
 
   const handleDrop = (e) => {
@@ -918,6 +922,12 @@ const isEditing = !!activeReport;
                   <button key={key} type="button"
                     onClick={() => {
                       if (isFuture) return;
+
+                      // Revoke any staged (unsaved) photo previews from the
+                      // date being left before swapping to the new one —
+                      // otherwise those blob URLs leak every time an
+                      // officer browses between date pills.
+                      images.forEach((img) => URL.revokeObjectURL(img.preview));
 
                       if (existingForDate) {
                         // Load the real submitted report for this date directly.

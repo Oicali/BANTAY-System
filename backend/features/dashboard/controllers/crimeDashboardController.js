@@ -368,6 +368,28 @@ const queryByDay = async (where, params, nextP) => {
   }));
 };
 
+const queryModeOfReporting = async (where, params, nextP) => {
+  const result = await pool.query(
+    `SELECT
+      TRIM(c.info_obtained) AS mode,
+      COUNT(*) AS count
+     FROM blotter_analytics_view be
+     JOIN complainants c ON c.blotter_id = be.blotter_id
+     ${where}
+     ${where ? "AND" : "WHERE"} UPPER(be.incident_type) = ANY($${nextP}::text[])
+       AND c.info_obtained IS NOT NULL
+       AND TRIM(c.info_obtained) <> ''
+     GROUP BY TRIM(c.info_obtained)
+     ORDER BY count DESC`,
+    [...params, INDEX_CRIMES],
+  );
+
+  return result.rows.map((r) => ({
+    mode: r.mode,
+    count: parseInt(r.count),
+  }));
+};
+
 const queryPlace = async (where, params, nextP) => {
   const result = await pool.query(
     `SELECT
@@ -531,7 +553,7 @@ const getOverview = async (req, res) => {
       }
     }
 
-    const [
+     const [
   summary,
   trends,
   hourly,
@@ -540,6 +562,7 @@ const getOverview = async (req, res) => {
   barangay,
   modus,
   completeData,
+  modeOfReporting,
 ] = await Promise.all([
   querySummary(where, params, nextP),
   queryTrends(where, params, nextP, granularity, date_from, date_to),
@@ -549,7 +572,9 @@ const getOverview = async (req, res) => {
   queryBarangay(where, params, nextP),
   queryModus(where, params, nextP),
   queryCompleteData(where, params, nextP),
+  queryModeOfReporting(where, params, nextP),
 ]);
+
 
 // ── Previous month summary for "this_month" delta ─────────────────────────
 let prevSummary = null;
@@ -573,6 +598,7 @@ if (preset === "this_month") {
   prevSummary = await querySummary(prevWhere, prevParams, prevNextP);
 }
 
+
 res.json({
   success: true,
   summary,
@@ -584,6 +610,7 @@ res.json({
   modus,
   completeData,
   prevSummary,
+  modeOfReporting,
 });
   } catch (err) {
     console.error("getOverview error:", err);
