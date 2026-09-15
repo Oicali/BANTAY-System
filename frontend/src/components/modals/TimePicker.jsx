@@ -32,6 +32,16 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
 
   const emit = (h12, min, p) => onChange(to24(h12, min, p));
 
+  // Determine whether a 12-hour hour value is inside the current shift's
+  // allowed window for the given AM/PM period. Used for both the hour list
+  // and the AM/PM toggle so they always agree on what's selectable.
+  const isHourAllowed = (h12, p) => {
+    if (!shift) return true;
+    let hh24 = h12 % 12;
+    if (p === "PM") hh24 += 12;
+    return shift === "AM" ? hh24 >= 8 && hh24 < 20 : hh24 >= 20 || hh24 < 8;
+  };
+
   // Close on outside click + trigger onBlur
   useEffect(() => {
     const handler = (e) => {
@@ -47,7 +57,7 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
   }, [open, onBlur]);
 
   // Detect if dropdown should open upward
-   const handleOpen = () => {
+  const handleOpen = () => {
     if (disabled) return;
     if (!open && ref.current) {
       const rect = ref.current.getBoundingClientRect();
@@ -71,19 +81,21 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
     return () => document.removeEventListener("keydown", handler);
   }, [open, onBlur]);
 
-  const hourListRef   = useRef(null);
+  const hourListRef = useRef(null);
   const minuteListRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const ITEM_HEIGHT = 36;
     setTimeout(() => {
-      if (hourListRef.current)   hourListRef.current.scrollTop   = (h - 1) * ITEM_HEIGHT;
-      if (minuteListRef.current) minuteListRef.current.scrollTop = m * ITEM_HEIGHT;
+      if (hourListRef.current)
+        hourListRef.current.scrollTop = (h - 1) * ITEM_HEIGHT;
+      if (minuteListRef.current)
+        minuteListRef.current.scrollTop = m * ITEM_HEIGHT;
     }, 0);
   }, [open]);
 
-  const hours   = Array.from({ length: 12 }, (_, i) => i + 1);
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
   const displayH = String(h).padStart(2, "0");
@@ -91,17 +103,25 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
 
   return (
     <div className="tp-root" ref={ref}>
-    <button
+      <button
         type="button"
         className={`tp-trigger ${disabled ? "tp-trigger-disabled" : ""}`}
         onClick={handleOpen}
         disabled={disabled}
       >
-        <span className="tp-value">{displayH}:{displayM}</span>
+        <span className="tp-value">
+          {displayH}:{displayM}
+        </span>
         <span className="tp-period-badge">{period}</span>
-        <svg className="tp-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="8" cy="8" r="6.5"/>
-          <path d="M8 4.5v3.75l2.5 1.5" strokeLinecap="round"/>
+        <svg
+          className="tp-icon"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M8 4.5v3.75l2.5 1.5" strokeLinecap="round" />
         </svg>
       </button>
 
@@ -111,25 +131,19 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
             <div className="tp-col-label">HR</div>
             <div className="tp-list" ref={hourListRef}>
               {hours.map((hv) => {
-  // Convert this option to 24h to check if it's in the allowed shift range
-  let hh24 = hv % 12;
-  if (period === "PM") hh24 += 12;
-  // AM shift: allowed 08:00–19:59 (8am to just before 8pm)
-  // PM shift: allowed 20:00–07:59 (8pm to just before 8am)
-  const outOfRange =
-    shift === "AM" ? (hh24 < 8 || hh24 >= 20)
-    : shift === "PM" ? (hh24 >= 8 && hh24 < 20)
-    : false;
-  return (
-    <div
-      key={hv}
-      className={`tp-item ${hv === h ? "tp-item-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
-      onClick={() => { if (!outOfRange) emit(hv, m, period); }}
-    >
-      {String(hv).padStart(2, "0")}
-    </div>
-  );
-})}
+                const outOfRange = !isHourAllowed(hv, period);
+                return (
+                  <div
+                    key={hv}
+                    className={`tp-item ${hv === h ? "tp-item-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
+                    onClick={() => {
+                      if (!outOfRange) emit(hv, m, period);
+                    }}
+                  >
+                    {String(hv).padStart(2, "0")}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -153,25 +167,30 @@ const TimePicker = ({ value, onChange, onBlur, baseHour, shift, disabled }) => {
           <div className="tp-col tp-col-period">
             <div className="tp-col-label">‎</div>
             <div className="tp-period-list">
-             {["AM", "PM"].map((p) => {
-  // Same boundary rule as the hour list — switching AM/PM must not be able
-  // to produce a time outside the current shift's allowed window.
-  let hh24 = h % 12;
-  if (p === "PM") hh24 += 12;
-  const outOfRange =
-    shift === "AM" ? (hh24 < 8 || hh24 >= 20)
-    : shift === "PM" ? (hh24 >= 8 && hh24 < 20)
-    : false;
-  return (
-    <div
-      key={p}
-      className={`tp-period-item ${p === period ? "tp-period-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
-      onClick={() => { if (!outOfRange) emit(h, m, p); }}
-    >
-      {p}
-    </div>
-  );
-})}
+              {["AM", "PM"].map((p) => {
+                // A period is only disabled if NONE of its 12 hours are valid for the
+                // current shift — not just whichever hour happens to be selected right
+                // now. Otherwise a PM shift (8pm–7:59am) could never reach its AM half
+                // (12am–7:59am) once an 8–11pm hour was already selected.
+                const outOfRange = !hours.some((hv) => isHourAllowed(hv, p));
+                return (
+                  <div
+                    key={p}
+                    className={`tp-period-item ${p === period ? "tp-period-active" : ""} ${outOfRange ? "tp-item-disabled" : ""}`}
+                    onClick={() => {
+                      if (outOfRange) return;
+                      // Current hour may not be valid in the new period (e.g. 11 PM ->
+                      // AM). Snap to the first valid hour in that period instead.
+                      const targetH = isHourAllowed(h, p)
+                        ? h
+                        : hours.find((hv) => isHourAllowed(hv, p));
+                      emit(targetH, m, p);
+                    }}
+                  >
+                    {p}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -151,8 +151,8 @@ const calcCreditHours = (from, to) => {
 };
 
 const DEFAULT_TIMES = {
-  AM: { timeFrom: "08:00", timeTo: "20:00" },
-  PM: { timeFrom: "20:00", timeTo: "08:00" },
+  AM: { timeFrom: "08:00", timeTo: "19:59" },
+  PM: { timeFrom: "20:00", timeTo: "07:59" },
   "AM & PM": { timeFrom: "08:00", timeTo: "08:00" },
 };
 
