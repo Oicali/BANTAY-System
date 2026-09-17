@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Lock, Camera, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Lock, Camera, ChevronDown, Monitor, Smartphone, LogOut, ShieldAlert } from "lucide-react";
 import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
@@ -50,6 +50,14 @@ export default function ProfileSettings() {
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+
+  // ── Device Sessions ──────────────────────────────────────────────────────
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState("");
+  const [revokingSessionId, setRevokingSessionId] = useState(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+  const [confirmRevokeAll, setConfirmRevokeAll] = useState(false);
 
   const [usernameVisible, setUsernameVisible] = useState(false);
   const usernameTimerRef = useRef(null);
@@ -467,6 +475,117 @@ export default function ProfileSettings() {
     fetchBarangays,
   ]);
 
+  // ── Device Sessions: fetch + revoke ─────────────────────────────────────
+  const fetchSessions = useCallback(async () => {
+    try {
+      setSessionsLoading(true);
+      setSessionsError("");
+      const token = sessionStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${API_URL}/users/sessions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      const d = await res.json();
+      if (d.success) {
+        setSessions(d.sessions || []);
+      } else {
+        setSessionsError(d.message || "Failed to load sessions");
+      }
+    } catch (err) {
+      console.error("fetchSessions:", err);
+      setSessionsError("Failed to load active sessions");
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  const handleRevokeSession = async (tokenId) => {
+    setRevokingSessionId(tokenId);
+    setSessionsError("");
+    try {
+      const token = sessionStorage.getItem("token");
+      const res = await fetch(`${API_URL}/users/sessions/${tokenId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) {
+        setSessionsError(d.message || "Failed to log out that device");
+        return;
+      }
+      setSessions((prev) => prev.filter((s) => s.token_id !== tokenId));
+      setSuccessMessage("Device logged out successfully");
+    } catch (err) {
+      console.error("handleRevokeSession:", err);
+      setSessionsError("Network error. Please try again.");
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  const handleRevokeAllOthers = async () => {
+    setRevokingAll(true);
+    setSessionsError("");
+    try {
+      const token = sessionStorage.getItem("token");
+      const res = await fetch(`${API_URL}/users/sessions/all-except-current`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) {
+        setSessionsError(d.message || "Failed to log out other devices");
+        return;
+      }
+      setSessions((prev) => prev.filter((s) => s.is_current));
+      setSuccessMessage("All other devices have been logged out");
+      setConfirmRevokeAll(false);
+    } catch (err) {
+      console.error("handleRevokeAllOthers:", err);
+      setSessionsError("Network error. Please try again.");
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
+  const formatSessionTime = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMins = Math.floor((now - d) / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    return d.toLocaleDateString("en-PH", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const parseDeviceLabel = (session) => {
+    const ua = session.user_agent || "";
+    let browser = "Unknown Browser";
+    if (/edg/i.test(ua)) browser = "Edge";
+    else if (/chrome/i.test(ua)) browser = "Chrome";
+    else if (/firefox/i.test(ua)) browser = "Firefox";
+    else if (/safari/i.test(ua)) browser = "Safari";
+    let os = "";
+    if (/windows/i.test(ua)) os = "Windows";
+    else if (/mac os/i.test(ua)) os = "macOS";
+    else if (/android/i.test(ua)) os = "Android";
+    else if (/iphone|ipad/i.test(ua)) os = "iOS";
+    else if (/linux/i.test(ua)) os = "Linux";
+    if (session.device_type === "mobile" && !os) os = "Mobile";
+    return os ? `${browser} on ${os}` : browser;
+  };
+
   const silentRefresh = useCallback(async () => {
     if (isEditingRef.current) return;
     try {
@@ -553,6 +672,7 @@ export default function ProfileSettings() {
     }
     setUser(userData);
     fetchProfile().then(() => startPolling());
+    fetchSessions();
     return () => stopPolling();
   }, []);
 
@@ -2390,7 +2510,136 @@ const handlePhoneInput = (e) => {
             )}
           </div>
         </div>
+
+        {/* ── Active Sessions ─────────────────────────────────────────────── */}
+        <div className="ps-sessions-card">
+          <div className="ps-sessions-header">
+            <div>
+              <h3 className="ps-form-section-title" style={{ border: "none", marginBottom: "4px", paddingBottom: 0 }}>
+                Active Sessions
+              </h3>
+              <p className="ps-sessions-subtitle">
+                Devices currently signed in to your account
+              </p>
+            </div>
+            {sessions.filter((s) => !s.is_current).length > 0 && (
+              <button
+                type="button"
+                className="ps-sessions-logout-all-btn"
+                onClick={() => setConfirmRevokeAll(true)}
+                disabled={revokingAll}
+              >
+                <LogOut size={14} />
+                Log Out All Other Devices
+              </button>
+            )}
+          </div>
+
+          {sessionsError && (
+            <div className="ps-sessions-alert">
+              <ShieldAlert size={15} />
+              {sessionsError}
+            </div>
+          )}
+
+          {sessionsLoading ? (
+            <p className="ps-sessions-empty">Loading sessions…</p>
+          ) : sessions.length === 0 ? (
+            <p className="ps-sessions-empty">No active sessions found.</p>
+          ) : (
+            <div className="ps-sessions-list">
+              {sessions.map((s) => (
+                <div
+                  key={s.token_id}
+                  className={`ps-session-row ${s.is_current ? "ps-session-row-current" : ""}`}
+                >
+                  <div className="ps-session-icon">
+                    {s.device_type === "mobile" ? (
+                      <Smartphone size={20} />
+                    ) : (
+                      <Monitor size={20} />
+                    )}
+                  </div>
+                  <div className="ps-session-info">
+                    <div className="ps-session-device-row">
+                      <span className="ps-session-device">
+                        {parseDeviceLabel(s)}
+                      </span>
+                      {s.is_current && (
+                        <span className="ps-session-current-badge">
+                          This device
+                        </span>
+                      )}
+                    </div>
+                    <div className="ps-session-meta">
+                      {s.ip_address && <span>{s.ip_address}</span>}
+                      {s.location_label && <span>{s.location_label}</span>}
+                      <span>Last active {formatSessionTime(s.last_active_at)}</span>
+                    </div>
+                  </div>
+                  {!s.is_current && (
+                    <button
+                      type="button"
+                      className="ps-session-logout-btn"
+                      onClick={() => handleRevokeSession(s.token_id)}
+                      disabled={revokingSessionId === s.token_id}
+                      title="Log out this device"
+                    >
+                      {revokingSessionId === s.token_id ? "…" : "Log Out"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ── Confirm: Log out all other devices ──────────────────────────── */}
+      {confirmRevokeAll && (
+        <div className="em-overlay" onClick={() => !revokingAll && setConfirmRevokeAll(false)}>
+          <div
+            className="em-modal"
+            style={{ maxWidth: "420px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="em-header">
+              <div className="em-header-icon">
+                <ShieldAlert size={20} />
+              </div>
+              <div className="em-header-text">
+                <h2>Log Out All Other Devices?</h2>
+                <p>This device stays signed in; every other session ends immediately.</p>
+              </div>
+              <button
+                className="em-close"
+                onClick={() => setConfirmRevokeAll(false)}
+                disabled={revokingAll}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="em-body">
+              <div className="em-footer">
+                <button
+                  className="em-btn em-btn-secondary"
+                  onClick={() => setConfirmRevokeAll(false)}
+                  disabled={revokingAll}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="em-btn em-btn-primary"
+                  onClick={handleRevokeAllOthers}
+                  disabled={revokingAll}
+                >
+                  {revokingAll ? "Logging out…" : "Log Out Other Devices"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toasts */}
       {successMessage && (

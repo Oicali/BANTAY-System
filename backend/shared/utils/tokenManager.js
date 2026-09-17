@@ -42,11 +42,18 @@ const createToken = async (userData, options = {}) => {
     const token = jwt.sign(userData, JWT_SECRET, { expiresIn });
     const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + getExpiryMs(expiresIn));
+
+    // NEW: device/session metadata — pass these in from the login controller
+    const userAgent     = options.userAgent || null;
+    const ipAddress     = options.ipAddress || null;
+    const deviceType    = options.deviceType || null;
+    const locationLabel = options.locationLabel || null;
  
     await pool.query(
-      `INSERT INTO tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [userData.user_id, tokenHash, expiresAt]
+      `INSERT INTO tokens
+         (user_id, token_hash, expires_at, user_agent, ip_address, device_type, location_label, last_active_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [userData.user_id, tokenHash, expiresAt, userAgent, ipAddress, deviceType, locationLabel]
     );
  
     return token;
@@ -96,6 +103,12 @@ const verifyToken = async (token) => {
     if (tokenData.status === "unverified") {
       throw new Error("Account is not yet verified");
     }
+
+    // NEW: fire-and-forget last-active update, doesn't block the request
+    pool.query(
+      `UPDATE tokens SET last_active_at = NOW() WHERE token_hash = $1`,
+      [tokenHash]
+    ).catch((err) => console.error("⚠️ last_active_at update failed:", err.message));
  
     return decoded;
   } catch (error) {
@@ -163,21 +176,74 @@ const cleanupExpiredTokens = async () => {
 // =====================================================
 // Get all active sessions for a user
 // =====================================================
-const getUserSessions = async (userId) => {
+const getUserSessions = async (userId, currentTokenHash = null) => {
   try {
     const result = await pool.query(
-      `SELECT token_id, created_at, expires_at
+      `SELECT token_id, created_at, expires_at, last_active_at,
+              user_agent, device_type, ip_address, location_label,
+              token_hash
        FROM tokens
        WHERE user_id = $1
          AND is_revoked = false
          AND expires_at > NOW()
-       ORDER BY created_at DESC`,
+       ORDER BY last_active_at DESC`,
       [userId]
     );
- 
-    return result.rows;
+
+    // Tag which row is the requester's current device, then drop the hash
+    // (never send token_hash to the frontend)
+    return result.rows.map(({ token_hash, ...row }) => ({
+      ...row,
+      is_current: currentTokenHash ? token_hash === currentTokenHash : false,
+    }));
   } catch (error) {
     console.error("❌ Get user sessions error:", error);
+    throw error;
+  }
+};
+
+// =====================================================
+// Revoke a single session by token_id (for "log out this device"
+// from the sessions list, where you don't have the raw token)
+// =====================================================
+const revokeTokenById = async (tokenId, requestingUserId) => {
+  try {
+    const result = await pool.query(
+      `UPDATE tokens
+       SET is_revoked = true, revoked_at = NOW()
+       WHERE token_id = $1 AND user_id = $2
+       RETURNING token_id`,
+      [tokenId, requestingUserId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error("Session not found or does not belong to this user");
+    }
+
+    return true;
+  } catch (error) {
+    console.error("❌ Revoke token by id error:", error);
+    throw error;
+  }
+};
+
+// =====================================================
+// Revoke all sessions except the current one
+// =====================================================
+const revokeAllExceptCurrent = async (userId, currentTokenHash) => {
+  try {
+    await pool.query(
+      `UPDATE tokens
+       SET is_revoked = true, revoked_at = NOW()
+       WHERE user_id = $1
+         AND token_hash != $2
+         AND is_revoked = false`,
+      [userId, currentTokenHash]
+    );
+
+    return true;
+  } catch (error) {
+    console.error("❌ Revoke all except current error:", error);
     throw error;
   }
 };
@@ -192,5 +258,7 @@ module.exports = {
   revokeAllUserTokens,
   cleanupExpiredTokens,
   getUserSessions,
+  revokeTokenById,
+  revokeAllExceptCurrent,
   hashToken,
 };
