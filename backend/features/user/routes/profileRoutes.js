@@ -14,6 +14,7 @@
 const router = require('express').Router();
 const ProfileController           = require('../controllers/profileController');
 const EmailVerificationController = require('../controllers/emailVerificationController');
+const SessionController           = require('../controllers/SessionController');
 const { authenticate }            = require('../../../shared/middleware/tokenMiddleware');
 const multer = require('multer');
 
@@ -63,5 +64,10 @@ router.post('/password/verify-current',   authenticate, ProfileController.verify
 router.post('/password/request-otp',      authenticate, ProfileController.requestPasswordOtp);
 router.post('/password/verify-otp',       authenticate, ProfileController.changePasswordWithOtp);
 router.post('/password/force-lock',       authenticate, ProfileController.forcePasswordLock);         // NEW
+
+// ── Device Sessions ────────────────────────────────────────────────────────────
+router.get('/sessions',                       authenticate, SessionController.getSessions);
+router.delete('/sessions/all-except-current', authenticate, SessionController.revokeAllOtherSessions);
+router.delete('/sessions/:tokenId',           authenticate, SessionController.revokeSession);
 
 module.exports = router;
