@@ -2362,13 +2362,30 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
     <div className="cd-risk-section">
 
       {/* Header */}
-      <div className="cd-risk-header">
+            <div className="cd-risk-header">
         <div>
           <div className="cd-risk-title">
             Top 15 High-Risk Barangays — Structural Risk Ranking
           </div>
           <div className="cd-risk-subtitle">
-            Historical data · Decay window: {decayWindow} days · Click row to expand
+            Historical data · Decay window: {decayWindow} days · {totalBrgys} of 47 barangays scored · Click row to expand
+          </div>
+          <div className="cd-risk-legend">
+            {[
+              { color: "#dc2626", bg: "rgba(220,38,38,0.08)",   border: "rgba(220,38,38,0.2)",  range: "80–100", label: "Priority patrol needed"         },
+              { color: "#ea580c", bg: "rgba(234,88,12,0.08)",   border: "rgba(234,88,12,0.2)",  range: "65–79",  label: "Closely monitor"                 },
+              { color: "#ca8a04", bg: "rgba(202,138,4,0.08)",   border: "rgba(202,138,4,0.2)",  range: "45–64",  label: "Keep under observation"          },
+              { color: "#6b7280", bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.2)",range: "0–44",   label: "Routine patrol sufficient"        },
+            ].map((item, i) => (
+              <div key={i} className="cd-risk-legend-item" style={{ background: item.bg, border: `1px solid ${item.border}` }}>
+                <span className="cd-risk-legend-dot" style={{ background: item.color }} />
+                <span className="cd-risk-legend-range" style={{ color: item.color }}>{item.range}</span>
+                <span className="cd-risk-legend-label">{item.label}</span>
+              </div>
+            ))}
+            <div className="cd-risk-legend-note">
+              Score ranks barangays against each other — 100 = highest risk area in this period, not a percentage chance of crime
+            </div>
           </div>
         </div>
         {showBacktestReport && backtest?.status === "ok" && (
@@ -2477,7 +2494,7 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                       <tr style={{ background: "var(--navy-dark)", color: "var(--white)" }}>
                         <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
                         <th style={{ padding: "6px 10px", textAlign: "left" }}>Barangay</th>
-                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Risk Score</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Priority Score</th>
                         <th style={{ padding: "6px 10px", textAlign: "right" }}>Freq</th>
                         <th style={{ padding: "6px 10px", textAlign: "right" }}>SBA</th>
                         <th style={{ padding: "6px 10px", textAlign: "right" }}>Recency</th>
@@ -2521,7 +2538,7 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
         <table className="cd-risk-table">
           <thead>
             <tr>
-              {["#", "Barangay", "Risk Score", "Primary Risk", "Last Incident", "Why Flagged", ""].map((h, i) => (
+              {["#", "Barangay", "Priority Score", "Primary Risk", "Last Incident", "Why Flagged", ""].map((h, i) => (
                 <th key={i}>{h}</th>
               ))}
             </tr>
@@ -2907,7 +2924,7 @@ const CrimeDashboard = () => {
 
     const phases = [
       "Querying blotter records...",
-      "Computing Barangay Risk Scores...",
+      "Computing Barangay Priority Scores...",
       "Computing forecasts...",
       ...crimes.map((c) => `Assessing ${CRIME_DISPLAY[c] || c}...`),
       "Finalizing assessment...",

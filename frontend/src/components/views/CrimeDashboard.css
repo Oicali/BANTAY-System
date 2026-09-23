@@ -3119,6 +3119,62 @@ body {
   margin-bottom: 24px;
 }
 
+/* ─── RISK SCORE LEGEND ───────────────────────────────────────────────────── */
+
+.cd-risk-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.cd-risk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.cd-risk-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cd-risk-legend-range {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: "Inter", monospace;
+}
+
+.cd-risk-legend-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.cd-risk-legend-note {
+  font-size: 10px;
+  color: var(--gray-400);
+  font-style: italic;
+  margin-left: 4px;
+  align-self: center;
+}
+
+@media (max-width: 600px) {
+  .cd-risk-legend {
+    gap: 6px;
+  }
+  .cd-risk-legend-note {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .cd-backtest-metrics {
