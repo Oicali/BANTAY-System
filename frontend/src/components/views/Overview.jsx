@@ -393,10 +393,10 @@ export default function Overview() {
         if (json.success) {
           // TEMP DEBUG: raw record straight from the API response, before
           // any frontend mapping/fallback logic touches it
-          console.log(
-            "[Overview] raw completeData[0]:",
-            json.completeData?.[0],
-          );
+          // console.log(
+          //   "[Overview] raw completeData[0]:",
+          //   json.completeData?.[0],
+          // );
           setDashData({
             summary: json.summary ?? [],
             trends: json.trends ?? [],
@@ -529,14 +529,14 @@ export default function Overview() {
       }),
     [dashData.trends],
   );
-  console.log("trends sample:", dashData.trends[0]);
-  console.log("hourly sample:", dashData.hourly[0]);
-  console.log(
-    "completeData keys:",
-    dashData.completeData[0]
-      ? Object.keys(dashData.completeData[0])
-      : "empty array",
-  );
+  // console.log("trends sample:", dashData.trends[0]);
+  // console.log("hourly sample:", dashData.hourly[0]);
+  // console.log(
+  //   "completeData keys:",
+  //   dashData.completeData[0]
+  //     ? Object.keys(dashData.completeData[0])
+  //     : "empty array",
+  // );
   const hourlySpark = useMemo(
     () => dashData.hourly.map((h) => h.count || 0),
     [dashData.hourly],

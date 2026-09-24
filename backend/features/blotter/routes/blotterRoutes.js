@@ -19,6 +19,7 @@ const {
   acceptReferral, createBrgyReport, getBrgyReports, getReferredCount, detectCrimeType, respondToReferral, getPatrolUsers, remindPatrols,
   checkReminderAccess,
   getReminderBlotterIds,
+  getAuditSummary,
 } = require("../controllers/blotterController");
 const {
   uploadAttachment,
@@ -86,5 +87,8 @@ router.delete(
 );
 // ✅ This one is fine where it is since /:id/remind won't conflict
 router.post("/:id/remind", authenticate, remindPatrols);
+
+// who created / last updated this report
+router.get("/:id/audit-summary", authenticate, getAuditSummary);
 
 module.exports = router;

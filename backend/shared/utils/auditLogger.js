@@ -17,6 +17,7 @@ const pool = require("../../config/database");
  * @param {string|null} params.source       - "Web Portal" | "Mobile App" | null
  * @param {string|null} params.ipAddress    - IP address string
  */
+// Insert one audit row (now with optional entity link). Never throws.
 const logAudit = async ({
   userId      = null,
   username    = null,
@@ -26,16 +27,17 @@ const logAudit = async ({
   status      = "success",
   source      = null,
   ipAddress   = null,
+  entityType  = null,
+  entityId    = null,
 }) => {
   try {
     await pool.query(
       `INSERT INTO audit_logs
-         (user_id, username, event_name, description, action, status, source, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [userId, username, eventName, description, action, status, source, ipAddress]
+         (user_id, username, event_name, description, action, status, source, ip_address, entity_type, entity_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [userId, username, eventName, description, action, status, source, ipAddress, entityType, entityId]
     );
   } catch (err) {
-    // Never crash the main request because of a logging failure
     console.error("⚠️ Audit log failed:", err.message);
   }
 };

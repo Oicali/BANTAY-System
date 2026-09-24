@@ -184,12 +184,12 @@ const assignInvestigator = async (req, res) => {
       source: "Web Portal",
       ipAddress: getClientIp(req),
     });
-    console.log(
-      "Sending notif to:",
-      assigned_io_id,
-      "type:",
-      typeof assigned_io_id,
-    );
+    // console.log(
+    //   "Sending notif to:",
+    //   assigned_io_id,
+    //   "type:",
+    //   typeof assigned_io_id,
+    // );
     await createNotification({
       recipientId: assigned_io_id,
       senderId: req.user.user_id,

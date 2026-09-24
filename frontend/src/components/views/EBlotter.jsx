@@ -223,6 +223,8 @@ function EBlotter() {
     type: "success",
   });
   const [viewAttachments, setViewAttachments] = useState([]);
+  // audit info shown in the view modal
+  const [auditSummary, setAuditSummary] = useState(null);
   const [pendingExport, setPendingExport] = useState(null);
   const [referredCount, setReferredCount] = useState(0);
   const fetchControllerRef = useRef(null);
@@ -1417,6 +1419,16 @@ function EBlotter() {
         setEditMode(false);
         setEditingBlotterId(blotterId);
         setShowModal(true);
+        // Fetch audit summary (created / last updated)
+        try {
+          const auRes = await fetch(`${API_URL}/${blotterId}/audit-summary`, {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          });
+          const auData = await auRes.json();
+          setAuditSummary(auData.success ? auData.data : null);
+        } catch {
+          setAuditSummary(null);
+        }
         // Fetch attachments
         try {
           const attRes = await fetch(
@@ -2405,6 +2417,7 @@ function EBlotter() {
     setLightboxImage(null);
     setAttachMediaTab("image");
     setViewMediaTab("image");
+    setAuditSummary(null);
   };
 
   const cancelClose = () => {
@@ -2516,14 +2529,14 @@ function EBlotter() {
             barangay: barangayName || s.barangay,
           };
         });
-        console.log(
-          "Accept PUT - lat:",
-          finalCaseDetail.lat,
-          "lng:",
-          finalCaseDetail.lng,
-          "type_of_place:",
-          finalCaseDetail.type_of_place,
-        );
+        // console.log(
+        //   "Accept PUT - lat:",
+        //   finalCaseDetail.lat,
+        //   "lng:",
+        //   finalCaseDetail.lng,
+        //   "type_of_place:",
+        //   finalCaseDetail.type_of_place,
+        // );
         // Update blotter first
         const updateRes = await fetch(`${API_URL}/${editingBlotterId}`, {
           method: "PUT",
@@ -3206,19 +3219,19 @@ function EBlotter() {
                           <div className="eb-view-item">
                             <span className="eb-view-label">Contact:</span>
                             <span className="eb-view-value">
-                              {c.contact_number || "N/A"}
+                              {c.contact_number || "—"}
                             </span>
                           </div>
                           <div className="eb-view-item">
                             <span className="eb-view-label">Alias:</span>
                             <span className="eb-view-value">
-                              {c.alias || "N/A"}
+                              {c.alias || "—"}
                             </span>
                           </div>
                           <div className="eb-view-item">
                             <span className="eb-view-label">Occupation:</span>
                             <span className="eb-view-value">
-                              {c.occupation || "N/A"}
+                              {c.occupation || "—"}
                             </span>
                           </div>
                           <div className="eb-view-item eb-view-full">
@@ -3234,7 +3247,7 @@ function EBlotter() {
                                 ].filter((v) => v && v.trim() !== "");
                                 return parts.length > 0
                                   ? parts.join(", ")
-                                  : "N/A";
+                                  : "—";
                               })()}
                             </span>
                           </div>
@@ -3364,13 +3377,13 @@ function EBlotter() {
                             <div className="eb-view-item">
                               <span className="eb-view-label">Birthday:</span>
                               <span className="eb-view-value">
-                                {s.birthday || "N/A"}
+                                {s.birthday || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
                               <span className="eb-view-label">Age:</span>
                               <span className="eb-view-value">
-                                {s.age || "N/A"}
+                                {s.age || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
@@ -3384,13 +3397,13 @@ function EBlotter() {
                             <div className="eb-view-item">
                               <span className="eb-view-label">Alias:</span>
                               <span className="eb-view-value">
-                                {s.alias || "N/A"}
+                                {s.alias || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
                               <span className="eb-view-label">Occupation:</span>
                               <span className="eb-view-value">
-                                {s.occupation || "N/A"}
+                                {s.occupation || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item eb-view-full">
@@ -3406,7 +3419,7 @@ function EBlotter() {
                                   ].filter((v) => v && v.trim() !== "");
                                   return parts.length > 0
                                     ? parts.join(", ")
-                                    : "N/A";
+                                    : "—";
                                 })()}
                               </span>
                             </div>
@@ -3425,7 +3438,7 @@ function EBlotter() {
                                 Birth Place:
                               </span>
                               <span className="eb-view-value">
-                                {s.birth_place || "N/A"}
+                                {s.birth_place || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
@@ -3433,7 +3446,7 @@ function EBlotter() {
                                 Relation to Victim:
                               </span>
                               <span className="eb-view-value">
-                                {s.relation_to_victim || "N/A"}
+                                {s.relation_to_victim || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
@@ -3441,13 +3454,13 @@ function EBlotter() {
                                 Educational Attainment:
                               </span>
                               <span className="eb-view-value">
-                                {s.educational_attainment || "N/A"}
+                                {s.educational_attainment || "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
                               <span className="eb-view-label">Height:</span>
                               <span className="eb-view-value">
-                                {s.height_cm ? `${s.height_cm} cm` : "N/A"}
+                                {s.height_cm ? `${s.height_cm} cm` : "—"}
                               </span>
                             </div>
                             <div className="eb-view-item">
@@ -3460,7 +3473,7 @@ function EBlotter() {
                             <div className="eb-view-item eb-view-full">
                               <span className="eb-view-label">Motive:</span>
                               <span className="eb-view-value">
-                                {s.motive || "N/A"}
+                                {s.motive || "—"}
                               </span>
                             </div>
                           </div>
@@ -3486,7 +3499,7 @@ function EBlotter() {
                         <div className="eb-view-item">
                           <span className="eb-view-label">Index Type:</span>
                           <span className="eb-view-value">
-                            {offenses[0]?.index_type || "N/A"}
+                            {offenses[0]?.index_type || "—"}
                           </span>
                         </div>
                         <div className="eb-view-item">
@@ -3499,7 +3512,7 @@ function EBlotter() {
                                 .map((m) => m.modus_name);
                               if (names.length > 0) return names.join(", ");
                               if (caseDetail.modus) return caseDetail.modus;
-                              return "N/A";
+                              return "—";
                             })()}
                           </span>
                         </div>
@@ -3510,7 +3523,7 @@ function EBlotter() {
                             Stage of Felony:
                           </span>
                           <span className="eb-view-value">
-                            {offenses[0]?.stage_of_felony || "N/A"}
+                            {offenses[0]?.stage_of_felony || "—"}
                           </span>
                         </div>
                         <div className="eb-view-item">
@@ -3534,13 +3547,13 @@ function EBlotter() {
                         <div className="eb-view-item">
                           <span className="eb-view-label">COP:</span>
                           <span className="eb-view-value">
-                            {caseDetail.cop || "N/A"}
+                            {caseDetail.cop || "—"}
                           </span>
                         </div>
                         <div className="eb-view-item">
                           <span className="eb-view-label">Private Place?</span>
                           <span className="eb-view-value">
-                            {caseDetail.is_private_place || "N/A"}
+                            {caseDetail.is_private_place || "—"}
                           </span>
                         </div>
                         <div className="eb-view-item">
@@ -3550,7 +3563,7 @@ function EBlotter() {
                           <span className="eb-view-value">
                             {caseDetail.amount_involved
                               ? `₱${caseDetail.amount_involved}`
-                              : "N/A"}
+                              : "—"}
                           </span>
                         </div>
 
@@ -3567,7 +3580,7 @@ function EBlotter() {
                         <div className="eb-view-item">
                           <span className="eb-view-label">Type of Place:</span>
                           <span className="eb-view-value">
-                            {typeOfPlace || "N/A"}
+                            {typeOfPlace || "—"}
                           </span>
                         </div>
 
@@ -3581,12 +3594,13 @@ function EBlotter() {
                           </span>
                         </div>
 
+
                         <div className="eb-view-item">
                           <span className="eb-view-label">Coordinates:</span>
                           <span className="eb-view-value">
                             {caseDetail.lat && caseDetail.lng
                               ? `${caseDetail.lat}, ${caseDetail.lng}`
-                              : "N/A"}
+                              : "—"}
                           </span>
                         </div>
                         {/* ROW 6: Map full width */}
@@ -3939,6 +3953,48 @@ function EBlotter() {
                     </div>
                   </div>
                 )}
+                {/* ── RECORD HISTORY (audit summary) ── */}
+                <div className="eb-view-section">
+                  <h3 className="eb-view-section-title">Record History</h3>
+                  <div className="eb-view-section-body">
+                    <div className="eb-view-card">
+                      <div className="eb-view-grid">
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Created By:</span>
+                          <span className="eb-view-value">
+                            {auditSummary?.created
+                              ? `${auditSummary.created.name}${auditSummary.created.imported ? " (import)" : ""}`
+                              : "Not recorded"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Date Created:</span>
+                          <span className="eb-view-value">
+                            {auditSummary?.created
+                              ? formatDate(auditSummary.created.at)
+                              : "Not recorded"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Last Updated By:</span>
+                          <span className="eb-view-value">
+                            {auditSummary?.updated
+                              ? auditSummary.updated.name
+                              : "Not recorded"}
+                          </span>
+                        </div>
+                        <div className="eb-view-item">
+                          <span className="eb-view-label">Last Updated:</span>
+                          <span className="eb-view-value">
+                            {auditSummary?.updated
+                              ? formatDate(auditSummary.updated.at)
+                              : "Not recorded"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               // ========== EDIT/CREATE MODE - ORIGINAL FORM ==========
@@ -9127,7 +9183,7 @@ function EBlotter() {
                               className="eb-action-btn eb-action-btn-view"
                               onClick={(e) => {
                                 e.preventDefault();
-                                console.log("selected referral row:", b);
+                                // console.log("selected referral row:", b);
                                 setSelectedReferral(b);
                                 setShowReferralModal(true);
                               }}
