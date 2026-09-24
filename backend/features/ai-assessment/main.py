@@ -1063,6 +1063,27 @@ def compute_barangay_risk(
         r["rank"] = i + 1
         r.pop("raw_score", None)
 
+    # ── Data-driven tier thresholds ───────────────────────────────────────────
+    # Percentiles computed over ALL scored barangays in this query, not just
+    # the top 15. Falls back to fixed bands when the sample is too small for
+    # percentiles to mean anything (e.g. a filter with only 3-4 barangays).
+    all_scores = [r["risk_score"] for r in results]
+    if len(all_scores) >= 10:
+        p90, p75, p50 = np.percentile(all_scores, [90, 75, 50])
+        risk_thresholds = {
+            "priority": round(float(p90)),
+            "monitor":  round(float(p75)),
+            "observe":  round(float(p50)),
+            "method":   "percentile",
+        }
+    else:
+        risk_thresholds = {
+            "priority": 80,
+            "monitor":  65,
+            "observe":  45,
+            "method":   "fixed_fallback",
+        }
+
     # ── Walk-forward backtest ─────────────────────────────────────────────────
     backtest = _run_backtest(incidents_df, date_from, date_to, decay_window)
 
@@ -1074,6 +1095,7 @@ def compute_barangay_risk(
         "total_barangays":   len(results),
         "as_of_date":        date_to,
         "is_retrospective":  bool(is_retrospective),
+        "risk_thresholds":   risk_thresholds,
     }
 
 

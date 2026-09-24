@@ -929,7 +929,9 @@ const SummaryCards = ({ data, prevSummary, isThisMonth }) => {
               </div>
               <span className="cd-summary-sub">{c.sub}</span>
             </div>
-            <div className={`cd-summary-value ${c.alert ? "cd-value-alert-blink" : ""}`}>
+            <div
+              className={`cd-summary-value ${c.alert ? "cd-value-alert-blink" : ""}`}
+            >
               {c.value}
             </div>
             <div className="cd-summary-label">{c.label}</div>
@@ -1332,12 +1334,14 @@ const TrendsTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
 
   const visible = [...payload]
-  .filter((p) => p.name === "Total" || (p.value !== undefined && p.value !== 0))
-  .sort((a, b) => {
-    if (a.name === "Total") return -1;
-    if (b.name === "Total") return 1;
-    return b.value - a.value;
-  });
+    .filter(
+      (p) => p.name === "Total" || (p.value !== undefined && p.value !== 0),
+    )
+    .sort((a, b) => {
+      if (a.name === "Total") return -1;
+      if (b.name === "Total") return 1;
+      return b.value - a.value;
+    });
 
   return (
     <div
@@ -1363,15 +1367,33 @@ const TrendsTooltip = ({ active, payload, label }) => {
         {label}
       </div>
       {visible.map((p, i) => (
-  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 2 }}>
-    <span style={{ color: "#374151", fontWeight: p.name === "Total" ? 700 : 400 }}>
-      {CRIME_LABEL[p.name] || p.name}
-    </span>
-    <span style={{ color: "#0a1628", fontWeight: p.name === "Total" ? 700 : 400 }}>
-      {p.value}
-    </span>
-  </div>
-))}
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            marginBottom: 2,
+          }}
+        >
+          <span
+            style={{
+              color: "#374151",
+              fontWeight: p.name === "Total" ? 700 : 400,
+            }}
+          >
+            {CRIME_LABEL[p.name] || p.name}
+          </span>
+          <span
+            style={{
+              color: "#0a1628",
+              fontWeight: p.name === "Total" ? 700 : 400,
+            }}
+          >
+            {p.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 };
@@ -2298,37 +2320,43 @@ const BarangayTable = ({ data }) => {
   );
 };
 
-
 const CRIME_PILL_COLORS = {
-  MURDER:               { bg: "#3f0e0e", color: "#fca5a5" },
-  THEFT:                { bg: "#0c2240", color: "#93c5fd" },
-  RAPE:                 { bg: "#2d1054", color: "#c4b5fd" },
-  ROBBERY:              { bg: "#1a2e0a", color: "#86efac" },
-  HOMICIDE:             { bg: "#2c1a0a", color: "#fdba74" },
+  MURDER: { bg: "#3f0e0e", color: "#fca5a5" },
+  THEFT: { bg: "#0c2240", color: "#93c5fd" },
+  RAPE: { bg: "#2d1054", color: "#c4b5fd" },
+  ROBBERY: { bg: "#1a2e0a", color: "#86efac" },
+  HOMICIDE: { bg: "#2c1a0a", color: "#fdba74" },
   "SPECIAL COMPLEX CRIME": { bg: "#1a1a2e", color: "#a5b4fc" },
-  "PHYSICAL INJURY":    { bg: "#1a2a1a", color: "#6ee7b7" },
-  "CARNAPPING - MC":    { bg: "#0c2240", color: "#93c5fd" },
-  "CARNAPPING - MV":    { bg: "#0c2240", color: "#7dd3fc" },
+  "PHYSICAL INJURY": { bg: "#1a2a1a", color: "#6ee7b7" },
+  "CARNAPPING - MC": { bg: "#0c2240", color: "#93c5fd" },
+  "CARNAPPING - MV": { bg: "#0c2240", color: "#7dd3fc" },
 };
 
 const CRIME_PILL_LABEL = {
-  MURDER: "Murder", THEFT: "Theft", RAPE: "Rape", ROBBERY: "Robbery",
-  HOMICIDE: "Homicide", "SPECIAL COMPLEX CRIME": "Spec. Complex",
-  "PHYSICAL INJURY": "Phys. Inj.", "CARNAPPING - MC": "Carnap MC",
+  MURDER: "Murder",
+  THEFT: "Theft",
+  RAPE: "Rape",
+  ROBBERY: "Robbery",
+  HOMICIDE: "Homicide",
+  "SPECIAL COMPLEX CRIME": "Spec. Complex",
+  "PHYSICAL INJURY": "Phys. Inj.",
+  "CARNAPPING - MC": "Carnap MC",
   "CARNAPPING - MV": "Carnap MV",
 };
 
 const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
+  // Toggles for the two expandable info panels: model reliability vs. how the score is computed
   const [expandedRow, setExpandedRow] = useState(null);
   const [showBacktest, setShowBacktest] = useState(false);
   const [selectedFold, setSelectedFold] = useState(null);
+  const [showCalcInfo, setShowCalcInfo] = useState(false);
 
   if (!forecastData) return null;
 
-  const rows        = forecastData.barangay_risk || [];
-  const backtest    = forecastData.backtest || null;
+  const rows = forecastData.barangay_risk || [];
+  const backtest = forecastData.backtest || null;
   const decayWindow = forecastData.decay_window_used ?? 90;
-  const totalBrgys  = forecastData.total_barangays ?? 0;
+  const totalBrgys = forecastData.total_barangays ?? 0;
 
   if (rows.length === 0) {
     return (
@@ -2341,28 +2369,34 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
   const toggleRow = (rank) =>
     setExpandedRow(expandedRow === rank ? null : rank);
 
-  const getScoreClass = (score) => {
-    if (score >= 80) return { num: "cd-score-critical", fill: "cd-fill-critical" };
-    if (score >= 65) return { num: "cd-score-high",     fill: "cd-fill-high" };
-    if (score >= 45) return { num: "cd-score-medium",   fill: "cd-fill-medium" };
-    return                  { num: "cd-score-low",      fill: "cd-fill-low" };
+  // Percentile-derived cutoffs from the backend; falls back to fixed bands on small samples
+  const thresholds = forecastData.risk_thresholds || {
+    priority: 80,
+    monitor: 65,
+    observe: 45,
+    method: "fixed_fallback",
   };
 
-  
-
-  
+  const getScoreClass = (score) => {
+    if (score >= thresholds.priority)
+      return { num: "cd-score-critical", fill: "cd-fill-critical" };
+    if (score >= thresholds.monitor)
+      return { num: "cd-score-high", fill: "cd-fill-high" };
+    if (score >= thresholds.observe)
+      return { num: "cd-score-medium", fill: "cd-fill-medium" };
+    return { num: "cd-score-low", fill: "cd-fill-low" };
+  };
 
   const verdictClass = (v) => {
-    if (v === "trustworthy")       return "cd-backtest-verdict-trust";
-    if (v === "use with caution")  return "cd-backtest-verdict-caution";
+    if (v === "trustworthy") return "cd-backtest-verdict-trust";
+    if (v === "use with caution") return "cd-backtest-verdict-caution";
     return "cd-backtest-verdict-weak";
   };
 
   return (
     <div className="cd-risk-section">
-
-      {/* Header */}
-            <div className="cd-risk-header">
+            {/* Header */}
+      <div className="cd-risk-header">
         <div>
           <div className="cd-risk-title">
             Top 15 High-Risk Barangays — Structural Risk Ranking
@@ -2370,12 +2404,13 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
           <div className="cd-risk-subtitle">
             Historical data · Decay window: {decayWindow} days · {totalBrgys} of 47 barangays scored · Click row to expand
           </div>
+          {/* Legend ranges now pull from thresholds instead of hardcoded numbers */}
           <div className="cd-risk-legend">
             {[
-              { color: "#dc2626", bg: "rgba(220,38,38,0.08)",   border: "rgba(220,38,38,0.2)",  range: "80–100", label: "Priority patrol needed"         },
-              { color: "#ea580c", bg: "rgba(234,88,12,0.08)",   border: "rgba(234,88,12,0.2)",  range: "65–79",  label: "Closely monitor"                 },
-              { color: "#ca8a04", bg: "rgba(202,138,4,0.08)",   border: "rgba(202,138,4,0.2)",  range: "45–64",  label: "Keep under observation"          },
-              { color: "#6b7280", bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.2)",range: "0–44",   label: "Routine patrol sufficient"        },
+              { color: "#dc2626", bg: "rgba(220,38,38,0.08)",   border: "rgba(220,38,38,0.2)",  range: `${thresholds.priority}–100`,                        label: "Priority patrol needed"    },
+              { color: "#ea580c", bg: "rgba(234,88,12,0.08)",   border: "rgba(234,88,12,0.2)",  range: `${thresholds.monitor}–${thresholds.priority - 1}`, label: "Closely monitor"            },
+              { color: "#ca8a04", bg: "rgba(202,138,4,0.08)",   border: "rgba(202,138,4,0.2)",  range: `${thresholds.observe}–${thresholds.monitor - 1}`,  label: "Keep under observation"    },
+              { color: "#6b7280", bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.2)",range: `0–${thresholds.observe - 1}`,                       label: "Routine patrol sufficient" },
             ].map((item, i) => (
               <div key={i} className="cd-risk-legend-item" style={{ background: item.bg, border: `1px solid ${item.border}` }}>
                 <span className="cd-risk-legend-dot" style={{ background: item.color }} />
@@ -2384,10 +2419,20 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
               </div>
             ))}
             <div className="cd-risk-legend-note">
-              Score ranks barangays against each other — 100 = highest risk area in this period, not a percentage chance of crime
+              Score ranks barangays against each other in this period — ranges recalculate per search.{" "}
+              100 = highest risk area, not a percentage chance of crime.{" "}
+              <button
+                className="cd-risk-inline-link"
+                onClick={() => setShowCalcInfo((v) => !v)}
+                style={{ background: "none", border: "none", padding: 0, color: "var(--navy-primary)", textDecoration: "underline", cursor: "pointer", fontSize: "inherit" }}
+              >
+                {showCalcInfo ? "Hide" : "See"} how it's calculated
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Only the Reliability Report button remains here — calc explanation is opened via the inline text link in the legend note */}
         {showBacktestReport && backtest?.status === "ok" && (
           <button
             className="cd-risk-toggle-btn"
@@ -2398,11 +2443,52 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
         )}
       </div>
 
+      {/* Explanation panel — reuses the backtest panel's styling for visual consistency */}
+      {showCalcInfo && (
+        <div className="cd-backtest-panel">
+          <div className="cd-backtest-title">How the Risk Score is Calculated</div>
+
+          <div className="cd-backtest-meta" style={{ marginBottom: 12 }}>
+            Each barangay's score is a weighted composite of three signals, rescaled 0–100 relative to this query's results.
+          </div>
+
+          <div className="cd-backtest-metrics">
+            <div className="cd-backtest-metric-box">
+              <div className="cd-backtest-metric-label">Frequency (50%)</div>
+              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
+                Incidents per week in the selected period.
+              </div>
+            </div>
+            <div className="cd-backtest-metric-box">
+              <div className="cd-backtest-metric-label">Interval Pattern (30%)</div>
+              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
+                How overdue the barangay is for its next incident, based on historical spacing between incidents (SBA forecast method).
+              </div>
+            </div>
+            <div className="cd-backtest-metric-box">
+              <div className="cd-backtest-metric-label">Recency (20%)</div>
+              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
+                How recently the last incident occurred, decaying over {decayWindow} days.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14, fontSize: 12, color: "var(--gray-600)", lineHeight: 1.6 }}>
+            The three signals are weighted and combined, then rescaled so the highest-scoring barangay in this
+            result set becomes 100 — every other score is shown relative to it, not against a fixed citywide standard.
+            <br /><br />
+            <strong>Legend cutoffs:</strong> the color bands above aren't fixed numbers either — they're the{" "}
+            90th, 75th, and 50th percentile of scores across all barangays in this query
+            {thresholds.method === "fixed_fallback"
+              ? " (too few barangays returned for percentiles to be meaningful, so default 80/65/45 bands were used instead)."
+              : ". That means a barangay is flagged \"Priority\" only if it's in the top 10% of this specific result set — changing the date range or filters will shift these numbers, since it changes what's being compared."}
+          </div>
+        </div>
+      )}
+
       {/* Backtest insufficient warning */}
       {showBacktestReport && backtest?.status === "insufficient" && (
-        <div className="cd-backtest-insufficient">
-          ⚠ {backtest.message}
-        </div>
+        <div className="cd-backtest-insufficient">⚠ {backtest.message}</div>
       )}
 
       {/* Backtest panel */}
@@ -2410,19 +2496,29 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
         <div className="cd-backtest-panel">
           <div className="cd-backtest-title">Backtest Reliability Report</div>
           <div className="cd-backtest-meta">
-            {backtest.folds} weekly folds · Walk-forward validation ·{" "}
-            Verdict:{" "}
-            <span className={`cd-backtest-verdict ${verdictClass(backtest.model_verdict)}`}>
+            {backtest.folds} weekly folds · Walk-forward validation · Verdict:{" "}
+            <span
+              className={`cd-backtest-verdict ${verdictClass(backtest.model_verdict)}`}
+            >
               {backtest.model_verdict}
             </span>
           </div>
 
           <div className="cd-backtest-metrics">
             {[
-              { label: "Hit Rate @ Top 5",   value: `${backtest.hit_rate_top5}%`  },
-              { label: "Hit Rate @ Top 10",  value: `${backtest.hit_rate_top10}%` },
-              { label: "Hit Rate @ Top 15",  value: `${backtest.hit_rate_top15}%` },
-              { label: "Avg Rank of Actual", value: backtest.mean_rank ?? "—"     },
+              {
+                label: "Hit Rate @ Top 5",
+                value: `${backtest.hit_rate_top5}%`,
+              },
+              {
+                label: "Hit Rate @ Top 10",
+                value: `${backtest.hit_rate_top10}%`,
+              },
+              {
+                label: "Hit Rate @ Top 15",
+                value: `${backtest.hit_rate_top15}%`,
+              },
+              { label: "Avg Rank of Actual", value: backtest.mean_rank ?? "—" },
             ].map((m, i) => (
               <div key={i} className="cd-backtest-metric-box">
                 <div className="cd-backtest-metric-label">{m.label}</div>
@@ -2434,7 +2530,8 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
           {backtest.per_fold?.length > 0 && (
             <div>
               <div className="cd-backtest-fold-label">
-                Per-week result (✓ = actual crime barangay in top 15) — click to see phase 1 ranking
+                Per-week result (✓ = actual crime barangay in top 15) — click to
+                see phase 1 ranking
               </div>
               <div className="cd-backtest-folds">
                 {backtest.per_fold.map((f, i) => (
@@ -2442,7 +2539,9 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                     key={i}
                     className={`cd-backtest-fold-dot ${f.hit_top15 ? "cd-fold-hit" : "cd-fold-miss"}`}
                     title={`Fold ${f.fold} — Test week: ${f.test_week_start} to ${f.test_week_end} — ${f.hit_top15 ? "Hit" : "Miss"} — Actual: ${f.actual_brgy?.join(", ")}`}
-                    onClick={() => setSelectedFold(selectedFold === i ? null : i)}
+                    onClick={() =>
+                      setSelectedFold(selectedFold === i ? null : i)
+                    }
                     style={{ cursor: "pointer", fontWeight: 700, fontSize: 11 }}
                   >
                     {f.fold}
@@ -2451,20 +2550,64 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
               </div>
 
               {selectedFold !== null && backtest.per_fold[selectedFold] && (
-                <div style={{ marginTop: 12, background: "var(--white)", border: "1px solid var(--gray-200)", borderRadius: 8, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--navy-primary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
-                    Phase 1 Ranking — Fold {backtest.per_fold[selectedFold].fold}
+                <div
+                  style={{
+                    marginTop: 12,
+                    background: "var(--white)",
+                    border: "1px solid var(--gray-200)",
+                    borderRadius: 8,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--navy-primary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.07em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    Phase 1 Ranking — Fold{" "}
+                    {backtest.per_fold[selectedFold].fold}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--gray-600)", marginBottom: 10 }}>
-                    Trained on data up to <strong>{backtest.per_fold[selectedFold].train_end}</strong> ·{" "}
-                    Testing week <strong>{backtest.per_fold[selectedFold].test_week_start}</strong> to <strong>{backtest.per_fold[selectedFold].test_week_end}</strong>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--gray-600)",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Trained on data up to{" "}
+                    <strong>{backtest.per_fold[selectedFold].train_end}</strong>{" "}
+                    · Testing week{" "}
+                    <strong>
+                      {backtest.per_fold[selectedFold].test_week_start}
+                    </strong>{" "}
+                    to{" "}
+                    <strong>
+                      {backtest.per_fold[selectedFold].test_week_end}
+                    </strong>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--gray-600)", marginBottom: 10 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--gray-600)",
+                      marginBottom: 10,
+                    }}
+                  >
                     Actual crime barangays:{" "}
-                    {(backtest.per_fold[selectedFold].actual_brgy || []).length === 0
-                      ? <span style={{ color: "var(--gray-400)" }}>none recorded</span>
-                      : (backtest.per_fold[selectedFold].actual_brgy || []).map((brgy, i) => {
-                          const ranked = backtest.per_fold[selectedFold].phase1_top15 || [];
+                    {(backtest.per_fold[selectedFold].actual_brgy || [])
+                      .length === 0 ? (
+                      <span style={{ color: "var(--gray-400)" }}>
+                        none recorded
+                      </span>
+                    ) : (
+                      (backtest.per_fold[selectedFold].actual_brgy || []).map(
+                        (brgy, i) => {
+                          const ranked =
+                            backtest.per_fold[selectedFold].phase1_top15 || [];
                           const isHit = ranked.some((r) => r.barangay === brgy);
                           return (
                             <span
@@ -2477,53 +2620,168 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                                 borderRadius: 4,
                                 fontSize: 11,
                                 fontWeight: 700,
-                                background: isHit ? "rgba(34,197,94,0.12)" : "rgba(220,38,38,0.10)",
+                                background: isHit
+                                  ? "rgba(34,197,94,0.12)"
+                                  : "rgba(220,38,38,0.10)",
                                 color: isHit ? "#16a34a" : "#dc2626",
                                 border: `1px solid ${isHit ? "rgba(34,197,94,0.3)" : "rgba(220,38,38,0.2)"}`,
                               }}
                             >
                               {formatBarangayLabel(brgy)}
-                              <span style={{ marginLeft: 4, opacity: 0.8 }}>{isHit ? "✓" : "✗"}</span>
+                              <span style={{ marginLeft: 4, opacity: 0.8 }}>
+                                {isHit ? "✓" : "✗"}
+                              </span>
                             </span>
                           );
-                        })
-                    }
+                        },
+                      )
+                    )}
                   </div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: 12,
+                    }}
+                  >
                     <thead>
-                      <tr style={{ background: "var(--navy-dark)", color: "var(--white)" }}>
-                        <th style={{ padding: "6px 10px", textAlign: "left" }}>#</th>
-                        <th style={{ padding: "6px 10px", textAlign: "left" }}>Barangay</th>
-                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Priority Score</th>
-                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Freq</th>
-                        <th style={{ padding: "6px 10px", textAlign: "right" }}>SBA</th>
-                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Recency</th>
-                        <th style={{ padding: "6px 10px", textAlign: "left" }}>Actual?</th>
+                      <tr
+                        style={{
+                          background: "var(--navy-dark)",
+                          color: "var(--white)",
+                        }}
+                      >
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>
+                          #
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>
+                          Barangay
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>
+                          Priority Score
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>
+                          Freq
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>
+                          SBA
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>
+                          Recency
+                        </th>
+                        <th style={{ padding: "6px 10px", textAlign: "left" }}>
+                          Actual?
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {backtest.per_fold[selectedFold].phase1_top15?.map((row, i) => {
-                        const isActual = backtest.per_fold[selectedFold].actual_brgy?.includes(row.barangay);
-                        return (
-                          <tr key={i} style={{ borderBottom: "1px solid var(--gray-100)", background: isActual ? "rgba(34,197,94,0.08)" : undefined }}>
-                            <td style={{ padding: "6px 10px", color: "var(--gray-400)", fontWeight: 700 }}>{row.rank}</td>
-                            <td style={{ padding: "6px 10px", fontWeight: 600, color: isActual ? "#16a34a" : "var(--navy-primary)" }}>
-                              {formatBarangayLabel(row.barangay)}
-                              {isActual && <span style={{ marginLeft: 6, fontSize: 10, background: "rgba(34,197,94,0.15)", color: "#16a34a", padding: "1px 6px", borderRadius: 4, fontWeight: 700 }}>ACTUAL</span>}
-                            </td>
-                            <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "var(--navy-dark)" }}>{row.risk_score}</td>
-                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.freq_rate}</td>
-                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.sba_score}</td>
-                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--gray-600)" }}>{row.recency.toFixed(3)}</td>
-                            <td style={{ padding: "6px 10px" }}>
-                              {isActual
-                                ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Hit</span>
-                                : <span style={{ color: "var(--gray-400)" }}>—</span>
-                              }
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {backtest.per_fold[selectedFold].phase1_top15?.map(
+                        (row, i) => {
+                          const isActual = backtest.per_fold[
+                            selectedFold
+                          ].actual_brgy?.includes(row.barangay);
+                          return (
+                            <tr
+                              key={i}
+                              style={{
+                                borderBottom: "1px solid var(--gray-100)",
+                                background: isActual
+                                  ? "rgba(34,197,94,0.08)"
+                                  : undefined,
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  color: "var(--gray-400)",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {row.rank}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  fontWeight: 600,
+                                  color: isActual
+                                    ? "#16a34a"
+                                    : "var(--navy-primary)",
+                                }}
+                              >
+                                {formatBarangayLabel(row.barangay)}
+                                {isActual && (
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      fontSize: 10,
+                                      background: "rgba(34,197,94,0.15)",
+                                      color: "#16a34a",
+                                      padding: "1px 6px",
+                                      borderRadius: 4,
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    ACTUAL
+                                  </span>
+                                )}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  textAlign: "right",
+                                  fontWeight: 700,
+                                  color: "var(--navy-dark)",
+                                }}
+                              >
+                                {row.risk_score}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  textAlign: "right",
+                                  color: "var(--gray-600)",
+                                }}
+                              >
+                                {row.freq_rate}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  textAlign: "right",
+                                  color: "var(--gray-600)",
+                                }}
+                              >
+                                {row.sba_score}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "6px 10px",
+                                  textAlign: "right",
+                                  color: "var(--gray-600)",
+                                }}
+                              >
+                                {row.recency.toFixed(3)}
+                              </td>
+                              <td style={{ padding: "6px 10px" }}>
+                                {isActual ? (
+                                  <span
+                                    style={{
+                                      color: "#16a34a",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    ✓ Hit
+                                  </span>
+                                ) : (
+                                  <span style={{ color: "var(--gray-400)" }}>
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        },
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2534,31 +2792,46 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
       )}
 
       {/* Table */}
-      <div className="cd-risk-table-wrap">
+            <div className="cd-risk-table-wrap">
         <table className="cd-risk-table">
           <thead>
             <tr>
-              {["#", "Barangay", "Priority Score", "Primary Risk", "Last Incident", "Why Flagged", ""].map((h, i) => (
-                <th key={i}>{h}</th>
-              ))}
+              <th>#</th>
+              <th>Barangay</th>
+              {/* Short-form tooltip for quick reference; full breakdown lives in the panel above */}
+              <th className="cd-th-tooltip-wrap">
+                Risk Score
+                <div className="cd-th-tooltip">
+                  <div className="cd-th-tooltip-title">Composite Risk Index</div>
+                  <div className="cd-th-tooltip-formula">
+                    50% Frequency + 30% Interval Pattern + 20% Recency, rescaled 0–100 relative to this result set.
+                  </div>
+                </div>
+              </th>
+              <th>Primary Risk</th>
+              <th>Last Incident</th>
+              <th>Why Flagged</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const sc       = getScoreClass(row.risk_score);
+              const sc = getScoreClass(row.risk_score);
               const isExpanded = expandedRow === row.rank;
 
               return (
                 <React.Fragment key={row.rank}>
                   <tr
                     onClick={() => toggleRow(row.rank)}
-                    style={{ background: isExpanded ? "var(--gray-50)" : undefined }}
+                    style={{
+                      background: isExpanded ? "var(--gray-50)" : undefined,
+                    }}
                   >
                     <td className="cd-brgy-rank">{row.rank}</td>
 
                     <td className="cd-risk-brgy-name">
-  {formatBarangayLabel(row.barangay)}
-</td>
+                      {formatBarangayLabel(row.barangay)}
+                    </td>
 
                     <td>
                       <div className="cd-risk-score-wrap">
@@ -2577,7 +2850,10 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                     <td>
                       <div className="cd-risk-crime-pills">
                         {(row.top_crimes || []).map((c, i) => {
-                          const ps = CRIME_PILL_COLORS[c] || { bg: "var(--gray-100)", color: "var(--gray-600)" };
+                          const ps = CRIME_PILL_COLORS[c] || {
+                            bg: "var(--gray-100)",
+                            color: "var(--gray-600)",
+                          };
                           return (
                             <span
                               key={i}
@@ -2597,9 +2873,14 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                       </span>
                     </td>
 
-                    
-
-                    <td style={{ fontSize: 11.5, color: "var(--gray-600)", maxWidth: 200, lineHeight: 1.5 }}>
+                    <td
+                      style={{
+                        fontSize: 11.5,
+                        color: "var(--gray-600)",
+                        maxWidth: 200,
+                        lineHeight: 1.5,
+                      }}
+                    >
                       {row.why_flagged}
                     </td>
 
@@ -2618,13 +2899,25 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
                           <div className="cd-risk-detail-stats">
                             {[
                               { label: "Total Incidents", value: row.total },
-                              { label: "Active Weeks",    value: row.nonzero_weeks },
-                              { label: "Avg Interval",    value: row.avg_interval_days ? `~${Math.round(row.avg_interval_days)}d` : "N/A" },
-                              { label: "Model Tier",      value: row.tier },
+                              {
+                                label: "Active Weeks",
+                                value: row.nonzero_weeks,
+                              },
+                              {
+                                label: "Avg Interval",
+                                value: row.avg_interval_days
+                                  ? `~${Math.round(row.avg_interval_days)}d`
+                                  : "N/A",
+                              },
+                              { label: "Model Tier", value: row.tier },
                             ].map((s, i) => (
                               <div key={i} className="cd-risk-detail-stat">
-                                <span className="cd-risk-detail-stat-label">{s.label}</span>
-                                <span className="cd-risk-detail-stat-val">{s.value}</span>
+                                <span className="cd-risk-detail-stat-label">
+                                  {s.label}
+                                </span>
+                                <span className="cd-risk-detail-stat-val">
+                                  {s.value}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -2641,7 +2934,6 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
     </div>
   );
 };
-
 
 // ─── MODULE-LEVEL CACHE ───────────────────────────────────────────────────────
 const CACHE_TTL = 5 * 60 * 1000;
@@ -2987,7 +3279,7 @@ const CrimeDashboard = () => {
     }
   };
 
-const handleGenerateAssessment = () => {
+  const handleGenerateAssessment = () => {
     if (isLoading || !dashData.summary.length) return;
 
     const dayCount = Math.round(
@@ -3150,14 +3442,15 @@ const handleGenerateAssessment = () => {
             <button
               className="cd-generate-btn"
               onClick={handleGenerateAssessment}
-              disabled={isLoading || isGeneratingAssessment || !dashData.summary.length}
+              disabled={
+                isLoading || isGeneratingAssessment || !dashData.summary.length
+              }
             >
               Generate Assessment
             </button>
             <p className="cd-ai-helper-text">
               Generates an AI-powered EMPO QUAD assessment based on current
               filters.{" "}
-              
             </p>
           </div>
         )}
@@ -3176,8 +3469,6 @@ const handleGenerateAssessment = () => {
               </div>
               <span className="cd-ai-badge">AI Output</span>
             </div>
-
-            
 
             {assessment.stats && (
               <div className="cd-ai-stat-row">
@@ -3224,7 +3515,9 @@ const handleGenerateAssessment = () => {
                 margin: "20px 0 16px",
               }}
             >
-              <div style={{ flex: 1, height: 1, background: "var(--gray-200)" }} />
+              <div
+                style={{ flex: 1, height: 1, background: "var(--gray-200)" }}
+              />
               <div
                 style={{
                   fontSize: 10,
@@ -3238,16 +3531,16 @@ const handleGenerateAssessment = () => {
               >
                 Per-Crime EMPO QUAD Assessment
               </div>
-              <div style={{ flex: 1, height: 1, background: "var(--gray-200)" }} />
+              <div
+                style={{ flex: 1, height: 1, background: "var(--gray-200)" }}
+              />
             </div>
 
             {(assessment.per_crime || []).map((crime, idx) => (
               <div key={idx} className="cd-ai-block cd-ai-crime-block">
                 <h4>
                   {crime.crime_type}
-                  {crime.is_ecp && (
-                    <span className="cd-ai-ecp-badge">ECP</span>
-                  )}
+                  {crime.is_ecp && <span className="cd-ai-ecp-badge">ECP</span>}
                 </h4>
 
                 <div className="cd-ai-quad-item">
