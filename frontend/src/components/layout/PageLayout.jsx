@@ -1,14 +1,21 @@
 // frontend\src\components\layout\PageLayout.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./Topbar";
 import { navItems } from "../../utils/navItems";
 import "./PageLayout.css";
-
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function PageLayout() {
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === "token" || e.key === null) window.location.reload();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const [openSections, setOpenSections] = useState(
     navItems.reduce((acc, group) => {
       acc[group.section] = true;
