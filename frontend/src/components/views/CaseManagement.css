@@ -65,12 +65,12 @@ body {
 }
 
 .cm-btn-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
 }
 
 .cm-btn-primary:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 
 /* === STATUS CARDS === */

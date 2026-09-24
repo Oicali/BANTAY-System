@@ -63,10 +63,10 @@
   gap: 8px;
 }
 .ap-wrap .pd-btn-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
 }
-.ap-wrap .pd-btn-primary:hover { background: var(--red-dark); }
+.ap-wrap .pd-btn-primary:hover { background: var(--navy-light); }
 
 .ap-wrap .pd-btn-secondary {
   background: var(--white);
@@ -184,7 +184,7 @@
 }
 .ap-apply-btn {
   padding: 8px 20px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -196,7 +196,7 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-.ap-apply-btn:hover { background: var(--navy-dark); }
+.ap-apply-btn:hover { background: var(--navy-light); }
 .ap-clear-btn {
   padding: 8px 12px;
   background: var(--white);

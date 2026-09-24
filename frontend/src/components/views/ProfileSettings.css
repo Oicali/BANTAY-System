@@ -90,13 +90,13 @@ body {
   background: var(--gray-50);
 }
 .ps-header-button-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
-  border-color: var(--red-primary);
+  border-color: var(--navy-primary);
 }
 .ps-header-button-primary:hover {
-  background: var(--red-dark);
-  border-color: var(--red-dark);
+  background: var(--navy-light);
+  border-color: var(--navy-light);
 }
 .ps-header-button-primary:disabled {
   background: var(--gray-400);

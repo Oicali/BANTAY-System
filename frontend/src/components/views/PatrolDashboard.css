@@ -81,8 +81,8 @@ body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; ba
 .toggle-active { background: var(--white); color: var(--navy-dark); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
 /* ADD BUTTON */
-.add-btn { padding: 8px 16px; background: var(--red-primary); color: var(--white); border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s ease; white-space: nowrap; flex-shrink: 0; }
-.add-btn:hover { background: var(--red-dark); }
+.add-btn { padding: 8px 16px; background: var(--navy-primary); color: var(--white); border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s ease; white-space: nowrap; flex-shrink: 0; }
+.add-btn:hover { background: var(--navy-light); }
 
 /* ── FILTER BAR — CrimeMapping style ──────────────────────────── */
 .pd-filter-bar {
@@ -139,7 +139,7 @@ body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; ba
 /* Apply → red-primary */
 .pd-filter-apply {
   padding: 8px 20px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   border: none;
   border-radius: 6px;
@@ -151,7 +151,7 @@ body { font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; ba
   white-space: nowrap;
   flex-shrink: 0;
 }
-.pd-filter-apply:hover { background: var(--red-dark); }
+.pd-filter-apply:hover { background: var(--navy-light); }
 
 .pd-filter-reset {
   padding: 8px 12px;
