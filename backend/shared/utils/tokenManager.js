@@ -228,6 +228,30 @@ const revokeTokenById = async (tokenId, requestingUserId) => {
 };
 
 // =====================================================
+// Revoke prior sessions from the SAME device (matched by
+// user_agent + ip_address) before issuing a new token.
+// Called at login so re-logging in from the same browser
+// collapses into one session instead of stacking duplicates.
+// =====================================================
+const revokeSessionsForSameDevice = async (userId, userAgent, ipAddress) => {
+  try {
+    if (!userAgent || !ipAddress) return; // nothing reliable to match on — skip
+    await pool.query(
+      `UPDATE tokens
+       SET is_revoked = true, revoked_at = NOW()
+       WHERE user_id = $1
+         AND is_revoked = false
+         AND user_agent = $2
+         AND ip_address = $3`,
+      [userId, userAgent, ipAddress]
+    );
+  } catch (error) {
+    console.error("❌ Revoke sessions for same device error:", error);
+    // Non-fatal — never block a login because this cleanup failed
+  }
+};
+
+// =====================================================
 // Revoke all sessions except the current one
 // =====================================================
 const revokeAllExceptCurrent = async (userId, currentTokenHash) => {
@@ -260,5 +284,6 @@ module.exports = {
   getUserSessions,
   revokeTokenById,
   revokeAllExceptCurrent,
+  revokeSessionsForSameDevice,
   hashToken,
 };
