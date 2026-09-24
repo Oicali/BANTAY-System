@@ -170,7 +170,7 @@ input:focus-visible {
 
 .crmap-apply-btn {
   padding: 8px 20px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -182,7 +182,7 @@ input:focus-visible {
 }
 
 .crmap-apply-btn:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 
 .crmap-clear-btn {

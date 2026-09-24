@@ -1928,6 +1928,13 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
               }}
               minZoom={minimal ? 11 : 11.5}
               maxZoom={18}
+              // Locks panning to Bacoor City's extent (with a small buffer) —
+              // this is what actually stops users from scrolling/hovering
+              // away into surrounding municipalities. minZoom alone can't do this.
+              maxBounds={[
+                [120.895, 14.345], // southwest corner [lng, lat]
+                [121.025, 14.495], // northeast corner [lng, lat]
+              ]}
               style={{ width: "100%", height: "100%" }}
               mapStyle={
                 heatmapMode

@@ -50,12 +50,12 @@
 }
 
 .al-btn-primary {
-  background: var(--red-primary, #c1272d);
+  background: var(--navy-primary, #1e3a5f);
   color: #ffffff;
 }
 
 .al-btn-primary:hover {
-  background: var(--red-dark, #8b1a1f);
+  background: var(--navy-light, #2d4a6f);
 }
 
 .al-btn-secondary {
@@ -202,14 +202,14 @@ input[type="date"].al-filter-input::-webkit-calendar-picker-indicator {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: var(--red-primary, #c1272d);
+  background: var(--navy-primary, #1e3a5f);
   color: #ffffff;
   white-space: nowrap;
   box-sizing: border-box;
 }
 
 .al-apply-btn:hover {
-  background: var(--red-dark, #8b1a1f);
+  background: var(--navy-light, #2d4a6f);
 }
 
 .al-apply-btn-dirty {

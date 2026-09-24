@@ -1472,7 +1472,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   white-space: nowrap;
   line-height: 42px;
@@ -1480,7 +1480,7 @@ body {
 }
 
 .cd-apply-btn:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 .cd-apply-btn-dirty {
   box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.22);
@@ -1660,18 +1660,18 @@ body {
   padding: 0 20px;
   border: none;
   border-radius: 8px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   font-family: "DM Sans", sans-serif;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 6px 18px rgba(193, 39, 45, 0.18);
+  box-shadow: 0 6px 18px rgba(30, 58, 95, 0.18);
 }
 
 .cd-generate-btn:hover:not(:disabled) {
-  background: var(--red-dark);
+  background: var(--navy-light);
   transform: translateY(-1px);
 }
 
@@ -3117,6 +3117,62 @@ body {
   font-size: 13px;
   color: var(--gray-600);
   margin-bottom: 24px;
+}
+
+/* ─── RISK SCORE LEGEND ───────────────────────────────────────────────────── */
+
+.cd-risk-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.cd-risk-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.cd-risk-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cd-risk-legend-range {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: "Inter", monospace;
+}
+
+.cd-risk-legend-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.cd-risk-legend-note {
+  font-size: 10px;
+  color: var(--gray-400);
+  font-style: italic;
+  margin-left: 4px;
+  align-self: center;
+}
+
+@media (max-width: 600px) {
+  .cd-risk-legend {
+    gap: 6px;
+  }
+  .cd-risk-legend-note {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 /* Responsive */

@@ -78,12 +78,12 @@ body {
 }
 
 .um-btn-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
 }
 
 .um-btn-primary:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 
 /* === TABS === */
@@ -216,14 +216,14 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   white-space: nowrap;
   box-sizing: border-box;
 }
 
 .um-apply-btn:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 
 /* Pulse ring when draft differs from applied */

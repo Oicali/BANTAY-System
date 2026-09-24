@@ -498,7 +498,7 @@
 .pdv-filter-arrow { font-size: 13px; color: var(--gray-400); }
 .pdv-filter-apply {
   padding: 7px 18px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   border: none;
   border-radius: 6px;
@@ -510,7 +510,7 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
-.pdv-filter-apply:hover { background: var(--red-dark); }
+.pdv-filter-apply:hover { background: var(--navy-light); }
 .pdv-filter-reset {
   padding: 7px 11px;
   background: var(--white);

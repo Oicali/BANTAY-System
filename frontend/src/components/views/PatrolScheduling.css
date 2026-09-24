@@ -65,11 +65,11 @@ body {
 
 /* Add Patrol → red-primary */
 .psch-btn-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
-  border: 1px solid var(--red-primary);
+  border: 1px solid var(--navy-primary);
 }
-.psch-btn-primary:hover { background: var(--red-dark); border-color: var(--red-dark); }
+.psch-btn-primary:hover { background: var(--navy-light); border-color: var(--navy-light); }
 
 .psch-btn-outline {
   background: var(--white);
@@ -223,7 +223,7 @@ body {
 
 .psch-filter-apply {
   padding: 8px 20px;
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
   border: none;
   border-radius: 6px;
@@ -235,7 +235,7 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
 }
-.psch-filter-apply:hover { background: var(--red-dark); }
+.psch-filter-apply:hover { background: var(--navy-light); }
 
 .psch-filter-reset {
   padding: 7px 11px;

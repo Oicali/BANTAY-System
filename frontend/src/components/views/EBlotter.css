@@ -71,12 +71,12 @@ body {
 }
 
 .eb-btn-primary {
-  background: var(--red-primary);
+  background: var(--navy-primary);
   color: var(--white);
 }
 
 .eb-btn-primary:hover {
-  background: var(--red-dark);
+  background: var(--navy-light);
 }
 
 .eb-btn-secondary {
