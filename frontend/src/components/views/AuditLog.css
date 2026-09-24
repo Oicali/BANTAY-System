@@ -213,7 +213,7 @@ input[type="date"].al-filter-input::-webkit-calendar-picker-indicator {
 }
 
 .al-apply-btn-dirty {
-  box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.22);
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.22);
 }
 
 .al-reset-btn {

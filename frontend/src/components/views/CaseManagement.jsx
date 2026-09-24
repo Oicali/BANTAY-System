@@ -204,7 +204,7 @@ function CaseManagement() {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       const data = await res.json();
-      console.log("STATS RESPONSE:", data);
+      // console.log("STATS RESPONSE:", data);
       if (data.success) setStats(data.data);
     } catch (err) {
       console.error(err);

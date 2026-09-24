@@ -2516,14 +2516,14 @@ function EBlotter() {
             barangay: barangayName || s.barangay,
           };
         });
-        console.log(
-          "Accept PUT - lat:",
-          finalCaseDetail.lat,
-          "lng:",
-          finalCaseDetail.lng,
-          "type_of_place:",
-          finalCaseDetail.type_of_place,
-        );
+        // console.log(
+        //   "Accept PUT - lat:",
+        //   finalCaseDetail.lat,
+        //   "lng:",
+        //   finalCaseDetail.lng,
+        //   "type_of_place:",
+        //   finalCaseDetail.type_of_place,
+        // );
         // Update blotter first
         const updateRes = await fetch(`${API_URL}/${editingBlotterId}`, {
           method: "PUT",
@@ -9127,7 +9127,7 @@ function EBlotter() {
                               className="eb-action-btn eb-action-btn-view"
                               onClick={(e) => {
                                 e.preventDefault();
-                                console.log("selected referral row:", b);
+                                // console.log("selected referral row:", b);
                                 setSelectedReferral(b);
                                 setShowReferralModal(true);
                               }}
