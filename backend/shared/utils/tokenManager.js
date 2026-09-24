@@ -271,6 +271,39 @@ const revokeAllExceptCurrent = async (userId, currentTokenHash) => {
     throw error;
   }
 };
+
+// =====================================================
+// Revoke all sessions except the current one, SKIPPING
+// any device that is currently trusted. Used when the
+// requesting session is itself untrusted — it may clear
+// out other untrusted sessions but must not touch trusted
+// ones. Returns the count of sessions actually revoked.
+// =====================================================
+const revokeAllExceptCurrentAndTrusted = async (userId, currentTokenHash) => {
+  try {
+    const result = await pool.query(
+      `UPDATE tokens
+       SET is_revoked = true, revoked_at = NOW()
+       WHERE user_id = $1
+         AND token_hash != $2
+         AND is_revoked = false
+         AND NOT EXISTS (
+           SELECT 1 FROM trusted_devices td
+           WHERE td.user_id = tokens.user_id
+             AND td.ip_address IS NOT DISTINCT FROM tokens.ip_address
+             AND td.user_agent IS NOT DISTINCT FROM tokens.user_agent
+             AND td.trusted_until > NOW()
+         )
+       RETURNING token_id`,
+      [userId, currentTokenHash]
+    );
+
+    return result.rowCount;
+  } catch (error) {
+    console.error("❌ Revoke all except current and trusted error:", error);
+    throw error;
+  }
+};
  
 // =====================================================
 // Get the set of "ip|userAgent" keys currently trusted
@@ -370,6 +403,38 @@ const trustDeviceByTokenId = async (tokenId, userId) => {
 };
 
 // =====================================================
+// Check whether the CURRENT session (identified by its
+// token_hash) is itself a trusted device. Used to gate
+// actions that target other trusted devices — an
+// untrusted session must not be able to log out or
+// remove trust from a trusted one.
+// =====================================================
+const isCurrentDeviceTrusted = async (tokenHash, userId) => {
+  try {
+    const tokenResult = await pool.query(
+      `SELECT ip_address, user_agent FROM tokens WHERE token_hash = $1 AND user_id = $2`,
+      [tokenHash, userId]
+    );
+    if (tokenResult.rows.length === 0) return false;
+
+    const { ip_address, user_agent } = tokenResult.rows[0];
+    const trustedCheck = await pool.query(
+      `SELECT 1 FROM trusted_devices
+       WHERE user_id = $1
+         AND ip_address IS NOT DISTINCT FROM $2
+         AND user_agent IS NOT DISTINCT FROM $3
+         AND trusted_until > NOW()
+       LIMIT 1`,
+      [userId, ip_address, user_agent]
+    );
+    return trustedCheck.rows.length > 0;
+  } catch (error) {
+    console.error("❌ isCurrentDeviceTrusted error:", error);
+    return false;
+  }
+};
+
+// =====================================================
 // EXPORTS
 // =====================================================
 module.exports = {
@@ -385,5 +450,7 @@ module.exports = {
   getTrustedDeviceKeys,
   removeTrustedDeviceByTokenId,
   trustDeviceByTokenId,
+  isCurrentDeviceTrusted,
+  revokeAllExceptCurrentAndTrusted,
   hashToken,
 };
