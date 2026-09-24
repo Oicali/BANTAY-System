@@ -921,6 +921,15 @@ const mobileLogin = async (req, res) => {
     );
     const isNewDevice = trustedCheck.rows.length === 0;
 
+    // A native app identifies itself via X-Client-App/X-Client-Platform,
+    // since its fetch's User-Agent can't be pattern-matched like a
+    // browser's. Computed once so both the stored session row and the
+    // NEW_LOGIN notification (if any) show the same label.
+    const clientApp = req.headers["x-client-app"]
+      ? { name: req.headers["x-client-app"], platform: req.headers["x-client-platform"] }
+      : null;
+    const deviceLabel = parseDeviceLabel(userAgent, "mobile", clientApp);
+
     const token = await tokenManager.createToken(
       {
         user_id:   user.user_id,
@@ -934,6 +943,7 @@ const mobileLogin = async (req, res) => {
         userAgent,
         deviceType: "mobile",
         ipAddress:  ip,
+        clientAppLabel: clientApp ? deviceLabel : null,
       },
     );
 
@@ -950,7 +960,6 @@ const mobileLogin = async (req, res) => {
     });
 
     if (isNewDevice) {
-      const deviceLabel = parseDeviceLabel(userAgent, "mobile");
       await pool.query(
         `INSERT INTO notifications
            (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)

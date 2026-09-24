@@ -44,16 +44,19 @@ const createToken = async (userData, options = {}) => {
     const expiresAt = new Date(Date.now() + getExpiryMs(expiresIn));
 
     // NEW: device/session metadata — pass these in from the login controller
-    const userAgent     = options.userAgent || null;
-    const ipAddress     = options.ipAddress || null;
-    const deviceType    = options.deviceType || null;
-    const locationLabel = options.locationLabel || null;
+    const userAgent      = options.userAgent || null;
+    const ipAddress      = options.ipAddress || null;
+    const deviceType     = options.deviceType || null;
+    const locationLabel  = options.locationLabel || null;
+    // Set only when the client identified itself via X-Client-App (native
+    // apps, whose fetch UA can't be pattern-matched like a browser's).
+    const clientAppLabel = options.clientAppLabel || null;
  
     await pool.query(
       `INSERT INTO tokens
-         (user_id, token_hash, expires_at, user_agent, ip_address, device_type, location_label, last_active_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [userData.user_id, tokenHash, expiresAt, userAgent, ipAddress, deviceType, locationLabel]
+         (user_id, token_hash, expires_at, user_agent, ip_address, device_type, location_label, client_app_label, last_active_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [userData.user_id, tokenHash, expiresAt, userAgent, ipAddress, deviceType, locationLabel, clientAppLabel]
     );
  
     return token;
@@ -181,7 +184,7 @@ const getUserSessions = async (userId, currentTokenHash = null) => {
     const result = await pool.query(
       `SELECT token_id, created_at, expires_at, last_active_at,
               user_agent, device_type, ip_address, location_label,
-              token_hash
+              client_app_label, token_hash
        FROM tokens
        WHERE user_id = $1
          AND is_revoked = false

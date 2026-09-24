@@ -613,6 +613,9 @@ export default function ProfileSettings() {
   };
 
   const parseDeviceLabel = (session) => {
+    // A native app (mobile) stores its own explicit label at login time,
+    // since its User-Agent can't be pattern-matched like a browser's.
+    if (session.client_app_label) return session.client_app_label;
     const ua = session.user_agent || "";
     let browser = "Unknown Browser";
     if (/edg/i.test(ua)) browser = "Edge";
