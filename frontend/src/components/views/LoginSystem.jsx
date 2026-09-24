@@ -276,6 +276,7 @@ const LoginSystem = () => {
         body: JSON.stringify({
           username: formData.username.trim(),
           password: formData.password.trim(),
+          rememberMe,
         }),
       });
 
@@ -288,10 +289,11 @@ const LoginSystem = () => {
         setIsLoading(false);
         return;
       }
-
       if (rememberMe) {
+        sessionStorage.removeItem("token");
         localStorage.setItem("token", data.token);
       } else {
+        localStorage.removeItem("token");
         sessionStorage.setItem("token", data.token);
       }
 
@@ -776,31 +778,19 @@ const LoginSystem = () => {
                 </div>
               </div>
 
-              <div
-                className="remember-me-row"
-                style={{
-                  margin: "8px 0 16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <label
-                  htmlFor="rememberMe"
-                  style={{ fontSize: 13, cursor: "pointer" }}
-                >
-                  Keep me logged in on this device
+              <div className="login-options-row">
+                <label className="remember-me" htmlFor="rememberMe">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>Keep me logged in on this device</span>
                 </label>
-              </div>
 
-              <div className="forgot-password-link">
                 <button
+                  type="button"
                   onClick={() => {
                     setCurrentView("forgot");
                     setError("");
