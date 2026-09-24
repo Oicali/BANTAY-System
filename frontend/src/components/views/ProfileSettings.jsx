@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Lock, Camera, ChevronDown, Monitor, Smartphone, LogOut, ShieldAlert } from "lucide-react";
+import { Eye, EyeOff, Lock, Camera, ChevronDown, ChevronLeft, ChevronRight, Monitor, Smartphone, LogOut, ShieldAlert } from "lucide-react";
 import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
@@ -53,11 +53,17 @@ export default function ProfileSettings() {
 
   // ── Device Sessions ──────────────────────────────────────────────────────
   const [sessions, setSessions] = useState([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState("");
   const [revokingSessionId, setRevokingSessionId] = useState(null);
   const [revokingAll, setRevokingAll] = useState(false);
   const [confirmRevokeAll, setConfirmRevokeAll] = useState(false);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
+  const [sessionsView, setSessionsView] = useState("list"); // "list" | "detail"
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [deviceHistory, setDeviceHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
 
   const [usernameVisible, setUsernameVisible] = useState(false);
   const usernameTimerRef = useRef(null);
@@ -519,6 +525,9 @@ export default function ProfileSettings() {
       }
       setSessions((prev) => prev.filter((s) => s.token_id !== tokenId));
       setSuccessMessage("Device logged out successfully");
+      if (selectedDevice?.token_id === tokenId) {
+        backToDeviceList();
+      }
     } catch (err) {
       console.error("handleRevokeSession:", err);
       setSessionsError("Network error. Please try again.");
@@ -584,6 +593,62 @@ export default function ProfileSettings() {
     else if (/linux/i.test(ua)) os = "Linux";
     if (session.device_type === "mobile" && !os) os = "Mobile";
     return os ? `${browser} on ${os}` : browser;
+  };
+
+  const formatFullTimestamp = (iso) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("en-PH", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  const openSessionsModal = () => {
+    setSessionsModalOpen(true);
+    setSessionsView("list");
+    setSelectedDevice(null);
+    fetchSessions();
+  };
+
+  const closeSessionsModal = () => {
+    setSessionsModalOpen(false);
+    setSessionsView("list");
+    setSelectedDevice(null);
+    setDeviceHistory([]);
+    setHistoryError("");
+    setConfirmRevokeAll(false);
+  };
+
+  const openDeviceDetail = async (session) => {
+    setSelectedDevice(session);
+    setSessionsView("detail");
+    setHistoryLoading(true);
+    setHistoryError("");
+    setDeviceHistory([]);
+    try {
+      const token = sessionStorage.getItem("token");
+      const res = await fetch(`${API_URL}/users/sessions/${session.token_id}/history`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (d.success) setDeviceHistory(d.history || []);
+      else setHistoryError(d.message || "Failed to load login history");
+    } catch (err) {
+      console.error("openDeviceDetail:", err);
+      setHistoryError("Failed to load login history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const backToDeviceList = () => {
+    setSessionsView("list");
+    setSelectedDevice(null);
+    setDeviceHistory([]);
+    setHistoryError("");
   };
 
   const silentRefresh = useCallback(async () => {
@@ -672,7 +737,6 @@ export default function ProfileSettings() {
     }
     setUser(userData);
     fetchProfile().then(() => startPolling());
-    fetchSessions();
     return () => stopPolling();
   }, []);
 
@@ -2128,6 +2192,14 @@ const handlePhoneInput = (e) => {
                   disabled={isBusy}
                 />
               </label>
+              <button
+                type="button"
+                className="ps-card-action-btn ps-card-action-upload"
+                onClick={openSessionsModal}
+                disabled={isBusy}
+              >
+                <Monitor size={15} /> Login Activity
+              </button>
             </div>
           </div>
 
@@ -2510,90 +2582,157 @@ const handlePhoneInput = (e) => {
             )}
           </div>
         </div>
+      </div>
 
-        {/* ── Active Sessions ─────────────────────────────────────────────── */}
-        <div className="ps-sessions-card">
-          <div className="ps-sessions-header">
-            <div>
-              <h3 className="ps-form-section-title" style={{ border: "none", marginBottom: "4px", paddingBottom: 0 }}>
-                Active Sessions
-              </h3>
-              <p className="ps-sessions-subtitle">
-                Devices currently signed in to your account
-              </p>
+      {/* ── Login Activity Modal ────────────────────────────────────────── */}
+      {sessionsModalOpen && (
+        <div className="em-overlay" onClick={closeSessionsModal}>
+          <div className="la-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="la-header">
+              {sessionsView === "detail" ? (
+                <button className="la-back-btn" onClick={backToDeviceList} aria-label="Back">
+                  <ChevronLeft size={20} />
+                </button>
+              ) : (
+                <span className="la-header-spacer" />
+              )}
+              <div className="la-header-titles">
+                <span className="la-header-sub">{user?.username} · BANTAY</span>
+                <h2 className="la-header-title">
+                  {sessionsView === "list"
+                    ? "Account login activity"
+                    : `Logins on ${selectedDevice ? parseDeviceLabel(selectedDevice) : "device"}`}
+                </h2>
+              </div>
+              <button className="la-close-btn" onClick={closeSessionsModal} aria-label="Close">✕</button>
             </div>
-            {sessions.filter((s) => !s.is_current).length > 0 && (
-              <button
-                type="button"
-                className="ps-sessions-logout-all-btn"
-                onClick={() => setConfirmRevokeAll(true)}
-                disabled={revokingAll}
-              >
-                <LogOut size={14} />
-                Log Out All Other Devices
-              </button>
-            )}
-          </div>
 
-          {sessionsError && (
-            <div className="ps-sessions-alert">
-              <ShieldAlert size={15} />
-              {sessionsError}
-            </div>
-          )}
+            <div className="la-body">
+              {/* ── LIST VIEW ── */}
+              {sessionsView === "list" && (
+                <>
+                  {sessionsError && (
+                    <div className="ps-sessions-alert">
+                      <ShieldAlert size={15} />
+                      {sessionsError}
+                    </div>
+                  )}
+                  {sessionsLoading ? (
+                    <p className="ps-sessions-empty">Loading sessions…</p>
+                  ) : (
+                    <>
+                      {sessions.filter((s) => s.is_current).map((s) => (
+                        <React.Fragment key={s.token_id}>
+                          <p className="la-section-label">You're currently logged in on this device:</p>
+                          <button
+                            className="la-device-row la-device-row-current"
+                            onClick={() => openDeviceDetail(s)}
+                          >
+                            <div className="ps-session-icon">
+                              {s.device_type === "mobile" ? <Smartphone size={20} /> : <Monitor size={20} />}
+                            </div>
+                            <div className="la-device-info">
+                              <span className="la-device-name">{parseDeviceLabel(s)}</span>
+                              <span className="la-device-loc">{s.location_label || s.ip_address || ""}</span>
+                              <span className="la-device-current">This device</span>
+                            </div>
+                            <ChevronRight size={16} className="la-chevron" />
+                          </button>
+                        </React.Fragment>
+                      ))}
 
-          {sessionsLoading ? (
-            <p className="ps-sessions-empty">Loading sessions…</p>
-          ) : sessions.length === 0 ? (
-            <p className="ps-sessions-empty">No active sessions found.</p>
-          ) : (
-            <div className="ps-sessions-list">
-              {sessions.map((s) => (
-                <div
-                  key={s.token_id}
-                  className={`ps-session-row ${s.is_current ? "ps-session-row-current" : ""}`}
-                >
-                  <div className="ps-session-icon">
-                    {s.device_type === "mobile" ? (
-                      <Smartphone size={20} />
-                    ) : (
-                      <Monitor size={20} />
+                      {sessions.filter((s) => !s.is_current).length > 0 && (
+                        <>
+                          <p className="la-section-label" style={{ marginTop: "18px" }}>
+                            Logins on other devices:
+                          </p>
+                          {sessions.filter((s) => !s.is_current).map((s) => (
+                            <button
+                              key={s.token_id}
+                              className="la-device-row"
+                              onClick={() => openDeviceDetail(s)}
+                            >
+                              <div className="ps-session-icon">
+                                {s.device_type === "mobile" ? <Smartphone size={20} /> : <Monitor size={20} />}
+                              </div>
+                              <div className="la-device-info">
+                                <span className="la-device-name">{parseDeviceLabel(s)}</span>
+                                <span className="la-device-loc">{s.location_label || s.ip_address || ""}</span>
+                                <span className="la-device-time">{formatSessionTime(s.last_active_at)}</span>
+                              </div>
+                              <ChevronRight size={16} className="la-chevron" />
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className="la-logout-all-link"
+                            onClick={() => setConfirmRevokeAll(true)}
+                          >
+                            Log out of all other devices
+                          </button>
+                        </>
+                      )}
+
+                      {sessions.length === 0 && (
+                        <p className="ps-sessions-empty">No active sessions found.</p>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── DETAIL VIEW ── */}
+              {sessionsView === "detail" && selectedDevice && (
+                <>
+                  <div className="la-detail-card">
+                    <span className="la-device-name">
+                      {selectedDevice.location_label || selectedDevice.ip_address || "Unknown location"}
+                    </span>
+                    <span className="la-device-loc">
+                      {selectedDevice.is_current
+                        ? "Active now"
+                        : `Last active ${formatSessionTime(selectedDevice.last_active_at)}`}
+                    </span>
+                    {!selectedDevice.is_current && (
+                      <button
+                        type="button"
+                        className="la-logout-btn"
+                        onClick={() => handleRevokeSession(selectedDevice.token_id)}
+                        disabled={revokingSessionId === selectedDevice.token_id}
+                      >
+                        {revokingSessionId === selectedDevice.token_id ? "Logging out…" : "Log Out"}
+                      </button>
                     )}
                   </div>
-                  <div className="ps-session-info">
-                    <div className="ps-session-device-row">
-                      <span className="ps-session-device">
-                        {parseDeviceLabel(s)}
-                      </span>
-                      {s.is_current && (
-                        <span className="ps-session-current-badge">
-                          This device
-                        </span>
-                      )}
+
+                  <p className="la-section-label" style={{ marginTop: "18px" }}>Recent logins</p>
+                  {historyLoading ? (
+                    <p className="ps-sessions-empty">Loading history…</p>
+                  ) : historyError ? (
+                    <div className="ps-sessions-alert">
+                      <ShieldAlert size={15} />
+                      {historyError}
                     </div>
-                    <div className="ps-session-meta">
-                      {s.ip_address && <span>{s.ip_address}</span>}
-                      {s.location_label && <span>{s.location_label}</span>}
-                      <span>Last active {formatSessionTime(s.last_active_at)}</span>
+                  ) : deviceHistory.length === 0 ? (
+                    <p className="ps-sessions-empty">No login history found for this device.</p>
+                  ) : (
+                    <div className="la-history-list">
+                      {deviceHistory.map((h, i) => (
+                        <div className="la-history-row" key={i}>
+                          <span className="la-device-name">
+                            {selectedDevice.location_label || h.ip_address || "Unknown location"}
+                          </span>
+                          <span className="la-device-loc">{formatFullTimestamp(h.created_at)}</span>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  {!s.is_current && (
-                    <button
-                      type="button"
-                      className="ps-session-logout-btn"
-                      onClick={() => handleRevokeSession(s.token_id)}
-                      disabled={revokingSessionId === s.token_id}
-                      title="Log out this device"
-                    >
-                      {revokingSessionId === s.token_id ? "…" : "Log Out"}
-                    </button>
                   )}
-                </div>
-              ))}
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Confirm: Log out all other devices ──────────────────────────── */}
       {confirmRevokeAll && (

@@ -231,13 +231,27 @@ const login = async (req, res) => {
       [user.user_id],
     );
 
-    const token = await tokenManager.createToken({
-      user_id:   user.user_id,
-      username:  user.username,
-      email:     user.email,
-      role:      user.role_name,
-      user_type: user.user_type,
-    });
+    const userAgent  = req.headers["user-agent"] || null;
+    const deviceType = /mobile/i.test(userAgent || "") ? "mobile" : "desktop";
+
+    // Collapse any previous session from this same browser/device
+    // so re-logging in doesn't stack duplicate stale sessions.
+    await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
+
+    const token = await tokenManager.createToken(
+      {
+        user_id:   user.user_id,
+        username:  user.username,
+        email:     user.email,
+        role:      user.role_name,
+        user_type: user.user_type,
+      },
+      {
+        userAgent,
+        deviceType,
+        ipAddress: ip,
+      }
+    );
 
     await logAudit({
       userId:      user.user_id,
@@ -849,6 +863,11 @@ const mobileLogin = async (req, res) => {
       [user.user_id],
     );
 
+    const userAgent = req.headers["user-agent"] || null;
+
+    // Collapse any previous session from this same device before issuing a new one
+    await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
+
     const token = await tokenManager.createToken(
       {
         user_id:   user.user_id,
@@ -857,7 +876,12 @@ const mobileLogin = async (req, res) => {
         role:      user.role_name,
         user_type: user.user_type,
       },
-      { expiresIn: MOBILE_TOKEN_EXPIRY },
+      {
+        expiresIn:  MOBILE_TOKEN_EXPIRY,
+        userAgent,
+        deviceType: "mobile",
+        ipAddress:  ip,
+      },
     );
 
     await logAudit({

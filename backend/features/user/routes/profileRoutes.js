@@ -68,6 +68,7 @@ router.post('/password/force-lock',       authenticate, ProfileController.forceP
 // ── Device Sessions ────────────────────────────────────────────────────────────
 router.get('/sessions',                       authenticate, SessionController.getSessions);
 router.delete('/sessions/all-except-current', authenticate, SessionController.revokeAllOtherSessions);
+router.get('/sessions/:tokenId/history',      authenticate, SessionController.getDeviceHistory);
 router.delete('/sessions/:tokenId',           authenticate, SessionController.revokeSession);
 
 module.exports = router;
