@@ -23,6 +23,7 @@ const LINK_MAP = {
   "/patrol-scheduling": "/patrol-scheduling",
   "/crime-dashboard": "/crime-dashboard",
   "/user-management": "/user-management",
+  "/profile": "/profile",
 };
 
 // ── Notification Toast ──────────────────────────────────────────────────────
@@ -200,6 +201,15 @@ const TopBar = ({ onMenuClick }) => {
   const prevUnreadRef = useRef(0);
   // ── Toast state ──
   const [toastNotif, setToastNotif] = useState(null);
+  // ── New-login activity modal ──
+  const [loginModalNotif, setLoginModalNotif] = useState(null); // null = closed
+  const [loginModalStep, setLoginModalStep] = useState("details"); // "details" | "trust"
+  const [trustChecked, setTrustChecked] = useState(false);
+  const [trustSaving, setTrustSaving] = useState(false);
+  const [trustError, setTrustError] = useState("");
+  const [logoutSaving, setLogoutSaving] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+  const [loggedOutSelf, setLoggedOutSelf] = useState(false);
   const prevNotifIdsRef = useRef(null); // null = first load, Set after first load
 
   useEffect(() => {
@@ -352,9 +362,112 @@ const TopBar = ({ onMenuClick }) => {
     }).catch(console.error);
   };
 
+  const openLoginModal = (notif) => {
+    setTrustChecked(false);
+    setTrustError("");
+    setLogoutError("");
+    setLoggedOutSelf(false);
+    setLoginModalStep("details");
+    setLoginModalNotif(notif);
+  };
+
+  // The current session was revoked, so send the user back to the login page
+  const handleLoggedOutSelfContinue = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("cachedProfile");
+    window.location.href = "/login";
+  };
+
+  const closeLoginModal = () => {
+    if (trustSaving || logoutSaving) return;
+    if (loginModalStep === "loggedout" && loggedOutSelf) {
+      handleLoggedOutSelfContinue();
+      return;
+    }
+    setLoginModalNotif(null);
+    setLoginModalStep("details");
+    setTrustChecked(false);
+    setTrustError("");
+    setLogoutError("");
+  };
+
+  const handleLogoutDevice = async () => {
+    const notif = loginModalNotif;
+    if (!notif) return;
+    setLogoutSaving(true);
+    setLogoutError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/notifications/${notif.id}/logout-device`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.success) {
+        setLogoutError(
+          d.message || "Unable to log out this device. Please try again.",
+        );
+        return;
+      }
+      setLoggedOutSelf(!!d.loggedOutSelf);
+      setLoginModalStep("loggedout");
+    } catch {
+      setLogoutError("Network error. Please try again.");
+    } finally {
+      setLogoutSaving(false);
+    }
+  };
+
+  const handleModalChangePassword = () => {
+    setLoginModalNotif(null);
+    setLoginModalStep("details");
+    navigate("/profile?openChangePassword=1");
+  };
+
+  const handleConfirmThisWasMe = async () => {
+    const notif = loginModalNotif;
+    if (!notif) return;
+    // Box unchecked: nothing to save; future logins from this device still notify
+    if (!trustChecked) {
+      closeLoginModal();
+      return;
+    }
+    setTrustSaving(true);
+    setTrustError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/notifications/${notif.id}/trust-device`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.success) {
+        setTrustError(
+          d.message || "Unable to save your preference. Please try again.",
+        );
+        return;
+      }
+      setLoginModalNotif(null);
+      setLoginModalStep("details");
+      setTrustChecked(false);
+    } catch {
+      setTrustError("Network error. Please try again.");
+    } finally {
+      setTrustSaving(false);
+    }
+  };
+
   // Navigate in-app so the component stays mounted and the PATCH completes
   const handleNotifClick = (notif) => {
     markOneRead(notif);
+    if (notif.type === "NEW_LOGIN") {
+      openLoginModal(notif);
+      setNotifOpen(false);
+      return;
+    }
     if (notif.link_to) {
       const basePath = notif.link_to.split("?")[0];
       if (LINK_MAP[basePath]) {
@@ -526,6 +639,23 @@ const TopBar = ({ onMenuClick }) => {
         </svg>
       ),
     },
+    NEW_LOGIN: {
+      color: "#f97316",
+      svg: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#f97316"
+          strokeWidth="2.5"
+        >
+          <path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" />
+          <path d="M12 8v4" />
+          <path d="M12 16h.01" />
+        </svg>
+      ),
+    },
   };
 
   const DEFAULT_ICON = {
@@ -547,10 +677,447 @@ const TopBar = ({ onMenuClick }) => {
 
   const getNotifIcon = (type) => NOTIF_ICONS[type] || DEFAULT_ICON;
 
+  const loginMeta = loginModalNotif?.metadata || {};
+  const formatLoginTime = (iso) =>
+    iso
+      ? new Date(iso).toLocaleString("en-PH", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "—";
+
   return (
     <>
       {/* ── Toast — rendered outside the header so it's truly centered ── */}
       <NotifToast notif={toastNotif} onDone={() => setToastNotif(null)} />
+
+      {/* ── New Login Detected modal ── */}
+      {loginModalNotif && (
+        <div
+          onClick={closeLoginModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.55)",
+            zIndex: 100000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "440px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              overflow: "hidden",
+            }}
+          >
+            {/* Header (both steps) */}
+            <div style={{ padding: "24px 24px 0", textAlign: "center" }}>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  background: "#fff7ed",
+                  border: "2px solid #fed7aa",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                }}
+              >
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#f97316"
+                  strokeWidth="2.2"
+                >
+                  <path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" />
+                  <path d="M12 8v4" />
+                  <path d="M12 16h.01" />
+                </svg>
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                {loginModalStep === "details"
+                  ? "New Login Detected"
+                  : loginModalStep === "loggedout"
+                    ? "Device Logged Out"
+                    : "Confirm This Device"}
+              </h2>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: "13px",
+                  color: "#6b7280",
+                  lineHeight: 1.5,
+                }}
+              >
+                {loginModalStep === "details"
+                  ? "A new login to your account was detected with the following details."
+                  : loginModalStep === "loggedout"
+                    ? "The device listed in this notification has been signed out of your account."
+                    : "Thank you for confirming this login. You may choose how you would like to be notified about future logins from this device."}
+              </p>
+            </div>
+
+            {loginModalStep === "details" ? (
+              <>
+                {/* Activity details */}
+                <div
+                  style={{
+                    margin: "18px 24px 0",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    background: "#f9fafb",
+                    padding: "4px 16px",
+                  }}
+                >
+                  {[
+                    ["Device", loginMeta.device_label || "Unknown device"],
+                    [
+                      loginMeta.location_label ? "Location" : "IP Address",
+                      loginMeta.location_label ||
+                        loginMeta.ip_address ||
+                        "Unavailable",
+                    ],
+                    [
+                      "Date & Time",
+                      formatLoginTime(
+                        loginMeta.login_at || loginModalNotif.created_at,
+                      ),
+                    ],
+                  ].map(([label, value], i, arr) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        padding: "10px 0",
+                        borderBottom:
+                          i < arr.length - 1 ? "1px solid #e5e7eb" : "none",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <span style={{ color: "#6b7280" }}>{label}</span>
+                      <span
+                        style={{
+                          color: "#111827",
+                          fontWeight: 600,
+                          textAlign: "right",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Warning */}
+                <div
+                  style={{
+                    margin: "14px 24px 0",
+                    padding: "12px 14px",
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    color: "#991b1b",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong>Was this not you?</strong> If you do not recognize
+                  this activity, someone else may have access to your account.
+                  Please log out this device immediately.
+                </div>
+
+                {/* Actions */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    padding: "18px 24px 24px",
+                  }}
+                >
+                  {logoutError && (
+                    <div style={{ fontSize: "12px", color: "#dc2626" }}>
+                      {logoutError}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleLogoutDevice}
+                    disabled={logoutSaving}
+                    style={{
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "#dc2626",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      cursor: logoutSaving ? "not-allowed" : "pointer",
+                      opacity: logoutSaving ? 0.7 : 1,
+                    }}
+                  >
+                    {logoutSaving ? "Logging Out…" : "Log Out This Device"}
+                  </button>
+                  <button
+                    onClick={() => setLoginModalStep("trust")}
+                    style={{
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
+                      color: "#111827",
+                      fontWeight: 600,
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    This Was Me
+                  </button>
+                </div>
+              </>
+            ) : loginModalStep === "loggedout" ? (
+              <>
+                <div
+                  style={{
+                    margin: "18px 24px 0",
+                    padding: "14px",
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "12px",
+                    fontSize: "13px",
+                    color: "#166534",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong>
+                    {loggedOutSelf
+                      ? "You have been logged out."
+                      : "This device has been logged out successfully."}
+                  </strong>{" "}
+                  {loggedOutSelf
+                    ? "The login in question came from the device you are currently using, so your session has ended."
+                    : "It can no longer access your account with its previous session."}
+                </div>
+
+                <div
+                  style={{
+                    margin: "12px 24px 0",
+                    padding: "12px 14px",
+                    background: "#fff7ed",
+                    border: "1px solid #fed7aa",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    color: "#9a3412",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  As a precaution, we strongly recommend that you change your
+                  password to keep your account secure.
+                  {loggedOutSelf && " Please log in again to do so."}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                    padding: "18px 24px 24px",
+                  }}
+                >
+                  {loggedOutSelf ? (
+                    <button
+                      onClick={handleLoggedOutSelfContinue}
+                      style={{
+                        padding: "11px 16px",
+                        borderRadius: "10px",
+                        border: "none",
+                        background: "#1e3a5f",
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Log In Again
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleModalChangePassword}
+                        style={{
+                          padding: "11px 16px",
+                          borderRadius: "10px",
+                          border: "none",
+                          background: "#dc2626",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Change Password
+                      </button>
+                      <button
+                        onClick={closeLoginModal}
+                        style={{
+                          padding: "11px 16px",
+                          borderRadius: "10px",
+                          border: "1px solid #d1d5db",
+                          background: "#fff",
+                          color: "#111827",
+                          fontWeight: 600,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Close
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Trust option */}
+                <label
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "flex-start",
+                    margin: "18px 24px 0",
+                    padding: "14px",
+                    border: `1px solid ${trustChecked ? "#fdba74" : "#e5e7eb"}`,
+                    background: trustChecked ? "#fff7ed" : "#f9fafb",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={trustChecked}
+                    onChange={(e) => setTrustChecked(e.target.checked)}
+                    disabled={trustSaving}
+                    style={{
+                      marginTop: "2px",
+                      width: "16px",
+                      height: "16px",
+                      accentColor: "#ea580c",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span>
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#111827",
+                      }}
+                    >
+                      Do not notify me when this device logs in for the next 30
+                      days.
+                    </span>
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: "4px",
+                        fontSize: "12px",
+                        color: "#6b7280",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      Leave this unchecked to continue receiving a notification
+                      each time this device logs in.
+                    </span>
+                  </span>
+                </label>
+
+                {trustError && (
+                  <div
+                    style={{
+                      margin: "12px 24px 0",
+                      fontSize: "12px",
+                      color: "#dc2626",
+                    }}
+                  >
+                    {trustError}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    padding: "18px 24px 24px",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setLoginModalStep("details");
+                      setTrustError("");
+                    }}
+                    disabled={trustSaving}
+                    style={{
+                      flex: 1,
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
+                      color: "#111827",
+                      fontWeight: 600,
+                      fontSize: "14px",
+                      cursor: trustSaving ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleConfirmThisWasMe}
+                    disabled={trustSaving}
+                    style={{
+                      flex: 1,
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "#1e3a5f",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      cursor: trustSaving ? "not-allowed" : "pointer",
+                      opacity: trustSaving ? 0.7 : 1,
+                    }}
+                  >
+                    {trustSaving ? "Saving…" : "Confirm"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <header className="top-bar">
         <div
@@ -745,7 +1312,10 @@ const TopBar = ({ onMenuClick }) => {
                             display: "flex",
                             gap: "10px",
                             alignItems: "flex-start",
-                            cursor: notif.link_to ? "pointer" : "default",
+                            cursor:
+                              notif.link_to || notif.type === "NEW_LOGIN"
+                                ? "pointer"
+                                : "default",
                             background: notif.is_read ? "#fff" : "#f0f4ff",
                             transition: "background 0.15s",
                           }}
@@ -824,6 +1394,35 @@ const TopBar = ({ onMenuClick }) => {
                               )}
                               {timeAgo(notif.created_at)}
                             </div>
+                            {notif.type === "NEW_LOGIN" && (
+                              <div
+                                style={{
+                                  marginTop: "6px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                }}
+                              >
+                                Not you?{" "}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleNotifClick(notif);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    cursor: "pointer",
+                                    color: "#ea580c",
+                                    fontWeight: "600",
+                                    fontSize: "12px",
+                                    textDecoration: "underline",
+                                  }}
+                                >
+                                  View activity
+                                </button>
+                              </div>
+                            )}
                           </div>
 
                           {!notif.is_read && (

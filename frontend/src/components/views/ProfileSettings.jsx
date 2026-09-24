@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Eye,
   EyeOff,
@@ -12,6 +12,7 @@ import {
   Smartphone,
   LogOut,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
@@ -24,6 +25,8 @@ const POLL_MS = 15000;
 const API_URL = import.meta.env.VITE_API_URL; // ← add here
 
 export default function ProfileSettings() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [profileData, setProfileData] = useState(null);
   const [formData, setFormData] = useState({
@@ -76,6 +79,7 @@ export default function ProfileSettings() {
   const [deviceHistory, setDeviceHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [removingTrust, setRemovingTrust] = useState(false);
 
   const [usernameVisible, setUsernameVisible] = useState(false);
   const usernameTimerRef = useRef(null);
@@ -577,21 +581,35 @@ export default function ProfileSettings() {
     }
   };
 
+  // Facebook-style absolute timestamp: "Today at 3:51 AM", "Yesterday at 7:30 PM",
+  // or "September 20 at 4:31 AM". Never relative — always the real clock time.
   const formatSessionTime = (iso) => {
     if (!iso) return "—";
     const d = new Date(iso);
     const now = new Date();
-    const diffMins = Math.floor((now - d) / 60000);
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHrs = Math.floor(diffMins / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    return d.toLocaleDateString("en-PH", {
-      month: "short",
-      day: "numeric",
+
+    const isSameDay = (a, b) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+
+    const timeStr = d.toLocaleTimeString("en-PH", {
       hour: "numeric",
       minute: "2-digit",
     });
+
+    if (isSameDay(d, now)) return `Today at ${timeStr}`;
+    if (isSameDay(d, yesterday)) return `Yesterday at ${timeStr}`;
+
+    const dateStr = d.toLocaleDateString("en-PH", {
+      month: "long",
+      day: "numeric",
+      ...(d.getFullYear() !== now.getFullYear() && { year: "numeric" }),
+    });
+    return `${dateStr} at ${timeStr}`;
   };
 
   const parseDeviceLabel = (session) => {
@@ -669,6 +687,70 @@ export default function ProfileSettings() {
     setSelectedDevice(null);
     setDeviceHistory([]);
     setHistoryError("");
+  };
+
+  const handleTrustDevice = async () => {
+    if (!selectedDevice) return;
+    setRemovingTrust(true);
+    setSessionsError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/users/sessions/${selectedDevice.token_id}/trust`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const d = await res.json();
+      if (!res.ok || !d.success) {
+        setSessionsError(d.message || "Failed to trust this device");
+        return;
+      }
+      setSelectedDevice((prev) => ({ ...prev, is_trusted: true }));
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.token_id === selectedDevice.token_id ? { ...s, is_trusted: true } : s,
+        ),
+      );
+      setSuccessMessage("This device is now trusted for 30 days");
+    } catch (err) {
+      console.error("handleTrustDevice:", err);
+      setSessionsError("Network error. Please try again.");
+    } finally {
+      setRemovingTrust(false);
+    }
+  };
+
+  const handleRemoveTrustedDevice = async () => {
+    if (!selectedDevice) return;
+    setRemovingTrust(true);
+    setSessionsError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/users/sessions/${selectedDevice.token_id}/trust`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const d = await res.json();
+      if (!res.ok || !d.success) {
+        setSessionsError(d.message || "Failed to remove trusted device");
+        return;
+      }
+      setSelectedDevice((prev) => ({ ...prev, is_trusted: false }));
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.token_id === selectedDevice.token_id
+            ? { ...s, is_trusted: false }
+            : s,
+        ),
+      );
+      setSuccessMessage("Device removed from trusted devices");
+    } catch (err) {
+      console.error("handleRemoveTrustedDevice:", err);
+      setSessionsError("Network error. Please try again.");
+    } finally {
+      setRemovingTrust(false);
+    }
   };
 
   const silentRefresh = useCallback(async () => {
@@ -760,6 +842,24 @@ export default function ProfileSettings() {
     fetchProfile().then(() => startPolling());
     return () => stopPolling();
   }, []);
+
+  // Auto-open Change Password modal when arriving from a
+  // "New login detected" notification (?openChangePassword=1)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("openChangePassword") === "1") {
+      setShowPasswordModal(true);
+      params.delete("openChangePassword");
+      const newSearch = params.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: newSearch ? `?${newSearch}` : "",
+        },
+        { replace: true },
+      );
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (isEditing) stopPolling();
@@ -2683,6 +2783,17 @@ export default function ProfileSettings() {
                               <div className="la-device-info">
                                 <span className="la-device-name">
                                   {parseDeviceLabel(s)}
+                                  {s.is_trusted && (
+                                    <ShieldCheck
+                                      size={14}
+                                      style={{
+                                        marginLeft: "6px",
+                                        color: "#16a34a",
+                                        verticalAlign: "-2px",
+                                      }}
+                                      title="Trusted device"
+                                    />
+                                  )}
                                 </span>
                                 <span className="la-device-loc">
                                   {s.location_label || s.ip_address || ""}
@@ -2722,6 +2833,17 @@ export default function ProfileSettings() {
                                 <div className="la-device-info">
                                   <span className="la-device-name">
                                     {parseDeviceLabel(s)}
+                                    {s.is_trusted && (
+                                      <ShieldCheck
+                                        size={14}
+                                        style={{
+                                          marginLeft: "6px",
+                                          color: "#16a34a",
+                                          verticalAlign: "-2px",
+                                        }}
+                                        title="Trusted device"
+                                      />
+                                    )}
                                   </span>
                                   <span className="la-device-loc">
                                     {s.location_label || s.ip_address || ""}
@@ -2764,12 +2886,54 @@ export default function ProfileSettings() {
                       {selectedDevice.location_label ||
                         selectedDevice.ip_address ||
                         "Unknown location"}
+                      {selectedDevice.is_trusted && (
+                        <ShieldCheck
+                          size={14}
+                          style={{
+                            marginLeft: "6px",
+                            color: "#16a34a",
+                            verticalAlign: "-2px",
+                          }}
+                          title="Trusted device"
+                        />
+                      )}
                     </span>
                     <span className="la-device-loc">
                       {selectedDevice.is_current
                         ? "Active now"
-                        : `Last active ${formatSessionTime(selectedDevice.last_active_at)}`}
+                        : `Last login: ${formatSessionTime(selectedDevice.last_active_at)}`}
                     </span>
+                    {selectedDevice.is_trusted ? (
+                      <button
+                        type="button"
+                        className="la-logout-btn"
+                        style={{
+                          background: "transparent",
+                          color: "#374151",
+                          border: "1px solid #d1d5db",
+                        }}
+                        onClick={handleRemoveTrustedDevice}
+                        disabled={removingTrust}
+                      >
+                        {removingTrust ? "Removing…" : "Remove from Trusted Devices"}
+                      </button>
+                    ) : (
+                      selectedDevice.is_current && (
+                        <button
+                          type="button"
+                          className="la-logout-btn"
+                          style={{
+                            background: "transparent",
+                            color: "#166534",
+                            border: "1px solid #bbf7d0",
+                          }}
+                          onClick={handleTrustDevice}
+                          disabled={removingTrust}
+                        >
+                          {removingTrust ? "Trusting…" : "Trust This Device (30 days)"}
+                        </button>
+                      )
+                    )}
                     {!selectedDevice.is_current && (
                       <button
                         type="button"

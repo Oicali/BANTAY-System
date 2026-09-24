@@ -273,6 +273,103 @@ const revokeAllExceptCurrent = async (userId, currentTokenHash) => {
 };
  
 // =====================================================
+// Get the set of "ip|userAgent" keys currently trusted
+// for a user (trust not expired). Used to tag each
+// session in the list without an N+1 query per device.
+// =====================================================
+const getTrustedDeviceKeys = async (userId) => {
+  try {
+    const result = await pool.query(
+      `SELECT ip_address, user_agent
+       FROM trusted_devices
+       WHERE user_id = $1 AND trusted_until > NOW()`,
+      [userId]
+    );
+    return new Set(
+      result.rows.map((r) => `${r.ip_address || ""}|${r.user_agent || ""}`)
+    );
+  } catch (error) {
+    console.error("❌ Get trusted device keys error:", error);
+    return new Set();
+  }
+};
+
+// =====================================================
+// Remove a device's trust (used by "Remove from trusted
+// device" in the login-activity detail modal). Matched by
+// the session's own ip_address/user_agent, looked up by
+// token_id so the frontend never sends raw IP/UA itself.
+// =====================================================
+const removeTrustedDeviceByTokenId = async (tokenId, userId) => {
+  try {
+    const tokenResult = await pool.query(
+      `SELECT ip_address, user_agent FROM tokens
+       WHERE token_id = $1 AND user_id = $2`,
+      [tokenId, userId]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      throw new Error("Session not found or does not belong to this user");
+    }
+
+    const { ip_address, user_agent } = tokenResult.rows[0];
+
+    const result = await pool.query(
+      `DELETE FROM trusted_devices
+       WHERE user_id = $1
+         AND ip_address IS NOT DISTINCT FROM $2
+         AND user_agent IS NOT DISTINCT FROM $3`,
+      [userId, ip_address, user_agent]
+    );
+
+    return result.rowCount > 0;
+  } catch (error) {
+    console.error("❌ Remove trusted device error:", error);
+    throw error;
+  }
+};
+
+// =====================================================
+// Trust a device by its token_id (used by "Trust This
+// Device" in Login Activity, for the CURRENT device only).
+// Mirrors the notification-based trust flow, but looked up
+// by token_id instead of a stored notification's metadata.
+// =====================================================
+const trustDeviceByTokenId = async (tokenId, userId) => {
+  try {
+    const tokenResult = await pool.query(
+      `SELECT ip_address, user_agent FROM tokens
+       WHERE token_id = $1 AND user_id = $2`,
+      [tokenId, userId]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      throw new Error("Session not found or does not belong to this user");
+    }
+
+    const { ip_address, user_agent } = tokenResult.rows[0];
+
+    await pool.query(
+      `DELETE FROM trusted_devices
+       WHERE user_id = $1
+         AND ip_address IS NOT DISTINCT FROM $2
+         AND user_agent IS NOT DISTINCT FROM $3`,
+      [userId, ip_address, user_agent]
+    );
+    await pool.query(
+      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')`,
+      [userId, ip_address, user_agent]
+    );
+
+    return true;
+  } catch (error) {
+    console.error("❌ Trust device by token id error:", error);
+    throw error;
+  }
+};
+
+// =====================================================
 // EXPORTS
 // =====================================================
 module.exports = {
@@ -285,5 +382,8 @@ module.exports = {
   revokeTokenById,
   revokeAllExceptCurrent,
   revokeSessionsForSameDevice,
+  getTrustedDeviceKeys,
+  removeTrustedDeviceByTokenId,
+  trustDeviceByTokenId,
   hashToken,
 };

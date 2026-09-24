@@ -7,6 +7,8 @@ const bcrypt       = require("bcrypt");
 const tokenManager = require("../../../shared/utils/tokenManager");
 const authService  = require("../services/authService");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
+const { parseDeviceLabel } = require("../../../shared/utils/deviceLabel");
+
 const {
   validateLoginInput,
   validateEmail,
@@ -237,6 +239,19 @@ const login = async (req, res) => {
     // so re-logging in doesn't stack duplicate stale sessions.
     await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
 
+    // ── New-device detection (IP + User-Agent) ──────────────────
+    // A device is "known" only if the user trusted it and the trust hasn't expired.
+    const trustedCheck = await pool.query(
+      `SELECT 1 FROM trusted_devices
+       WHERE user_id = $1
+         AND ip_address IS NOT DISTINCT FROM $2
+         AND user_agent IS NOT DISTINCT FROM $3
+         AND trusted_until > NOW()
+       LIMIT 1`,
+      [user.user_id, ip, userAgent],
+    );
+    const isNewDevice = trustedCheck.rows.length === 0;
+
     const token = await tokenManager.createToken(
   {
     user_id:   user.user_id,
@@ -262,7 +277,29 @@ const login = async (req, res) => {
       status:      "success",
       source:      "Web Portal",
       ipAddress:   ip,
+      userAgent,
     });
+
+    if (isNewDevice) {
+      const deviceLabel = parseDeviceLabel(userAgent, deviceType);
+      await pool.query(
+        `INSERT INTO notifications
+           (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
+         VALUES ($1, NULL, NULL, 'NEW_LOGIN', $2, $3, $4, FALSE, $5::jsonb)`,
+        [
+          user.user_id,
+          "New login detected",
+          `A new login to your account was detected on ${deviceLabel}.`,
+          "/profile?openChangePassword=1",
+          JSON.stringify({
+            device_label: deviceLabel,
+            ip_address:   ip,
+            user_agent:   userAgent,
+            login_at:     new Date().toISOString(),
+          }),
+        ],
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -601,6 +638,10 @@ const changePassword = async (req, res) => {
     );
 
     await tokenManager.revokeAllUserTokens(req.user.user_id);
+    await client.query(
+      "DELETE FROM trusted_devices WHERE user_id = $1",
+      [req.user.user_id],
+    );
 
     await client.query("COMMIT");
 
@@ -868,6 +909,18 @@ const mobileLogin = async (req, res) => {
     // Collapse any previous session from this same device before issuing a new one
     await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
 
+    // ── New-device detection (IP + User-Agent) ──────────────────
+    const trustedCheck = await pool.query(
+      `SELECT 1 FROM trusted_devices
+       WHERE user_id = $1
+         AND ip_address IS NOT DISTINCT FROM $2
+         AND user_agent IS NOT DISTINCT FROM $3
+         AND trusted_until > NOW()
+       LIMIT 1`,
+      [user.user_id, ip, userAgent],
+    );
+    const isNewDevice = trustedCheck.rows.length === 0;
+
     const token = await tokenManager.createToken(
       {
         user_id:   user.user_id,
@@ -893,7 +946,29 @@ const mobileLogin = async (req, res) => {
       status:      "success",
       source:      "Mobile App",
       ipAddress:   ip,
+      userAgent,
     });
+
+    if (isNewDevice) {
+      const deviceLabel = parseDeviceLabel(userAgent, "mobile");
+      await pool.query(
+        `INSERT INTO notifications
+           (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
+         VALUES ($1, NULL, NULL, 'NEW_LOGIN', $2, $3, $4, FALSE, $5::jsonb)`,
+        [
+          user.user_id,
+          "New login detected",
+          `A new login to your account was detected on ${deviceLabel}.`,
+          "/profile?openChangePassword=1",
+          JSON.stringify({
+            device_label: deviceLabel,
+            ip_address:   ip,
+            user_agent:   userAgent,
+            login_at:     new Date().toISOString(),
+          }),
+        ],
+      );
+    }
 
     return res.status(200).json({
       success: true,
