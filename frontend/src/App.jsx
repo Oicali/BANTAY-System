@@ -26,7 +26,7 @@ import AuditLog from "./components/views/AuditLog";
 import Overview from "./components/views/Overview";
 
 const getRole = () => {
-  const raw = sessionStorage.getItem("token");
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -82,7 +82,7 @@ function App() {
           />
           <Route path="/after-patrol" element={<AfterPatrol />} />
           <Route path="/user-management" element={<UserManagement />} />
-          
+
           <Route path="/profile" element={<ProfileSettings />} />
           <Route path="/modus-management" element={<ModusManagement />} />
           <Route path="/brgy-report" element={<BrgyReport />} />

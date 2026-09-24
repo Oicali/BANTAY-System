@@ -177,20 +177,21 @@ const UserManagement = () => {
   // FETCH FILTER OPTIONS
   // ===================================================
   const fetchFilterOptions = async () => {
-  try {
-    const token = sessionStorage.getItem("token");
-    const res = await fetch(`${API_URL}/user-management/filter-options`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setPoliceRoles(data.roles || []);
-      setBarangayRoles(data.barangayRoles || []); // ← ADD
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(`${API_URL}/user-management/filter-options`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPoliceRoles(data.roles || []);
+        setBarangayRoles(data.barangayRoles || []); // ← ADD
+      }
+    } catch (err) {
+      console.error("Error fetching filter options:", err);
     }
-  } catch (err) {
-    console.error("Error fetching filter options:", err);
-  }
-};
+  };
 
   // ===================================================
   // ON MOUNT
@@ -209,7 +210,8 @@ const UserManagement = () => {
     async (page = 1) => {
       try {
         setLoading(true);
-        const token = sessionStorage.getItem("token");
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
 
         const params = new URLSearchParams();
         params.set("userType", activeTab === "police" ? "police" : "barangay");
@@ -226,13 +228,13 @@ const UserManagement = () => {
           params.set("role", appliedFilters.roleFilter);
         }
         if (activeTab === "barangay") {
-  if (appliedFilters.barangayFilter !== "all") {
-    params.set("barangayCode", appliedFilters.barangayFilter);
-  }
-  if (appliedFilters.barangayRoleFilter !== "all") {
-    params.set("role", appliedFilters.barangayRoleFilter);
-  }
-}
+          if (appliedFilters.barangayFilter !== "all") {
+            params.set("barangayCode", appliedFilters.barangayFilter);
+          }
+          if (appliedFilters.barangayRoleFilter !== "all") {
+            params.set("role", appliedFilters.barangayRoleFilter);
+          }
+        }
 
         const res = await fetch(
           `${API_URL}/user-management/users?${params.toString()}`,
@@ -601,22 +603,27 @@ const UserManagement = () => {
 
           {/* Role filter — barangay tab */}
           {activeTab === "barangay" && (
-  <div className="um-filter-group">
-    <label className="um-filter-label">Role</label>
-    <select
-      className="um-filter-input"
-      value={draft.barangayRoleFilter}
-      onChange={(e) =>
-        setDraft((f) => ({ ...f, barangayRoleFilter: e.target.value }))
-      }
-    >
-      <option value="all">All Roles</option>
-      {barangayRoles.map((r) => (
-        <option key={r} value={r}>{r}</option>
-      ))}
-    </select>
-  </div>
-)}
+            <div className="um-filter-group">
+              <label className="um-filter-label">Role</label>
+              <select
+                className="um-filter-input"
+                value={draft.barangayRoleFilter}
+                onChange={(e) =>
+                  setDraft((f) => ({
+                    ...f,
+                    barangayRoleFilter: e.target.value,
+                  }))
+                }
+              >
+                <option value="all">All Roles</option>
+                {barangayRoles.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Status filter */}
           <div className="um-filter-group">

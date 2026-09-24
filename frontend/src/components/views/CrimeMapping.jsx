@@ -10,7 +10,8 @@ import {
 import LoadingModal from "../modals/LoadingModal";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-map`;
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 const INCIDENT_COLORS = {
   ROBBERY: "#ef4444",
@@ -777,7 +778,11 @@ const BarangayMultiSelect = ({ selected, onChange }) => {
     </div>
   );
 };
-function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange = null }) {
+function CrimeMapping({
+  minimal = false,
+  externalFilters = null,
+  onFilterChange = null,
+}) {
   const rawUser = sessionStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
@@ -855,7 +860,9 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
         date_from: externalFilters.date_from ?? defaultDateFrom,
         date_to: externalFilters.date_to ?? defaultDateTo,
         barangays:
-          isBarangayUser && userBarangay ? [userBarangay] : externalFilters.barangays ?? [],
+          isBarangayUser && userBarangay
+            ? [userBarangay]
+            : (externalFilters.barangays ?? []),
       };
     }
     return {
@@ -874,7 +881,9 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
         date_from: externalFilters.date_from ?? defaultDateFrom,
         date_to: externalFilters.date_to ?? defaultDateTo,
         barangays:
-          isBarangayUser && userBarangay ? [userBarangay] : externalFilters.barangays ?? [],
+          isBarangayUser && userBarangay
+            ? [userBarangay]
+            : (externalFilters.barangays ?? []),
       };
     }
     return {
@@ -911,7 +920,7 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
         ? patrolAssignedBarangays
         : isBarangayUser && userBarangay
           ? [userBarangay]
-          : externalFilters.barangays ?? [];
+          : (externalFilters.barangays ?? []);
 
     const next = {
       incident_types: externalFilters.incident_types ?? [],
@@ -920,12 +929,19 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
       barangays: lockedBarangays,
     };
 
-    if (JSON.stringify(next) === JSON.stringify(appliedFiltersRef.current)) return;
+    if (JSON.stringify(next) === JSON.stringify(appliedFiltersRef.current))
+      return;
 
     setFilters(next);
     setAppliedFilters(next);
     setFetchTrigger((t) => t + 1);
-  }, [externalFiltersKey, isPatrol, hasPatrolAssignment, isBarangayUser, userBarangay]);
+  }, [
+    externalFiltersKey,
+    isPatrol,
+    hasPatrolAssignment,
+    isBarangayUser,
+    userBarangay,
+  ]);
 
   const [activeTab, setActiveTab] = useState("legend");
   const [sidebarOpen, setSidebarOpen] = useState(!minimal);
@@ -1448,7 +1464,6 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
     [geoJSONData, isBarangayUser, userBarangay],
   );
 
-
   const geoJSON = buildGeoJSON();
 
   const fillLayer = {
@@ -1710,144 +1725,148 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
           )}
 
           {!minimal && (
-          <>
-          <div className="crmap-date-range">
-            <input
-              type="date"
-              className="crmap-fsel crmap-fsel-date"
-              value={filters.date_from}
-              max={(() => {
-                if (!filters.date_to) return getPHTDate(0);
-                const d = new Date(filters.date_to);
-                d.setDate(d.getDate() - 1);
-                return d.toISOString().slice(0, 10);
-              })()}
-              onChange={(e) => {
-                const from = e.target.value;
-                const autoTo =
-                  filters.date_to && filters.date_to > from
-                    ? filters.date_to
-                    : getPHTToday();
-                setFilters((f) => ({ ...f, date_from: from, date_to: autoTo }));
-              }}
-              onKeyDown={(e) => e.preventDefault()}
-              onPaste={(e) => e.preventDefault()}
-              onClick={(e) => {
-                if (e.target.showPicker) {
-                  try {
-                    e.target.showPicker();
-                  } catch {}
-                }
-              }}
-            />
-            <span className="crmap-date-arrow">→</span>
-            <input
-              type="date"
-              className="crmap-fsel crmap-fsel-date"
-              value={filters.date_to}
-              min={(() => {
-                if (!filters.date_from) return undefined;
-                const d = new Date(filters.date_from);
-                d.setDate(d.getDate() + 1);
-                return d.toISOString().slice(0, 10);
-              })()}
-              max={getPHTDate(0)}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, date_to: e.target.value }))
-              }
-              onKeyDown={(e) => e.preventDefault()}
-              onPaste={(e) => e.preventDefault()}
-              onClick={(e) => {
-                if (e.target.showPicker) {
-                  try {
-                    e.target.showPicker();
-                  } catch {}
-                }
-              }}
-            />
-          </div>
+            <>
+              <div className="crmap-date-range">
+                <input
+                  type="date"
+                  className="crmap-fsel crmap-fsel-date"
+                  value={filters.date_from}
+                  max={(() => {
+                    if (!filters.date_to) return getPHTDate(0);
+                    const d = new Date(filters.date_to);
+                    d.setDate(d.getDate() - 1);
+                    return d.toISOString().slice(0, 10);
+                  })()}
+                  onChange={(e) => {
+                    const from = e.target.value;
+                    const autoTo =
+                      filters.date_to && filters.date_to > from
+                        ? filters.date_to
+                        : getPHTToday();
+                    setFilters((f) => ({
+                      ...f,
+                      date_from: from,
+                      date_to: autoTo,
+                    }));
+                  }}
+                  onKeyDown={(e) => e.preventDefault()}
+                  onPaste={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (e.target.showPicker) {
+                      try {
+                        e.target.showPicker();
+                      } catch {}
+                    }
+                  }}
+                />
+                <span className="crmap-date-arrow">→</span>
+                <input
+                  type="date"
+                  className="crmap-fsel crmap-fsel-date"
+                  value={filters.date_to}
+                  min={(() => {
+                    if (!filters.date_from) return undefined;
+                    const d = new Date(filters.date_from);
+                    d.setDate(d.getDate() + 1);
+                    return d.toISOString().slice(0, 10);
+                  })()}
+                  max={getPHTDate(0)}
+                  onChange={(e) =>
+                    setFilters((f) => ({ ...f, date_to: e.target.value }))
+                  }
+                  onKeyDown={(e) => e.preventDefault()}
+                  onPaste={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (e.target.showPicker) {
+                      try {
+                        e.target.showPicker();
+                      } catch {}
+                    }
+                  }}
+                />
+              </div>
 
-          <button
-            className="crmap-apply-btn"
-            onClick={() => {
-              // For patrol users, always use assigned barangays
-              const filtersToApply =
-                isPatrol && hasPatrolAssignment
-                  ? { ...filters, barangays: patrolAssignedBarangays }
-                  : filters;
+              <button
+                className="crmap-apply-btn"
+                onClick={() => {
+                  // For patrol users, always use assigned barangays
+                  const filtersToApply =
+                    isPatrol && hasPatrolAssignment
+                      ? { ...filters, barangays: patrolAssignedBarangays }
+                      : filters;
 
-              setAppliedFilters(filtersToApply);
-              setFetchTrigger((t) => t + 1);
+                  setAppliedFilters(filtersToApply);
+                  setFetchTrigger((t) => t + 1);
 
-              const selectedBarangays = filtersToApply.barangays;
-              if (selectedBarangays?.length > 0 && geoJSONData) {
-                const allCoords = [];
-                for (const brgy of selectedBarangays) {
-                  const feature = geoJSONData.features.find(
-                    (f) => f.properties.name_db === brgy,
-                  );
-                  if (!feature) continue;
-                  const coords =
-                    feature.geometry.type === "Polygon"
-                      ? feature.geometry.coordinates[0]
-                      : feature.geometry.coordinates[0][0];
-                  allCoords.push(...coords);
-                }
-                if (allCoords.length > 0 && mapRef.current) {
-                  const lngs = allCoords.map((c) => c[0]);
-                  const lats = allCoords.map((c) => c[1]);
-                  mapRef.current.fitBounds(
-                    [
-                      [Math.min(...lngs), Math.min(...lats)],
-                      [Math.max(...lngs), Math.max(...lats)],
-                    ],
-                    { padding: 60, duration: 1200 },
-                  );
-                }
-              } else if (!selectedBarangays?.length && mapRef.current) {
-                mapRef.current.flyTo({
-                  center: [120.964, 14.4341],
-                  zoom: 12,
-                  duration: 1200,
-                });
-              }
-            }}
-          >
-            Apply Filters
-          </button>
+                  const selectedBarangays = filtersToApply.barangays;
+                  if (selectedBarangays?.length > 0 && geoJSONData) {
+                    const allCoords = [];
+                    for (const brgy of selectedBarangays) {
+                      const feature = geoJSONData.features.find(
+                        (f) => f.properties.name_db === brgy,
+                      );
+                      if (!feature) continue;
+                      const coords =
+                        feature.geometry.type === "Polygon"
+                          ? feature.geometry.coordinates[0]
+                          : feature.geometry.coordinates[0][0];
+                      allCoords.push(...coords);
+                    }
+                    if (allCoords.length > 0 && mapRef.current) {
+                      const lngs = allCoords.map((c) => c[0]);
+                      const lats = allCoords.map((c) => c[1]);
+                      mapRef.current.fitBounds(
+                        [
+                          [Math.min(...lngs), Math.min(...lats)],
+                          [Math.max(...lngs), Math.max(...lats)],
+                        ],
+                        { padding: 60, duration: 1200 },
+                      );
+                    }
+                  } else if (!selectedBarangays?.length && mapRef.current) {
+                    mapRef.current.flyTo({
+                      center: [120.964, 14.4341],
+                      zoom: 12,
+                      duration: 1200,
+                    });
+                  }
+                }}
+              >
+                Apply Filters
+              </button>
 
-          {/* // REPLACE the entire crmap-clear-btn onClick: */}
-          <button
-            className="crmap-clear-btn"
-            onClick={() => {
-              const clearTo = getPHTToday();
-              const clearFrom = getPHTOneYearAgo();
-              const cleared = {
-                incident_types: [],
-                date_from: clearFrom,
-                date_to: clearTo,
-                barangays:
-                  isPatrol && hasPatrolAssignment
-                    ? patrolAssignedBarangays
-                    : isBarangayUser && userBarangay
-                      ? [userBarangay]
-                      : [],
-              };
-              setFilters(cleared);
-              setAppliedFilters(cleared);
-              if (!isBarangayUser && !(isPatrol && hasPatrolAssignment)) {
-                mapRef.current?.flyTo({
-                  center: [120.964, 14.4341],
-                  zoom: 12,
-                  duration: 800,
-                });
-              }
-              setFetchTrigger((t) => t + 1);
-            }}
-          >
-            ↺
-          </button>
-          </>
+              {/* // REPLACE the entire crmap-clear-btn onClick: */}
+              <button
+                className="crmap-clear-btn"
+                onClick={() => {
+                  const clearTo = getPHTToday();
+                  const clearFrom = getPHTOneYearAgo();
+                  const cleared = {
+                    incident_types: [],
+                    date_from: clearFrom,
+                    date_to: clearTo,
+                    barangays:
+                      isPatrol && hasPatrolAssignment
+                        ? patrolAssignedBarangays
+                        : isBarangayUser && userBarangay
+                          ? [userBarangay]
+                          : [],
+                  };
+                  setFilters(cleared);
+                  setAppliedFilters(cleared);
+                  if (!isBarangayUser && !(isPatrol && hasPatrolAssignment)) {
+                    mapRef.current?.flyTo({
+                      center: [120.964, 14.4341],
+                      zoom: 12,
+                      duration: 800,
+                    });
+                  }
+                  setFetchTrigger((t) => t + 1);
+                }}
+              >
+                ↺
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1944,7 +1963,6 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
               attributionControl={false}
               onZoom={(e) => setZoom(e.viewState.zoom)}
               onDblClick={handleMapDblClick}
-              
               doubleClickZoom={false}
               onMouseMove={(e) => {
                 if (hoveredOfficerRef.current) return; // ← reads ref, always current value
@@ -2254,8 +2272,6 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
                     </div>
                   </Marker>
                 ))}
-
-              
             </Map>
 
             {hoveredOfficer && (
@@ -2958,7 +2974,6 @@ function CrimeMapping({ minimal = false, externalFilters = null, onFilterChange 
                                   zoom: 14,
                                   duration: 800,
                                 });
-                              
                               }}
                             >
                               <div

@@ -9,7 +9,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import "./LoginSystem.css";
-import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import DataPrivacyModal from "../modals/DataPrivacyModal";
 
@@ -71,7 +70,7 @@ const LoginSystem = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-
+  const [rememberMe, setRememberMe] = useState(false);
   // ── OTP lockout state — now supports "blocked" (daily limit) and
   // "session-locked" (3x wrong OTP), same as ChangePasswordModal ────────────
   const [fpStep, setFpStep] = useState("active"); // "active" | "blocked" | "session-locked"
@@ -290,12 +289,11 @@ const LoginSystem = () => {
         return;
       }
 
-      sessionStorage.setItem("token", data.token);
-      const decoded = jwtDecode(data.token);
-      sessionStorage.setItem("role", decoded.role);
-      sessionStorage.setItem("userId", decoded.user_id);
-      sessionStorage.setItem("username", decoded.username);
-      sessionStorage.setItem("user", JSON.stringify(data.user));
+      if (rememberMe) {
+        localStorage.setItem("token", data.token);
+      } else {
+        sessionStorage.setItem("token", data.token);
+      }
 
       setSuccess("Login successful!");
       setFormData((prev) => ({
@@ -776,6 +774,29 @@ const LoginSystem = () => {
                     )}{" "}
                   </button>
                 </div>
+              </div>
+
+              <div
+                className="remember-me-row"
+                style={{
+                  margin: "8px 0 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <label
+                  htmlFor="rememberMe"
+                  style={{ fontSize: 13, cursor: "pointer" }}
+                >
+                  Keep me logged in on this device
+                </label>
               </div>
 
               <div className="forgot-password-link">

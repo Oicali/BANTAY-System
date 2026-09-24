@@ -238,7 +238,8 @@ const TopBar = ({ onMenuClick }) => {
 
   const fetchProfileData = async () => {
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const cached = localStorage.getItem("cachedProfile");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -263,7 +264,8 @@ const TopBar = ({ onMenuClick }) => {
 
   const fetchNotifications = async () => {
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) return;
       const res = await fetch(`${API_URL}/notifications`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -322,7 +324,8 @@ const TopBar = ({ onMenuClick }) => {
     setUnread(0);
     prevUnreadRef.current = 0;
     // API in background
-    const token = sessionStorage.getItem("token");
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
     // Same keepalive guard for the bulk mark-read
     fetch(`${API_URL}/notifications/read-all`, {
       method: "PATCH",
@@ -340,7 +343,8 @@ const TopBar = ({ onMenuClick }) => {
     setUnread((prev) => Math.max(0, prev - 1));
     prevUnreadRef.current = Math.max(0, prevUnreadRef.current - 1);
     // API in background — keepalive lets it finish even if the page unloads
-    const token = sessionStorage.getItem("token");
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
     fetch(`${API_URL}/notifications/${notif.id}/read`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
@@ -850,7 +854,7 @@ const TopBar = ({ onMenuClick }) => {
               <div className="user-role">
                 {profileData?.user_type === "barangay" &&
                 profileData?.barangay_code
-                  ? `${profileData?.role || user?.role } - ${formatBarangayLabel(profileData.barangay_code)}`
+                  ? `${profileData?.role || user?.role} - ${formatBarangayLabel(profileData.barangay_code)}`
                   : profileData?.role || user?.role}
               </div>
             </div>

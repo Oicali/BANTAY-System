@@ -4,7 +4,7 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { navItems } from "../../utils/navItems";
 import { roleAccess } from "../../utils/roleAccess";
-
+import { getUserFromToken } from "../../utils/auth";
 export default function Sidebar({
   openSections,
   toggleSection,
@@ -12,8 +12,9 @@ export default function Sidebar({
   sidebarOpen,
   onClose,
 }) {
-  const role = sessionStorage.getItem("role");
-  const isAdmin = role === "Administrator" || role === "Technical Administrator";
+  const role = getUserFromToken()?.role;
+  const isAdmin =
+    role === "Administrator" || role === "Technical Administrator";
   const allowedTabs = roleAccess[role] || [];
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -34,7 +35,7 @@ export default function Sidebar({
               }}
             />
             <div className="logo-text">
-              <h1 style={{ letterSpacing: "2px"}}>B.A.N.T.A.Y.</h1>
+              <h1 style={{ letterSpacing: "2px" }}>B.A.N.T.A.Y.</h1>
               <p>City of Bacoor</p>
             </div>
           </div>
@@ -67,7 +68,9 @@ export default function Sidebar({
                     strokeWidth="2"
                     dangerouslySetInnerHTML={{ __html: item.icon }}
                   />
-                  {(!isAdmin && item.nonAdminLabel) ? item.nonAdminLabel : item.label}
+                  {!isAdmin && item.nonAdminLabel
+                    ? item.nonAdminLabel
+                    : item.label}
                 </NavLink>
               ));
             }
@@ -104,7 +107,9 @@ export default function Sidebar({
                         strokeWidth="2"
                         dangerouslySetInnerHTML={{ __html: item.icon }}
                       />
-                      {(!isAdmin && item.nonAdminLabel) ? item.nonAdminLabel : item.label}
+                      {!isAdmin && item.nonAdminLabel
+                        ? item.nonAdminLabel
+                        : item.label}
                     </NavLink>
                   ))}
               </div>

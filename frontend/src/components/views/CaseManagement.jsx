@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from "react";
 import "./CaseManagement.css";
 import LoadingModal from "../modals/LoadingModal";
-
+import { getUserFromToken } from "../../utils/auth";
 const API_URL = `${import.meta.env.VITE_API_URL}/cases`;
 
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 const getUser = () => ({
-  role: sessionStorage.getItem("role"),
-  user_id: sessionStorage.getItem("userId"),
-  username: sessionStorage.getItem("username"),
+  role: getUserFromToken()?.role,
+  user_id: getUserFromToken()?.user_id,
+  username: getUserFromToken()?.username,
 });
 
 function CaseManagement() {

@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { getUserFromToken } from "../../utils/auth";
 import {
   BarChart,
   Bar,
@@ -46,7 +47,8 @@ const DEFAULT_PRESET = "365d";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
 const AI_API = `${import.meta.env.VITE_API_URL}/ai-assessment`;
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 const STATUS_COLORS = {
   solved: "#22c55e",
@@ -2395,36 +2397,85 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
 
   return (
     <div className="cd-risk-section">
-            {/* Header */}
+      {/* Header */}
       <div className="cd-risk-header">
         <div>
           <div className="cd-risk-title">
             Top 15 High-Risk Barangays — Structural Risk Ranking
           </div>
           <div className="cd-risk-subtitle">
-            Historical data · Decay window: {decayWindow} days · {totalBrgys} of 47 barangays scored · Click row to expand
+            Historical data · Decay window: {decayWindow} days · {totalBrgys} of
+            47 barangays scored · Click row to expand
           </div>
           {/* Legend ranges now pull from thresholds instead of hardcoded numbers */}
           <div className="cd-risk-legend">
             {[
-              { color: "#dc2626", bg: "rgba(220,38,38,0.08)",   border: "rgba(220,38,38,0.2)",  range: `${thresholds.priority}–100`,                        label: "Priority patrol needed"    },
-              { color: "#ea580c", bg: "rgba(234,88,12,0.08)",   border: "rgba(234,88,12,0.2)",  range: `${thresholds.monitor}–${thresholds.priority - 1}`, label: "Closely monitor"            },
-              { color: "#ca8a04", bg: "rgba(202,138,4,0.08)",   border: "rgba(202,138,4,0.2)",  range: `${thresholds.observe}–${thresholds.monitor - 1}`,  label: "Keep under observation"    },
-              { color: "#6b7280", bg: "rgba(107,114,128,0.08)", border: "rgba(107,114,128,0.2)",range: `0–${thresholds.observe - 1}`,                       label: "Routine patrol sufficient" },
+              {
+                color: "#dc2626",
+                bg: "rgba(220,38,38,0.08)",
+                border: "rgba(220,38,38,0.2)",
+                range: `${thresholds.priority}–100`,
+                label: "Priority patrol needed",
+              },
+              {
+                color: "#ea580c",
+                bg: "rgba(234,88,12,0.08)",
+                border: "rgba(234,88,12,0.2)",
+                range: `${thresholds.monitor}–${thresholds.priority - 1}`,
+                label: "Closely monitor",
+              },
+              {
+                color: "#ca8a04",
+                bg: "rgba(202,138,4,0.08)",
+                border: "rgba(202,138,4,0.2)",
+                range: `${thresholds.observe}–${thresholds.monitor - 1}`,
+                label: "Keep under observation",
+              },
+              {
+                color: "#6b7280",
+                bg: "rgba(107,114,128,0.08)",
+                border: "rgba(107,114,128,0.2)",
+                range: `0–${thresholds.observe - 1}`,
+                label: "Routine patrol sufficient",
+              },
             ].map((item, i) => (
-              <div key={i} className="cd-risk-legend-item" style={{ background: item.bg, border: `1px solid ${item.border}` }}>
-                <span className="cd-risk-legend-dot" style={{ background: item.color }} />
-                <span className="cd-risk-legend-range" style={{ color: item.color }}>{item.range}</span>
+              <div
+                key={i}
+                className="cd-risk-legend-item"
+                style={{
+                  background: item.bg,
+                  border: `1px solid ${item.border}`,
+                }}
+              >
+                <span
+                  className="cd-risk-legend-dot"
+                  style={{ background: item.color }}
+                />
+                <span
+                  className="cd-risk-legend-range"
+                  style={{ color: item.color }}
+                >
+                  {item.range}
+                </span>
                 <span className="cd-risk-legend-label">{item.label}</span>
               </div>
             ))}
             <div className="cd-risk-legend-note">
-              Score ranks barangays against each other in this period — ranges recalculate per search.{" "}
-              100 = highest risk area, not a percentage chance of crime.{" "}
+              Score ranks barangays against each other in this period — ranges
+              recalculate per search. 100 = highest risk area, not a percentage
+              chance of crime.{" "}
               <button
                 className="cd-risk-inline-link"
                 onClick={() => setShowCalcInfo((v) => !v)}
-                style={{ background: "none", border: "none", padding: 0, color: "var(--navy-primary)", textDecoration: "underline", cursor: "pointer", fontSize: "inherit" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: "var(--navy-primary)",
+                  textDecoration: "underline",
+                  cursor: "pointer",
+                  fontSize: "inherit",
+                }}
               >
                 {showCalcInfo ? "Hide" : "See"} how it's calculated
               </button>
@@ -2446,39 +2497,78 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
       {/* Explanation panel — reuses the backtest panel's styling for visual consistency */}
       {showCalcInfo && (
         <div className="cd-backtest-panel">
-          <div className="cd-backtest-title">How the Risk Score is Calculated</div>
+          <div className="cd-backtest-title">
+            How the Risk Score is Calculated
+          </div>
 
           <div className="cd-backtest-meta" style={{ marginBottom: 12 }}>
-            Each barangay's score is a weighted composite of three signals, rescaled 0–100 relative to this query's results.
+            Each barangay's score is a weighted composite of three signals,
+            rescaled 0–100 relative to this query's results.
           </div>
 
           <div className="cd-backtest-metrics">
             <div className="cd-backtest-metric-box">
               <div className="cd-backtest-metric-label">Frequency (50%)</div>
-              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--gray-600)",
+                  lineHeight: 1.5,
+                  marginTop: 4,
+                }}
+              >
                 Incidents per week in the selected period.
               </div>
             </div>
             <div className="cd-backtest-metric-box">
-              <div className="cd-backtest-metric-label">Interval Pattern (30%)</div>
-              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
-                How overdue the barangay is for its next incident, based on historical spacing between incidents (SBA forecast method).
+              <div className="cd-backtest-metric-label">
+                Interval Pattern (30%)
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--gray-600)",
+                  lineHeight: 1.5,
+                  marginTop: 4,
+                }}
+              >
+                How overdue the barangay is for its next incident, based on
+                historical spacing between incidents (SBA forecast method).
               </div>
             </div>
             <div className="cd-backtest-metric-box">
               <div className="cd-backtest-metric-label">Recency (20%)</div>
-              <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5, marginTop: 4 }}>
-                How recently the last incident occurred, decaying over {decayWindow} days.
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--gray-600)",
+                  lineHeight: 1.5,
+                  marginTop: 4,
+                }}
+              >
+                How recently the last incident occurred, decaying over{" "}
+                {decayWindow} days.
               </div>
             </div>
           </div>
 
-          <div style={{ marginTop: 14, fontSize: 12, color: "var(--gray-600)", lineHeight: 1.6 }}>
-            The three signals are weighted and combined, then rescaled so the highest-scoring barangay in this
-            result set becomes 100 — every other score is shown relative to it, not against a fixed citywide standard.
-            <br /><br />
-            <strong>Legend cutoffs:</strong> the color bands above aren't fixed numbers either — they're the{" "}
-            90th, 75th, and 50th percentile of scores across all barangays in this query
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 12,
+              color: "var(--gray-600)",
+              lineHeight: 1.6,
+            }}
+          >
+            The three signals are weighted and combined, then rescaled so the
+            highest-scoring barangay in this result set becomes 100 — every
+            other score is shown relative to it, not against a fixed citywide
+            standard.
+            <br />
+            <br />
+            <strong>Legend cutoffs:</strong> the color bands above aren't fixed
+            numbers either — they're the 90th, 75th, and 50th percentile of
+            scores across all barangays in this query
             {thresholds.method === "fixed_fallback"
               ? " (too few barangays returned for percentiles to be meaningful, so default 80/65/45 bands were used instead)."
               : ". That means a barangay is flagged \"Priority\" only if it's in the top 10% of this specific result set — changing the date range or filters will shift these numbers, since it changes what's being compared."}
@@ -2792,7 +2882,7 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
       )}
 
       {/* Table */}
-            <div className="cd-risk-table-wrap">
+      <div className="cd-risk-table-wrap">
         <table className="cd-risk-table">
           <thead>
             <tr>
@@ -2802,9 +2892,12 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
               <th className="cd-th-tooltip-wrap">
                 Risk Score
                 <div className="cd-th-tooltip">
-                  <div className="cd-th-tooltip-title">Composite Risk Index</div>
+                  <div className="cd-th-tooltip-title">
+                    Composite Risk Index
+                  </div>
                   <div className="cd-th-tooltip-formula">
-                    50% Frequency + 30% Interval Pattern + 20% Recency, rescaled 0–100 relative to this result set.
+                    50% Frequency + 30% Interval Pattern + 20% Recency, rescaled
+                    0–100 relative to this result set.
                   </div>
                 </div>
               </th>
@@ -2956,7 +3049,7 @@ const CrimeDashboard = () => {
     currentUser?.role_name === "Patrol" || currentUser?.role === "Patrol";
   const userBarangay = currentUser?.assigned_barangay_code ?? null;
 
-  const role = sessionStorage.getItem("role");
+  const role = getUserFromToken()?.role;
   const isAdmin =
     role === "Administrator" || role === "Technical Administrator";
 

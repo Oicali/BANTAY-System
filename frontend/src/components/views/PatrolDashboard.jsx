@@ -8,7 +8,11 @@ import Notification from "../modals/Notification";
 import { ShieldCheck, AlertTriangle, Car, Users } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
-const VEHICLE_TYPES = ["Pickup Patrols", "Patrol Sedans / Crossovers", "Patrol Motorcycles"];
+const VEHICLE_TYPES = [
+  "Pickup Patrols",
+  "Patrol Sedans / Crossovers",
+  "Patrol Motorcycles",
+];
 const PAGE_SIZE = 5;
 
 // ── FIX 1: FilterBar and Pagination are defined OUTSIDE the component.
@@ -78,13 +82,22 @@ const PatrollerFilterBar = ({
   }, []);
 
   const filteredLocations = barangayOptions.filter((b) =>
-    b.toLowerCase().includes(locationSearch.toLowerCase())
+    b.toLowerCase().includes(locationSearch.toLowerCase()),
   );
 
   return (
     <div className="pd-filter-bar">
       <div className="pd-filter-icon">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
       </div>
@@ -137,7 +150,9 @@ const PatrollerFilterBar = ({
               — All Locations —
             </div>
             {filteredLocations.length === 0 ? (
-              <div className="pd-location-option pd-location-empty">No results</div>
+              <div className="pd-location-option pd-location-empty">
+                No results
+              </div>
             ) : (
               filteredLocations.map((b) => (
                 <div
@@ -162,7 +177,11 @@ const PatrollerFilterBar = ({
       </button>
 
       {/* FIX 4: Reset button is ALWAYS visible */}
-      <button className="pd-filter-reset" onClick={onReset} title="Reset filters">
+      <button
+        className="pd-filter-reset"
+        onClick={onReset}
+        title="Reset filters"
+      >
         ↺
       </button>
     </div>
@@ -181,7 +200,16 @@ const MobileUnitFilterBar = ({
 }) => (
   <div className="pd-filter-bar">
     <div className="pd-filter-icon">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
       </svg>
     </div>
@@ -204,7 +232,9 @@ const MobileUnitFilterBar = ({
     >
       <option value="">All Vehicle Types</option>
       {VEHICLE_TYPES.map((t) => (
-        <option key={t} value={t}>{t}</option>
+        <option key={t} value={t}>
+          {t}
+        </option>
       ))}
     </select>
 
@@ -222,32 +252,57 @@ const DeleteConfirmDialog = ({ itemName, onConfirm, onCancel }) =>
   createPortal(
     <div
       style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200,
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1200,
       }}
       onClick={onCancel}
     >
       <div
         style={{
-          background: "#fff", borderRadius: "12px", padding: "28px 28px 22px",
-          width: "360px", boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
-          display: "flex", flexDirection: "column", gap: "12px",
+          background: "#fff",
+          borderRadius: "12px",
+          padding: "28px 28px 22px",
+          width: "360px",
+          boxShadow: "0 16px 48px rgba(0,0,0,0.2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>Delete Mobile Unit</div>
+        <div style={{ fontSize: "17px", fontWeight: 700, color: "#0a1628" }}>
+          Delete Mobile Unit
+        </div>
         <div style={{ fontSize: "13px", color: "#6c757d", lineHeight: 1.6 }}>
           Are you sure you want to delete{" "}
-          <strong style={{ color: "#212529" }}>{itemName}</strong>?{" "}
-          This action cannot be undone.
+          <strong style={{ color: "#212529" }}>{itemName}</strong>? This action
+          cannot be undone.
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "8px",
+            marginTop: "8px",
+          }}
+        >
           <button
             onClick={onCancel}
             style={{
-              padding: "8px 18px", background: "transparent", border: "1px solid #ced4da",
-              borderRadius: "7px", fontSize: "13px", fontWeight: 500, color: "#495057",
-              cursor: "pointer", fontFamily: "inherit",
+              padding: "8px 18px",
+              background: "transparent",
+              border: "1px solid #ced4da",
+              borderRadius: "7px",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#495057",
+              cursor: "pointer",
+              fontFamily: "inherit",
             }}
           >
             Cancel
@@ -255,9 +310,15 @@ const DeleteConfirmDialog = ({ itemName, onConfirm, onCancel }) =>
           <button
             onClick={onConfirm}
             style={{
-              padding: "8px 20px", background: "#dc2626", border: "none",
-              borderRadius: "7px", fontSize: "13px", fontWeight: 700, color: "#fff",
-              cursor: "pointer", fontFamily: "inherit",
+              padding: "8px 20px",
+              background: "#dc2626",
+              border: "none",
+              borderRadius: "7px",
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#fff",
+              cursor: "pointer",
+              fontFamily: "inherit",
             }}
           >
             Delete
@@ -265,12 +326,13 @@ const DeleteConfirmDialog = ({ itemName, onConfirm, onCancel }) =>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 
 // ─────────────────────────────────────────────────────────────────────────────
 const PatrollerDashboard = () => {
-  const token = () => sessionStorage.getItem("token");
+  const token = () =>
+    localStorage.getItem("token") || sessionStorage.getItem("token");
 
   // ── State ──────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -361,7 +423,11 @@ const PatrollerDashboard = () => {
   useEffect(() => {
     const loadData = async (isInitial = false) => {
       if (isInitial) setLoading(true);
-      await Promise.all([fetchPatrolStats(), fetchPatrollers(), fetchMobileUnits()]);
+      await Promise.all([
+        fetchPatrolStats(),
+        fetchPatrollers(),
+        fetchMobileUnits(),
+      ]);
       if (isInitial) setLoading(false);
     };
     loadData(true);
@@ -369,7 +435,6 @@ const PatrollerDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  
   const onlineCount = patrollers.filter((o) => {
     const lastSeen = o.last_location_at ? new Date(o.last_location_at) : null;
     return lastSeen && Date.now() - lastSeen.getTime() <= 30000;
@@ -377,19 +442,17 @@ const PatrollerDashboard = () => {
 
   const offlineCount = patrollers.length - onlineCount;
 
-  
- const totalPatrollerCount = patrollers.length;
- 
+  const totalPatrollerCount = patrollers.length;
 
   // ── Modal handlers ─────────────────────────────────────
-const openAddModal = () => {
-  setModalMode("add");
-  setSelectedUnit(null);
-  setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
-  setAutoFilledName("");
-  setPlateError("");
-  setShowModal(true);
-};
+  const openAddModal = () => {
+    setModalMode("add");
+    setSelectedUnit(null);
+    setForm({ mobile_unit_name: "", vehicle_type: "", plate_number: "" });
+    setAutoFilledName("");
+    setPlateError("");
+    setShowModal(true);
+  };
 
   const openEditModal = (unit) => {
     setModalMode("edit");
@@ -412,18 +475,24 @@ const openAddModal = () => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   // ── Submit ─────────────────────────────────────────────
- const handleSubmit = async () => {
-  if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
-    setNotif({ message: "Please fill in all required fields.", type: "warning" });
-    return;
-  }
-  if (!PLATE_REGEX.test(form.plate_number) || plateError) {
-    setNotif({ message: plateError || "Please enter a valid plate number.", type: "warning" });
-    return;
-  }
-  setLoadingAction(modalMode); // "add" or "edit"
-  setSubmitLoading(true);
-  try {
+  const handleSubmit = async () => {
+    if (!form.mobile_unit_name || !form.vehicle_type || !form.plate_number) {
+      setNotif({
+        message: "Please fill in all required fields.",
+        type: "warning",
+      });
+      return;
+    }
+    if (!PLATE_REGEX.test(form.plate_number) || plateError) {
+      setNotif({
+        message: plateError || "Please enter a valid plate number.",
+        type: "warning",
+      });
+      return;
+    }
+    setLoadingAction(modalMode); // "add" or "edit"
+    setSubmitLoading(true);
+    try {
       const url =
         modalMode === "add"
           ? `${API_BASE}/patrol/mobile-units`
@@ -443,11 +512,17 @@ const openAddModal = () => {
         closeModal();
         await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
         setNotif({
-          message: modalMode === "add" ? "Mobile unit added successfully!" : "Mobile unit updated successfully!",
+          message:
+            modalMode === "add"
+              ? "Mobile unit added successfully!"
+              : "Mobile unit updated successfully!",
           type: "success",
         });
       } else {
-        setNotif({ message: data.message || "Something went wrong.", type: "error" });
+        setNotif({
+          message: data.message || "Something went wrong.",
+          type: "error",
+        });
       }
     } catch (err) {
       setNotif({ message: "Server error. Please try again.", type: "error" });
@@ -457,101 +532,119 @@ const openAddModal = () => {
   };
 
   // ── Delete ─────────────────────────────────────────────
-const confirmDelete = (id, name) => {
-  setDeleteTarget({ id, name });
-};
+  const confirmDelete = (id, name) => {
+    setDeleteTarget({ id, name });
+  };
 
-const handleDelete = async () => {
-  if (!deleteTarget) return;
-  const id = deleteTarget.id;
-  setDeleteTarget(null);
-  setLoadingAction("delete");
-  setSubmitLoading(true);
-  try {
-    const res = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const data = await res.json();
-    if (data.success) {
-      await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
-      setNotif({ message: "Mobile unit deleted.", type: "success" });
-    } else {
-      setNotif({ message: data.message || "Something went wrong.", type: "error" });
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    setDeleteTarget(null);
+    setLoadingAction("delete");
+    setSubmitLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/patrol/mobile-units/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchMobileUnits(), fetchPatrolStats()]);
+        setNotif({ message: "Mobile unit deleted.", type: "success" });
+      } else {
+        setNotif({
+          message: data.message || "Something went wrong.",
+          type: "error",
+        });
+      }
+    } catch (err) {
+      setNotif({ message: "Server error. Please try again.", type: "error" });
+    } finally {
+      setSubmitLoading(false);
     }
-  } catch (err) {
-    setNotif({ message: "Server error. Please try again.", type: "error" });
-  } finally {
-    setSubmitLoading(false);
-  }
-};
+  };
 
   // ── Helpers ────────────────────────────────────────────
-  const getInitials = (name) => (name ? name.substring(0, 2).toUpperCase() : "NA");
+  const getInitials = (name) =>
+    name ? name.substring(0, 2).toUpperCase() : "NA";
 
-  const formatDateTime = (ts) => (ts ? new Date(ts).toLocaleDateString() : "No Data");
+  const formatDateTime = (ts) =>
+    ts ? new Date(ts).toLocaleDateString() : "No Data";
 
-const getVehicleBadgeClass = (type) => {
+  const getVehicleBadgeClass = (type) => {
     switch (type) {
-      case "Pickup Patrols": return "vehicle-pickup";
-      case "Patrol Sedans / Crossovers": return "vehicle-sedan";
-      case "Patrol Motorcycles": return "vehicle-motorcycle";
-      default: return "vehicle-other";
+      case "Pickup Patrols":
+        return "vehicle-pickup";
+      case "Patrol Sedans / Crossovers":
+        return "vehicle-sedan";
+      case "Patrol Motorcycles":
+        return "vehicle-motorcycle";
+      default:
+        return "vehicle-other";
     }
   };
 
   const PLATE_REGEX = /^[A-Z]{2,3}[\s-]?\d{3,5}$/;
 
   const handlePlateChange = (e) => {
-  const value = e.target.value.toUpperCase();
-  setForm((prev) => ({ ...prev, plate_number: value }));
+    const value = e.target.value.toUpperCase();
+    setForm((prev) => ({ ...prev, plate_number: value }));
 
-  if (!value) {
-    setPlateError("");
-    return;
-  }
-  if (!PLATE_REGEX.test(value)) {
-    setPlateError("Enter a valid plate number (e.g. ABC 1234).");
-    return;
-  }
-  const isDuplicate = mobileUnits.some(
-    (u) =>
-      u.plate_number?.toUpperCase() === value &&
-      (modalMode === "add" || u.mobile_unit_id !== selectedUnit?.mobile_unit_id)
-  );
-  setPlateError(isDuplicate ? "This plate number is already registered." : "");
-};
+    if (!value) {
+      setPlateError("");
+      return;
+    }
+    if (!PLATE_REGEX.test(value)) {
+      setPlateError("Enter a valid plate number (e.g. ABC 1234).");
+      return;
+    }
+    const isDuplicate = mobileUnits.some(
+      (u) =>
+        u.plate_number?.toUpperCase() === value &&
+        (modalMode === "add" ||
+          u.mobile_unit_id !== selectedUnit?.mobile_unit_id),
+    );
+    setPlateError(
+      isDuplicate ? "This plate number is already registered." : "",
+    );
+  };
 
-const VEHICLE_NAME_PRESETS = {
-  "Pickup Patrols": "Mobile Patrol",
-  "Patrol Sedans / Crossovers": "Sedan Patrol",
-  "Patrol Motorcycles": "Motorcycle Patrol",
-};
+  const VEHICLE_NAME_PRESETS = {
+    "Pickup Patrols": "Mobile Patrol",
+    "Patrol Sedans / Crossovers": "Sedan Patrol",
+    "Patrol Motorcycles": "Motorcycle Patrol",
+  };
 
-const [autoFilledName, setAutoFilledName] = useState("");
+  const [autoFilledName, setAutoFilledName] = useState("");
 
-const handleVehicleTypeChange = (e) => {
-  const type = e.target.value;
+  const handleVehicleTypeChange = (e) => {
+    const type = e.target.value;
 
-  if (!type) {
-    setForm((prev) => ({ ...prev, vehicle_type: "" }));
-    return;
-  }
+    if (!type) {
+      setForm((prev) => ({ ...prev, vehicle_type: "" }));
+      return;
+    }
 
-  const base = VEHICLE_NAME_PRESETS[type];
-  const countSameType = mobileUnits.filter((u) => u.vehicle_type === type).length;
-  const preset = base ? `${base} ${countSameType + 1}` : "";
+    const base = VEHICLE_NAME_PRESETS[type];
+    const countSameType = mobileUnits.filter(
+      (u) => u.vehicle_type === type,
+    ).length;
+    const preset = base ? `${base} ${countSameType + 1}` : "";
 
-  setAutoFilledName(preset);
-  setForm((prev) => ({ ...prev, vehicle_type: type, mobile_unit_name: preset }));
-};
+    setAutoFilledName(preset);
+    setForm((prev) => ({
+      ...prev,
+      vehicle_type: type,
+      mobile_unit_name: preset,
+    }));
+  };
 
   // ── FIX 2: Build barangay options from live patroller data ─────────────────
   const barangayOptions = [
     ...new Set(
       patrollers
         .map((o) => o.current_barangay || o.last_location_name)
-        .filter(Boolean)
+        .filter(Boolean),
     ),
   ].sort();
 
@@ -592,16 +685,20 @@ const handleVehicleTypeChange = (e) => {
     // Location filter
     if (location) {
       const barangay = o.current_barangay || o.last_location_name || "";
-      if (!barangay.toLowerCase().includes(location.toLowerCase())) return false;
+      if (!barangay.toLowerCase().includes(location.toLowerCase()))
+        return false;
     }
 
     return true;
   });
 
-  const totalPatrollerPages = Math.max(1, Math.ceil(filteredPatrollers.length / PAGE_SIZE));
+  const totalPatrollerPages = Math.max(
+    1,
+    Math.ceil(filteredPatrollers.length / PAGE_SIZE),
+  );
   const paginatedPatrollers = filteredPatrollers.slice(
     (patrollerPage - 1) * PAGE_SIZE,
-    patrollerPage * PAGE_SIZE
+    patrollerPage * PAGE_SIZE,
   );
 
   // ── Mobile unit filter logic ───────────────────────────
@@ -621,7 +718,7 @@ const handleVehicleTypeChange = (e) => {
     a.mobile_unit_name.localeCompare(b.mobile_unit_name, undefined, {
       numeric: true,
       sensitivity: "base",
-    })
+    }),
   );
 
   const filteredUnits = sortedUnits.filter((u) => {
@@ -637,10 +734,13 @@ const handleVehicleTypeChange = (e) => {
     return true;
   });
 
-  const totalUnitPages = Math.max(1, Math.ceil(filteredUnits.length / PAGE_SIZE));
+  const totalUnitPages = Math.max(
+    1,
+    Math.ceil(filteredUnits.length / PAGE_SIZE),
+  );
   const paginatedUnits = filteredUnits.slice(
     (unitPage - 1) * PAGE_SIZE,
-    unitPage * PAGE_SIZE
+    unitPage * PAGE_SIZE,
   );
 
   // ── Render ─────────────────────────────────────────────
@@ -690,7 +790,7 @@ const handleVehicleTypeChange = (e) => {
                 <Users size={20} />
               </div>
             </div>
-             <div className="stat-value">{totalPatrollerCount}</div>
+            <div className="stat-value">{totalPatrollerCount}</div>
             <div className="stat-label">Total Patrollers</div>
           </div>
         </div>
@@ -819,7 +919,9 @@ const handleVehicleTypeChange = (e) => {
                                     }
                                   })()
                                 ) : (
-                                  <span className="unassigned-badge">No location</span>
+                                  <span className="unassigned-badge">
+                                    No location
+                                  </span>
                                 )}
                               </span>
                             </td>
@@ -827,13 +929,21 @@ const handleVehicleTypeChange = (e) => {
                               <span className="time-badge">
                                 {lastSeen
                                   ? (() => {
-                                      const dd = String(lastSeen.getDate()).padStart(2, "0");
-                                      const mm = String(lastSeen.getMonth() + 1).padStart(2, "0");
+                                      const dd = String(
+                                        lastSeen.getDate(),
+                                      ).padStart(2, "0");
+                                      const mm = String(
+                                        lastSeen.getMonth() + 1,
+                                      ).padStart(2, "0");
                                       const yyyy = lastSeen.getFullYear();
                                       const hours = lastSeen.getHours();
-                                      const mins = String(lastSeen.getMinutes()).padStart(2, "0");
+                                      const mins = String(
+                                        lastSeen.getMinutes(),
+                                      ).padStart(2, "0");
                                       const ampm = hours >= 12 ? "PM" : "AM";
-                                      const h = String(hours % 12 || 12).padStart(2, "0");
+                                      const h = String(
+                                        hours % 12 || 12,
+                                      ).padStart(2, "0");
                                       return `${dd}/${mm}/${yyyy}, ${h}:${mins} ${ampm}`;
                                     })()
                                   : "Never"}
@@ -894,15 +1004,21 @@ const handleVehicleTypeChange = (e) => {
                       paginatedUnits.map((unit, index) => (
                         <tr key={unit.mobile_unit_id || index}>
                           <td>
-                            <span className="unit-badge">{unit.mobile_unit_name}</span>
+                            <span className="unit-badge">
+                              {unit.mobile_unit_name}
+                            </span>
                           </td>
                           <td>
-                         <span className={`vehicle-badge ${getVehicleBadgeClass(unit.vehicle_type)}`}>
+                            <span
+                              className={`vehicle-badge ${getVehicleBadgeClass(unit.vehicle_type)}`}
+                            >
                               {unit.vehicle_type}
                             </span>
                           </td>
                           <td>
-                            <span className="plate-number">{unit.plate_number}</span>
+                            <span className="plate-number">
+                              {unit.plate_number}
+                            </span>
                           </td>
                           <td>
                             <span className="time-badge">
@@ -918,11 +1034,16 @@ const handleVehicleTypeChange = (e) => {
                                 Edit
                               </button>
                               <button
-  className="delete-btn"
-  onClick={() => confirmDelete(unit.mobile_unit_id, unit.mobile_unit_name)}
->
-  Delete
-</button>
+                                className="delete-btn"
+                                onClick={() =>
+                                  confirmDelete(
+                                    unit.mobile_unit_id,
+                                    unit.mobile_unit_name,
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -945,28 +1066,37 @@ const handleVehicleTypeChange = (e) => {
         </div>
       </div>
 
-
       {/* ── ADD / EDIT MODAL ── */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}</h3>
-              <button className="modal-close" onClick={closeModal}>✕</button>
+              <h3>
+                {modalMode === "add" ? "Add Mobile Unit" : "Edit Mobile Unit"}
+              </h3>
+              <button className="modal-close" onClick={closeModal}>
+                ✕
+              </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
                 <label>
                   Vehicle Type <span className="required">*</span>
                 </label>
-               <select name="vehicle_type" value={form.vehicle_type} onChange={handleVehicleTypeChange}>
+                <select
+                  name="vehicle_type"
+                  value={form.vehicle_type}
+                  onChange={handleVehicleTypeChange}
+                >
                   <option value="">— Select Vehicle Type —</option>
                   {VEHICLE_TYPES.map((type) => (
-                    <option key={type} value={type}>{type}</option>
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
                   ))}
                 </select>
               </div>
-               <div className="form-group">
+              <div className="form-group">
                 <label>
                   Mobile Unit Name <span className="required">*</span>
                 </label>
@@ -983,22 +1113,31 @@ const handleVehicleTypeChange = (e) => {
                   Plate Number <span className="required">*</span>
                 </label>
                 <input
-  type="text"
-  name="plate_number"
-  value={form.plate_number}
-  onChange={handlePlateChange}
-  placeholder="e.g. ABC 1234"
-  style={{ textTransform: "uppercase" }}
-/>
-{plateError && (
-  <span style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px", display: "block" }}>
-    {plateError}
-  </span>
-)}
+                  type="text"
+                  name="plate_number"
+                  value={form.plate_number}
+                  onChange={handlePlateChange}
+                  placeholder="e.g. ABC 1234"
+                  style={{ textTransform: "uppercase" }}
+                />
+                {plateError && (
+                  <span
+                    style={{
+                      color: "#dc2626",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                      display: "block",
+                    }}
+                  >
+                    {plateError}
+                  </span>
+                )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+              <button className="btn-cancel" onClick={closeModal}>
+                Cancel
+              </button>
               <button className="btn-save" onClick={handleSubmit}>
                 {modalMode === "add" ? "Add Unit" : "Save Changes"}
               </button>
@@ -1007,25 +1146,24 @@ const handleVehicleTypeChange = (e) => {
         </div>
       )}
 
-      
-{deleteTarget && (
-  <DeleteConfirmDialog
-    itemName={deleteTarget.name}
-    onConfirm={handleDelete}
-    onCancel={() => setDeleteTarget(null)}
-  />
-)}
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          itemName={deleteTarget.name}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
       <LoadingModal isOpen={loading} message="Loading dashboard..." />
-<LoadingModal
-  isOpen={submitLoading}
-  message={
-    loadingAction === "add"
-      ? "Adding mobile unit..."
-      : loadingAction === "edit"
-        ? "Saving changes..."
-        : "Deleting mobile unit..."
-  }
-/>
+      <LoadingModal
+        isOpen={submitLoading}
+        message={
+          loadingAction === "add"
+            ? "Adding mobile unit..."
+            : loadingAction === "edit"
+              ? "Saving changes..."
+              : "Deleting mobile unit..."
+        }
+      />
 
       {notif && (
         <Notification

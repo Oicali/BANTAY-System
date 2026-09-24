@@ -38,10 +38,11 @@ const labelLayer = {
 };
 
 // ── Helpers ───────────────────────────────────────────────
-const token = () => sessionStorage.getItem("token");
+const token = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 const getMyUserId = () => {
-  const raw = sessionStorage.getItem("token");
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -53,7 +54,7 @@ const getMyUserId = () => {
 };
 
 const getMyRole = () => {
-  const raw = sessionStorage.getItem("token");
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -249,8 +250,6 @@ const OngoingShiftCard = ({ patrol, geoJSONData, myShifts, isUpcoming }) => {
             </div>
           </div>
         </div>
-
-        
       </div>
 
       {/* Card body: map + schedule */}

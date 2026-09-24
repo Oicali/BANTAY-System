@@ -3,7 +3,13 @@
 import React, { useState, useEffect } from "react";
 import "./RemindPatrolModal.css";
 
-const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind }) => {
+const RemindPatrolModal = ({
+  isOpen,
+  onClose,
+  blotterId,
+  blotterNumber,
+  onRemind,
+}) => {
   const [patrols, setPatrols] = useState([]);
   const [selectedPatrols, setSelectedPatrols] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,29 +24,33 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
     }
   }, [isOpen]);
 
- const fetchPatrols = async () => {
-  setLoading(true);
-  try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/blotters/patrols`, {
-      headers: {
-        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-      },
-    });
-    const data = await response.json();
-    if (data.success) {
-      setPatrols(data.data);
+  const fetchPatrols = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters/patrols`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
+        },
+      );
+      const data = await response.json();
+      if (data.success) {
+        setPatrols(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching patrols:", error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("Error fetching patrols:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const filteredPatrols = patrols.filter((patrol) => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return true;
-    const fullName = `${patrol.first_name || ""} ${patrol.last_name || ""}`.toLowerCase();
+    const fullName =
+      `${patrol.first_name || ""} ${patrol.last_name || ""}`.toLowerCase();
     const rank = (patrol.rank_abbreviation || "").toLowerCase();
     return fullName.includes(term) || rank.includes(term);
   });
@@ -49,16 +59,16 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
     if (selectAll) {
       setSelectedPatrols([]);
     } else {
-      setSelectedPatrols(filteredPatrols.map(p => p.user_id));
+      setSelectedPatrols(filteredPatrols.map((p) => p.user_id));
     }
     setSelectAll(!selectAll);
   };
 
   const handleTogglePatrol = (userId) => {
-    setSelectedPatrols(prev =>
+    setSelectedPatrols((prev) =>
       prev.includes(userId)
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
     );
   };
 
@@ -70,14 +80,17 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
 
     setSubmitting(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/blotters/${blotterId}/remind`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/blotters/${blotterId}/remind`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ patrol_ids: selectedPatrols }),
         },
-        body: JSON.stringify({ patrol_ids: selectedPatrols }),
-      });
+      );
       const data = await response.json();
       if (data.success) {
         onRemind?.(selectedPatrols.length);
@@ -97,19 +110,35 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container remind-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-container remind-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <div className="modal-header-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <path d="M12 6v6l4 2" />
             </svg>
           </div>
           <div className="modal-header-text">
             <h3>Remind Patrol Officers</h3>
-            <p>Select patrol officers to remind about referral #{blotterNumber}</p>
+            <p>
+              Select patrol officers to remind about referral #{blotterNumber}
+            </p>
           </div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
@@ -117,7 +146,14 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
             <div className="remind-loading">Loading patrol officers...</div>
           ) : patrols.length === 0 ? (
             <div className="remind-empty">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9ca3af"
+                strokeWidth="1.5"
+              >
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -128,7 +164,17 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
           ) : (
             <>
               <div className="remind-search-wrap">
-                <svg className="remind-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  className="remind-search-icon"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.3-4.3" />
                 </svg>
@@ -160,14 +206,18 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
                   />
                   <span>Select All Patrol Officers</span>
                 </label>
-                <span className="remind-count">{selectedPatrols.length} selected</span>
+                <span className="remind-count">
+                  {selectedPatrols.length} selected
+                </span>
               </div>
 
               <div className="remind-patrol-list">
                 {filteredPatrols.length === 0 ? (
-                  <div className="remind-no-results">No patrol officers match "{searchTerm}"</div>
+                  <div className="remind-no-results">
+                    No patrol officers match "{searchTerm}"
+                  </div>
                 ) : (
-                  filteredPatrols.map(patrol => (
+                  filteredPatrols.map((patrol) => (
                     <label key={patrol.user_id} className="remind-patrol-item">
                       <input
                         type="checkbox"
@@ -178,15 +228,21 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
                         {patrol.profile_picture ? (
                           <img src={patrol.profile_picture} alt="" />
                         ) : (
-                          <span>{patrol.first_name?.[0]}{patrol.last_name?.[0]}</span>
+                          <span>
+                            {patrol.first_name?.[0]}
+                            {patrol.last_name?.[0]}
+                          </span>
                         )}
                       </div>
                       <div className="remind-patrol-info">
                         <div className="remind-patrol-name">
-                          {patrol.rank_abbreviation && `${patrol.rank_abbreviation}. `}
+                          {patrol.rank_abbreviation &&
+                            `${patrol.rank_abbreviation}. `}
                           {patrol.first_name} {patrol.last_name}
                         </div>
-                        <div className="remind-patrol-email">{patrol.email}</div>
+                        <div className="remind-patrol-email">
+                          {patrol.email}
+                        </div>
                       </div>
                     </label>
                   ))
@@ -205,7 +261,9 @@ const RemindPatrolModal = ({ isOpen, onClose, blotterId, blotterNumber, onRemind
             onClick={handleSubmit}
             disabled={submitting || selectedPatrols.length === 0}
           >
-            {submitting ? "Sending..." : `Send Reminder (${selectedPatrols.length})`}
+            {submitting
+              ? "Sending..."
+              : `Send Reminder (${selectedPatrols.length})`}
           </button>
         </div>
       </div>

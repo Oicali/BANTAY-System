@@ -10,7 +10,6 @@ import PdfPreviewModal from "../modals/PdfPreviewModal";
 import DeletedSchedulesModal from "../modals/DeletedSchedulesModal";
 import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
 
-
 const API_BASE = import.meta.env.VITE_API_URL;
 
 const PATROLS_PER_PAGE = 15;
@@ -107,11 +106,12 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 };
 
 const PatrolScheduling = () => {
-  const token = () => sessionStorage.getItem("token");
+  const token = () =>
+    localStorage.getItem("token") || sessionStorage.getItem("token");
   const [isAdmin] = useState(
     () =>
-      sessionStorage.getItem("role") === "Administrator" ||
-      sessionStorage.getItem("role") === "Technical Administrator",
+      getUserFromToken()?.role === "Administrator" ||
+      getUserFromToken()?.role === "Technical Administrator",
   );
 
   const [patrols, setPatrols] = useState([]);
@@ -129,18 +129,17 @@ const PatrolScheduling = () => {
   const [barangayFilters, setBarangayFilters] = useState([]);
   const [barangaySearch, setBrgySearch] = useState("");
 
-
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
   // Applied filter values (only change on Apply click)
   const [appliedFilters, setAppliedFilters] = useState({
-  search: "",
-  status: "all",
-  dateFrom: "",
-  dateTo: "",
-  barangay: "",
-});
+    search: "",
+    status: "all",
+    dateFrom: "",
+    dateTo: "",
+    barangay: "",
+  });
 
   // Hover popups
   const [patrollerAnchor, setPatrollerAnchor] = useState(null);
@@ -156,9 +155,9 @@ const PatrolScheduling = () => {
   const [beatCardPatrol, setBeatCardPatrol] = useState(null);
 
   const [showDeletedModal, setShowDeletedModal] = useState(false);
-const [deletedPatrols, setDeletedPatrols] = useState([]);
-const [deletedLoading, setDeletedLoading] = useState(false);
-const [restoringId, setRestoringId] = useState(null);
+  const [deletedPatrols, setDeletedPatrols] = useState([]);
+  const [deletedLoading, setDeletedLoading] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
 
   // PDF list preview state
   const [listPdfPreview, setListPdfPreview] = useState(null);
@@ -205,45 +204,51 @@ const [restoringId, setRestoringId] = useState(null);
   };
 
   const fetchDeletedPatrols = async () => {
-  setDeletedLoading(true);
-  try {
-    const res = await fetch(`${API_BASE}/patrol/patrols/deleted`, {
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const data = await res.json();
-    if (data.success) setDeletedPatrols(data.data);
-  } catch (err) {
-    console.error("Deleted patrols error:", err);
-  } finally {
-    setDeletedLoading(false);
-  }
-};
-
-const openDeletedModal = () => {
-  setShowDeletedModal(true);
-  fetchDeletedPatrols();
-};
-
-const handleRestore = async (id) => {
-  setRestoringId(id);
-  try {
-    const res = await fetch(`${API_BASE}/patrol/patrols/${id}/restore`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token()}` },
-    });
-    const data = await res.json();
-    if (data.success) {
-      await Promise.all([fetchDeletedPatrols(), fetchPatrols()]);
-      setNotif({ message: "Schedule restored successfully.", type: "success" });
-    } else {
-      setNotif({ message: data.message || "Something went wrong.", type: "error" });
+    setDeletedLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/patrol/patrols/deleted`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      if (data.success) setDeletedPatrols(data.data);
+    } catch (err) {
+      console.error("Deleted patrols error:", err);
+    } finally {
+      setDeletedLoading(false);
     }
-  } catch (err) {
-    setNotif({ message: "Server error.", type: "error" });
-  } finally {
-    setRestoringId(null);
-  }
-};
+  };
+
+  const openDeletedModal = () => {
+    setShowDeletedModal(true);
+    fetchDeletedPatrols();
+  };
+
+  const handleRestore = async (id) => {
+    setRestoringId(id);
+    try {
+      const res = await fetch(`${API_BASE}/patrol/patrols/${id}/restore`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchDeletedPatrols(), fetchPatrols()]);
+        setNotif({
+          message: "Schedule restored successfully.",
+          type: "success",
+        });
+      } else {
+        setNotif({
+          message: data.message || "Something went wrong.",
+          type: "error",
+        });
+      }
+    } catch (err) {
+      setNotif({ message: "Server error.", type: "error" });
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   useEffect(() => {
     fetchPatrols();
@@ -358,44 +363,45 @@ const handleRestore = async (id) => {
   ];
 
   const handleApply = () => {
-  setAppliedFilters({
-    search,
-    status: statusFilter,
-    dateFrom,
-    dateTo,
-    barangay: barangaySearch,
-  });
-  setFiltersApplied(
-    search !== "" ||
-      statusFilter !== "all" ||
-      dateFrom !== "" ||
-      dateTo !== "" ||
-      barangaySearch !== "",
-  );
-  setCurrentPage(1);
-};
+    setAppliedFilters({
+      search,
+      status: statusFilter,
+      dateFrom,
+      dateTo,
+      barangay: barangaySearch,
+    });
+    setFiltersApplied(
+      search !== "" ||
+        statusFilter !== "all" ||
+        dateFrom !== "" ||
+        dateTo !== "" ||
+        barangaySearch !== "",
+    );
+    setCurrentPage(1);
+  };
 
   const handleReset = () => {
-  setSearch("");
-  setStatus("all");
-  setDateFrom("");
-  setDateTo("");
-  setBrgySearch("");
-  setAppliedFilters({
-    search: "",
-    status: "all",
-    dateFrom: "",
-    dateTo: "",
-    barangay: "",
-  });
-  setFiltersApplied(false);
-  setCurrentPage(1);
-};
+    setSearch("");
+    setStatus("all");
+    setDateFrom("");
+    setDateTo("");
+    setBrgySearch("");
+    setAppliedFilters({
+      search: "",
+      status: "all",
+      dateFrom: "",
+      dateTo: "",
+      barangay: "",
+    });
+    setFiltersApplied(false);
+    setCurrentPage(1);
+  };
 
   const handleExportListClick = async () => {
     if (isExporting) return;
     try {
-      const authToken = sessionStorage.getItem("token");
+      const authToken =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const response = await fetch(`${API_BASE}/patrol/export/list`, {
         method: "POST",
         headers: {
@@ -430,10 +436,13 @@ const handleRestore = async (id) => {
     }
   };
 
- 
-
   const matchesNonStatusFilters = (p) => {
-    const { search: s, dateFrom: df, dateTo: dt, barangay: bg } = appliedFilters;
+    const {
+      search: s,
+      dateFrom: df,
+      dateTo: dt,
+      barangay: bg,
+    } = appliedFilters;
 
     if (
       s &&
@@ -504,9 +513,14 @@ const handleRestore = async (id) => {
 
   const counts = {
     all: baseFilteredPatrols.length,
-    active: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "active").length,
-    upcoming: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "upcoming").length,
-    completed: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "completed").length,
+    active: baseFilteredPatrols.filter((p) => getPatrolStatus(p) === "active")
+      .length,
+    upcoming: baseFilteredPatrols.filter(
+      (p) => getPatrolStatus(p) === "upcoming",
+    ).length,
+    completed: baseFilteredPatrols.filter(
+      (p) => getPatrolStatus(p) === "completed",
+    ).length,
   };
 
   const statusConfig = {
@@ -571,7 +585,6 @@ const handleRestore = async (id) => {
                   Export PDF
                 </>
               )}
-             
             </button>
             {isAdmin && (
               <button
@@ -691,16 +704,16 @@ const handleRestore = async (id) => {
             />
           </div>
 
-        <input
-  className="psch-filter-select"
-  type="text"
-  placeholder="Filter by barangay..."
-  value={barangaySearch}
-  onChange={(e) => setBrgySearch(e.target.value)}
-  onKeyDown={(e) => e.key === "Enter" && handleApply()}
-  style={{ flex: 1, minWidth: 140 }}
-/>
-                
+          <input
+            className="psch-filter-select"
+            type="text"
+            placeholder="Filter by barangay..."
+            value={barangaySearch}
+            onChange={(e) => setBrgySearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleApply()}
+            style={{ flex: 1, minWidth: 140 }}
+          />
+
           <button className="psch-filter-apply" onClick={handleApply}>
             Apply Filters
           </button>
@@ -770,13 +783,18 @@ const handleRestore = async (id) => {
 
                         <td>
                           <span className="psch-unit-text">
-  {patrol.mobile_unit_name
-    ? patrol.mobile_unit_name
-    : patrol.deleted_unit_name
-      ? <span className="unassigned-badge">Unit Removed ({patrol.deleted_unit_name})</span>
-      : <span className="unassigned-badge">Unit Removed</span>
-  }
-</span>
+                            {patrol.mobile_unit_name ? (
+                              patrol.mobile_unit_name
+                            ) : patrol.deleted_unit_name ? (
+                              <span className="unassigned-badge">
+                                Unit Removed ({patrol.deleted_unit_name})
+                              </span>
+                            ) : (
+                              <span className="unassigned-badge">
+                                Unit Removed
+                              </span>
+                            )}
+                          </span>
                         </td>
 
                         <td>

@@ -153,13 +153,15 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     }
 
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await res.json();
       if (d.blocked) {
-        const until = Date.now() + (d.msLeft ?? (d.hoursLeft ?? 24) * 3_600_000);
+        const until =
+          Date.now() + (d.msLeft ?? (d.hoursLeft ?? 24) * 3_600_000);
         setRateLimitHours(d.hoursLeft ?? null);
         setBlockedUntilTs(until);
         setBlockedCountdown(fmtCountdown(until - Date.now()));
@@ -179,7 +181,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
         setPwLockedCountdown(fmtCountdown(until - Date.now()));
         writeLock(LOCK_KEYS.pw, until);
         setStep("pw-locked");
-      
       } else {
         setStep("verify-current");
         setTimeout(() => currentPwRef.current?.focus(), 120);
@@ -228,7 +229,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     }
     return () => {
       clearInterval(otpRef.current);
-      
     };
   }, [isOpen, checkStatus]);
 
@@ -249,7 +249,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
             "cpm_session_locked",
             JSON.stringify({ until: lockUntil }),
           );
-          const token = sessionStorage.getItem("token");
+          const token =
+            localStorage.getItem("token") || sessionStorage.getItem("token");
           fetch(`${API_URL}/users/password/force-lock`, {
             method: "POST",
             headers: {
@@ -325,7 +326,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setIsVerifying(true);
     setCurrentPwError("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/verify-current`, {
         method: "POST",
         headers: {
@@ -397,7 +399,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setPasswordErrors({});
     setRateLimitMsg("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: {
@@ -468,7 +471,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpLoading(true);
     setOtpError("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/verify-otp`, {
         method: "POST",
         headers: {
@@ -529,7 +533,8 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, onError }) => {
     setOtpBoxes(["", "", "", "", "", ""]);
     setIsSubmitting(true);
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/password/request-otp`, {
         method: "POST",
         headers: {

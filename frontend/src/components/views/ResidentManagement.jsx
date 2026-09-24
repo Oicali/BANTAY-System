@@ -145,7 +145,9 @@ function ResidentManagement() {
   // Fetch barangay name from profile
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/users/profile`, {
-      headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+      },
     })
       .then((r) => r.json())
       .then((data) => {
@@ -168,7 +170,9 @@ function ResidentManagement() {
     setLoadingRemoved(true);
     try {
       const res = await fetch(`${API_URL}/removed`, {
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       const data = await res.json();
       if (data.success) setRemovedResidents(data.data);
@@ -194,7 +198,9 @@ function ResidentManagement() {
         params.append("voter_status", appliedFilters.voterStatus);
 
       const res = await fetch(`${API_URL}?${params}`, {
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       const data = await res.json();
       if (data.success) {
@@ -211,7 +217,9 @@ function ResidentManagement() {
     try {
       const res = await fetch(`${API_URL}/${id}/restore`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       const data = await res.json();
       if (data.success) {
@@ -232,7 +240,9 @@ function ResidentManagement() {
     try {
       const res = await fetch(`${API_URL}/${confirmDelete.id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       const data = await res.json();
       if (data.success) {

@@ -457,7 +457,8 @@ const EditPatrolModal = ({
   onClose,
   onSave,
 }) => {
-  const token = () => sessionStorage.getItem("token");
+  const token = () =>
+    localStorage.getItem("token") || sessionStorage.getItem("token");
   const mapRef = useRef(null);
   const deletedRouteIds = useRef(new Set());
   const tasksDirty = useRef(false);

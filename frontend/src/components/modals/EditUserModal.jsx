@@ -128,7 +128,9 @@ const EditUserModal = ({
     const fetchRoles = async () => {
       try {
         const res = await fetch(`${API_URL}/user-management/roles`, {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -147,7 +149,9 @@ const EditUserModal = ({
       try {
         setLoadingRanks(true);
         const res = await fetch(`${API_URL}/user-management/ranks`, {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
         });
         if (res.ok) {
           const data = await res.json();
@@ -350,7 +354,9 @@ const EditUserModal = ({
 
       const res = await fetch(endpoint, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       const data = await res.json();
 
@@ -379,7 +385,7 @@ const EditUserModal = ({
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
           },
         },
       );
@@ -716,7 +722,7 @@ const EditUserModal = ({
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+              Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
             },
             body: picFd,
           },
@@ -791,7 +797,9 @@ const EditUserModal = ({
         `${API_URL}/user-management/users/${user.user_id}`,
         {
           method: "PUT",
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
           body: fd,
         },
       );

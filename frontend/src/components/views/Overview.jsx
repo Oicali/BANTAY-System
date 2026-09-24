@@ -21,7 +21,8 @@ import CrimeMapping from "./CrimeMapping";
 import "./Overview.css";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 const INDEX_CRIMES = [
   "MURDER",

@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Lock, Camera, ChevronDown, ChevronLeft, ChevronRight, Monitor, Smartphone, LogOut, ShieldAlert } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Camera,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Monitor,
+  Smartphone,
+  LogOut,
+  ShieldAlert,
+} from "lucide-react";
 import { logout, getUserFromToken } from "../../utils/auth";
 import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
@@ -432,7 +444,8 @@ export default function ProfileSettings() {
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setLoading(false);
         return;
@@ -486,7 +499,8 @@ export default function ProfileSettings() {
     try {
       setSessionsLoading(true);
       setSessionsError("");
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) return;
       const res = await fetch(`${API_URL}/users/sessions`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -513,7 +527,8 @@ export default function ProfileSettings() {
     setRevokingSessionId(tokenId);
     setSessionsError("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/sessions/${tokenId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -540,7 +555,8 @@ export default function ProfileSettings() {
     setRevokingAll(true);
     setSessionsError("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/sessions/all-except-current`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -629,10 +645,14 @@ export default function ProfileSettings() {
     setHistoryError("");
     setDeviceHistory([]);
     try {
-      const token = sessionStorage.getItem("token");
-      const res = await fetch(`${API_URL}/users/sessions/${session.token_id}/history`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/users/sessions/${session.token_id}/history`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const d = await res.json();
       if (d.success) setDeviceHistory(d.history || []);
       else setHistoryError(d.message || "Failed to load login history");
@@ -654,7 +674,8 @@ export default function ProfileSettings() {
   const silentRefresh = useCallback(async () => {
     if (isEditingRef.current) return;
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) return;
       const res = await fetch(`${API_URL}/users/profile`, {
         headers: {
@@ -826,7 +847,8 @@ export default function ProfileSettings() {
     setIsUploadingPhoto(true);
     setErrorMessage("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const fd = new FormData();
       fd.append("profilePicture", croppedFile);
       const res = await fetch(`${API_URL}/users/profile/picture`, {
@@ -953,7 +975,8 @@ export default function ProfileSettings() {
     if (!clean.startsWith("9")) return `${fieldName} must start with 9`;
     if (origPhone && clean === origPhone.replace(/\D/g, "")) return null;
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/check-phone`, {
         method: "POST",
         headers: {
@@ -1075,19 +1098,19 @@ export default function ProfileSettings() {
     setSuccessMessage("");
     setErrorMessage("");
   };
-const handlePhoneInput = (e) => {
-  const { name, value } = e.target;
-  const digits = value.replace(/\D/g, "").slice(0, 10);
-  setFormData((p) => ({ ...p, [name]: digits }));
-  if (name === "phone") setPhoneChanged(true);
-  if (name === "alternate_phone") setAltPhoneChanged(true);
-  if (validationErrors[name])
-    setValidationErrors((p) => {
-      const n = { ...p };
-      delete n[name];
-      return n;
-    });
-};
+  const handlePhoneInput = (e) => {
+    const { name, value } = e.target;
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    setFormData((p) => ({ ...p, [name]: digits }));
+    if (name === "phone") setPhoneChanged(true);
+    if (name === "alternate_phone") setAltPhoneChanged(true);
+    if (validationErrors[name])
+      setValidationErrors((p) => {
+        const n = { ...p };
+        delete n[name];
+        return n;
+      });
+  };
   const handleRegionChange = (e) => {
     const code = e.target.value;
     setFormData((p) => ({
@@ -1185,7 +1208,8 @@ const handlePhoneInput = (e) => {
           setEmailSessionLockedCountdown(fmtCountdown(lockUntil - Date.now()));
           writeEmailLock(EMAIL_LOCK_KEYS.session, lockUntil);
           // FIX: Persist lock to backend so it survives logout/re-login
-          const token = sessionStorage.getItem("token");
+          const token =
+            localStorage.getItem("token") || sessionStorage.getItem("token");
           fetch(`${API_URL}/users/email/force-lock`, {
             method: "POST",
             headers: {
@@ -1286,7 +1310,8 @@ const handlePhoneInput = (e) => {
     // The in-memory session store on the backend survives logout/re-login
     // because it is keyed by userId, not by browser session.
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1379,7 +1404,8 @@ const handlePhoneInput = (e) => {
     setEmailModalErr("");
     setEmailPasswordErr("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-password`, {
         method: "POST",
         headers: {
@@ -1442,7 +1468,8 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/request-old-otp`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -1500,7 +1527,8 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-old-otp`, {
         method: "POST",
         headers: {
@@ -1565,7 +1593,8 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/request-new-otp`, {
         method: "POST",
         headers: {
@@ -1628,7 +1657,8 @@ const handlePhoneInput = (e) => {
     setEmailModalLoading(true);
     setEmailModalErr("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       const res = await fetch(`${API_URL}/users/email/verify-new-otp`, {
         method: "POST",
         headers: {
@@ -1699,7 +1729,8 @@ const handlePhoneInput = (e) => {
     setSuccessMessage("");
     setErrorMessage("");
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setErrorMessage("Authentication token not found.");
         setIsSaving(false);
@@ -2590,7 +2621,11 @@ const handlePhoneInput = (e) => {
           <div className="la-modal" onClick={(e) => e.stopPropagation()}>
             <div className="la-header">
               {sessionsView === "detail" ? (
-                <button className="la-back-btn" onClick={backToDeviceList} aria-label="Back">
+                <button
+                  className="la-back-btn"
+                  onClick={backToDeviceList}
+                  aria-label="Back"
+                >
                   <ChevronLeft size={20} />
                 </button>
               ) : (
@@ -2604,7 +2639,13 @@ const handlePhoneInput = (e) => {
                     : `Logins on ${selectedDevice ? parseDeviceLabel(selectedDevice) : "device"}`}
                 </h2>
               </div>
-              <button className="la-close-btn" onClick={closeSessionsModal} aria-label="Close">✕</button>
+              <button
+                className="la-close-btn"
+                onClick={closeSessionsModal}
+                aria-label="Close"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="la-body">
@@ -2621,48 +2662,80 @@ const handlePhoneInput = (e) => {
                     <p className="ps-sessions-empty">Loading sessions…</p>
                   ) : (
                     <>
-                      {sessions.filter((s) => s.is_current).map((s) => (
-                        <React.Fragment key={s.token_id}>
-                          <p className="la-section-label">You're currently logged in on this device:</p>
-                          <button
-                            className="la-device-row la-device-row-current"
-                            onClick={() => openDeviceDetail(s)}
-                          >
-                            <div className="ps-session-icon">
-                              {s.device_type === "mobile" ? <Smartphone size={20} /> : <Monitor size={20} />}
-                            </div>
-                            <div className="la-device-info">
-                              <span className="la-device-name">{parseDeviceLabel(s)}</span>
-                              <span className="la-device-loc">{s.location_label || s.ip_address || ""}</span>
-                              <span className="la-device-current">This device</span>
-                            </div>
-                            <ChevronRight size={16} className="la-chevron" />
-                          </button>
-                        </React.Fragment>
-                      ))}
-
-                      {sessions.filter((s) => !s.is_current).length > 0 && (
-                        <>
-                          <p className="la-section-label" style={{ marginTop: "18px" }}>
-                            Logins on other devices:
-                          </p>
-                          {sessions.filter((s) => !s.is_current).map((s) => (
+                      {sessions
+                        .filter((s) => s.is_current)
+                        .map((s) => (
+                          <React.Fragment key={s.token_id}>
+                            <p className="la-section-label">
+                              You're currently logged in on this device:
+                            </p>
                             <button
-                              key={s.token_id}
-                              className="la-device-row"
+                              className="la-device-row la-device-row-current"
                               onClick={() => openDeviceDetail(s)}
                             >
                               <div className="ps-session-icon">
-                                {s.device_type === "mobile" ? <Smartphone size={20} /> : <Monitor size={20} />}
+                                {s.device_type === "mobile" ? (
+                                  <Smartphone size={20} />
+                                ) : (
+                                  <Monitor size={20} />
+                                )}
                               </div>
                               <div className="la-device-info">
-                                <span className="la-device-name">{parseDeviceLabel(s)}</span>
-                                <span className="la-device-loc">{s.location_label || s.ip_address || ""}</span>
-                                <span className="la-device-time">{formatSessionTime(s.last_active_at)}</span>
+                                <span className="la-device-name">
+                                  {parseDeviceLabel(s)}
+                                </span>
+                                <span className="la-device-loc">
+                                  {s.location_label || s.ip_address || ""}
+                                </span>
+                                <span className="la-device-current">
+                                  This device
+                                </span>
                               </div>
                               <ChevronRight size={16} className="la-chevron" />
                             </button>
-                          ))}
+                          </React.Fragment>
+                        ))}
+
+                      {sessions.filter((s) => !s.is_current).length > 0 && (
+                        <>
+                          <p
+                            className="la-section-label"
+                            style={{ marginTop: "18px" }}
+                          >
+                            Logins on other devices:
+                          </p>
+                          {sessions
+                            .filter((s) => !s.is_current)
+                            .map((s) => (
+                              <button
+                                key={s.token_id}
+                                className="la-device-row"
+                                onClick={() => openDeviceDetail(s)}
+                              >
+                                <div className="ps-session-icon">
+                                  {s.device_type === "mobile" ? (
+                                    <Smartphone size={20} />
+                                  ) : (
+                                    <Monitor size={20} />
+                                  )}
+                                </div>
+                                <div className="la-device-info">
+                                  <span className="la-device-name">
+                                    {parseDeviceLabel(s)}
+                                  </span>
+                                  <span className="la-device-loc">
+                                    {s.location_label || s.ip_address || ""}
+                                  </span>
+                                  <span className="la-device-time">
+                                    {formatSessionTime(s.last_active_at)}
+                                  </span>
+                                </div>
+                                <ChevronRight
+                                  size={16}
+                                  className="la-chevron"
+                                />
+                              </button>
+                            ))}
                           <button
                             type="button"
                             className="la-logout-all-link"
@@ -2674,7 +2747,9 @@ const handlePhoneInput = (e) => {
                       )}
 
                       {sessions.length === 0 && (
-                        <p className="ps-sessions-empty">No active sessions found.</p>
+                        <p className="ps-sessions-empty">
+                          No active sessions found.
+                        </p>
                       )}
                     </>
                   )}
@@ -2686,7 +2761,9 @@ const handlePhoneInput = (e) => {
                 <>
                   <div className="la-detail-card">
                     <span className="la-device-name">
-                      {selectedDevice.location_label || selectedDevice.ip_address || "Unknown location"}
+                      {selectedDevice.location_label ||
+                        selectedDevice.ip_address ||
+                        "Unknown location"}
                     </span>
                     <span className="la-device-loc">
                       {selectedDevice.is_current
@@ -2697,15 +2774,21 @@ const handlePhoneInput = (e) => {
                       <button
                         type="button"
                         className="la-logout-btn"
-                        onClick={() => handleRevokeSession(selectedDevice.token_id)}
+                        onClick={() =>
+                          handleRevokeSession(selectedDevice.token_id)
+                        }
                         disabled={revokingSessionId === selectedDevice.token_id}
                       >
-                        {revokingSessionId === selectedDevice.token_id ? "Logging out…" : "Log Out"}
+                        {revokingSessionId === selectedDevice.token_id
+                          ? "Logging out…"
+                          : "Log Out"}
                       </button>
                     )}
                   </div>
 
-                  <p className="la-section-label" style={{ marginTop: "18px" }}>Recent logins</p>
+                  <p className="la-section-label" style={{ marginTop: "18px" }}>
+                    Recent logins
+                  </p>
                   {historyLoading ? (
                     <p className="ps-sessions-empty">Loading history…</p>
                   ) : historyError ? (
@@ -2714,15 +2797,21 @@ const handlePhoneInput = (e) => {
                       {historyError}
                     </div>
                   ) : deviceHistory.length === 0 ? (
-                    <p className="ps-sessions-empty">No login history found for this device.</p>
+                    <p className="ps-sessions-empty">
+                      No login history found for this device.
+                    </p>
                   ) : (
                     <div className="la-history-list">
                       {deviceHistory.map((h, i) => (
                         <div className="la-history-row" key={i}>
                           <span className="la-device-name">
-                            {selectedDevice.location_label || h.ip_address || "Unknown location"}
+                            {selectedDevice.location_label ||
+                              h.ip_address ||
+                              "Unknown location"}
                           </span>
-                          <span className="la-device-loc">{formatFullTimestamp(h.created_at)}</span>
+                          <span className="la-device-loc">
+                            {formatFullTimestamp(h.created_at)}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -2736,7 +2825,10 @@ const handlePhoneInput = (e) => {
 
       {/* ── Confirm: Log out all other devices ──────────────────────────── */}
       {confirmRevokeAll && (
-        <div className="em-overlay" onClick={() => !revokingAll && setConfirmRevokeAll(false)}>
+        <div
+          className="em-overlay"
+          onClick={() => !revokingAll && setConfirmRevokeAll(false)}
+        >
           <div
             className="em-modal"
             style={{ maxWidth: "420px" }}
@@ -2748,7 +2840,10 @@ const handlePhoneInput = (e) => {
               </div>
               <div className="em-header-text">
                 <h2>Log Out All Other Devices?</h2>
-                <p>This device stays signed in; every other session ends immediately.</p>
+                <p>
+                  This device stays signed in; every other session ends
+                  immediately.
+                </p>
               </div>
               <button
                 className="em-close"

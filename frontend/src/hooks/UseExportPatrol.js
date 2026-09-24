@@ -7,7 +7,7 @@
 import { useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_URL;
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () => (localStorage.getItem("token") || sessionStorage.getItem("token"));
 
 async function downloadPdf(response, filename) {
   if (!response.ok) {

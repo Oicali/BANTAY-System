@@ -288,22 +288,27 @@ const ExportPreviewModal = ({ preview, onDownload, onClose, formatDate }) => {
                     zIndex: 1,
                   }}
                 >
-                  {["User", "Event", "Description", "Status", "IP", "Timestamp"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: "left",
-                          padding: "10px 14px",
-                          borderBottom: "1px solid #e5e7eb",
-                          color: "#475569",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  {[
+                    "User",
+                    "Event",
+                    "Description",
+                    "Status",
+                    "IP",
+                    "Timestamp",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 14px",
+                        borderBottom: "1px solid #e5e7eb",
+                        color: "#475569",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -311,14 +316,21 @@ const ExportPreviewModal = ({ preview, onDownload, onClose, formatDate }) => {
                   <tr>
                     <td
                       colSpan={6}
-                      style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}
+                      style={{
+                        padding: 40,
+                        textAlign: "center",
+                        color: "#94a3b8",
+                      }}
                     >
                       No records to export.
                     </td>
                   </tr>
                 ) : (
                   previewRows.map((r) => (
-                    <tr key={r.log_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <tr
+                      key={r.log_id}
+                      style={{ borderBottom: "1px solid #f1f5f9" }}
+                    >
                       <td style={{ padding: "9px 14px" }}>
                         {r.display_name || r.username || "—"}
                       </td>
@@ -337,14 +349,17 @@ const ExportPreviewModal = ({ preview, onDownload, onClose, formatDate }) => {
                       <td style={{ padding: "9px 14px" }}>
                         <span
                           style={{
-                            color: r.status === "success" ? "#15803d" : "#b91c1c",
+                            color:
+                              r.status === "success" ? "#15803d" : "#b91c1c",
                             fontWeight: 600,
                           }}
                         >
                           {r.status}
                         </span>
                       </td>
-                      <td style={{ padding: "9px 14px" }}>{r.ip_address || "—"}</td>
+                      <td style={{ padding: "9px 14px" }}>
+                        {r.ip_address || "—"}
+                      </td>
                       <td style={{ padding: "9px 14px" }}>
                         {formatDate(r.created_at)}
                       </td>
@@ -423,7 +438,8 @@ const AuditLog = () => {
     async (page = 1) => {
       try {
         setLoading(true);
-        const token = sessionStorage.getItem("token");
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
         const params = new URLSearchParams();
         params.set("page", page);
         params.set("limit", ITEMS_PER_PAGE);
@@ -501,7 +517,8 @@ const AuditLog = () => {
   const handleExportCSV = async () => {
     setIsExporting(true);
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       let all = [];
       let page = 1;
       const limit = 100; // backend max
@@ -704,7 +721,9 @@ const AuditLog = () => {
               onChange={(e) => {
                 const from = e.target.value;
                 let autoTo =
-                  draft.dateTo && draft.dateTo > from ? draft.dateTo : getToday();
+                  draft.dateTo && draft.dateTo > from
+                    ? draft.dateTo
+                    : getToday();
                 // clamp autoTo so range never exceeds 364 days
                 const maxAllowedTo = addDays(from, 364);
                 if (autoTo > maxAllowedTo) autoTo = maxAllowedTo;
@@ -739,7 +758,9 @@ const AuditLog = () => {
                 const rangeMax = addDays(draft.dateFrom, 364);
                 return rangeMax < today ? rangeMax : today;
               })()}
-              onChange={(e) => setDraft((f) => ({ ...f, dateTo: e.target.value }))}
+              onChange={(e) =>
+                setDraft((f) => ({ ...f, dateTo: e.target.value }))
+              }
               onKeyDown={(e) => e.preventDefault()}
               onPaste={(e) => e.preventDefault()}
               onClick={(e) => {

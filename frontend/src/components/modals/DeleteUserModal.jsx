@@ -92,7 +92,8 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
 
     (async () => {
       try {
-        const token = sessionStorage.getItem("token");
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}/user-management/reauth-status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -162,7 +163,8 @@ const DeleteUserModal = ({ isOpen, onClose, user, onUserDeleted }) => {
     setAttemptsLeft(null);
 
     try {
-      const token = sessionStorage.getItem("token");
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
 
       if (!token) {
         setError("Authentication token not found. Please login again.");

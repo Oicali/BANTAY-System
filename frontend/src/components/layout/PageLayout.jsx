@@ -13,7 +13,7 @@ export default function PageLayout() {
     navItems.reduce((acc, group) => {
       acc[group.section] = true;
       return acc;
-    }, {})
+    }, {}),
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -25,13 +25,14 @@ export default function PageLayout() {
   };
 
   const handleLogout = async () => {
-    const token = sessionStorage.getItem("token");
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
 
     try {
       await fetch(`${API_URL}/auth/logout`, {
-        method:  "POST",
+        method: "POST",
         headers: {
-          Authorization:  `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });

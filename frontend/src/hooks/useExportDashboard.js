@@ -2,7 +2,7 @@ import { useState } from "react";
 import html2canvas from "html2canvas";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-dashboard`;
-const getToken = () => sessionStorage.getItem("token");
+const getToken = () => (localStorage.getItem("token") || sessionStorage.getItem("token"));
 
 async function captureElement(ref) {
   if (!ref?.current) return null;

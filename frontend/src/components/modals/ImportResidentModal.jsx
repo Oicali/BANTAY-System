@@ -117,7 +117,9 @@ function ImportResidentModal({ onClose, onSuccess }) {
         `${import.meta.env.VITE_API_URL}/residents/import`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+          },
           body: formData,
         },
       );

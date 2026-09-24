@@ -172,7 +172,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
     try {
       setLoadingRanks(true);
       const res = await fetch(`${API_URL}/user-management/ranks`, {
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -649,7 +651,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
 
       const response = await fetch(`${API_URL}/user-management/register`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
+        },
         body: submitData,
       });
 
@@ -665,7 +669,7 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
               {
                 method: "POST",
                 headers: {
-                  Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+                  Authorization: `Bearer ${localStorage.getItem("token") || sessionStorage.getItem("token")}`,
                 },
                 body: picFd,
               },

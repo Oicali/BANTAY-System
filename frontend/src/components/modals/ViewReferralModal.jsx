@@ -64,7 +64,9 @@ const formatDateTime = (dateString) => {
 
 const formatUploadedAt = (raw) => {
   if (!raw) return "";
-  const cleaned = String(raw).replace("Z", "").replace(/\+\d{2}:\d{2}$/, "");
+  const cleaned = String(raw)
+    .replace("Z", "")
+    .replace(/\+\d{2}:\d{2}$/, "");
   return new Date(cleaned).toLocaleString("en-PH", {
     month: "short",
     day: "numeric",
@@ -79,8 +81,9 @@ const formatUploadedAt = (raw) => {
 // actually asks for ("House / Street Address" field, plus the
 // barangay the report was filed under).
 const addressLine = (p, barangay) =>
-  [p.house_street, barangay].filter((v) => v && String(v).trim() !== "").join(", ") ||
-  "N/A";
+  [p.house_street, barangay]
+    .filter((v) => v && String(v).trim() !== "")
+    .join(", ") || "N/A";
 
 export default function ViewReferralModal({
   blotterId,
@@ -108,7 +111,8 @@ export default function ViewReferralModal({
       setLoading(true);
       setError(null);
       try {
-        const token = sessionStorage.getItem("token");
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
         const [detailRes, attRes] = await Promise.all([
           fetch(`${API_URL}/${blotterId}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -247,9 +251,7 @@ export default function ViewReferralModal({
                         </span>
                       </div>
                       <div className="vrfm-item">
-                        <span className="vrfm-label">
-                          Date & Time Reported
-                        </span>
+                        <span className="vrfm-label">Date & Time Reported</span>
                         <span className="vrfm-value">
                           {formatDateTime(detail.date_time_reported)}
                         </span>

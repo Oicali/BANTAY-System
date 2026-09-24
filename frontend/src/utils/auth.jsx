@@ -2,28 +2,18 @@
 export const API_URL = import.meta.env.VITE_API_URL;
 export const logout = async () => {
   try {
-    const token = sessionStorage.getItem("token");
-
+    const token = getToken();
     if (token) {
-      // Call backend logout to revoke token
       await fetch(`${API_URL}/auth/logout`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
     }
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
-    // Always clear local storage
     sessionStorage.removeItem("token");
-    sessionStorage.removeItem("role");
-    sessionStorage.removeItem("userType");
-    sessionStorage.removeItem("userId");
-    sessionStorage.removeItem("username");
-    sessionStorage.removeItem("profilePicture");
-
+    localStorage.removeItem("token");
     window.location.href = "/login";
   }
 };
@@ -37,7 +27,7 @@ export const logout = async () => {
 // ⚠️ WEAK SECURITY PRACTICE: Using window.location instead of React Router
 
 export const isAuthenticated = () => {
-  return !!sessionStorage.getItem("token");
+  return !!getToken();
 };
 
 // ✅ Check if user is logged in
@@ -51,7 +41,11 @@ export const isAuthenticated = () => {
 //    Better: Verify token with backend or check expiration
 
 export const getToken = () => {
-  return sessionStorage.getItem("token");
+  return (
+    localStorage.getItem("token") ||
+    localStorage.getItem("token") ||
+    sessionStorage.getItem("token")
+  );
 };
 
 // 🎫 Retrieve the JWT token
@@ -64,7 +58,7 @@ export const getToken = () => {
 //    })
 
 export const getUserFromToken = () => {
-  const token = sessionStorage.getItem("token");
+  const token = getToken();
   if (!token) return null;
 
   // 🎫 Extract user information from JWT token

@@ -84,7 +84,7 @@ const getPatrolDateRange = (startDate, endDate) => {
 };
 
 const getMyUserId = () => {
-  const raw = sessionStorage.getItem("token");
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const payload = raw.split(".")[1];
@@ -97,7 +97,7 @@ const getMyUserId = () => {
 };
 
 const getMyRole = () => {
-  const raw = sessionStorage.getItem("token");
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (!raw) return null;
   try {
     const b64 = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -156,7 +156,8 @@ const DEFAULT_TIMES = {
   "AM & PM": { timeFrom: "08:00", timeTo: "08:00" },
 };
 
-const token = () => sessionStorage.getItem("token");
+const token = () =>
+  localStorage.getItem("token") || sessionStorage.getItem("token");
 
 // ── Icons ──────────────────────────────────────────────────────────
 const ReportIcon = () => (

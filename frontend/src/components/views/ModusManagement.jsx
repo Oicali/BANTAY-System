@@ -104,7 +104,8 @@ function ModusManagement() {
   });
   const [currentPage, setCurrentPage] = useState(1);
 
-  const token = () => sessionStorage.getItem("token");
+  const token = () =>
+    localStorage.getItem("token") || sessionStorage.getItem("token");
 
   useEffect(() => {
     fetchModus();
