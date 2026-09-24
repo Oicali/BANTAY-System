@@ -1422,7 +1422,9 @@ function EBlotter() {
         // Fetch audit summary (created / last updated)
         try {
           const auRes = await fetch(`${API_URL}/${blotterId}/audit-summary`, {
-            headers: { Authorization: `Bearer ${sessionStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+            },
           });
           const auData = await auRes.json();
           setAuditSummary(auData.success ? auData.data : null);
@@ -3009,11 +3011,9 @@ function EBlotter() {
               strokeLinejoin="round"
               style={{ marginRight: "8px", verticalAlign: "middle" }}
             >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6" />
-              <path d="M14 11v6" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              <rect x="2" y="4" width="20" height="5" rx="1" />
+              <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+              <line x1="10" y1="13" x2="14" y2="13" />
             </svg>
             Deleted Records
           </button>
@@ -3594,7 +3594,6 @@ function EBlotter() {
                           </span>
                         </div>
 
-
                         <div className="eb-view-item">
                           <span className="eb-view-label">Coordinates:</span>
                           <span className="eb-view-value">
@@ -3976,7 +3975,9 @@ function EBlotter() {
                           </span>
                         </div>
                         <div className="eb-view-item">
-                          <span className="eb-view-label">Last Updated By:</span>
+                          <span className="eb-view-label">
+                            Last Updated By:
+                          </span>
                           <span className="eb-view-value">
                             {auditSummary?.updated
                               ? auditSummary.updated.name
@@ -6017,7 +6018,10 @@ function EBlotter() {
                       </div>
 
                       {/* ── ROW 2: CASE ADMIN ── */}
-                      <div className="eb-modal-form-group">
+                      <div
+                        className="eb-modal-form-group"
+                        style={{ display: "none" }}
+                      >
                         <label className="eb-modal-label">
                           COP (Chief of Police)
                         </label>
@@ -9223,29 +9227,18 @@ function EBlotter() {
                             {userRole === "Patrol" &&
                               b.responder &&
                               b.responder.sender_user_id === currentUserId && (
-                                <>
-                                  <button
-                                    className="eb-action-btn"
-                                    style={{
-                                      background: "#16a34a",
-                                      color: "white",
-                                    }}
-                                    onClick={() =>
-                                      handleAcceptReferral(b.blotter_id)
-                                    }
-                                  >
-                                    ✓ Accept
-                                  </button>
-                                  <button
-                                    className="eb-action-btn eb-action-btn-danger"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleDelete(b.blotter_id);
-                                    }}
-                                  >
-                                    <DeleteIcon /> Delete
-                                  </button>
-                                </>
+                                <button
+                                  className="eb-action-btn"
+                                  style={{
+                                    background: "#16a34a",
+                                    color: "white",
+                                  }}
+                                  onClick={() =>
+                                    handleAcceptReferral(b.blotter_id)
+                                  }
+                                >
+                                  ✓ Accept
+                                </button>
                               )}
                             {userRole === "Patrol" &&
                               b.responder &&
@@ -9369,7 +9362,6 @@ function EBlotter() {
                             )}
                           </>
                         ) : (
-                          // Non-referred tab actions (View, Edit, Delete)
                           <>
                             <button
                               className="eb-action-btn eb-action-btn-view"
@@ -9389,15 +9381,17 @@ function EBlotter() {
                             >
                               <EditIcon /> Edit
                             </button>
-                            <button
-                              className="eb-action-btn eb-action-btn-danger"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleDelete(b.blotter_id);
-                              }}
-                            >
-                              <DeleteIcon /> Delete
-                            </button>
+                            {userRole !== "Patrol" && (
+                              <button
+                                className="eb-action-btn eb-action-btn-danger"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDelete(b.blotter_id);
+                                }}
+                              >
+                                <DeleteIcon /> Delete
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
