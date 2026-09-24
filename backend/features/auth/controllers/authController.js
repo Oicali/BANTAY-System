@@ -7,7 +7,7 @@ const bcrypt       = require("bcrypt");
 const tokenManager = require("../../../shared/utils/tokenManager");
 const authService  = require("../services/authService");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-const { parseDeviceLabel } = require("../../../shared/utils/DeviceLabel");
+const { parseDeviceLabel } = require("../../../shared/utils/deviceLabel");
 
 const {
   validateLoginInput,
