@@ -387,7 +387,9 @@ const createBlotter = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Crime Report Created",
-      description: `Created crime report for incident type "${blotterData.incident_type}"`,
+      entityType: "blotter",
+      entityId: String(result.blotter_id),
+      description: `Created crime report ${result.blotter_entry_number} for incident type "${blotterData.incident_type}"`,
       action: "CREATE",
       status: "success",
       source: "Web Portal",
@@ -556,6 +558,7 @@ const updateBlotterStatus = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Crime Report Status Updated",
+      entityType: "blotter", entityId: String(id),
       description: `Updated crime report ID ${id} status to "${status}"`,
       action: "UPDATE",
       status: "success",
@@ -592,6 +595,8 @@ const deleteBlotter = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Crime Report Deleted",
+      entityType: "blotter",
+      entityId: String(id),
       description: `Soft-deleted crime report ID ${id}`,
       action: "DELETE",
       status: "success",
@@ -708,6 +713,8 @@ const updateBlotter = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Crime Report Updated",
+      entityType: "blotter",
+      entityId: String(id),
       description: `Updated crime report ID ${id}`,
       action: "UPDATE",
       status: "success",
@@ -762,6 +769,8 @@ const restoreBlotter = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Crime Report Restored",
+      entityType: "blotter",
+      entityId: String(id),
       description: `Restored crime report ID ${id}`,
       action: "UPDATE",
       status: "success",
@@ -1606,6 +1615,7 @@ const importBlotters = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Blotters Imported",
+      entityType: "blotter_import", entityId: batchId,
       description: `Imported ${actualInserted} blotter(s) — ${duplicates.length} duplicate(s) skipped, ${errors.length} error(s) (batch: ${batchId})`,
       action: "CREATE",
       status: "success",
@@ -1684,6 +1694,8 @@ const acceptReferral = async (req, res) => {
         userId: req.user?.user_id,
         username: req.user?.username,
         eventName: "Referral Accepted",
+        entityType: "blotter",
+        entityId: String(id),
         description: `Accepted barangay referral for crime report ID ${id}`,
         action: "UPDATE",
         status: "success",
@@ -1878,6 +1890,7 @@ const createBrgyReport = async (req, res) => {
         userId: req.user?.user_id,
         username: req.user?.username,
         eventName: "Barangay Report Submitted",
+        entityType: "blotter", entityId: String(blotterId),
         description: `Submitted barangay report "${blotterNumber}" for incident type "${resolvedIncidentType}"`,
         action: "CREATE",
         status: "success",
@@ -2214,6 +2227,8 @@ const respondToReferral = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Response to Referral",
+      entityType: "blotter",
+      entityId: String(id),
       description: `${responderName} responded to referral ID ${id}`,
       action: "UPDATE",
       status: "success",
@@ -2302,6 +2317,8 @@ const remindPatrols = async (req, res) => {
       userId: req.user?.user_id,
       username: req.user?.username,
       eventName: "Patrol Reminded",
+      entityType: "blotter",
+      entityId: String(id),
       description: `Sent reminders for referral ${blotterNumber} to ${successCount} patrol officer(s)`,
       action: "UPDATE",
       status: "success",
@@ -2363,6 +2380,88 @@ const getReminderBlotterIds = async (req, res) => {
   }
 };
 
+// Build "PO1. Juan Dela Cruz" style name from an audit row
+const buildAuditName = (r) => {
+  if (!r.first_name) return r.username || "Unknown";
+  return [r.rank_abbr ? `${r.rank_abbr}.` : "", r.first_name, r.last_name, r.suffix]
+    .filter(Boolean)
+    .join(" ");
+};
+
+// Shared SELECT: name parts + Manila-local timestamp (so frontend formatDate is correct)
+const AUDIT_SELECT = `
+  SELECT al.event_name, al.username,
+         TO_CHAR(al.created_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD"T"HH24:MI') AS at,
+         u.first_name, u.last_name, u.suffix, pr.abbreviation AS rank_abbr
+  FROM audit_logs al
+  LEFT JOIN users u      ON al.user_id = u.user_id
+  LEFT JOIN pnp_ranks pr ON u.rank_id  = pr.rank_id
+`;
+
+// GET /blotters/:id/audit-summary → who created / last updated this record
+const getAuditSummary = async (req, res) => {
+  try {
+    const parsedId = parseInt(req.params.id, 10);
+    if (isNaN(parsedId)) {
+      return res.status(400).json({ success: false, message: "Invalid crime report ID" });
+    }
+
+    const blotter = await pool.query(
+      `SELECT import_batch_id FROM blotter_entries WHERE blotter_id = $1 AND is_deleted = false`,
+      [parsedId],
+    );
+    if (blotter.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Crime report not found" });
+    }
+
+    const CREATED_EVENTS = ["Crime Report Created", "Barangay Report Submitted"];
+    const UPDATED_EVENTS = [
+      "Crime Report Updated",
+      "Crime Report Status Updated",
+      "Referral Accepted",
+      "Crime Report Restored",
+    ];
+
+    // newest first
+    const rows = (
+      await pool.query(
+        `${AUDIT_SELECT}
+         WHERE al.entity_type = 'blotter' AND al.entity_id = $1
+           AND al.status = 'success' AND al.event_name = ANY($2)
+         ORDER BY al.created_at DESC`,
+        [String(parsedId), [...CREATED_EVENTS, ...UPDATED_EVENTS]],
+      )
+    ).rows;
+
+    const createdRow = [...rows].reverse().find((r) => CREATED_EVENTS.includes(r.event_name));
+    let created = createdRow ? { name: buildAuditName(createdRow), at: createdRow.at } : null;
+
+    // Imported records: fall back to the batch's audit row
+    const batchId = blotter.rows[0].import_batch_id;
+    if (!created && batchId) {
+      const imp = await pool.query(
+        `${AUDIT_SELECT}
+         WHERE al.entity_type = 'blotter_import' AND al.entity_id = $1
+         ORDER BY al.created_at ASC LIMIT 1`,
+        [batchId],
+      );
+      if (imp.rows[0]) {
+        created = { name: buildAuditName(imp.rows[0]), at: imp.rows[0].at, imported: true };
+      }
+    }
+
+    // latest of create/update; equals "created" if never edited
+    const updated = rows[0]
+      ? { name: buildAuditName(rows[0]), at: rows[0].at }
+      : created;
+
+    return res.status(200).json({ success: true, data: { created, updated } });
+  } catch (error) {
+    console.error("Audit summary error:", error);
+    return res.status(500).json({ success: false, message: "Error fetching audit summary" });
+  }
+};
+
 module.exports = {
   createBlotter,
   getAllBlotters,
@@ -2384,4 +2483,5 @@ module.exports = {
   getPatrolUsers,
   checkReminderAccess,
   getReminderBlotterIds,
+  getAuditSummary,
 };
