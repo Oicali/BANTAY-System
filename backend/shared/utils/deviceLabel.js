@@ -1,5 +1,14 @@
 // backend/shared/utils/deviceLabel.js
-const parseDeviceLabel = (userAgent, deviceType) => {
+const parseDeviceLabel = (userAgent, deviceType, clientApp) => {
+  // Native apps identify themselves explicitly via headers, since their
+  // fetch implementation doesn't send a browser-style User-Agent the
+  // regex matching below can recognize.
+  if (clientApp && clientApp.name) {
+    return clientApp.platform
+      ? `${clientApp.name} on ${clientApp.platform}`
+      : clientApp.name;
+  }
+
   const ua = userAgent || "";
   let browser = "Unknown Browser";
   if (/edg/i.test(ua)) browser = "Edge";

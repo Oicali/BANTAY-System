@@ -109,7 +109,7 @@ const getDeviceHistory = async (req, res) => {
     const { tokenId } = req.params;
 
     const sessionResult = await pool.query(
-      `SELECT ip_address, user_agent, device_type, location_label, last_active_at
+      `SELECT ip_address, user_agent, device_type, location_label, client_app_label, last_active_at
        FROM tokens
        WHERE token_id = $1 AND user_id = $2`,
       [tokenId, userId]
