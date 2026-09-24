@@ -9,9 +9,17 @@ const getSessions = async (req, res) => {
     const rawToken = req.headers.authorization?.split(" ")[1];
     const currentTokenHash = rawToken ? hashToken(rawToken) : null;
 
-    const sessions = await tokenManager.getUserSessions(userId, currentTokenHash);
+    const [sessions, trustedKeys] = await Promise.all([
+      tokenManager.getUserSessions(userId, currentTokenHash),
+      tokenManager.getTrustedDeviceKeys(userId),
+    ]);
 
-    res.json({ success: true, sessions });
+    const withTrust = sessions.map((s) => ({
+      ...s,
+      is_trusted: trustedKeys.has(`${s.ip_address || ""}|${s.user_agent || ""}`),
+    }));
+
+    res.json({ success: true, sessions: withTrust });
   } catch (error) {
     console.error("❌ getSessions error:", error);
     res.status(500).json({ success: false, message: "Failed to load sessions" });
@@ -74,6 +82,11 @@ const getDeviceHistory = async (req, res) => {
 
     const device = sessionResult.rows[0];
 
+    const trustedKeys = await tokenManager.getTrustedDeviceKeys(userId);
+    device.is_trusted = trustedKeys.has(
+      `${device.ip_address || ""}|${device.user_agent || ""}`
+    );
+
     const historyResult = await pool.query(
       `SELECT description, created_at, ip_address
        FROM audit_logs
@@ -93,4 +106,45 @@ const getDeviceHistory = async (req, res) => {
   }
 };
 
-module.exports = { getSessions, revokeSession, revokeAllOtherSessions, getDeviceHistory };
+// POST /users/sessions/:tokenId/trust
+const trustDevice = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { tokenId } = req.params;
+
+    await tokenManager.trustDeviceByTokenId(tokenId, userId);
+
+    res.json({ success: true, message: "Device trusted for 30 days" });
+  } catch (error) {
+    console.error("❌ trustDevice error:", error);
+    res.status(400).json({ success: false, message: error.message || "Failed to trust device" });
+  }
+};
+
+// DELETE /users/sessions/:tokenId/trust
+const removeTrustedDevice = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { tokenId } = req.params;
+
+    const removed = await tokenManager.removeTrustedDeviceByTokenId(tokenId, userId);
+
+    if (!removed) {
+      return res.status(404).json({ success: false, message: "This device wasn't trusted." });
+    }
+
+    res.json({ success: true, message: "Device removed from trusted devices" });
+  } catch (error) {
+    console.error("❌ removeTrustedDevice error:", error);
+    res.status(400).json({ success: false, message: error.message || "Failed to remove trusted device" });
+  }
+};
+
+module.exports = {
+  getSessions,
+  revokeSession,
+  revokeAllOtherSessions,
+  getDeviceHistory,
+  removeTrustedDevice,
+  trustDevice,
+};

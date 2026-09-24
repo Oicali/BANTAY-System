@@ -27,15 +27,16 @@ const logAudit = async ({
   status      = "success",
   source      = null,
   ipAddress   = null,
+  userAgent   = null,
   entityType  = null,
   entityId    = null,
 }) => {
   try {
     await pool.query(
       `INSERT INTO audit_logs
-         (user_id, username, event_name, description, action, status, source, ip_address, entity_type, entity_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [userId, username, eventName, description, action, status, source, ipAddress, entityType, entityId]
+         (user_id, username, event_name, description, action, status, source, ip_address, user_agent, entity_type, entity_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [userId, username, eventName, description, action, status, source, ipAddress, userAgent, entityType, entityId]
     );
   } catch (err) {
     console.error("⚠️ Audit log failed:", err.message);

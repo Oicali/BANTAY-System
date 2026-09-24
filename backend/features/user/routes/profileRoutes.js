@@ -70,5 +70,7 @@ router.get('/sessions',                       authenticate, SessionController.ge
 router.delete('/sessions/all-except-current', authenticate, SessionController.revokeAllOtherSessions);
 router.get('/sessions/:tokenId/history',      authenticate, SessionController.getDeviceHistory);
 router.delete('/sessions/:tokenId',           authenticate, SessionController.revokeSession);
+router.delete('/sessions/:tokenId/trust',     authenticate, SessionController.removeTrustedDevice);
+router.post('/sessions/:tokenId/trust',       authenticate, SessionController.trustDevice);
 
 module.exports = router;
