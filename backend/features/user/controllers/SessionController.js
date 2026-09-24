@@ -31,32 +31,6 @@ const revokeSession = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const { tokenId } = req.params;
-    const rawToken = req.headers.authorization?.split(" ")[1];
-    const currentTokenHash = rawToken ? hashToken(rawToken) : null;
-
-    const targetResult = await pool.query(
-      `SELECT ip_address, user_agent FROM tokens WHERE token_id = $1 AND user_id = $2`,
-      [tokenId, userId]
-    );
-    if (targetResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Session not found" });
-    }
-
-    const { ip_address, user_agent } = targetResult.rows[0];
-    const trustedKeys = await tokenManager.getTrustedDeviceKeys(userId);
-    const targetIsTrusted = trustedKeys.has(`${ip_address || ""}|${user_agent || ""}`);
-
-    if (targetIsTrusted) {
-      const currentIsTrusted = currentTokenHash
-        ? await tokenManager.isCurrentDeviceTrusted(currentTokenHash, userId)
-        : false;
-      if (!currentIsTrusted) {
-        return res.status(403).json({
-          success: false,
-          message: "Only a trusted device can log out another trusted device.",
-        });
-      }
-    }
 
     await tokenManager.revokeTokenById(tokenId, userId);
 
@@ -78,22 +52,9 @@ const revokeAllOtherSessions = async (req, res) => {
       return res.status(400).json({ success: false, message: "No current session token found" });
     }
 
-    const currentIsTrusted = await tokenManager.isCurrentDeviceTrusted(currentTokenHash, userId);
+    await tokenManager.revokeAllExceptCurrent(userId, currentTokenHash);
 
-    if (currentIsTrusted) {
-      await tokenManager.revokeAllExceptCurrent(userId, currentTokenHash);
-      return res.json({ success: true, message: "All other sessions revoked" });
-    }
-
-    // Untrusted current session: skip trusted devices, revoke the rest
-    const revokedCount = await tokenManager.revokeAllExceptCurrentAndTrusted(userId, currentTokenHash);
-    res.json({
-      success: true,
-      message:
-        revokedCount > 0
-          ? "Other sessions revoked. Trusted devices were left signed in."
-          : "No untrusted sessions to revoke. Trusted devices were left signed in.",
-    });
+    res.json({ success: true, message: "All other sessions revoked" });
   } catch (error) {
     console.error("❌ revokeAllOtherSessions error:", error);
     res.status(500).json({ success: false, message: "Failed to revoke sessions" });
@@ -165,19 +126,6 @@ const removeTrustedDevice = async (req, res) => {
   try {
     const userId = req.user.user_id;
     const { tokenId } = req.params;
-    const rawToken = req.headers.authorization?.split(" ")[1];
-    const currentTokenHash = rawToken ? hashToken(rawToken) : null;
-
-    const currentIsTrusted = currentTokenHash
-      ? await tokenManager.isCurrentDeviceTrusted(currentTokenHash, userId)
-      : false;
-
-    if (!currentIsTrusted) {
-      return res.status(403).json({
-        success: false,
-        message: "Only a trusted device can remove trust from another device.",
-      });
-    }
 
     const removed = await tokenManager.removeTrustedDeviceByTokenId(tokenId, userId);
 
