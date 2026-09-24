@@ -19,6 +19,7 @@ import BrgyReport from "./components/views/BrgyReport";
 import VerificationSuccess from "./components/views/VerificationSucess";
 import AfterPatrol from "./components/views/AfterPatrol";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
 import PageLayout from "./components/layout/PageLayout.jsx";
 import PatrollerDashboard from "./components/views/PatrolDashboard";
 import ResidentManagement from "./components/views/ResidentManagement";
@@ -50,7 +51,14 @@ function App() {
     <Router>
       <Routes>
         {/* Public */}
-        <Route path="/login" element={<LoginSystem />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginSystem />
+            </PublicRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/verification-success" element={<VerificationSuccess />} />
         {/* Full-screen Overview — outside PageLayout so Sidebar/TopBar don't mount */}

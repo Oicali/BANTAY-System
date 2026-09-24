@@ -40,12 +40,27 @@ export const isAuthenticated = () => {
 //    Token could be expired or invalid
 //    Better: Verify token with backend or check expiration
 
+const isTokenExpired = (token) => {
+  try {
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return payload.exp ? payload.exp * 1000 <= Date.now() : false;
+  } catch {
+    return true;
+  }
+};
+
 export const getToken = () => {
-  return (
-    localStorage.getItem("token") ||
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("token")
-  );
+  const token =
+    localStorage.getItem("token") || sessionStorage.getItem("token");
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    return null;
+  }
+  return token;
 };
 
 // 🎫 Retrieve the JWT token

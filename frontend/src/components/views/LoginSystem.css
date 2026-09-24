@@ -740,6 +740,38 @@ input:-webkit-autofill:active {
   color: #86efac;
   font-weight: 600;
 }
+.login-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 20px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-me input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.login-options-row .link-button {
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1;
+}
 
 /* ===== RESPONSIVE DESIGN ===== */
 @media (min-width: 769px) {

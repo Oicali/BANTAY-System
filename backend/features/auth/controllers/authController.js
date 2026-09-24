@@ -7,7 +7,6 @@ const bcrypt       = require("bcrypt");
 const tokenManager = require("../../../shared/utils/tokenManager");
 const authService  = require("../services/authService");
 const { logAudit, getClientIp } = require("../../../shared/utils/auditLogger");
-
 const {
   validateLoginInput,
   validateEmail,
@@ -21,7 +20,7 @@ const {
 // ============================================================
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+   const { username, password, rememberMe } = req.body;
     const ip = getClientIp(req);
 
     const errors = validateLoginInput(username, password);
@@ -239,19 +238,20 @@ const login = async (req, res) => {
     await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
 
     const token = await tokenManager.createToken(
-      {
-        user_id:   user.user_id,
-        username:  user.username,
-        email:     user.email,
-        role:      user.role_name,
-        user_type: user.user_type,
-      },
-      {
-        userAgent,
-        deviceType,
-        ipAddress: ip,
-      }
-    );
+  {
+    user_id:   user.user_id,
+    username:  user.username,
+    email:     user.email,
+    role:      user.role_name,
+    user_type: user.user_type,
+  },
+  {
+    expiresIn: rememberMe === true ? "7d" : undefined,
+    userAgent,
+    deviceType,
+    ipAddress: ip,
+  }
+);
 
     await logAudit({
       userId:      user.user_id,

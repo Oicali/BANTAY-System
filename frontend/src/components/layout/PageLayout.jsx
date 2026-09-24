@@ -41,6 +41,7 @@ export default function PageLayout() {
       console.error("Logout API error:", err);
     } finally {
       localStorage.clear();
+      sessionStorage.removeItem("token");
       window.location.href = "/";
     }
   };
