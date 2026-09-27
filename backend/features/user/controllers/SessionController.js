@@ -44,20 +44,6 @@ const revokeSession = async (req, res) => {
 
     const { ip_address, user_agent } = targetResult.rows[0];
     const trustedKeys = await tokenManager.getTrustedDeviceKeys(userId);
-    const targetIsTrusted = trustedKeys.has(`${ip_address || ""}|${user_agent || ""}`);
-
-    if (targetIsTrusted) {
-      const currentIsTrusted = currentTokenHash
-        ? await tokenManager.isCurrentDeviceTrusted(currentTokenHash, userId)
-        : false;
-      if (!currentIsTrusted) {
-        return res.status(403).json({
-          success: false,
-          message: "Only a trusted device can log out another trusted device.",
-        });
-      }
-    }
-
     await tokenManager.revokeTokenById(tokenId, userId);
 
     res.json({ success: true, message: "Session revoked" });
