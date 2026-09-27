@@ -19,13 +19,22 @@ if (!admin.apps.length) {
   }
 }
 
-const sendPushNotification = async (fcmToken, title, message, linkTo = null) => {
+const sendPushNotification = async (fcmToken, title, message, linkTo = null, type = null, metadata = null, notificationId = null) => {
   if (!fcmToken) return;
   try {
     const result = await admin.messaging().send({
   token: fcmToken,
   notification: { title, body: message }, // ← FCM handles display when backgrounded
-  data: { title, body: message, linkTo: linkTo || "" },
+  data: {
+    title,
+    body: message,
+    linkTo: linkTo || "",
+    type: type || "",
+    // FCM data values must be strings — the app JSON.parses this to
+    // render the approve/deny modal for LOGIN_APPROVAL_REQUEST pushes.
+    metadata: metadata ? JSON.stringify(metadata) : "",
+    notificationId: notificationId != null ? String(notificationId) : "",
+  },
   
   apns: {
     payload: { aps: { sound: "default", badge: 1 } },
@@ -37,14 +46,16 @@ const sendPushNotification = async (fcmToken, title, message, linkTo = null) => 
   }
 };
 
-const createNotification = async ({ recipientId, senderId = null, senderName = null, senderAvatar = null, type, title, message, linkTo = null }) => {
+const createNotification = async ({ recipientId, senderId = null, senderName = null, senderAvatar = null, type, title, message, linkTo = null, metadata = null }) => {
   try {
-    await pool.query(
+    const insert = await pool.query(
       `INSERT INTO notifications 
-        (recipient_user_id, sender_user_id, sender_name, sender_avatar, type, title, message, link_to)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [recipientId, senderId, senderName, senderAvatar, type, title, message, linkTo]
+        (recipient_user_id, sender_user_id, sender_name, sender_avatar, type, title, message, link_to, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+       RETURNING id`,
+      [recipientId, senderId, senderName, senderAvatar, type, title, message, linkTo, metadata ? JSON.stringify(metadata) : null]
     );
+    const notificationId = insert.rows[0]?.id;
 
     // Send push notification if user has a token
     const userResult = await pool.query(
@@ -53,7 +64,7 @@ const createNotification = async ({ recipientId, senderId = null, senderName = n
     );
     const pushToken = userResult.rows[0]?.push_token;
     if (pushToken) {
-      await sendPushNotification(pushToken, title, message, linkTo);
+      await sendPushNotification(pushToken, title, message, linkTo, type, metadata, notificationId);
     }
   } catch (err) {
     console.error("createNotification error:", err.message);
