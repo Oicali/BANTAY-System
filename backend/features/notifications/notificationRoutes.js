@@ -204,4 +204,82 @@ router.post("/:id/logout-device", authenticate, async (req, res) => {
   }
 });
 
+// POST /notifications/:id/approve-login — approve a pending login from this trusted device
+router.post("/:id/approve-login", authenticate, async (req, res) => {
+  try {
+    const { trustDevice } = req.body; // "Don't ask again on this device for 30 days" checkbox
+
+    const notif = await pool.query(
+      `SELECT metadata FROM notifications
+       WHERE id = $1 AND recipient_user_id = $2 AND type = 'LOGIN_APPROVAL_REQUEST'`,
+      [req.params.id, req.user.user_id]
+    );
+
+    if (notif.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Notification not found." });
+    }
+
+    const meta = notif.rows[0].metadata;
+    if (!meta?.pending_id) {
+      return res.status(400).json({ success: false, message: "This request is missing details." });
+    }
+
+    const result = await pool.query(
+      `UPDATE pending_device_logins
+       SET approval_status = 'approved', trust_this_device = $2
+       WHERE pending_id = $1 AND approval_status = 'pending' AND expires_at > NOW()
+       RETURNING pending_id`,
+      [meta.pending_id, trustDevice === true]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ success: false, message: "This login request is no longer active." });
+    }
+
+    await pool.query(
+      `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND recipient_user_id = $2`,
+      [req.params.id, req.user.user_id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("approve-login error:", err);
+    res.status(500).json({ success: false, message: "Unable to approve this login." });
+  }
+});
+
+// POST /notifications/:id/deny-login — deny a pending login
+router.post("/:id/deny-login", authenticate, async (req, res) => {
+  try {
+    const notif = await pool.query(
+      `SELECT metadata FROM notifications
+       WHERE id = $1 AND recipient_user_id = $2 AND type = 'LOGIN_APPROVAL_REQUEST'`,
+      [req.params.id, req.user.user_id]
+    );
+
+    if (notif.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Notification not found." });
+    }
+
+    const meta = notif.rows[0].metadata;
+    if (meta?.pending_id) {
+      await pool.query(
+        `UPDATE pending_device_logins SET approval_status = 'denied'
+         WHERE pending_id = $1 AND approval_status = 'pending'`,
+        [meta.pending_id]
+      );
+    }
+
+    await pool.query(
+      `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND recipient_user_id = $2`,
+      [req.params.id, req.user.user_id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("deny-login error:", err);
+    res.status(500).json({ success: false, message: "Unable to deny this login." });
+  }
+});
+
 module.exports = router;

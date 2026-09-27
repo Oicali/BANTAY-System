@@ -181,20 +181,23 @@ const cleanupExpiredTokens = async () => {
 // =====================================================
 const getUserSessions = async (userId, currentTokenHash = null) => {
   try {
+    // Active sessions always show. Revoked (logged-out) sessions stay
+    // visible too, like Facebook's login activity, but only for 30 days
+    // after being revoked so the list doesn't grow forever.
     const result = await pool.query(
       `SELECT token_id, created_at, expires_at, last_active_at,
               user_agent, device_type, ip_address, location_label,
-              client_app_label, token_hash
+              client_app_label, token_hash, is_revoked, revoked_at
        FROM tokens
        WHERE user_id = $1
-         AND is_revoked = false
-         AND expires_at > NOW()
-       ORDER BY last_active_at DESC`,
+         AND (
+           (is_revoked = false AND expires_at > NOW())
+           OR (is_revoked = true AND revoked_at > NOW() - INTERVAL '30 days')
+         )
+       ORDER BY is_revoked ASC, COALESCE(revoked_at, last_active_at) DESC`,
       [userId]
     );
 
-    // Tag which row is the requester's current device, then drop the hash
-    // (never send token_hash to the frontend)
     return result.rows.map(({ token_hash, ...row }) => ({
       ...row,
       is_current: currentTokenHash ? token_hash === currentTokenHash : false,
