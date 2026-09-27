@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const pool = require("../../../config/database");
 const { logAudit } = require("../../../shared/utils/auditLogger");
 const { parseDeviceLabel } = require("../../../shared/utils/deviceLabel");
+const notificationService = require("../../notifications/notificationService");
 
 const OTP_MAX_ATTEMPTS = 3;
 const OTP_LOCKOUT_MS = 15 * 60 * 1000;
@@ -585,7 +586,7 @@ function maskEmail(email) {
   return `${visible}${"*".repeat(Math.max(name.length - visible.length, 3))}@${domain}`;
 }
 
-async function createPendingDeviceLogin({ userId, email, firstName, ipAddress, userAgent, deviceType, rememberMe }) {
+async function createPendingDeviceLogin({ userId, email, firstName, ipAddress, userAgent, deviceType, rememberMe, deviceId = null, deviceLabel = null }) {
   try {
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
@@ -593,10 +594,10 @@ async function createPendingDeviceLogin({ userId, email, firstName, ipAddress, u
 
     const insert = await pool.query(
       `INSERT INTO pending_device_logins
-         (user_id, otp_hash, ip_address, user_agent, device_type, remember_me, expires_at, resends_left)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (user_id, otp_hash, ip_address, user_agent, device_type, remember_me, expires_at, resends_left, device_id, device_label)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING pending_id`,
-      [userId, otpHash, ipAddress, userAgent, deviceType, rememberMe, expiresAt, DEVICE_OTP_RESEND_MAX],
+      [userId, otpHash, ipAddress, userAgent, deviceType, rememberMe, expiresAt, DEVICE_OTP_RESEND_MAX, deviceId, deviceLabel],
     );
 
     const pendingId = insert.rows[0].pending_id;
@@ -710,13 +711,15 @@ async function verifyPendingDeviceLogin(pendingId, code, ipAddress = null) {
 
     await pool.query("DELETE FROM pending_device_logins WHERE pending_id = $1", [pendingId]);
 
-    return {
+        return {
       success: true,
       userRow: userResult.rows[0],
       ipAddress: p.ip_address,
       userAgent: p.user_agent,
       deviceType: p.device_type,
       rememberMe: p.remember_me,
+      deviceId: p.device_id,
+      deviceLabel: p.device_label,
     };
   } catch (error) {
     console.error("Error verifying pending device login:", error);
@@ -832,25 +835,24 @@ async function requestDeviceApproval(pendingId) {
       [pendingId, newExpiry],
     );
 
-    const deviceLabel = parseDeviceLabel(p.user_agent, p.device_type);
+    const deviceLabel = p.device_label || parseDeviceLabel(p.user_agent, p.device_type);
 
-    await pool.query(
-      `INSERT INTO notifications
-         (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
-       VALUES ($1, NULL, NULL, 'LOGIN_APPROVAL_REQUEST', $2, $3, NULL, FALSE, $4::jsonb)`,
-      [
-        p.user_id,
-        "Approve login from another device",
-        `A login attempt on ${deviceLabel} is waiting for your approval.`,
-        JSON.stringify({
-          pending_id:   pendingId,
-          device_label: deviceLabel,
-          ip_address:   p.ip_address,
-          user_agent:   p.user_agent,
-          requested_at: new Date().toISOString(),
-        }),
-      ],
-    );
+    // Routed through notificationService (not a raw INSERT) so this also
+    // fires a push via Firebase to a trusted device with a push_token,
+    // the same helper web's existing bell-icon notifications use.
+    await notificationService.createNotification({
+      recipientId: p.user_id,
+      type:        "LOGIN_APPROVAL_REQUEST",
+      title:       "Approve login from another device",
+      message:     `A login attempt on ${deviceLabel} is waiting for your approval.`,
+      metadata: {
+        pending_id:   pendingId,
+        device_label: deviceLabel,
+        ip_address:   p.ip_address,
+        user_agent:   p.user_agent,
+        requested_at: new Date().toISOString(),
+      },
+    });
 
     return { success: true, otpExpiresAt: newExpiry };
   } catch (error) {
@@ -911,6 +913,7 @@ async function pollPendingDeviceLogin(pendingId) {
       deviceType:  p.device_type,
       rememberMe:  p.remember_me,
       trustDevice: p.trust_this_device,
+      deviceId:    p.device_id,
     };
   } catch (error) {
     console.error("Error polling pending device login:", error);

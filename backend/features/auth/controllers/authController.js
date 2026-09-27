@@ -368,14 +368,23 @@ const login = async (req, res) => {
 // ============================================================
 // Shared by verifyDeviceLogin (never trusts) and the approve-poll endpoint
 // (trusts only if the approver checked the box). trustDevice controls that.
-async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice }) {
+async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice, deviceId = null, deviceLabel: precomputedLabel = null }) {
   if (trustDevice) {
-    await pool.query(
-      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
-       ON CONFLICT DO NOTHING`,
-      [userRow.user_id, ipAddress, userAgent],
-    );
+    if (deviceId) {
+      // Mobile: trust the app install, not ip/ua — cellular IPs churn.
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until, device_id)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', $4)`,
+        [userRow.user_id, ipAddress, userAgent, deviceId],
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+         ON CONFLICT DO NOTHING`,
+        [userRow.user_id, ipAddress, userAgent],
+      );
+    }
   }
 
   const token = await tokenManager.createToken(
@@ -387,14 +396,15 @@ async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType
       user_type: userRow.user_type,
     },
     {
-      expiresIn: rememberMe ? "7d" : undefined,
+      expiresIn: deviceType === "mobile" ? "30d" : (rememberMe ? "7d" : undefined),
       userAgent,
       deviceType,
       ipAddress,
+      clientAppLabel: precomputedLabel,
     },
   );
 
-  const deviceLabel = parseDeviceLabel(userAgent, deviceType);
+  const deviceLabel = precomputedLabel || parseDeviceLabel(userAgent, deviceType);
   await pool.query(
     `INSERT INTO notifications
        (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
@@ -432,10 +442,10 @@ const verifyDeviceLogin = async (req, res) => {
       return res.status(status).json(result);
     }
 
-    const { userRow, ipAddress, userAgent, deviceType, rememberMe } = result;
+    const { userRow, ipAddress, userAgent, deviceType, rememberMe, deviceId, deviceLabel } = result;
 
     const token = await issueDeviceLoginToken({
-      userRow, ipAddress, userAgent, deviceType, rememberMe,
+      userRow, ipAddress, userAgent, deviceType, rememberMe, deviceId, deviceLabel,
       trustDevice: false, // manual code-entry never auto-trusts
     });
 
@@ -525,10 +535,10 @@ const pollDeviceLogin = async (req, res) => {
       return res.status(200).json(result);
     }
 
-    const { userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice } = result;
+    const { userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice, deviceId, deviceLabel } = result;
 
     const token = await issueDeviceLoginToken({
-      userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice,
+      userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice, deviceId, deviceLabel,
     });
 
     await logAudit({
@@ -1136,6 +1146,11 @@ const mobileLogin = async (req, res) => {
     }
 
     // ── SUCCESS ────────────────────────────────────────────────
+    // Same pattern as web login(): captured BEFORE the UPDATE below
+    // overwrites last_login. NULL means this account has never logged
+    // in anywhere (web or mobile) — its first login skips verification
+    // and becomes the trusted baseline instead.
+    const isFirstEverLogin = user.last_login === null;
 
     await pool.query(
       `UPDATE users
@@ -1148,30 +1163,109 @@ const mobileLogin = async (req, res) => {
     );
 
     const userAgent = req.headers["user-agent"] || null;
+    const deviceId  = req.headers["x-device-id"] || null;
 
     // Collapse any previous session from this same device before issuing a new one
     await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
 
-    // ── New-device detection (IP + User-Agent) ──────────────────
-    const trustedCheck = await pool.query(
-      `SELECT 1 FROM trusted_devices
-       WHERE user_id = $1
-         AND ip_address IS NOT DISTINCT FROM $2
-         AND user_agent IS NOT DISTINCT FROM $3
-         AND trusted_until > NOW()
-       LIMIT 1`,
-      [user.user_id, ip, userAgent],
-    );
-    const isNewDevice = trustedCheck.rows.length === 0;
-
-    // A native app identifies itself via X-Client-App/X-Client-Platform,
-    // since its fetch's User-Agent can't be pattern-matched like a
-    // browser's. Computed once so both the stored session row and the
-    // NEW_LOGIN notification (if any) show the same label.
+    // A native app identifies itself via X-Client-App/X-Client-Platform.
+    // Computed once so the token row, any notification, and the
+    // pending-device-login record (if this is a new device) all agree.
     const clientApp = req.headers["x-client-app"]
       ? { name: req.headers["x-client-app"], platform: req.headers["x-client-platform"] }
       : null;
     const deviceLabel = parseDeviceLabel(userAgent, "mobile", clientApp);
+
+    // ── New-device detection — keyed on the per-install device ID, NOT
+    // ip+ua. Cellular IPs churn constantly, so ip+ua trust would barely
+    // ever hold on mobile. Falls back to ip+ua only if X-Device-Id is
+    // somehow missing (older app build).
+    let isNewDevice = false;
+    if (!isFirstEverLogin) {
+      const trustedCheck = deviceId
+        ? await pool.query(
+            `SELECT 1 FROM trusted_devices
+             WHERE user_id = $1 AND device_id = $2 AND trusted_until > NOW()
+             LIMIT 1`,
+            [user.user_id, deviceId],
+          )
+        : await pool.query(
+            `SELECT 1 FROM trusted_devices
+             WHERE user_id = $1
+               AND ip_address IS NOT DISTINCT FROM $2
+               AND user_agent IS NOT DISTINCT FROM $3
+               AND trusted_until > NOW()
+             LIMIT 1`,
+            [user.user_id, ip, userAgent],
+          );
+      isNewDevice = trustedCheck.rows.length === 0;
+    }
+
+    // ── Unrecognized device → hold the login, require the emailed code
+    // (or approval from another trusted device) before a token is issued.
+    if (isNewDevice) {
+      const pending = await authService.createPendingDeviceLogin({
+        userId:     user.user_id,
+        email:      user.email,
+        firstName:  user.first_name,
+        ipAddress:  ip,
+        userAgent,
+        deviceType: "mobile",
+        rememberMe: false,
+        deviceId,
+        deviceLabel,
+      });
+
+      if (!pending.success) {
+        return res.status(500).json({
+          success: false,
+          message: pending.message || "Failed to start device verification",
+        });
+      }
+
+      await logAudit({
+        userId:      user.user_id,
+        username:    user.username,
+        eventName:   "Device Verification Required",
+        description: "Mobile login held pending new-device email verification",
+        action:      "LOGIN",
+        status:      "pending",
+        source:      "Mobile App",
+        ipAddress:   ip,
+        userAgent,
+      });
+
+      const canUseTrustedDevice = await authService.userHasTrustedDevice(user.user_id);
+
+      return res.status(200).json({
+        success:                    false,
+        requiresDeviceVerification: true,
+        pendingId:                  pending.pendingId,
+        maskedEmail:                pending.maskedEmail,
+        otpExpiresAt:               pending.otpExpiresAt,
+        resendsLeft:                pending.resendsLeft,
+        canUseTrustedDevice,
+      });
+    }
+
+    // First-ever login (web or mobile) → this device becomes the
+    // trusted baseline, keyed on device_id for mobile.
+    if (isFirstEverLogin) {
+      if (deviceId) {
+        await pool.query(
+          `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until, device_id)
+           VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', $4)`,
+          [user.user_id, ip, userAgent, deviceId],
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+           VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+           ON CONFLICT DO NOTHING`,
+          [user.user_id, ip, userAgent],
+        );
+      }
+    }
 
     const token = await tokenManager.createToken(
       {
@@ -1201,26 +1295,6 @@ const mobileLogin = async (req, res) => {
       ipAddress:   ip,
       userAgent,
     });
-
-    if (isNewDevice) {
-      await pool.query(
-        `INSERT INTO notifications
-           (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
-         VALUES ($1, NULL, NULL, 'NEW_LOGIN', $2, $3, $4, FALSE, $5::jsonb)`,
-        [
-          user.user_id,
-          "New login detected",
-          `A new login to your account was detected on ${deviceLabel}.`,
-          "/profile?openChangePassword=1",
-          JSON.stringify({
-            device_label: deviceLabel,
-            ip_address:   ip,
-            user_agent:   userAgent,
-            login_at:     new Date().toISOString(),
-          }),
-        ],
-      );
-    }
 
     return res.status(200).json({
       success: true,
