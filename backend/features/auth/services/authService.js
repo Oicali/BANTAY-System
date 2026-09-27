@@ -834,8 +834,27 @@ async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
       return { success: false, message: "This login request is no longer active." };
     }
 
+    // Any OTHER active session for this account — web included. A session
+    // only needs to be logged in and polling notifications to approve a
+    // login; it doesn't need a registered push token. This is checked
+    // against `tokens` (every logged-in device/browser has a row there),
+    // not `device_push_tokens` (mobile-only), so web sessions count too.
+    const activeSessionCheck = await pool.query(
+      `SELECT 1 FROM tokens WHERE user_id = $1 AND is_revoked = false AND expires_at > NOW() LIMIT 1`,
+      [p.user_id],
+    );
+
+    if (activeSessionCheck.rows.length === 0) {
+      return {
+        success: false,
+        message: "No other active session is available to approve this login.",
+      };
+    }
+
     // Every OTHER device's push token — never push approval back to the
-    // same device that's asking for it.
+    // same device that's asking for it. Empty is fine here (e.g. the only
+    // other session is on web with no push token); the notification is
+    // still created below and picked up by that session's own polling.
     const tokenRows = requestingDeviceId
       ? await pool.query(
           `SELECT push_token FROM device_push_tokens WHERE user_id = $1 AND device_id != $2`,
@@ -845,13 +864,6 @@ async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
           `SELECT push_token FROM device_push_tokens WHERE user_id = $1`,
           [p.user_id],
         );
-
-    if (tokenRows.rows.length === 0) {
-      return {
-        success: false,
-        message: "No other trusted device is available to approve this login.",
-      };
-    }
 
     const updated = await pool.query(
       `UPDATE pending_device_logins
