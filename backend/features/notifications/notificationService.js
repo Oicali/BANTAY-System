@@ -209,8 +209,36 @@ const notifyPatrolsForReferral = async (barangay, payload, excludeUserId = null)
   }
 };
 
+// Like createNotification, but pushes to an explicit list of tokens
+// instead of the single users.push_token column — used when one
+// logical notification (e.g. login approval) must reach several of
+// the user's OTHER devices without inserting a duplicate row each.
+const createNotificationForTokens = async ({ recipientId, senderId = null, senderName = null, senderAvatar = null, type, title, message, linkTo = null, metadata = null, pushTokens = [] }) => {
+  try {
+    const insert = await pool.query(
+      `INSERT INTO notifications 
+        (recipient_user_id, sender_user_id, sender_name, sender_avatar, type, title, message, link_to, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+       RETURNING id`,
+      [recipientId, senderId, senderName, senderAvatar, type, title, message, linkTo, metadata ? JSON.stringify(metadata) : null]
+    );
+    const notificationId = insert.rows[0]?.id;
+
+    await Promise.all(
+      pushTokens
+        .filter(Boolean)
+        .map((token) => sendPushNotification(token, title, message, linkTo, type, metadata, notificationId))
+    );
+
+    return notificationId;
+  } catch (err) {
+    console.error("createNotificationForTokens error:", err.message);
+  }
+};
+
 module.exports = { 
   createNotification, 
+  createNotificationForTokens,
   notifyAllByRole, 
   getResponderForReferral,
   getRespondersForReferrals,

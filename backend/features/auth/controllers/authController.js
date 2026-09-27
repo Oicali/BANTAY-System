@@ -511,7 +511,8 @@ const requestDeviceApproval = async (req, res) => {
     if (!pendingId) {
       return res.status(400).json({ success: false, message: "Missing pending login id" });
     }
-    const result = await authService.requestDeviceApproval(pendingId);
+    const requestingDeviceId = req.headers["x-device-id"] || null;
+    const result = await authService.requestDeviceApproval(pendingId, requestingDeviceId);
     res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     console.error("Request device approval error:", error);

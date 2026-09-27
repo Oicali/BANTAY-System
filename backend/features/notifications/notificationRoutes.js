@@ -69,10 +69,25 @@ router.patch("/:id/read", authenticate, async (req, res) => {
 router.post("/push-token", authenticate, async (req, res) => {
   try {
     const { push_token } = req.body;
+    const deviceId = req.headers["x-device-id"] || null;
+
     await pool.query(
       `UPDATE users SET push_token = $1 WHERE user_id = $2`,
       [push_token, req.user.user_id]
     );
+
+    // Per-device record so approval pushes can target every OTHER
+    // trusted device, excluding whichever one is requesting approval.
+    if (deviceId) {
+      await pool.query(
+        `INSERT INTO device_push_tokens (user_id, device_id, push_token, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (user_id, device_id)
+         DO UPDATE SET push_token = EXCLUDED.push_token, updated_at = NOW()`,
+        [req.user.user_id, deviceId, push_token]
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -82,10 +97,20 @@ router.post("/push-token", authenticate, async (req, res) => {
 // DELETE /notifications/push-token — clear on logout
 router.delete("/push-token", authenticate, async (req, res) => {
   try {
+    const deviceId = req.headers["x-device-id"] || null;
+
     await pool.query(
       `UPDATE users SET push_token = NULL WHERE user_id = $1`,
       [req.user.user_id]
     );
+
+    if (deviceId) {
+      await pool.query(
+        `DELETE FROM device_push_tokens WHERE user_id = $1 AND device_id = $2`,
+        [req.user.user_id, deviceId]
+      );
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
