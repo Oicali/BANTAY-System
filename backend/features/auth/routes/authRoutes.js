@@ -1,5 +1,5 @@
 // ================================================================================
-// FILE: backend/modules/auth/authRoutes.js
+// FILE: backend/features/auth/routes/authRoutes.js
 // ================================================================================
 
 const router = require("express").Router();
@@ -7,7 +7,7 @@ const { authenticate } = require("../../../shared/middleware/tokenMiddleware");
 const {
   login,
   mobileLogin,
-  validateToken, // ← add this
+  validateToken,
   logout,
   logoutAll,
   sendOTP,
@@ -16,6 +16,11 @@ const {
   forceLockOTP,
   resetPassword,
   changePassword,
+  verifyDeviceLogin,
+  resendDeviceLogin,
+  requestDeviceApproval,
+  pollDeviceLogin,
+  trustCurrentDevice,
 } = require("../controllers/authController");
 
 // ============================================================
@@ -28,6 +33,10 @@ router.post("/otp/verify", verifyOTP);
 router.post("/otp/resend", resendOTP);
 router.post("/otp/force-lock", forceLockOTP);
 router.post("/password/reset", resetPassword);
+router.post("/device/verify", verifyDeviceLogin);
+router.post("/device/resend", resendDeviceLogin);
+router.post("/device/request-approval", requestDeviceApproval);
+router.get("/device/poll", pollDeviceLogin);
 
 // ============================================================
 // PROTECTED ROUTES (auth required)
@@ -36,5 +45,6 @@ router.post("/logout", authenticate, logout);
 router.post("/logout-all", authenticate, logoutAll);
 router.post("/password/change", authenticate, changePassword);
 router.get("/validate-token", authenticate, validateToken);
+router.post("/device/trust-current", authenticate, trustCurrentDevice);
 
 module.exports = router;

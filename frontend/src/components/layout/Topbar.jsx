@@ -210,6 +210,13 @@ const TopBar = ({ onMenuClick }) => {
   const [logoutSaving, setLogoutSaving] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [loggedOutSelf, setLoggedOutSelf] = useState(false);
+  // ── Login-approval modal (LOGIN_APPROVAL_REQUEST — "Try another device") ──
+  const [approvalModalNotif, setApprovalModalNotif] = useState(null); // null = closed
+  const [approvalTrustChecked, setApprovalTrustChecked] = useState(false);
+  const [approvalSaving, setApprovalSaving] = useState(false);
+  const [approvalDenying, setApprovalDenying] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const [approvalResolved, setApprovalResolved] = useState(null); // null | "approved" | "denied"
   const prevNotifIdsRef = useRef(null); // null = first load, Set after first load
 
   useEffect(() => {
@@ -460,11 +467,88 @@ const TopBar = ({ onMenuClick }) => {
     }
   };
 
+  const closeApprovalModal = () => {
+    if (approvalSaving || approvalDenying) return;
+    setApprovalModalNotif(null);
+    setApprovalTrustChecked(false);
+    setApprovalError("");
+    setApprovalResolved(null);
+  };
+
+  const handleApproveLogin = async () => {
+    const notif = approvalModalNotif;
+    if (!notif) return;
+    setApprovalSaving(true);
+    setApprovalError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/notifications/${notif.id}/approve-login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ trustDevice: approvalTrustChecked }),
+        },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.success) {
+        setApprovalError(
+          d.message || "Unable to approve this login. Please try again.",
+        );
+        return;
+      }
+      setApprovalResolved("approved");
+    } catch {
+      setApprovalError("Network error. Please try again.");
+    } finally {
+      setApprovalSaving(false);
+    }
+  };
+
+  const handleDenyLogin = async () => {
+    const notif = approvalModalNotif;
+    if (!notif) return;
+    setApprovalDenying(true);
+    setApprovalError("");
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      const res = await fetch(
+        `${API_URL}/notifications/${notif.id}/deny-login`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.success) {
+        setApprovalError(
+          d.message || "Unable to deny this login. Please try again.",
+        );
+        return;
+      }
+      setApprovalResolved("denied");
+    } catch {
+      setApprovalError("Network error. Please try again.");
+    } finally {
+      setApprovalDenying(false);
+    }
+  };
+
   // Navigate in-app so the component stays mounted and the PATCH completes
   const handleNotifClick = (notif) => {
     markOneRead(notif);
     if (notif.type === "NEW_LOGIN") {
       openLoginModal(notif);
+      setNotifOpen(false);
+      return;
+    }
+    if (notif.type === "LOGIN_APPROVAL_REQUEST") {
+      setApprovalTrustChecked(false);
+      setApprovalError("");
+      setApprovalResolved(null);
+      setApprovalModalNotif(notif);
       setNotifOpen(false);
       return;
     }
@@ -653,6 +737,23 @@ const TopBar = ({ onMenuClick }) => {
           <path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" />
           <path d="M12 8v4" />
           <path d="M12 16h.01" />
+        </svg>
+      ),
+    },
+    LOGIN_APPROVAL_REQUEST: {
+      color: "#0ea5e9",
+      svg: (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#0ea5e9"
+          strokeWidth="2.5"
+        >
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M3 9h18" />
+          <path d="m9 15 2 2 4-4" />
         </svg>
       ),
     },
@@ -1114,6 +1215,296 @@ const TopBar = ({ onMenuClick }) => {
                   </button>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Login Approval Request modal ("Try another device") ── */}
+      {approvalModalNotif && (
+        <div
+          onClick={closeApprovalModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.55)",
+            zIndex: 100000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "440px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "24px 24px 0", textAlign: "center" }}>
+              <div
+                style={{
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "50%",
+                  background: "#f0f9ff",
+                  border: "2px solid #bae6fd",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                }}
+              >
+                <svg
+                  width="26"
+                  height="26"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#0ea5e9"
+                  strokeWidth="2.2"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path d="M3 9h18" />
+                  <path d="m9 15 2 2 4-4" />
+                </svg>
+              </div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                {approvalResolved === "approved"
+                  ? "Login Approved"
+                  : approvalResolved === "denied"
+                    ? "Login Denied"
+                    : "Approve This Login?"}
+              </h2>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: "13px",
+                  color: "#6b7280",
+                  lineHeight: 1.5,
+                }}
+              >
+                {approvalResolved === "approved"
+                  ? "The other device has been signed in."
+                  : approvalResolved === "denied"
+                    ? "The other device was not allowed to sign in."
+                    : "Someone is trying to log in from another device using your account."}
+              </p>
+            </div>
+
+            {!approvalResolved ? (
+              <>
+                <div
+                  style={{
+                    margin: "18px 24px 0",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    background: "#f9fafb",
+                    padding: "4px 16px",
+                  }}
+                >
+                  {[
+                    [
+                      "Device",
+                      approvalModalNotif.metadata?.device_label ||
+                        "Unknown device",
+                    ],
+                    [
+                      "IP Address",
+                      approvalModalNotif.metadata?.ip_address || "Unavailable",
+                    ],
+                    [
+                      "Requested",
+                      approvalModalNotif.metadata?.requested_at
+                        ? new Date(
+                            approvalModalNotif.metadata.requested_at,
+                          ).toLocaleString("en-PH", {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : "—",
+                    ],
+                  ].map(([label, value], i, arr) => (
+                    <div
+                      key={label}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        padding: "10px 0",
+                        borderBottom:
+                          i < arr.length - 1 ? "1px solid #e5e7eb" : "none",
+                        fontSize: "13px",
+                      }}
+                    >
+                      <span style={{ color: "#6b7280" }}>{label}</span>
+                      <span
+                        style={{
+                          color: "#111827",
+                          fontWeight: 600,
+                          textAlign: "right",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <label
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    alignItems: "flex-start",
+                    margin: "14px 24px 0",
+                    padding: "14px",
+                    border: `1px solid ${approvalTrustChecked ? "#7dd3fc" : "#e5e7eb"}`,
+                    background: approvalTrustChecked ? "#f0f9ff" : "#f9fafb",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={approvalTrustChecked}
+                    onChange={(e) => setApprovalTrustChecked(e.target.checked)}
+                    disabled={approvalSaving || approvalDenying}
+                    style={{
+                      marginTop: "2px",
+                      width: "16px",
+                      height: "16px",
+                      accentColor: "#0284c7",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span>
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "#111827",
+                      }}
+                    >
+                      Don't ask again on this device for 30 days.
+                    </span>
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: "4px",
+                        fontSize: "12px",
+                        color: "#6b7280",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      Leave this unchecked if you'd rather confirm the other
+                      device every time it logs in.
+                    </span>
+                  </span>
+                </label>
+
+                {approvalError && (
+                  <div
+                    style={{
+                      margin: "12px 24px 0",
+                      fontSize: "12px",
+                      color: "#dc2626",
+                    }}
+                  >
+                    {approvalError}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    padding: "18px 24px 24px",
+                  }}
+                >
+                  <button
+                    onClick={handleDenyLogin}
+                    disabled={approvalSaving || approvalDenying}
+                    style={{
+                      flex: 1,
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
+                      color: "#111827",
+                      fontWeight: 600,
+                      fontSize: "14px",
+                      cursor:
+                        approvalSaving || approvalDenying
+                          ? "not-allowed"
+                          : "pointer",
+                    }}
+                  >
+                    {approvalDenying ? "Denying…" : "Deny"}
+                  </button>
+                  <button
+                    onClick={handleApproveLogin}
+                    disabled={approvalSaving || approvalDenying}
+                    style={{
+                      flex: 1,
+                      padding: "11px 16px",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "#0284c7",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      cursor:
+                        approvalSaving || approvalDenying
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity: approvalSaving ? 0.7 : 1,
+                    }}
+                  >
+                    {approvalSaving ? "Approving…" : "Approve"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  padding: "18px 24px 24px",
+                }}
+              >
+                <button
+                  onClick={closeApprovalModal}
+                  style={{
+                    padding: "11px 16px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "#1e3a5f",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: "14px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -71,6 +71,30 @@ const LoginSystem = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // ── Device login verification (new-device email gate) ───────────────────
+  const [pendingId, setPendingId] = useState(null);
+  const [deviceMaskedEmail, setDeviceMaskedEmail] = useState("");
+  const [deviceCode, setDeviceCode] = useState(["", "", "", "", "", ""]);
+  const [deviceTimer, setDeviceTimer] = useState(120);
+  const [deviceCanResend, setDeviceCanResend] = useState(false);
+  const [deviceOtpState, setDeviceOtpState] = useState("active");
+  const [deviceResendsLeft, setDeviceResendsLeft] = useState(3);
+  const deviceResendsLeftRef = useRef(3);
+  const [deviceStep, setDeviceStep] = useState("active");
+  const [canUseTrustedDevice, setCanUseTrustedDevice] = useState(false);
+  const [approvalRequesting, setApprovalRequesting] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const approvalPollRef = useRef(null);
+  const [deviceTrustChecked, setDeviceTrustChecked] = useState(false);
+  const [deviceTrustSaving, setDeviceTrustSaving] = useState(false);
+  const [deviceLockedUntilTs, setDeviceLockedUntilTs] = useState(null);
+  const [deviceLockedCountdown, setDeviceLockedCountdown] = useState("");
+  const deviceLockTimerRef = useRef(null);
+  const [deviceError, setDeviceError] = useState("");
+  const [deviceVerifying, setDeviceVerifying] = useState(false);
+  const [deviceSending, setDeviceSending] = useState(false);
+  const deviceCodeInputs = useRef([]);
   // ── OTP lockout state — now supports "blocked" (daily limit) and
   // "session-locked" (3x wrong OTP), same as ChangePasswordModal ────────────
   const [fpStep, setFpStep] = useState("active"); // "active" | "blocked" | "session-locked"
@@ -138,6 +162,39 @@ const LoginSystem = () => {
   useEffect(() => {
     resendsLeftRef.current = resendsLeft;
   }, [resendsLeft]);
+
+  useEffect(() => {
+    deviceResendsLeftRef.current = deviceResendsLeft;
+  }, [deviceResendsLeft]);
+
+  useEffect(() => {
+    let interval;
+    if (currentView === "device-verify" && deviceTimer > 0 && deviceStep === "active") {
+      interval = setInterval(() => {
+        setDeviceTimer((prev) => {
+          if (prev <= 1) {
+            setDeviceCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [currentView, deviceTimer, deviceStep]);
+
+  useEffect(() => {
+    clearInterval(deviceLockTimerRef.current);
+    if (deviceStep !== "session-locked" || !deviceLockedUntilTs) return;
+    const tick = () => setDeviceLockedCountdown(fmtCountdown(deviceLockedUntilTs - Date.now()));
+    tick();
+    deviceLockTimerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(deviceLockTimerRef.current);
+  }, [deviceStep, deviceLockedUntilTs]);
+
+  useEffect(() => {
+    return () => clearInterval(approvalPollRef.current);
+  }, []);
 
   // ── Single ticker effect — mirrors ChangePasswordModal's pattern exactly.
   // Re-runs whenever fpStep changes, so it never gets stuck after navigation.
@@ -282,13 +339,34 @@ const LoginSystem = () => {
 
       const data = await response.json();
 
-      if (!response.ok) {
+      // ── New/unrecognized device → hold here, no token issued yet ──────
+      if (data.requiresDeviceVerification) {
+        setIsLoading(false);
+        setPendingId(data.pendingId);
+        setDeviceMaskedEmail(data.maskedEmail || "");
+        setDeviceCode(["", "", "", "", "", ""]);
+        setDeviceTimer(120);
+        setDeviceCanResend(false);
+        setDeviceOtpState("active");
+        setDeviceStep("active");
+        setDeviceError("");
+        setApprovalError("");
+        setCanUseTrustedDevice(data.canUseTrustedDevice === true);
+        const rl = data.resendsLeft ?? 3;
+        setDeviceResendsLeft(rl);
+        deviceResendsLeftRef.current = rl;
+        setCurrentView("device-verify");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
         setError(
           data.message || "Login failed! Please enter your credentials.",
         );
         setIsLoading(false);
         return;
       }
+
       if (rememberMe) {
         sessionStorage.removeItem("token");
         localStorage.setItem("token", data.token);
@@ -312,6 +390,212 @@ const LoginSystem = () => {
       setError("Server error. Check backend.");
       setIsLoading(false);
     }
+  };
+
+  const handleDeviceCodeChange = (index, value) => {
+    if (value.length > 1) value = value[0];
+    if (!/^\d*$/.test(value)) return;
+    const next = [...deviceCode];
+    next[index] = value;
+    setDeviceCode(next);
+    setDeviceError("");
+    if (value && index < 5) deviceCodeInputs.current[index + 1]?.focus();
+  };
+
+  const handleDeviceCodeKeyDown = (index, e) => {
+    if (e.key === "Backspace" && !deviceCode[index] && index > 0) {
+      deviceCodeInputs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyDeviceLogin = async () => {
+    const code = deviceCode.join("");
+    if (code.length !== 6) {
+      setDeviceError("Please enter all 6 digits");
+      return;
+    }
+    setDeviceVerifying(true);
+    setDeviceError("");
+    try {
+      const response = await fetch(`${API_URL}/auth/device/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pendingId, code }),
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        if (data.sessionLocked) {
+          setDeviceLockedUntilTs(Date.now() + (data.minutesLeft || 15) * 60000);
+          setDeviceStep("session-locked");
+          setDeviceVerifying(false);
+          return;
+        }
+        if (data.forceResend) {
+          setDeviceOtpState("attempts-exceeded");
+          setDeviceCode(["", "", "", "", "", ""]);
+          if (data.resendsLeft !== undefined) {
+            setDeviceResendsLeft(data.resendsLeft);
+            deviceResendsLeftRef.current = data.resendsLeft;
+          }
+          setDeviceError(data.message);
+          setDeviceVerifying(false);
+          return;
+        }
+        setDeviceError(data.message || "Invalid code");
+        setDeviceCode(["", "", "", "", "", ""]);
+        setTimeout(() => deviceCodeInputs.current[0]?.focus(), 60);
+        setDeviceVerifying(false);
+        return;
+      }
+
+      if (rememberMe) {
+        sessionStorage.removeItem("token");
+        localStorage.setItem("token", data.token);
+      } else {
+        localStorage.removeItem("token");
+        sessionStorage.setItem("token", data.token);
+      }
+      setDeviceVerifying(false);
+      setDeviceTrustChecked(false);
+      setDeviceStep("confirm-trust");
+    } catch (err) {
+      console.error(err);
+      setDeviceError("Network error. Please try again.");
+      setDeviceVerifying(false);
+    }
+  };
+
+  const handleConfirmDeviceTrust = async () => {
+    setDeviceTrustSaving(true);
+    try {
+      if (deviceTrustChecked) {
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
+        await fetch(`${API_URL}/auth/device/trust-current`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+    } finally {
+      navigate("/crime-dashboard");
+    }
+  };
+
+  const handleResendDeviceLogin = async () => {
+    if ((!deviceCanResend && deviceOtpState !== "attempts-exceeded") || deviceSending) return;
+    setDeviceSending(true);
+    setDeviceError("");
+    try {
+      const response = await fetch(`${API_URL}/auth/device/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pendingId }),
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        if (data.locked) {
+          setDeviceLockedUntilTs(Date.now() + (data.minutesLeft || 15) * 60000);
+          setDeviceStep("session-locked");
+          setDeviceSending(false);
+          return;
+        }
+        setDeviceError(data.message || "Failed to resend code");
+        setDeviceSending(false);
+        return;
+      }
+
+      setDeviceTimer(120);
+      setDeviceCanResend(false);
+      setDeviceOtpState("active");
+      setDeviceCode(["", "", "", "", "", ""]);
+      const rl = data.resendsLeft ?? 0;
+      setDeviceResendsLeft(rl);
+      deviceResendsLeftRef.current = rl;
+      setDeviceSending(false);
+    } catch (err) {
+      console.error(err);
+      setDeviceError("Network error. Please try again.");
+      setDeviceSending(false);
+    }
+  };
+
+  const startApprovalPolling = () => {
+    clearInterval(approvalPollRef.current);
+    approvalPollRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/auth/device/poll?pendingId=${encodeURIComponent(pendingId)}`,
+        );
+        const data = await response.json();
+
+        if (data.status === "approved" && data.success) {
+          clearInterval(approvalPollRef.current);
+          if (rememberMe) {
+            sessionStorage.removeItem("token");
+            localStorage.setItem("token", data.token);
+          } else {
+            localStorage.removeItem("token");
+            sessionStorage.setItem("token", data.token);
+          }
+          setSuccess("Login approved! Logging you in...");
+          setTimeout(() => navigate("/crime-dashboard"), 800);
+          return;
+        }
+
+        if (data.denied) {
+          clearInterval(approvalPollRef.current);
+          setApprovalError(data.message || "The login request was denied.");
+          setDeviceStep("active");
+          return;
+        }
+
+        if (data.expired) {
+          clearInterval(approvalPollRef.current);
+          setApprovalError(data.message || "This login request has expired. Please log in again.");
+          setCurrentView("login");
+          setPendingId(null);
+        }
+        // status "pending" → keep polling
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    }, 3000);
+  };
+
+  const handleUseAnotherDevice = async () => {
+    if (!pendingId || approvalRequesting) return;
+    setApprovalRequesting(true);
+    setApprovalError("");
+    try {
+      const response = await fetch(`${API_URL}/auth/device/request-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pendingId }),
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        setApprovalError(data.message || "Failed to request approval. Please try again.");
+        setApprovalRequesting(false);
+        return;
+      }
+
+      setDeviceStep("awaiting-approval");
+      setApprovalRequesting(false);
+      startApprovalPolling();
+    } catch (err) {
+      console.error(err);
+      setApprovalError("Network error. Please try again.");
+      setApprovalRequesting(false);
+    }
+  };
+
+  const handleCancelAwaitingApproval = () => {
+    clearInterval(approvalPollRef.current);
+    setDeviceStep("active");
+    setApprovalError("");
   };
 
   const handleForgotPassword = async () => {
@@ -828,6 +1112,231 @@ const LoginSystem = () => {
                   </span>
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Device Verification View — SESSION-LOCKED */}
+          {currentView === "device-verify" && deviceStep === "session-locked" && (
+            <div style={{ textAlign: "center" }}>
+              <h2 className="form-title" style={{ fontSize: 24 }}>
+                Verification Locked
+              </h2>
+              <p className="form-subtitle">
+                Too many incorrect attempts. For your security, this device
+                verification has been temporarily locked.
+              </p>
+              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                Try again in:
+              </p>
+              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+                {deviceLockedCountdown || "Calculating…"}
+              </div>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setCurrentView("login");
+                  setPendingId(null);
+                }}
+              >
+                Back to Login
+              </button>
+            </div>
+          )}
+
+          {/* Device Verification View — ACTIVE */}
+          {currentView === "device-verify" && deviceStep === "active" && (
+            <div>
+              <h2 className="form-title">Verify This Device</h2>
+              <p className="form-subtitle-small">
+                We don't recognize this device. Enter the 6-digit code sent to
+              </p>
+              <p className="email-display">{deviceMaskedEmail}</p>
+
+              {deviceError && (
+                <div className="alert alert-error">
+                  <AlertCircle size={18} />
+                  <span>{deviceError}</span>
+                </div>
+              )}
+              {approvalError && (
+                <div className="alert alert-error">
+                  <AlertCircle size={18} />
+                  <span>{approvalError}</span>
+                </div>
+              )}
+              {success && <div className="alert alert-success">{success}</div>}
+
+              <div className="verification-section">
+                <div className="code-inputs">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <input
+                      key={index}
+                      ref={(el) => (deviceCodeInputs.current[index] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength="1"
+                      value={deviceCode[index]}
+                      onChange={(e) => handleDeviceCodeChange(index, e.target.value)}
+                      onKeyDown={(e) => handleDeviceCodeKeyDown(index, e)}
+                      className="code-input"
+                      disabled={deviceVerifying || deviceOtpState === "attempts-exceeded"}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {deviceOtpState === "active" && (
+                <button
+                  onClick={handleVerifyDeviceLogin}
+                  className="primary-button"
+                  disabled={deviceVerifying || success !== ""}
+                >
+                  {deviceVerifying ? "Verifying..." : "Verify & Log In"}
+                </button>
+              )}
+
+              <button
+                onClick={handleResendDeviceLogin}
+                disabled={
+                  (!deviceCanResend && deviceOtpState !== "attempts-exceeded") ||
+                  deviceSending ||
+                  deviceResendsLeft <= 0
+                }
+                className="secondary-button"
+              >
+                {deviceSending
+                  ? "Sending..."
+                  : deviceResendsLeft <= 0
+                    ? "No resends available"
+                    : deviceOtpState === "attempts-exceeded"
+                      ? `Request New Code (${deviceResendsLeft} left)`
+                      : deviceCanResend
+                        ? `Resend Code (${deviceResendsLeft} left)`
+                        : `Resend in ${deviceTimer}s`}
+              </button>
+
+              {canUseTrustedDevice && (
+                <button
+                  onClick={handleUseAnotherDevice}
+                  disabled={approvalRequesting}
+                  className="secondary-button"
+                  style={{ marginTop: 10 }}
+                >
+                  {approvalRequesting ? "Requesting…" : "Use another device instead"}
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setCurrentView("login");
+                  setPendingId(null);
+                }}
+                className="link-button"
+                style={{ marginTop: 12 }}
+              >
+                Cancel and go back
+              </button>
+            </div>
+          )}
+
+          {/* Device Verification View — AWAITING APPROVAL */}
+          {currentView === "device-verify" && deviceStep === "awaiting-approval" && (
+            <div style={{ textAlign: "center" }}>
+              <h2 className="form-title" style={{ fontSize: 24 }}>
+                Waiting for Approval
+              </h2>
+              <p className="form-subtitle">
+                We sent a request to your trusted device. Open the notification
+                bell there and approve or deny this login.
+              </p>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  margin: "24px auto",
+                  border: "3px solid rgba(96,165,250,0.3)",
+                  borderTopColor: "#60a5fa",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+              {approvalError && (
+                <div className="alert alert-error" style={{ textAlign: "left" }}>
+                  <AlertCircle size={18} />
+                  <span>{approvalError}</span>
+                </div>
+              )}
+
+              <button
+                onClick={handleCancelAwaitingApproval}
+                className="link-button"
+                style={{ marginTop: 12 }}
+              >
+                Cancel and enter code instead
+              </button>
+            </div>
+          )}
+
+          {/* Device Verification View — CONFIRM TRUST (post successful code entry) */}
+          {currentView === "device-verify" && deviceStep === "confirm-trust" && (
+            <div style={{ textAlign: "center" }}>
+              <h2 className="form-title" style={{ fontSize: 24 }}>
+                Code Is Correct
+              </h2>
+              <p className="form-subtitle">
+                You're logged in. Would you like us to remember this device so
+                you're not asked for a code again for a while?
+              </p>
+
+              <label
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "flex-start",
+                  textAlign: "left",
+                  margin: "20px auto",
+                  maxWidth: 360,
+                  padding: "14px",
+                  border: `1px solid ${deviceTrustChecked ? "#60a5fa" : "rgba(255,255,255,0.15)"}`,
+                  background: deviceTrustChecked
+                    ? "rgba(59,130,246,0.12)"
+                    : "rgba(255,255,255,0.04)",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={deviceTrustChecked}
+                  onChange={(e) => setDeviceTrustChecked(e.target.checked)}
+                  disabled={deviceTrustSaving}
+                  style={{
+                    marginTop: 2,
+                    width: 16,
+                    height: 16,
+                    accentColor: "#3b82f6",
+                    flexShrink: 0,
+                  }}
+                />
+                <span>
+                  <span style={{ display: "block", fontWeight: 600, fontSize: 13, color: "#e2e8f0" }}>
+                    Don't ask again on this device for 30 days.
+                  </span>
+                  <span style={{ display: "block", marginTop: 4, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
+                    Leave this unchecked to verify with a code again next time.
+                  </span>
+                </span>
+              </label>
+
+              <button
+                onClick={handleConfirmDeviceTrust}
+                className="primary-button"
+                disabled={deviceTrustSaving}
+              >
+                {deviceTrustSaving ? "Saving…" : "Confirm"}
+              </button>
             </div>
           )}
 

@@ -79,7 +79,6 @@ export default function ProfileSettings() {
   const [deviceHistory, setDeviceHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
-  const [removingTrust, setRemovingTrust] = useState(false);
 
   const [usernameVisible, setUsernameVisible] = useState(false);
   const usernameTimerRef = useRef(null);
@@ -542,10 +541,19 @@ export default function ProfileSettings() {
         setSessionsError(d.message || "Failed to log out that device");
         return;
       }
-      setSessions((prev) => prev.filter((s) => s.token_id !== tokenId));
+      const revokedAt = new Date().toISOString();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.token_id === tokenId
+            ? { ...s, is_revoked: true, revoked_at: revokedAt }
+            : s,
+        ),
+      );
       setSuccessMessage("Device logged out successfully");
       if (selectedDevice?.token_id === tokenId) {
-        backToDeviceList();
+        setSelectedDevice((prev) =>
+          prev ? { ...prev, is_revoked: true, revoked_at: revokedAt } : prev,
+        );
       }
     } catch (err) {
       console.error("handleRevokeSession:", err);
@@ -570,7 +578,14 @@ export default function ProfileSettings() {
         setSessionsError(d.message || "Failed to log out other devices");
         return;
       }
-      setSessions((prev) => prev.filter((s) => s.is_current));
+      const revokedAt = new Date().toISOString();
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.is_current || s.is_revoked
+            ? s
+            : { ...s, is_revoked: true, revoked_at: revokedAt },
+        ),
+      );
       setSuccessMessage("All other devices have been logged out");
       setConfirmRevokeAll(false);
     } catch (err) {
@@ -690,70 +705,6 @@ export default function ProfileSettings() {
     setSelectedDevice(null);
     setDeviceHistory([]);
     setHistoryError("");
-  };
-
-  const handleTrustDevice = async () => {
-    if (!selectedDevice) return;
-    setRemovingTrust(true);
-    setSessionsError("");
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      const res = await fetch(
-        `${API_URL}/users/sessions/${selectedDevice.token_id}/trust`,
-        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
-      );
-      const d = await res.json();
-      if (!res.ok || !d.success) {
-        setSessionsError(d.message || "Failed to trust this device");
-        return;
-      }
-      setSelectedDevice((prev) => ({ ...prev, is_trusted: true }));
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.token_id === selectedDevice.token_id ? { ...s, is_trusted: true } : s,
-        ),
-      );
-      setSuccessMessage("This device is now trusted for 30 days");
-    } catch (err) {
-      console.error("handleTrustDevice:", err);
-      setSessionsError("Network error. Please try again.");
-    } finally {
-      setRemovingTrust(false);
-    }
-  };
-
-  const handleRemoveTrustedDevice = async () => {
-    if (!selectedDevice) return;
-    setRemovingTrust(true);
-    setSessionsError("");
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      const res = await fetch(
-        `${API_URL}/users/sessions/${selectedDevice.token_id}/trust`,
-        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
-      );
-      const d = await res.json();
-      if (!res.ok || !d.success) {
-        setSessionsError(d.message || "Failed to remove trusted device");
-        return;
-      }
-      setSelectedDevice((prev) => ({ ...prev, is_trusted: false }));
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.token_id === selectedDevice.token_id
-            ? { ...s, is_trusted: false }
-            : s,
-        ),
-      );
-      setSuccessMessage("Device removed from trusted devices");
-    } catch (err) {
-      console.error("handleRemoveTrustedDevice:", err);
-      setSessionsError("Network error. Please try again.");
-    } finally {
-      setRemovingTrust(false);
-    }
   };
 
   const silentRefresh = useCallback(async () => {
@@ -2810,7 +2761,7 @@ export default function ProfileSettings() {
                           </React.Fragment>
                         ))}
 
-                      {sessions.filter((s) => !s.is_current).length > 0 && (
+                      {sessions.filter((s) => !s.is_current && !s.is_revoked).length > 0 && (
                         <>
                           <p
                             className="la-section-label"
@@ -2819,7 +2770,7 @@ export default function ProfileSettings() {
                             Logins on other devices:
                           </p>
                           {sessions
-                            .filter((s) => !s.is_current)
+                            .filter((s) => !s.is_current && !s.is_revoked)
                             .map((s) => (
                               <button
                                 key={s.token_id}
@@ -2871,6 +2822,50 @@ export default function ProfileSettings() {
                         </>
                       )}
 
+                      {sessions.filter((s) => s.is_revoked).length > 0 && (
+                        <>
+                          <p
+                            className="la-section-label"
+                            style={{ marginTop: "18px" }}
+                          >
+                            Logged out devices:
+                          </p>
+                          {sessions
+                            .filter((s) => s.is_revoked)
+                            .map((s) => (
+                              <button
+                                key={s.token_id}
+                                className="la-device-row"
+                                style={{ opacity: 0.55 }}
+                                onClick={() => openDeviceDetail(s)}
+                              >
+                                <div className="ps-session-icon">
+                                  {s.device_type === "mobile" ? (
+                                    <Smartphone size={20} />
+                                  ) : (
+                                    <Monitor size={20} />
+                                  )}
+                                </div>
+                                <div className="la-device-info">
+                                  <span className="la-device-name">
+                                    {parseDeviceLabel(s)}
+                                  </span>
+                                  <span className="la-device-loc">
+                                    {s.location_label || s.ip_address || ""}
+                                  </span>
+                                  <span className="la-device-time">
+                                    Logged out {formatSessionTime(s.revoked_at)}
+                                  </span>
+                                </div>
+                                <ChevronRight
+                                  size={16}
+                                  className="la-chevron"
+                                />
+                              </button>
+                            ))}
+                        </>
+                      )}
+
                       {sessions.length === 0 && (
                         <p className="ps-sessions-empty">
                           No active sessions found.
@@ -2902,42 +2897,13 @@ export default function ProfileSettings() {
                       )}
                     </span>
                     <span className="la-device-loc">
-                      {selectedDevice.is_current
-                        ? "Active now"
-                        : `Last login: ${formatSessionTime(selectedDevice.last_active_at)}`}
+                      {selectedDevice.is_revoked
+                        ? `Logged out ${formatSessionTime(selectedDevice.revoked_at)}`
+                        : selectedDevice.is_current
+                          ? "Active now"
+                          : `Last login: ${formatSessionTime(selectedDevice.last_active_at)}`}
                     </span>
-                    {selectedDevice.is_trusted ? (
-                      <button
-                        type="button"
-                        className="la-logout-btn"
-                        style={{
-                          background: "transparent",
-                          color: "#374151",
-                          border: "1px solid #d1d5db",
-                        }}
-                        onClick={handleRemoveTrustedDevice}
-                        disabled={removingTrust}
-                      >
-                        {removingTrust ? "Removing…" : "Remove from Trusted Devices"}
-                      </button>
-                    ) : (
-                      selectedDevice.is_current && (
-                        <button
-                          type="button"
-                          className="la-logout-btn"
-                          style={{
-                            background: "transparent",
-                            color: "#166534",
-                            border: "1px solid #bbf7d0",
-                          }}
-                          onClick={handleTrustDevice}
-                          disabled={removingTrust}
-                        >
-                          {removingTrust ? "Trusting…" : "Trust This Device (30 days)"}
-                        </button>
-                      )
-                    )}
-                    {!selectedDevice.is_current && (
+                    {!selectedDevice.is_current && !selectedDevice.is_revoked && (
                       <button
                         type="button"
                         className="la-logout-btn"

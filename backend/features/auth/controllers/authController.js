@@ -224,6 +224,9 @@ const login = async (req, res) => {
     }
 
     // ── SUCCESS ────────────────────────────────────────────────
+    // Capture this BEFORE the UPDATE below overwrites last_login — a NULL
+    // here means the account has never logged in anywhere, ever.
+    const isFirstEverLogin = user.last_login === null;
 
     await pool.query(
       `UPDATE users
@@ -240,17 +243,77 @@ const login = async (req, res) => {
     await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
 
     // ── New-device detection (IP + User-Agent) ──────────────────
-    // A device is "known" only if the user trusted it and the trust hasn't expired.
-    const trustedCheck = await pool.query(
-      `SELECT 1 FROM trusted_devices
-       WHERE user_id = $1
-         AND ip_address IS NOT DISTINCT FROM $2
-         AND user_agent IS NOT DISTINCT FROM $3
-         AND trusted_until > NOW()
-       LIMIT 1`,
-      [user.user_id, ip, userAgent],
-    );
-    const isNewDevice = trustedCheck.rows.length === 0;
+    // A brand-new account has no baseline device to compare against yet,
+    // so its very first login always skips the check and becomes the
+    // trusted baseline instead of triggering a verification email.
+    let isNewDevice = false;
+    if (!isFirstEverLogin) {
+      const trustedCheck = await pool.query(
+        `SELECT 1 FROM trusted_devices
+         WHERE user_id = $1
+           AND ip_address IS NOT DISTINCT FROM $2
+           AND user_agent IS NOT DISTINCT FROM $3
+           AND trusted_until > NOW()
+         LIMIT 1`,
+        [user.user_id, ip, userAgent],
+      );
+      isNewDevice = trustedCheck.rows.length === 0;
+    }
+
+    // ── Unrecognized device on an existing account → hold the login,
+    // require an emailed code before a token is ever issued ──────────
+    if (isNewDevice) {
+      const pending = await authService.createPendingDeviceLogin({
+        userId:     user.user_id,
+        email:      user.email,
+        firstName:  user.first_name,
+        ipAddress:  ip,
+        userAgent,
+        deviceType,
+        rememberMe: rememberMe === true,
+      });
+
+      if (!pending.success) {
+        return res.status(500).json({
+          success: false,
+          message: pending.message || "Failed to start device verification",
+        });
+      }
+
+      await logAudit({
+        userId:      user.user_id,
+        username:    user.username,
+        eventName:   "Device Verification Required",
+        description: "Login held pending new-device email verification",
+        action:      "LOGIN",
+        status:      "pending",
+        source:      "Web Portal",
+        ipAddress:   ip,
+        userAgent,
+      });
+
+      const canUseTrustedDevice = await authService.userHasTrustedDevice(user.user_id);
+
+      return res.status(200).json({
+        success:                    false,
+        requiresDeviceVerification: true,
+        pendingId:                  pending.pendingId,
+        maskedEmail:                pending.maskedEmail,
+        otpExpiresAt:               pending.otpExpiresAt,
+        resendsLeft:                pending.resendsLeft,
+        canUseTrustedDevice,
+      });
+    }
+
+    // First-ever login on this account → this device becomes the trusted baseline
+    if (isFirstEverLogin) {
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+         ON CONFLICT DO NOTHING`,
+        [user.user_id, ip, userAgent],
+      );
+    }
 
     const token = await tokenManager.createToken(
   {
@@ -280,27 +343,6 @@ const login = async (req, res) => {
       userAgent,
     });
 
-    if (isNewDevice) {
-      const deviceLabel = parseDeviceLabel(userAgent, deviceType);
-      await pool.query(
-        `INSERT INTO notifications
-           (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
-         VALUES ($1, NULL, NULL, 'NEW_LOGIN', $2, $3, $4, FALSE, $5::jsonb)`,
-        [
-          user.user_id,
-          "New login detected",
-          `A new login to your account was detected on ${deviceLabel}.`,
-          "/profile?openChangePassword=1",
-          JSON.stringify({
-            device_label: deviceLabel,
-            ip_address:   ip,
-            user_agent:   userAgent,
-            login_at:     new Date().toISOString(),
-          }),
-        ],
-      );
-    }
-
     return res.status(200).json({
       success: true,
       token,
@@ -318,6 +360,207 @@ const login = async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ success: false, message: "Login failed" });
+  }
+};
+
+// ============================================================
+// VERIFY NEW-DEVICE LOGIN (email code gate before token issuance)
+// ============================================================
+// Shared by verifyDeviceLogin (never trusts) and the approve-poll endpoint
+// (trusts only if the approver checked the box). trustDevice controls that.
+async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice }) {
+  if (trustDevice) {
+    await pool.query(
+      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+       ON CONFLICT DO NOTHING`,
+      [userRow.user_id, ipAddress, userAgent],
+    );
+  }
+
+  const token = await tokenManager.createToken(
+    {
+      user_id:   userRow.user_id,
+      username:  userRow.username,
+      email:     userRow.email,
+      role:      userRow.role_name,
+      user_type: userRow.user_type,
+    },
+    {
+      expiresIn: rememberMe ? "7d" : undefined,
+      userAgent,
+      deviceType,
+      ipAddress,
+    },
+  );
+
+  const deviceLabel = parseDeviceLabel(userAgent, deviceType);
+  await pool.query(
+    `INSERT INTO notifications
+       (recipient_user_id, sender_user_id, sender_name, type, title, message, link_to, is_read, metadata)
+     VALUES ($1, NULL, NULL, 'NEW_LOGIN', $2, $3, $4, FALSE, $5::jsonb)`,
+    [
+      userRow.user_id,
+      "New login detected",
+      `A new login to your account was detected on ${deviceLabel}.`,
+      "/profile?openChangePassword=1",
+      JSON.stringify({
+        device_label: deviceLabel,
+        ip_address:   ipAddress,
+        user_agent:   userAgent,
+        login_at:     new Date().toISOString(),
+      }),
+    ],
+  );
+
+  return token;
+}
+
+const verifyDeviceLogin = async (req, res) => {
+  try {
+    const { pendingId, code } = req.body;
+    const ip = getClientIp(req);
+
+    if (!pendingId || !code) {
+      return res.status(400).json({ success: false, message: "Missing verification details" });
+    }
+
+    const result = await authService.verifyPendingDeviceLogin(pendingId, code, ip);
+
+    if (!result.success) {
+      const status = result.locked || result.sessionLocked ? 429 : 400;
+      return res.status(status).json(result);
+    }
+
+    const { userRow, ipAddress, userAgent, deviceType, rememberMe } = result;
+
+    const token = await issueDeviceLoginToken({
+      userRow, ipAddress, userAgent, deviceType, rememberMe,
+      trustDevice: false, // manual code-entry never auto-trusts
+    });
+
+    await logAudit({
+      userId:      userRow.user_id,
+      username:    userRow.username,
+      eventName:   "User Login",
+      description: "New device verified and login completed via web portal",
+      action:      "LOGIN",
+      status:      "success",
+      source:      "Web Portal",
+      ipAddress,
+      userAgent,
+    });
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        user_id:                userRow.user_id,
+        username:               userRow.username,
+        role:                   userRow.role_name,
+        user_type:              userRow.user_type,
+        first_name:             userRow.first_name,
+        last_name:              userRow.last_name,
+        profile_picture:        userRow.profile_picture || null,
+        assigned_barangay_code: userRow.assigned_barangay_code || null,
+      },
+    });
+  } catch (error) {
+    console.error("Verify device login error:", error);
+    res.status(500).json({ success: false, message: "Verification failed" });
+  }
+};
+
+// ============================================================
+// RESEND NEW-DEVICE LOGIN OTP
+// ============================================================
+const resendDeviceLogin = async (req, res) => {
+  try {
+    const { pendingId } = req.body;
+    const ip = getClientIp(req);
+
+    if (!pendingId) {
+      return res.status(400).json({ success: false, message: "Missing pending login id" });
+    }
+
+    const result = await authService.resendPendingDeviceLogin(pendingId, ip);
+    const status = result.success ? 200 : (result.locked ? 429 : 400);
+    res.status(status).json(result);
+  } catch (error) {
+    console.error("Resend device login error:", error);
+    res.status(500).json({ success: false, message: "Failed to resend code" });
+  }
+};
+
+// ============================================================
+// REQUEST APPROVAL FROM ANOTHER (TRUSTED) DEVICE
+// ============================================================
+const requestDeviceApproval = async (req, res) => {
+  try {
+    const { pendingId } = req.body;
+    if (!pendingId) {
+      return res.status(400).json({ success: false, message: "Missing pending login id" });
+    }
+    const result = await authService.requestDeviceApproval(pendingId);
+    res.status(result.success ? 200 : 400).json(result);
+  } catch (error) {
+    console.error("Request device approval error:", error);
+    res.status(500).json({ success: false, message: "Failed to request approval" });
+  }
+};
+
+// ============================================================
+// POLL — waiting device checks whether it's been approved/denied
+// ============================================================
+const pollDeviceLogin = async (req, res) => {
+  try {
+    const { pendingId } = req.query;
+    if (!pendingId) {
+      return res.status(400).json({ success: false, message: "Missing pending login id" });
+    }
+
+    const result = await authService.pollPendingDeviceLogin(pendingId);
+
+    if (!result.success || result.status !== "approved") {
+      return res.status(200).json(result);
+    }
+
+    const { userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice } = result;
+
+    const token = await issueDeviceLoginToken({
+      userRow, ipAddress, userAgent, deviceType, rememberMe, trustDevice,
+    });
+
+    await logAudit({
+      userId:      userRow.user_id,
+      username:    userRow.username,
+      eventName:   "User Login",
+      description: "Login approved from another device via web portal",
+      action:      "LOGIN",
+      status:      "success",
+      source:      "Web Portal",
+      ipAddress,
+      userAgent,
+    });
+
+    return res.status(200).json({
+      success: true,
+      status:  "approved",
+      token,
+      user: {
+        user_id:                userRow.user_id,
+        username:               userRow.username,
+        role:                   userRow.role_name,
+        user_type:              userRow.user_type,
+        first_name:             userRow.first_name,
+        last_name:              userRow.last_name,
+        profile_picture:        userRow.profile_picture || null,
+        assigned_barangay_code: userRow.assigned_barangay_code || null,
+      },
+    });
+  } catch (error) {
+    console.error("Poll device login error:", error);
+    res.status(500).json({ success: false, message: "Failed to check login status" });
   }
 };
 
@@ -1011,6 +1254,28 @@ const validateToken = async (req, res) => {
 // ============================================================
 // EXPORTS
 // ============================================================
+// ============================================================
+// TRUST CURRENT DEVICE (post-verify "don't ask again" confirm)
+// ============================================================
+const trustCurrentDevice = async (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    const userAgent = req.headers["user-agent"] || null;
+
+    await pool.query(
+      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+       ON CONFLICT DO NOTHING`,
+      [req.user.user_id, ip, userAgent],
+    );
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Trust current device error:", error);
+    res.status(500).json({ success: false, message: "Failed to save preference" });
+  }
+};
+
 module.exports = {
   login,
   mobileLogin,
@@ -1023,4 +1288,9 @@ module.exports = {
   forceLockOTP,
   resetPassword,
   changePassword,
+  verifyDeviceLogin,
+  resendDeviceLogin,
+  requestDeviceApproval,
+  pollDeviceLogin,
+  trustCurrentDevice,
 };
