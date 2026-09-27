@@ -590,17 +590,21 @@ async function createPendingDeviceLogin({ userId, email, firstName, ipAddress, u
   try {
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
+    // Computed server-side (NOW() + INTERVAL) rather than as a JS Date —
+    // a JS Date written into a naive timestamp column can be serialized
+    // in the wrong timezone context, causing it to compare as already
+    // expired against a later NOW() even though it's genuinely still valid.
     const insert = await pool.query(
       `INSERT INTO pending_device_logins
          (user_id, otp_hash, ip_address, user_agent, device_type, remember_me, expires_at, resends_left, device_id, device_label)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING pending_id`,
-      [userId, otpHash, ipAddress, userAgent, deviceType, rememberMe, expiresAt, DEVICE_OTP_RESEND_MAX, deviceId, deviceLabel],
+       VALUES ($1,$2,$3,$4,$5,$6, NOW() + INTERVAL '2 minutes', $7,$8,$9)
+       RETURNING pending_id, expires_at`,
+      [userId, otpHash, ipAddress, userAgent, deviceType, rememberMe, DEVICE_OTP_RESEND_MAX, deviceId, deviceLabel],
     );
 
     const pendingId = insert.rows[0].pending_id;
+    const expiresAt = insert.rows[0].expires_at;
 
     try {
       await sendBrevoDeviceLoginEmail({ to: email, firstName, otp });
@@ -766,14 +770,15 @@ async function resendPendingDeviceLogin(pendingId, ipAddress = null) {
     const newResendsLeft = p.resends_left - 1;
     const otp = generateOTP();
     const otpHash = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
 
-    await pool.query(
+    const resendResult = await pool.query(
       `UPDATE pending_device_logins
-       SET otp_hash = $2, expires_at = $3, attempts = 0, resends_left = $4
-       WHERE pending_id = $1`,
-      [pendingId, otpHash, expiresAt, newResendsLeft],
+       SET otp_hash = $2, expires_at = NOW() + INTERVAL '2 minutes', attempts = 0, resends_left = $3
+       WHERE pending_id = $1
+       RETURNING expires_at`,
+      [pendingId, otpHash, newResendsLeft],
     );
+    const expiresAt = resendResult.rows[0]?.expires_at;
 
     try {
       await sendBrevoDeviceLoginEmail({ to: p.email, firstName: p.first_name, otp });
@@ -814,7 +819,7 @@ async function userHasTrustedDevice(userId) {
   }
 }
 
-async function requestDeviceApproval(pendingId) {
+async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
   try {
     const result = await pool.query(
       `SELECT * FROM pending_device_logins WHERE pending_id = $1`,
@@ -829,18 +834,37 @@ async function requestDeviceApproval(pendingId) {
       return { success: false, message: "This login request is no longer active." };
     }
 
-    const newExpiry = new Date(Date.now() + 5 * 60 * 1000);
-    await pool.query(
-      `UPDATE pending_device_logins SET expires_at = GREATEST(expires_at, $2) WHERE pending_id = $1`,
-      [pendingId, newExpiry],
+    // Every OTHER device's push token — never push approval back to the
+    // same device that's asking for it.
+    const tokenRows = requestingDeviceId
+      ? await pool.query(
+          `SELECT push_token FROM device_push_tokens WHERE user_id = $1 AND device_id != $2`,
+          [p.user_id, requestingDeviceId],
+        )
+      : await pool.query(
+          `SELECT push_token FROM device_push_tokens WHERE user_id = $1`,
+          [p.user_id],
+        );
+
+    if (tokenRows.rows.length === 0) {
+      return {
+        success: false,
+        message: "No other trusted device is available to approve this login.",
+      };
+    }
+
+    const updated = await pool.query(
+      `UPDATE pending_device_logins
+       SET expires_at = GREATEST(expires_at, NOW() + INTERVAL '5 minutes')
+       WHERE pending_id = $1
+       RETURNING expires_at`,
+      [pendingId],
     );
+    const newExpiry = updated.rows[0]?.expires_at;
 
     const deviceLabel = p.device_label || parseDeviceLabel(p.user_agent, p.device_type);
 
-    // Routed through notificationService (not a raw INSERT) so this also
-    // fires a push via Firebase to a trusted device with a push_token,
-    // the same helper web's existing bell-icon notifications use.
-    await notificationService.createNotification({
+    await notificationService.createNotificationForTokens({
       recipientId: p.user_id,
       type:        "LOGIN_APPROVAL_REQUEST",
       title:       "Approve login from another device",
@@ -852,6 +876,7 @@ async function requestDeviceApproval(pendingId) {
         user_agent:   p.user_agent,
         requested_at: new Date().toISOString(),
       },
+      pushTokens: tokenRows.rows.map((r) => r.push_token),
     });
 
     return { success: true, otpExpiresAt: newExpiry };
@@ -914,6 +939,7 @@ async function pollPendingDeviceLogin(pendingId) {
       rememberMe:  p.remember_me,
       trustDevice: p.trust_this_device,
       deviceId:    p.device_id,
+      deviceLabel: p.device_label,
     };
   } catch (error) {
     console.error("Error polling pending device login:", error);

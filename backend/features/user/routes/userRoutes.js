@@ -21,6 +21,8 @@ const {
   getReauthStatus
 } = require("../controllers/userController");
 
+
+
 // Multer setup for file uploads
 const multer = require("multer");
 const path = require("path");
@@ -98,6 +100,10 @@ router.post("/users/:id/resend-verification", authenticate, resendVerificationEm
 // GET  /roles
 router.get("/roles", authenticate, getAllRoles);
 
+// GET  /ranks
 router.get("/ranks", authenticate, getRanks);
 
+
+
 module.exports = router;
+
