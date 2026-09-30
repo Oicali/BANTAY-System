@@ -1246,8 +1246,30 @@ const TopBar = ({ onMenuClick }) => {
               maxWidth: "440px",
               boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
               overflow: "hidden",
+              position: "relative",
             }}
           >
+            <button
+              onClick={closeApprovalModal}
+              disabled={approvalSaving || approvalDenying}
+              aria-label="Close"
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "14px",
+                background: "none",
+                border: "none",
+                fontSize: "26px",
+                lineHeight: 1,
+                color: "#9ca3af",
+                cursor:
+                  approvalSaving || approvalDenying
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              &times;
+            </button>
             <div style={{ padding: "24px 24px 0", textAlign: "center" }}>
               <div
                 style={{
@@ -1439,6 +1461,7 @@ const TopBar = ({ onMenuClick }) => {
                     padding: "18px 24px 24px",
                   }}
                 >
+
                   <button
                     onClick={handleDenyLogin}
                     disabled={approvalSaving || approvalDenying}
