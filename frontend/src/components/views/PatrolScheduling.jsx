@@ -9,6 +9,8 @@ import LoadingModal from "../modals/LoadingModal";
 import PdfPreviewModal from "../modals/PdfPreviewModal";
 import DeletedSchedulesModal from "../modals/DeletedSchedulesModal";
 import { useExportPatrolList } from "../../hooks/UseExportPatrol.js";
+// Needed for the isAdmin role check
+import { getUserFromToken } from "../../utils/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL;
 
@@ -108,11 +110,11 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 const PatrolScheduling = () => {
   const token = () =>
     localStorage.getItem("token") || sessionStorage.getItem("token");
-  const [isAdmin] = useState(
-    () =>
-      getUserFromToken()?.role === "Administrator" ||
-      getUserFromToken()?.role === "Technical Administrator",
-  );
+  // Read the token once, then compare against the raw role
+  const [isAdmin] = useState(() => {
+    const role = getUserFromToken()?.role;
+    return role === "Administrator" || role === "Technical Administrator";
+  });
 
   const [patrols, setPatrols] = useState([]);
   const [mobileUnits, setMobileUnits] = useState([]);

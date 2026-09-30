@@ -22,7 +22,7 @@ const PRIVACY_SECTIONS = [
         <p>
           <strong>This system is not open to public sign-up.</strong>{" "}
           Accounts are created and assigned by PNP Bacoor administrators for
-          authorized personnel only (police officers, investigators, patrol
+          authorized personnel only (police officers, investigation officers, patrol
           officers, barangay staff). By logging into and using the Bantay
           System, you consent to the data practices described in this
           statement.

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import "./AuditLog.css";
 import LoadingModal from "../modals/LoadingModal";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const ITEMS_PER_PAGE = 15;
 const API_URL = import.meta.env.VITE_API_URL;
@@ -851,7 +853,7 @@ const AuditLog = () => {
                               {log.display_name || log.username || "—"}
                             </div>
                             <div className="al-user-email">
-                              {log.role_name || "—"}
+                              {formatRole(log.role_name) || "—"}
                             </div>
                           </td>
                         )}

@@ -258,8 +258,8 @@ function CaseManagement() {
       if (data.success) {
         showToast(
           selectedInvestigatorId
-            ? "Investigator assigned successfully!"
-            : "Investigator unassigned successfully!",
+            ? "Investigation Officer assigned successfully!"
+            : "Investigation Officer unassigned successfully!",
         );
         setShowAssignModal(false);
         fetchCases();
@@ -268,7 +268,7 @@ function CaseManagement() {
         showError(data.message);
       }
     } catch (err) {
-      showError("Failed to assign investigator. Please try again.");
+      showError("Failed to assign investigation officer. Please try again.");
     } finally {
       setModalLoading(false);
     }
@@ -899,7 +899,7 @@ function CaseManagement() {
             style={{ maxWidth: "700px", width: "95vw" }}
           >
             <div className="cm-modal-header">
-              <h2>Assign Investigator</h2>
+              <h2>Assign an Investigation Officer</h2>
               <span
                 className="cm-modal-close"
                 onClick={() => setShowAssignModal(false)}
@@ -988,7 +988,7 @@ function CaseManagement() {
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                 </svg>
-                Available Investigators ({investigators.length})
+                Available Investigation Officers ({investigators.length})
               </div>
 
               <div className="cm-io-list">
@@ -1001,7 +1001,7 @@ function CaseManagement() {
                       fontSize: "13px",
                     }}
                   >
-                    Loading investigators...
+                    Loading investigation officers...
                   </div>
                 ) : (
                   investigators.map((inv) => {
@@ -1094,7 +1094,7 @@ function CaseManagement() {
                               >
                                 <circle cx="12" cy="12" r="10" />
                               </svg>
-                              Investigator · Active
+                              Investigation Officer · Active
                             </span>
                           </div>
                         </div>
@@ -1120,7 +1120,7 @@ function CaseManagement() {
                 {modalLoading
                   ? "Saving..."
                   : selectedInvestigatorId
-                    ? "Assign Investigator"
+                    ? "Assign IO"
                     : "Unassign IO"}
               </button>
             </div>

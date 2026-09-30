@@ -3023,14 +3023,15 @@ body {
   transition: width 0.3s ease;
 }
 
-.cd-score-critical { color: #dc2626; }
-.cd-score-high     { color: #ea580c; }
-.cd-score-medium   { color: #ca8a04; }
+/* Score colors matched to Crime Map choropleth; low stays gray */
+.cd-score-critical { color: #b91c1c; }
+.cd-score-high     { color: #f97316; }
+.cd-score-medium   { color: #eab308; }
 .cd-score-low      { color: var(--gray-400); }
 
-.cd-fill-critical  { background: #dc2626; }
-.cd-fill-high      { background: #ea580c; }
-.cd-fill-medium    { background: #ca8a04; }
+.cd-fill-critical  { background: #b91c1c; }
+.cd-fill-high      { background: #f97316; }
+.cd-fill-medium    { background: #eab308; }
 .cd-fill-low       { background: var(--gray-300); }
 
 /* Crime pills */

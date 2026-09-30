@@ -6,6 +6,8 @@ import {
   LEGACY_BARANGAY_OPTIONS,
 } from "../../utils/barangayOptions";
 import ImageCropperModal from "../modals/ImageCropperModal";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const API_URL = import.meta.env.VITE_API_URL;
@@ -1326,8 +1328,9 @@ const AddUserModal = ({ isOpen, onClose, onUserAdded }) => {
                           Technical Administrator
                         </option>
                         <option value="Administrator">Administrator</option>
-                        <option value="Investigator">Investigator</option>
-                        <option value="Patrol">Patrol</option>
+                        {/* value stays raw; only the label is formatted */}
+                        <option value="Investigator">{formatRole("Investigator")}</option>
+                        <option value="Patrol">{formatRole("Patrol")}</option>
                       </select>
                     </div>
                     <div className="aum-form-group">

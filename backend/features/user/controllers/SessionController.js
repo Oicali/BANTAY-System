@@ -34,7 +34,7 @@ const revokeSession = async (req, res) => {
       return res.status(404).json({ success: false, message: "Session not found" });
     }
 
-    const targetIsTrusted = await tokenManager.isSessionTrusted(tokenId, userId);
+        const targetIsTrusted = await tokenManager.isSessionTrusted(tokenId, userId);
 
     if (targetIsTrusted) {
       const currentIsTrusted = currentTokenHash
