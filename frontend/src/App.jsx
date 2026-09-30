@@ -25,6 +25,7 @@ import PatrollerDashboard from "./components/views/PatrolDashboard";
 import ResidentManagement from "./components/views/ResidentManagement";
 import AuditLog from "./components/views/AuditLog";
 import Overview from "./components/views/Overview";
+import SessionWatcher from "./components/SessionWatcher";
 
 const getRole = () => {
   const raw = localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -49,6 +50,7 @@ const RoleBasedPatrolDashboard = () => {
 function App() {
   return (
     <Router>
+      <SessionWatcher />
       <Routes>
         {/* Public */}
         <Route

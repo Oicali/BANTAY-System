@@ -49,7 +49,7 @@ router.post("/device/trust-current", authenticate, trustCurrentDevice);
 router.get(
   "/session-check",
   (req, res, next) => {
-    console.log("🔎 session-check hit", new Date().toISOString());
+    res.set("Cache-Control", "no-store");
     next();
   },
   authenticate,
