@@ -9,15 +9,7 @@ const getSessions = async (req, res) => {
     const rawToken = req.headers.authorization?.split(" ")[1];
     const currentTokenHash = rawToken ? hashToken(rawToken) : null;
 
-    const [sessions, trustedKeys] = await Promise.all([
-      tokenManager.getUserSessions(userId, currentTokenHash),
-      tokenManager.getTrustedDeviceKeys(userId),
-    ]);
-
-    const withTrust = sessions.map((s) => ({
-      ...s,
-      is_trusted: trustedKeys.has(`${s.ip_address || ""}|${s.user_agent || ""}`),
-    }));
+    const withTrust = await tokenManager.getUserSessions(userId, currentTokenHash);
 
     res.json({ success: true, sessions: withTrust });
   } catch (error) {
@@ -35,16 +27,14 @@ const revokeSession = async (req, res) => {
     const currentTokenHash = rawToken ? hashToken(rawToken) : null;
 
     const targetResult = await pool.query(
-      `SELECT ip_address, user_agent FROM tokens WHERE token_id = $1 AND user_id = $2`,
+      `SELECT 1 FROM tokens WHERE token_id = $1 AND user_id = $2`,
       [tokenId, userId]
     );
     if (targetResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: "Session not found" });
     }
 
-    const { ip_address, user_agent } = targetResult.rows[0];
-    const trustedKeys = await tokenManager.getTrustedDeviceKeys(userId);
-    const targetIsTrusted = trustedKeys.has(`${ip_address || ""}|${user_agent || ""}`);
+    const targetIsTrusted = await tokenManager.isSessionTrusted(tokenId, userId);
 
     if (targetIsTrusted) {
       const currentIsTrusted = currentTokenHash
@@ -121,10 +111,7 @@ const getDeviceHistory = async (req, res) => {
 
     const device = sessionResult.rows[0];
 
-    const trustedKeys = await tokenManager.getTrustedDeviceKeys(userId);
-    device.is_trusted = trustedKeys.has(
-      `${device.ip_address || ""}|${device.user_agent || ""}`
-    );
+    device.is_trusted = await tokenManager.isSessionTrusted(tokenId, userId);
 
     const historyResult = await pool.query(
       `SELECT description, created_at, ip_address

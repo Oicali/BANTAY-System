@@ -373,6 +373,10 @@ async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType
     if (deviceId) {
       // Mobile: trust the app install, not ip/ua — cellular IPs churn.
       await pool.query(
+        `DELETE FROM trusted_devices WHERE user_id = $1 AND device_id = $2`,
+        [userRow.user_id, deviceId],
+      );
+      await pool.query(
         `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until, device_id)
          VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', $4)`,
         [userRow.user_id, ipAddress, userAgent, deviceId],
@@ -400,6 +404,7 @@ async function issueDeviceLoginToken({ userRow, ipAddress, userAgent, deviceType
       userAgent,
       deviceType,
       ipAddress,
+      deviceId,
       clientAppLabel: precomputedLabel,
     },
   );
@@ -1167,7 +1172,7 @@ const mobileLogin = async (req, res) => {
     const deviceId  = req.headers["x-device-id"] || null;
 
     // Collapse any previous session from this same device before issuing a new one
-    await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip);
+    await tokenManager.revokeSessionsForSameDevice(user.user_id, userAgent, ip, deviceId);
 
     // A native app identifies itself via X-Client-App/X-Client-Platform.
     // Computed once so the token row, any notification, and the
@@ -1281,6 +1286,7 @@ const mobileLogin = async (req, res) => {
         userAgent,
         deviceType: "mobile",
         ipAddress:  ip,
+        deviceId,
         clientAppLabel: clientApp ? deviceLabel : null,
       },
     );
@@ -1336,13 +1342,28 @@ const trustCurrentDevice = async (req, res) => {
   try {
     const ip = getClientIp(req);
     const userAgent = req.headers["user-agent"] || null;
+    const deviceId = req.headers["x-device-id"] || null;
 
-    await pool.query(
-      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
-       ON CONFLICT DO NOTHING`,
-      [req.user.user_id, ip, userAgent],
-    );
+    if (deviceId) {
+      // Mobile: trust the app install (device_id), not ip/ua
+      await pool.query(
+        `DELETE FROM trusted_devices WHERE user_id = $1 AND device_id = $2`,
+        [req.user.user_id, deviceId],
+      );
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until, device_id)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', $4)`,
+        [req.user.user_id, ip, userAgent, deviceId],
+      );
+    } else {
+      // Web: trust by ip + user agent
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')
+         ON CONFLICT DO NOTHING`,
+        [req.user.user_id, ip, userAgent],
+      );
+    }
 
     res.status(200).json({ success: true });
   } catch (error) {

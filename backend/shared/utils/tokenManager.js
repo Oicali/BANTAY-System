@@ -54,9 +54,9 @@ const createToken = async (userData, options = {}) => {
  
     await pool.query(
       `INSERT INTO tokens
-         (user_id, token_hash, expires_at, user_agent, ip_address, device_type, location_label, client_app_label, last_active_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-      [userData.user_id, tokenHash, expiresAt, userAgent, ipAddress, deviceType, locationLabel, clientAppLabel]
+         (user_id, token_hash, expires_at, user_agent, ip_address, device_type, location_label, client_app_label, device_id, last_active_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [userData.user_id, tokenHash, expiresAt, userAgent, ipAddress, deviceType, locationLabel, clientAppLabel, options.deviceId || null]
     );
  
     return token;
@@ -82,34 +82,42 @@ const verifyToken = async (token) => {
       `SELECT t.*, u.status
        FROM tokens t
        JOIN users u ON t.user_id = u.user_id
-       WHERE t.token_hash = $1
-         AND t.is_revoked = false
-         AND t.expires_at > NOW()`,
+       WHERE t.token_hash = $1`,
       [tokenHash]
     );
  
+    const fail = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
+
     if (result.rows.length === 0) {
-      throw new Error("Token not found or expired");
+      throw fail("SESSION_INVALID", "Session not found");
+    }
+    if (result.rows[0].is_revoked) {
+      throw fail("SESSION_REVOKED", "You were logged out from another device");
+    }
+    if (new Date(result.rows[0].expires_at) <= new Date()) {
+      throw fail("SESSION_EXPIRED", "Session expired");
     }
  
     const tokenData = result.rows[0];
  
     // 4. Check user account status
-    if (tokenData.status === "deactivated") {
-      throw new Error("Account is deactivated");
+       if (tokenData.status === "deactivated") {
+      throw fail("SESSION_INVALID", "Account is deactivated");
     }
- 
+
     if (tokenData.status === "locked") {
-      throw new Error("Account is locked");
+      throw fail("SESSION_INVALID", "Account is locked");
     }
- 
+
     if (tokenData.status === "unverified") {
-      throw new Error("Account is not yet verified");
+      throw fail("SESSION_INVALID", "Account is not yet verified");
     }
 
     // NEW: fire-and-forget last-active update, doesn't block the request
     pool.query(
-      `UPDATE tokens SET last_active_at = NOW() WHERE token_hash = $1`,
+      `UPDATE tokens SET last_active_at = NOW()
+       WHERE token_hash = $1
+         AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '60 seconds')`,
       [tokenHash]
     ).catch((err) => console.error("⚠️ last_active_at update failed:", err.message));
  
@@ -187,7 +195,17 @@ const getUserSessions = async (userId, currentTokenHash = null) => {
     const result = await pool.query(
       `SELECT token_id, created_at, expires_at, last_active_at,
               user_agent, device_type, ip_address, location_label,
-              client_app_label, token_hash, is_revoked, revoked_at
+              client_app_label, token_hash, is_revoked, revoked_at,
+              EXISTS (
+                SELECT 1 FROM trusted_devices td
+                WHERE td.user_id = tokens.user_id AND td.trusted_until > NOW()
+                  AND (
+                    (tokens.device_id IS NOT NULL AND td.device_id = tokens.device_id)
+                    OR (tokens.device_id IS NULL AND td.device_id IS NULL
+                        AND td.ip_address IS NOT DISTINCT FROM tokens.ip_address
+                        AND td.user_agent IS NOT DISTINCT FROM tokens.user_agent)
+                  )
+              ) AS is_trusted
        FROM tokens
        WHERE user_id = $1
          AND (
@@ -239,21 +257,25 @@ const revokeTokenById = async (tokenId, requestingUserId) => {
 // Called at login so re-logging in from the same browser
 // collapses into one session instead of stacking duplicates.
 // =====================================================
-const revokeSessionsForSameDevice = async (userId, userAgent, ipAddress) => {
+const revokeSessionsForSameDevice = async (userId, userAgent, ipAddress, deviceId = null) => {
   try {
-    if (!userAgent || !ipAddress) return; // nothing reliable to match on — skip
+    if (deviceId) {
+      await pool.query(
+        `UPDATE tokens SET is_revoked = true, revoked_at = NOW()
+         WHERE user_id = $1 AND is_revoked = false AND device_id = $2`,
+        [userId, deviceId]
+      );
+      return;
+    }
+    if (!userAgent || !ipAddress) return;
     await pool.query(
-      `UPDATE tokens
-       SET is_revoked = true, revoked_at = NOW()
-       WHERE user_id = $1
-         AND is_revoked = false
-         AND user_agent = $2
-         AND ip_address = $3`,
+      `UPDATE tokens SET is_revoked = true, revoked_at = NOW()
+       WHERE user_id = $1 AND is_revoked = false
+         AND device_id IS NULL AND user_agent = $2 AND ip_address = $3`,
       [userId, userAgent, ipAddress]
     );
   } catch (error) {
     console.error("❌ Revoke sessions for same device error:", error);
-    // Non-fatal — never block a login because this cleanup failed
   }
 };
 
@@ -295,10 +317,13 @@ const revokeAllExceptCurrentAndTrusted = async (userId, currentTokenHash) => {
          AND is_revoked = false
          AND NOT EXISTS (
            SELECT 1 FROM trusted_devices td
-           WHERE td.user_id = tokens.user_id
-             AND td.ip_address IS NOT DISTINCT FROM tokens.ip_address
-             AND td.user_agent IS NOT DISTINCT FROM tokens.user_agent
-             AND td.trusted_until > NOW()
+           WHERE td.user_id = tokens.user_id AND td.trusted_until > NOW()
+             AND (
+               (tokens.device_id IS NOT NULL AND td.device_id = tokens.device_id)
+               OR (tokens.device_id IS NULL AND td.device_id IS NULL
+                   AND td.ip_address IS NOT DISTINCT FROM tokens.ip_address
+                   AND td.user_agent IS NOT DISTINCT FROM tokens.user_agent)
+             )
          )
        RETURNING token_id`,
       [userId, currentTokenHash]
@@ -341,26 +366,28 @@ const getTrustedDeviceKeys = async (userId) => {
 // =====================================================
 const removeTrustedDeviceByTokenId = async (tokenId, userId) => {
   try {
-    const tokenResult = await pool.query(
-      `SELECT ip_address, user_agent FROM tokens
+    const t = await pool.query(
+      `SELECT ip_address, user_agent, device_id FROM tokens
        WHERE token_id = $1 AND user_id = $2`,
       [tokenId, userId]
     );
-
-    if (tokenResult.rows.length === 0) {
+    if (t.rows.length === 0) {
       throw new Error("Session not found or does not belong to this user");
     }
+    const { ip_address, user_agent, device_id } = t.rows[0];
 
-    const { ip_address, user_agent } = tokenResult.rows[0];
-
-    const result = await pool.query(
-      `DELETE FROM trusted_devices
-       WHERE user_id = $1
-         AND ip_address IS NOT DISTINCT FROM $2
-         AND user_agent IS NOT DISTINCT FROM $3`,
-      [userId, ip_address, user_agent]
-    );
-
+    const result = device_id
+      ? await pool.query(
+          `DELETE FROM trusted_devices WHERE user_id = $1 AND device_id = $2`,
+          [userId, device_id]
+        )
+      : await pool.query(
+          `DELETE FROM trusted_devices
+           WHERE user_id = $1 AND device_id IS NULL
+             AND ip_address IS NOT DISTINCT FROM $2
+             AND user_agent IS NOT DISTINCT FROM $3`,
+          [userId, ip_address, user_agent]
+        );
     return result.rowCount > 0;
   } catch (error) {
     console.error("❌ Remove trusted device error:", error);
@@ -376,31 +403,37 @@ const removeTrustedDeviceByTokenId = async (tokenId, userId) => {
 // =====================================================
 const trustDeviceByTokenId = async (tokenId, userId) => {
   try {
-    const tokenResult = await pool.query(
-      `SELECT ip_address, user_agent FROM tokens
+    const t = await pool.query(
+      `SELECT ip_address, user_agent, device_id FROM tokens
        WHERE token_id = $1 AND user_id = $2`,
       [tokenId, userId]
     );
-
-    if (tokenResult.rows.length === 0) {
+    if (t.rows.length === 0) {
       throw new Error("Session not found or does not belong to this user");
     }
+    const { ip_address, user_agent, device_id } = t.rows[0];
 
-    const { ip_address, user_agent } = tokenResult.rows[0];
-
-    await pool.query(
-      `DELETE FROM trusted_devices
-       WHERE user_id = $1
-         AND ip_address IS NOT DISTINCT FROM $2
-         AND user_agent IS NOT DISTINCT FROM $3`,
-      [userId, ip_address, user_agent]
-    );
-    await pool.query(
-      `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')`,
-      [userId, ip_address, user_agent]
-    );
-
+    if (device_id) {
+      await pool.query(`DELETE FROM trusted_devices WHERE user_id = $1 AND device_id = $2`, [userId, device_id]);
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until, device_id)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days', $4)`,
+        [userId, ip_address, user_agent, device_id]
+      );
+    } else {
+      await pool.query(
+        `DELETE FROM trusted_devices
+         WHERE user_id = $1 AND device_id IS NULL
+           AND ip_address IS NOT DISTINCT FROM $2
+           AND user_agent IS NOT DISTINCT FROM $3`,
+        [userId, ip_address, user_agent]
+      );
+      await pool.query(
+        `INSERT INTO trusted_devices (user_id, ip_address, user_agent, trusted_until)
+         VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')`,
+        [userId, ip_address, user_agent]
+      );
+    }
     return true;
   } catch (error) {
     console.error("❌ Trust device by token id error:", error);
@@ -417,25 +450,49 @@ const trustDeviceByTokenId = async (tokenId, userId) => {
 // =====================================================
 const isCurrentDeviceTrusted = async (tokenHash, userId) => {
   try {
-    const tokenResult = await pool.query(
-      `SELECT ip_address, user_agent FROM tokens WHERE token_hash = $1 AND user_id = $2`,
+    const r = await pool.query(
+      `SELECT 1 FROM tokens t
+       WHERE t.token_hash = $1 AND t.user_id = $2
+         AND EXISTS (
+           SELECT 1 FROM trusted_devices td
+           WHERE td.user_id = t.user_id AND td.trusted_until > NOW()
+             AND (
+               (t.device_id IS NOT NULL AND td.device_id = t.device_id)
+               OR (t.device_id IS NULL AND td.device_id IS NULL
+                   AND td.ip_address IS NOT DISTINCT FROM t.ip_address
+                   AND td.user_agent IS NOT DISTINCT FROM t.user_agent)
+             )
+         )`,
       [tokenHash, userId]
     );
-    if (tokenResult.rows.length === 0) return false;
-
-    const { ip_address, user_agent } = tokenResult.rows[0];
-    const trustedCheck = await pool.query(
-      `SELECT 1 FROM trusted_devices
-       WHERE user_id = $1
-         AND ip_address IS NOT DISTINCT FROM $2
-         AND user_agent IS NOT DISTINCT FROM $3
-         AND trusted_until > NOW()
-       LIMIT 1`,
-      [userId, ip_address, user_agent]
-    );
-    return trustedCheck.rows.length > 0;
+    return r.rows.length > 0;
   } catch (error) {
     console.error("❌ isCurrentDeviceTrusted error:", error);
+    return false;
+  }
+};
+
+// Same check, but by token_id (for the sessions list actions)
+const isSessionTrusted = async (tokenId, userId) => {
+  try {
+    const r = await pool.query(
+      `SELECT 1 FROM tokens t
+       WHERE t.token_id = $1 AND t.user_id = $2
+         AND EXISTS (
+           SELECT 1 FROM trusted_devices td
+           WHERE td.user_id = t.user_id AND td.trusted_until > NOW()
+             AND (
+               (t.device_id IS NOT NULL AND td.device_id = t.device_id)
+               OR (t.device_id IS NULL AND td.device_id IS NULL
+                   AND td.ip_address IS NOT DISTINCT FROM t.ip_address
+                   AND td.user_agent IS NOT DISTINCT FROM t.user_agent)
+             )
+         )`,
+      [tokenId, userId]
+    );
+    return r.rows.length > 0;
+  } catch (error) {
+    console.error("❌ isSessionTrusted error:", error);
     return false;
   }
 };
@@ -457,6 +514,7 @@ module.exports = {
   removeTrustedDeviceByTokenId,
   trustDeviceByTokenId,
   isCurrentDeviceTrusted,
+   isSessionTrusted,
   revokeAllExceptCurrentAndTrusted,
   hashToken,
 };

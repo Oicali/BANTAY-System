@@ -839,9 +839,15 @@ async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
     // login; it doesn't need a registered push token. This is checked
     // against `tokens` (every logged-in device/browser has a row there),
     // not `device_push_tokens` (mobile-only), so web sessions count too.
+    // Trust the server-side value stored at login, not the client header
+    const effectiveDeviceId = p.device_id || requestingDeviceId || null;
+
     const activeSessionCheck = await pool.query(
-      `SELECT 1 FROM tokens WHERE user_id = $1 AND is_revoked = false AND expires_at > NOW() LIMIT 1`,
-      [p.user_id],
+      `SELECT 1 FROM tokens
+       WHERE user_id = $1 AND is_revoked = false AND expires_at > NOW()
+         AND device_id IS DISTINCT FROM $2
+       LIMIT 1`,
+      [p.user_id, effectiveDeviceId],
     );
 
     if (activeSessionCheck.rows.length === 0) {
@@ -855,15 +861,11 @@ async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
     // same device that's asking for it. Empty is fine here (e.g. the only
     // other session is on web with no push token); the notification is
     // still created below and picked up by that session's own polling.
-    const tokenRows = requestingDeviceId
-      ? await pool.query(
-          `SELECT push_token FROM device_push_tokens WHERE user_id = $1 AND device_id != $2`,
-          [p.user_id, requestingDeviceId],
-        )
-      : await pool.query(
-          `SELECT push_token FROM device_push_tokens WHERE user_id = $1`,
-          [p.user_id],
-        );
+    const tokenRows = await pool.query(
+      `SELECT push_token FROM device_push_tokens
+       WHERE user_id = $1 AND device_id IS DISTINCT FROM $2`,
+      [p.user_id, effectiveDeviceId],
+    );
 
     const updated = await pool.query(
       `UPDATE pending_device_logins
@@ -883,6 +885,7 @@ async function requestDeviceApproval(pendingId, requestingDeviceId = null) {
       message:     `A login attempt on ${deviceLabel} is waiting for your approval.`,
       metadata: {
         pending_id:   pendingId,
+        requesting_device_id: effectiveDeviceId,
         device_label: deviceLabel,
         ip_address:   p.ip_address,
         user_agent:   p.user_agent,

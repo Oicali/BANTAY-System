@@ -46,5 +46,17 @@ router.post("/logout-all", authenticate, logoutAll);
 router.post("/password/change", authenticate, changePassword);
 router.get("/validate-token", authenticate, validateToken);
 router.post("/device/trust-current", authenticate, trustCurrentDevice);
+router.get(
+  "/session-check",
+  (req, res, next) => {
+    console.log("🔎 session-check hit", new Date().toISOString());
+    next();
+  },
+  authenticate,
+  (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.json({ success: true });
+  },
+);
 
 module.exports = router;
