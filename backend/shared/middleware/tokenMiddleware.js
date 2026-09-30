@@ -13,9 +13,10 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'No authentication token provided' 
+        code: 'NO_TOKEN',
+        message: 'No authentication token provided'
       });
     }
 
@@ -34,23 +35,27 @@ const authenticate = async (req, res, next) => {
   } catch (error) {
     // Handle JWT-specific errors
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'Invalid token format' 
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Token has expired. Please login again.' 
+        code: 'INVALID_TOKEN',
+        message: 'Invalid token format'
       });
     }
 
-    // Handle custom errors from verifyToken
-    return res.status(401).json({ 
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_EXPIRED',
+        message: 'Session expired. Please login again.'
+      });
+    }
+
+    // Custom errors from verifyToken carry a code
+    // (SESSION_INVALID / SESSION_REVOKED / SESSION_EXPIRED)
+    return res.status(401).json({
       success: false,
-      message: error.message || 'Authentication failed' 
+      code: error.code,
+      message: error.message || 'Authentication failed'
     });
   }
 };
