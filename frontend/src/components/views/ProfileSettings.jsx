@@ -19,6 +19,8 @@ import ChangePasswordModal from "../modals/ChangePasswordModal";
 import "./ProfileSettings.css";
 import LoadingModal from "../modals/LoadingModal";
 import ImageCropperModal from "../modals/ImageCropperModal";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const PSGC = "https://psgc.gitlab.io/api";
 const POLL_MS = 15000;
@@ -2069,7 +2071,7 @@ export default function ProfileSettings() {
               <div className="ps-official-row">
                 <span className="ps-official-key">Role</span>
                 <span className="ps-official-value">
-                  {profileData?.role || "—"}
+                  {formatRole(profileData?.role) || "—"}
                 </span>
               </div>
               <div className="ps-official-row">
@@ -2084,7 +2086,7 @@ export default function ProfileSettings() {
             <div className="ps-official-row">
               <span className="ps-official-key">Role</span>
               <span className="ps-official-value">
-                {profileData?.role || "—"}
+                {formatRole(profileData?.role) || "—"}
               </span>
             </div>
           )}
@@ -2227,7 +2229,7 @@ export default function ProfileSettings() {
                 : ""}
               {getFullName()}
             </h2>
-            <div className="ps-profile-badge">{profileData.role || "N/A"}</div>
+            <div className="ps-profile-badge">{formatRole(profileData.role) || "N/A"}</div>
 
             <div className="ps-username-display">
               <div className="ps-username-label">Username</div>
@@ -2632,7 +2634,7 @@ export default function ProfileSettings() {
                           <div className="ps-official-row">
                             <span className="ps-official-key">Role</span>
                             <span className="ps-official-value">
-                              {profileData?.role || "—"}
+                              {formatRole(profileData?.role) || "—"}
                             </span>
                           </div>
                           <div className="ps-official-row">
@@ -2650,7 +2652,7 @@ export default function ProfileSettings() {
                         <div className="ps-official-row">
                           <span className="ps-official-key">Role</span>
                           <span className="ps-official-value">
-                            {profileData?.role || "—"}
+                            {formatRole(profileData?.role) || "—"}
                           </span>
                         </div>
                       )}

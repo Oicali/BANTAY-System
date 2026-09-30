@@ -10,6 +10,8 @@ import DeleteUserModal from "../modals/DeleteUserModal";
 import RestoreUserModal from "../modals/RestoreUserModal";
 import "./UserManagement.css";
 import LoadingModal from "../modals/LoadingModal";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const ITEMS_PER_PAGE = 15;
 const PSGC_BASE = "https://psgc.gitlab.io/api";
@@ -447,7 +449,8 @@ const UserManagement = () => {
   const formatRoleLabel = (role) => {
     if (!role) return "N/A";
     if (role.toLowerCase() === "technical administrator") return "Tech Admin"; // ← display only
-    return role;
+    if (role.toLowerCase() === "investigator") return "Invest. Officer"; // one-liner handled by CSS; swap for "Invest. Officer" if too wide
+    return formatRole(role); // Patrol → Patrol Officer (display only)
   };
 
   const getStatusText = (userData) => {
@@ -563,7 +566,7 @@ const UserManagement = () => {
                 <option value="all">All Roles</option>
                 {policeRoles.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {formatRole(r)}
                   </option>
                 ))}
               </select>

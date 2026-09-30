@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserFromToken } from "../../utils/auth";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -1844,8 +1846,8 @@ const TopBar = ({ onMenuClick }) => {
               <div className="user-role">
                 {profileData?.user_type === "barangay" &&
                 profileData?.barangay_code
-                  ? `${profileData?.role || user?.role} - ${formatBarangayLabel(profileData.barangay_code)}`
-                  : profileData?.role || user?.role}
+                  ? `${formatRole(profileData?.role || user?.role)} - ${formatBarangayLabel(profileData.barangay_code)}`
+                  : formatRole(profileData?.role || user?.role)}
               </div>
             </div>
             <div className="user-avatar">

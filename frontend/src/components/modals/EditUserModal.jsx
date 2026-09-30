@@ -8,6 +8,8 @@ import {
 import "./EditUserModal.css";
 import LoadingModal from "../modals/LoadingModal";
 import ImageCropperModal from "../modals/ImageCropperModal";
+// Display-only role label (Patrol → Patrol Officer)
+import { formatRole } from "../../utils/roleLabel";
 
 const PSGC_BASE = "https://psgc.gitlab.io/api";
 const BACOOR_CITY_CODE = "042103000";
@@ -1476,14 +1478,14 @@ const EditUserModal = ({
                       {availableRoles.length > 0 ? (
                         availableRoles.map((r) => (
                           <option key={r.role_id} value={r.role_name}>
-                            {r.role_name}
+                            {formatRole(r.role_name)}
                           </option>
                         ))
                       ) : (
                         <>
                           <option value="Administrator">Administrator</option>
-                          <option value="Investigator">Investigator</option>
-                          <option value="Patrol">Patrol</option>
+                          <option value="Investigator">{formatRole("Investigator")}</option>
+                          <option value="Patrol">{formatRole("Patrol")}</option>
                         </>
                       )}
                     </select>
