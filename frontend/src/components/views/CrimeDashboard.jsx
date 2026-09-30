@@ -2410,24 +2410,25 @@ const BarangayRiskTable = ({ forecastData, showBacktestReport = true }) => {
           {/* Legend ranges now pull from thresholds instead of hardcoded numbers */}
           <div className="cd-risk-legend">
             {[
+              // Risk legend colors matched to Crime Map choropleth (High / Moderate / Low)
               {
-                color: "#dc2626",
-                bg: "rgba(220,38,38,0.08)",
-                border: "rgba(220,38,38,0.2)",
+                color: "#b91c1c",
+                bg: "rgba(185,28,28,0.08)",
+                border: "rgba(185,28,28,0.2)",
                 range: `${thresholds.priority}–100`,
                 label: "Priority patrol needed",
               },
               {
-                color: "#ea580c",
-                bg: "rgba(234,88,12,0.08)",
-                border: "rgba(234,88,12,0.2)",
+                color: "#f97316",
+                bg: "rgba(249,115,22,0.08)",
+                border: "rgba(249,115,22,0.2)",
                 range: `${thresholds.monitor}–${thresholds.priority - 1}`,
                 label: "Closely monitor",
               },
               {
-                color: "#ca8a04",
-                bg: "rgba(202,138,4,0.08)",
-                border: "rgba(202,138,4,0.2)",
+                color: "#eab308",
+                bg: "rgba(234,179,8,0.08)",
+                border: "rgba(234,179,8,0.2)",
                 range: `${thresholds.observe}–${thresholds.monitor - 1}`,
                 label: "Keep under observation",
               },
