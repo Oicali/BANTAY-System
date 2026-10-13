@@ -9238,18 +9238,29 @@ function EBlotter() {
                             {userRole === "Patrol" &&
                               b.responder &&
                               b.responder.sender_user_id === currentUserId && (
-                                <button
-                                  className="eb-action-btn"
-                                  style={{
-                                    background: "#16a34a",
-                                    color: "white",
-                                  }}
-                                  onClick={() =>
-                                    handleAcceptReferral(b.blotter_id)
-                                  }
-                                >
-                                  ✓ Accept
-                                </button>
+                                <>
+                                  <button
+                                    className="eb-action-btn"
+                                    style={{
+                                      background: "#16a34a",
+                                      color: "white",
+                                    }}
+                                    onClick={() =>
+                                      handleAcceptReferral(b.blotter_id)
+                                    }
+                                  >
+                                    ✓ Accept
+                                  </button>
+                                  <button
+                                    className="eb-action-btn eb-action-btn-danger"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleDelete(b.blotter_id);
+                                    }}
+                                  >
+                                    <DeleteIcon /> Delete
+                                  </button>
+                                </>
                               )}
                             {userRole === "Patrol" &&
                               b.responder &&
