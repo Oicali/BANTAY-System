@@ -783,7 +783,8 @@ function CrimeMapping({
   externalFilters = null,
   onFilterChange = null,
 }) {
-  const rawUser = sessionStorage.getItem("user");
+  const rawUser =
+    sessionStorage.getItem("user") || localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
   const isBarangayUser = currentUser?.user_type === "barangay";
   const isInvestigator =
@@ -1009,19 +1010,7 @@ function CrimeMapping({
       incidenceTooltipTimerRef.current = null;
     }
 
-    useEffect(() => {
-      const handleClickOutside = (e) => {
-        if (
-          brgyTooltipRef.current &&
-          !brgyTooltipRef.current.contains(e.target)
-        ) {
-          setHoveredBarangay(null);
-        }
-      };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+
 
     const rect = e.currentTarget.getBoundingClientRect();
     const tooltipWidth = 260;
@@ -1044,6 +1033,19 @@ function CrimeMapping({
       left,
       type,
     });
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        brgyTooltipRef.current &&
+        !brgyTooltipRef.current.contains(e.target)
+      ) {
+        setHoveredBarangay(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -1177,7 +1179,7 @@ function CrimeMapping({
     } catch (err) {
       console.warn("[Map] fetchOfficers error:", err.message);
     }
-  }, [isBarangayUser]);
+  }, [isBarangayUser, isInvestigator]);
 
   useEffect(() => {
     fetchOfficers();

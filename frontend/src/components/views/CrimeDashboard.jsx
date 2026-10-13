@@ -3043,14 +3043,23 @@ const isCacheValid = (filters) =>
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const CrimeDashboard = () => {
   const navigate = useNavigate();
-  const rawUser = sessionStorage.getItem("user");
+  const rawUser =
+    sessionStorage.getItem("user") || localStorage.getItem("user");
   const currentUser = rawUser ? JSON.parse(rawUser) : null;
-  const isBarangayUser = currentUser?.user_type === "barangay";
+  const tokenUser = getUserFromToken();
+  const isBarangayUser =
+    currentUser?.user_type === "barangay" ||
+    tokenUser?.user_type === "barangay";
   const isPatrol =
-    currentUser?.role_name === "Patrol" || currentUser?.role === "Patrol";
-  const userBarangay = currentUser?.assigned_barangay_code ?? null;
+    currentUser?.role_name === "Patrol" ||
+    currentUser?.role === "Patrol" ||
+    tokenUser?.role === "Patrol";
+  const userBarangay =
+    currentUser?.assigned_barangay_code ??
+    tokenUser?.assigned_barangay_code ??
+    null;
 
-  const role = getUserFromToken()?.role;
+  const role = tokenUser?.role;
   const isAdmin =
     role === "Administrator" || role === "Technical Administrator";
 
