@@ -932,7 +932,13 @@ const changePassword = async (req, res) => {
 // MOBILE LOGIN (Admin + Patrol only — 30d token)
 // ============================================================
 const mobileLogin = async (req, res) => {
-  const ALLOWED_ROLES    = ["Administrator", "Patrol", "Technical Administrator"];
+  const ALLOWED_ROLES = [
+    "Administrator",
+    "Patrol",
+    "Technical Administrator",
+    "Brgy. Official", // confirmed from the web login response
+    "Brgy. Captain", // my guess — verify with: SELECT role_name FROM roles;
+  ];
   const MOBILE_TOKEN_EXPIRY = "30d";
 
   try {
@@ -990,7 +996,8 @@ const mobileLogin = async (req, res) => {
       });
       return res.status(403).json({
         success: false,
-        message: "Access denied. This app is restricted to Admin and Patrol officers only.",
+        message:
+          "Access denied. This app is restricted to PNP officers and barangay officials only.",
       });
     }
 
