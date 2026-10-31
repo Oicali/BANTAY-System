@@ -8,6 +8,8 @@ import {
   LEGACY_BARANGAY_OPTIONS,
 } from "../../utils/barangayOptions";
 import LoadingModal from "../modals/LoadingModal";
+// Shared identity helpers
+import { getStoredUser, getUserFromToken } from "../../utils/auth";
 
 const API = `${import.meta.env.VITE_API_URL}/crime-map`;
 const getToken = () =>
@@ -783,16 +785,24 @@ function CrimeMapping({
   externalFilters = null,
   onFilterChange = null,
 }) {
-  const rawUser =
-    sessionStorage.getItem("user") || localStorage.getItem("user");
-  const currentUser = rawUser ? JSON.parse(rawUser) : null;
-  const isBarangayUser = currentUser?.user_type === "barangay";
+  // Identity: stored profile (cachedProfile) first, token as fallback
+  const currentUser = getStoredUser();
+  const tokenUser = getUserFromToken();
+  const isBarangayUser =
+    currentUser?.user_type === "barangay" ||
+    tokenUser?.user_type === "barangay";
   const isInvestigator =
     currentUser?.role_name === "Investigator" ||
-    currentUser?.role === "Investigator";
-  const userBarangay = currentUser?.assigned_barangay_code ?? null;
+    currentUser?.role === "Investigator" ||
+    tokenUser?.role === "Investigator";
+  const userBarangay =
+    currentUser?.assigned_barangay_code ??
+    tokenUser?.assigned_barangay_code ??
+    null;
   const isPatrol =
-    currentUser?.role_name === "Patrol" || currentUser?.role === "Patrol";
+    currentUser?.role_name === "Patrol" ||
+    currentUser?.role === "Patrol" ||
+    tokenUser?.role === "Patrol";
 
   const [boundaries, setBoundaries] = useState([]);
   const [mapReady, setMapReady] = useState(false);

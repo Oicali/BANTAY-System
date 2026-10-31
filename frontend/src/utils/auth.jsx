@@ -12,8 +12,11 @@ export const logout = async () => {
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
-    sessionStorage.removeItem("token");
-    localStorage.removeItem("token");
+    // Clear token AND cached profile from both storages so the next login starts clean
+    ["token", "user", "cachedProfile"].forEach((k) => {
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    });
     window.location.href = "/login";
   }
 };
@@ -151,3 +154,23 @@ export const getUserFromToken = () => {
 //    - Malicious user could modify token payload in browser
 //    - Backend MUST verify token signature on all protected endpoints
 //    - Frontend decoding is ONLY for UI display, NOT for authorization
+
+
+// Single source of truth for the stored profile; rejects a profile that doesn't belong to the current token
+export const getStoredUser = () => {
+  try {
+    const raw =
+      sessionStorage.getItem("user") ||
+      localStorage.getItem("user") ||
+      sessionStorage.getItem("cachedProfile") ||
+      localStorage.getItem("cachedProfile");
+    const profile = raw ? JSON.parse(raw) : null;
+    const tokenUser = getUserFromToken();
+    if (profile && tokenUser?.user_id && profile.user_id !== tokenUser.user_id) {
+      return null; // stale profile from a previous login
+    }
+    return profile;
+  } catch {
+    return null;
+  }
+};

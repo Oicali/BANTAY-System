@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { getUserFromToken } from "../../utils/auth";
+// Shared identity helpers
+import { getUserFromToken, getStoredUser } from "../../utils/auth";
 import {
   BarChart,
   Bar,
@@ -3043,9 +3044,8 @@ const isCacheValid = (filters) =>
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const CrimeDashboard = () => {
   const navigate = useNavigate();
-  const rawUser =
-    sessionStorage.getItem("user") || localStorage.getItem("user");
-  const currentUser = rawUser ? JSON.parse(rawUser) : null;
+  // Stored profile via shared helper (reads cachedProfile)
+  const currentUser = getStoredUser();
   const tokenUser = getUserFromToken();
   const isBarangayUser =
     currentUser?.user_type === "barangay" ||
