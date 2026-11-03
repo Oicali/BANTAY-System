@@ -14,6 +14,11 @@ const CF_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN || "";
 const CF_MODEL =
   process.env.CLOUDFLARE_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct";
 
+// How many AI calls run at the same time. 4 is a safe default.
+// If Cloudflare starts returning 429 (rate limit), lower it to 2 or 3
+// (set AI_CONCURRENCY in your .env, no code change needed).
+const AI_CONCURRENCY = Math.max(1, Number(process.env.AI_CONCURRENCY) || 4);
+
 const inferMode = (dateTo) => {
   if (!dateTo) return "current";
   const today = new Date();
@@ -126,6 +131,27 @@ const flattenCrimeFields = (parsed) => {
   });
 
   return parsed;
+};
+
+// Runs worker(item, index) over all items, at most `limit` at the same time.
+// Results keep the original order.
+const runWithLimit = async (items, limit, worker) => {
+  const results = new Array(items.length);
+  let next = 0;
+
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (true) {
+        const i = next++;
+        if (i >= items.length) return;
+        results[i] = await worker(items[i], i);
+      }
+    },
+  );
+
+  await Promise.all(runners);
+  return results;
 };
 
 const fetchModusDescriptions = async (crimeTypes = []) => {
@@ -333,7 +359,21 @@ const callCloudflare = async (prompt) => {
   return text || "";
 };
 
-const callAI = async (prompt) => callCloudflare(prompt);
+// Because calls now run in parallel, a rate limit (429) or a temporary
+// Cloudflare error (5xx) is possible. Retry once after a short wait.
+const callAI = async (prompt) => {
+  try {
+    return await callCloudflare(prompt);
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 429 || (status && status >= 500)) {
+      console.warn(`[AI] Cloudflare returned ${status}, retrying once...`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return callCloudflare(prompt);
+    }
+    throw err;
+  }
+};
 
 const maybeEnhanceWithAI = async (
   analysis,
@@ -366,24 +406,6 @@ const maybeEnhanceWithAI = async (
   };
 
   try {
-    console.time("[AI] overall_assessment");
-    const top3Overall = allRiskRows.slice(0, 3);
-
-    const generalPrompt = buildGeneralAssessmentPrompt({
-      analysis,
-      baseAssessment,
-      riskBarangays: top3Overall,
-    });
-    const generalRawText = await callAI(generalPrompt);
-    console.timeEnd("[AI] overall_assessment");
-
-    const generalParsed = parseJsonFromText(generalRawText);
-    const overallAssessment =
-      generalParsed?.overall_assessment ||
-      generalParsed?.general_assessment ||
-      baseAssessment.overall_assessment;
-
-    const perCrimeResults = [];
     const perCrimeBase = baseAssessment.per_crime || [];
 
     const diagnosticsMap = {};
@@ -393,29 +415,66 @@ const maybeEnhanceWithAI = async (
       });
     }
 
-    for (const crimeBase of perCrimeBase) {
-      console.time(`[AI] ${crimeBase.crime_type}`);
+    // ── Overall assessment (runs at the same time as the per-crime calls) ────
+    const overallTask = (async () => {
+      console.time("[AI] overall_assessment");
       try {
-        const crimeTopBarangays = getCrimeTopBarangays(crimeBase.crime_type, 3);
-
-        const crimePrompt = buildPerCrimePrompt({
+        const top3Overall = allRiskRows.slice(0, 3);
+        const generalPrompt = buildGeneralAssessmentPrompt({
           analysis,
-          crimeType: crimeBase.crime_type,
-          crimeBase,
-          modusMap,
-          diagnosticsMap,
-          riskBarangays: crimeTopBarangays,
+          baseAssessment,
+          riskBarangays: top3Overall,
         });
-        const crimeRawText = await callAI(crimePrompt);
-        const crimeParsed = parseJsonFromText(crimeRawText);
+        const generalRawText = await callAI(generalPrompt);
+        const generalParsed = parseJsonFromText(generalRawText);
+        return (
+          generalParsed?.overall_assessment ||
+          generalParsed?.general_assessment ||
+          baseAssessment.overall_assessment
+        );
+      } catch (err) {
+        console.error("[AI] Overall assessment failed:", err.message);
+        return baseAssessment.overall_assessment;
+      } finally {
+        console.timeEnd("[AI] overall_assessment");
+      }
+    })();
 
-        if (crimeParsed && crimeParsed.crime_type) {
-          if (crimeParsed.general_assessment && !crimeParsed.crime_assessment) {
-            crimeParsed.crime_assessment = crimeParsed.general_assessment;
-            delete crimeParsed.general_assessment;
+    // ── Per-crime assessments, AI_CONCURRENCY at a time ──────────────────────
+    const perCrimeTask = runWithLimit(
+      perCrimeBase,
+      AI_CONCURRENCY,
+      async (crimeBase) => {
+        const label = `[AI] ${crimeBase.crime_type}`;
+        console.time(label);
+        try {
+          const crimeTopBarangays = getCrimeTopBarangays(
+            crimeBase.crime_type,
+            3,
+          );
+
+          const crimePrompt = buildPerCrimePrompt({
+            analysis,
+            crimeType: crimeBase.crime_type,
+            crimeBase,
+            modusMap,
+            diagnosticsMap,
+            riskBarangays: crimeTopBarangays,
+          });
+          const crimeRawText = await callAI(crimePrompt);
+          const crimeParsed = parseJsonFromText(crimeRawText);
+
+          if (crimeParsed && crimeParsed.crime_type) {
+            if (
+              crimeParsed.general_assessment &&
+              !crimeParsed.crime_assessment
+            ) {
+              crimeParsed.crime_assessment = crimeParsed.general_assessment;
+              delete crimeParsed.general_assessment;
+            }
+            return flattenCrimeFields(crimeParsed);
           }
-          perCrimeResults.push(flattenCrimeFields(crimeParsed));
-        } else {
+
           console.warn(
             `[AI] Could not parse JSON for ${crimeBase.crime_type}, using base draft`,
           );
@@ -425,17 +484,23 @@ const maybeEnhanceWithAI = async (
               ? crimeRawText.slice(0, 800)
               : crimeRawText,
           );
-          perCrimeResults.push(crimeBase);
+          return crimeBase;
+        } catch (crimeErr) {
+          console.error(
+            `[AI] Failed for ${crimeBase.crime_type}:`,
+            crimeErr.message,
+          );
+          return crimeBase;
+        } finally {
+          console.timeEnd(label);
         }
-      } catch (crimeErr) {
-        console.error(
-          `[AI] Failed for ${crimeBase.crime_type}:`,
-          crimeErr.message,
-        );
-        perCrimeResults.push(crimeBase);
-      }
-      console.timeEnd(`[AI] ${crimeBase.crime_type}`);
-    }
+      },
+    );
+
+    const [overallAssessment, perCrimeResults] = await Promise.all([
+      overallTask,
+      perCrimeTask,
+    ]);
 
     return {
       providerUsed: AI_PROVIDER,
@@ -471,7 +536,10 @@ const generateAssessment = async ({
 }) => {
   const resolvedMode = mode || inferMode(date_to);
 
-  const [analysis, riskResult] = await Promise.all([
+  // Python analysis, Python forecast and the modus lookup don't depend on
+  // each other, so all three run at the same time.
+  console.time("[AI] python analyze + forecast + modus");
+  const [analysis, riskResult, modusMap] = await Promise.all([
     analyzeWithPython({
       barangays,
       date_from,
@@ -486,16 +554,20 @@ const generateAssessment = async ({
       crime_types,
       decay_window,
     }),
+    fetchModusDescriptions(crime_types),
   ]);
+  console.timeEnd("[AI] python analyze + forecast + modus");
 
-  const modusMap = await fetchModusDescriptions(crime_types);
   const baseAssessment = buildBaseAssessment(analysis);
+
+  console.time("[AI] all AI text generation");
   const aiResult = await maybeEnhanceWithAI(
     analysis,
     baseAssessment,
     modusMap,
     riskResult,
   );
+  console.timeEnd("[AI] all AI text generation");
 
   return {
     analysis,
