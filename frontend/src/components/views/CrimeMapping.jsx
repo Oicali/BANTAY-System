@@ -1485,8 +1485,8 @@ const darkBase = heatmapMode || satelliteMode;
     paint: {
       "fill-color": ["get", "fillColor"],
       "fill-opacity": heatmapMode
-        ? ["case", ["==", ["get", "isLocked"], true], 0.35, 0]
-        : ["case", ["==", ["get", "isSelected"], false], 0, 0.5],
+  ? ["case", ["==", ["get", "isLocked"], true], 0.35, 0]
+  : ["case", ["==", ["get", "isSelected"], false], 0, satelliteMode ? 0.4 : 0.5],
     },
   };
 
@@ -1958,15 +1958,8 @@ const darkBase = heatmapMode || satelliteMode;
                 latitude: 14.4341,
                 zoom: minimal ? 11 : 12,
               }}
-              minZoom={minimal ? 11 : 11.5}
-              maxZoom={18}
-              // Locks panning to Bacoor City's extent (with a small buffer) —
-              // this is what actually stops users from scrolling/hovering
-              // away into surrounding municipalities. minZoom alone can't do this.
-              maxBounds={[
-                [120.895, 14.345], // southwest corner [lng, lat]
-                [121.025, 14.495], // northeast corner [lng, lat]
-              ]}
+              minZoom={4.5}
+maxZoom={18}
               style={{ width: "100%", height: "100%" }}
             mapStyle={
   satelliteMode
@@ -2023,16 +2016,18 @@ const darkBase = heatmapMode || satelliteMode;
                 setHoveredBarangay(null);
               }}
             >
-              <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
-                <Layer
-                  id="world-mask-fill"
-                  type="fill"
-                  paint={{
-                    "fill-color": darkBase ? "#000000" : "#e5e7eb",
-"fill-opacity": darkBase ? 0.6 : 0.55,
-                  }}
-                />
-              </Source>
+              {!satelliteMode && (
+  <Source id="world-mask" type="geojson" data={WORLD_MASK_GEOJSON}>
+    <Layer
+      id="world-mask-fill"
+      type="fill"
+      paint={{
+        "fill-color": heatmapMode ? "#000000" : "#e5e7eb",
+        "fill-opacity": heatmapMode ? 0.6 : 0.55,
+      }}
+    />
+  </Source>
+)}
 
               {/* Use this if lighter mask for heatmap */}
               {/* from #e5e7eb to #e5e7eb */}
