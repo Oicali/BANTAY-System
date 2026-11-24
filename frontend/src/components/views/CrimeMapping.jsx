@@ -963,6 +963,7 @@ function CrimeMapping({
   const [showPins, setShowPins] = useState(true);
   const [showPinIcons, setShowPinIcons] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
+  const [satelliteMode, setSatelliteMode] = useState(false);
   const [incidenceTooltip, setIncidenceTooltip] = useState({
     visible: false,
     top: 0,
@@ -1477,7 +1478,7 @@ function CrimeMapping({
   );
 
   const geoJSON = buildGeoJSON();
-
+const darkBase = heatmapMode || satelliteMode;
   const fillLayer = {
     id: "barangay-fill",
     type: "fill",
@@ -1493,7 +1494,7 @@ function CrimeMapping({
     id: "barangay-outline",
     type: "line",
     paint: {
-      "line-color": heatmapMode ? "#96c8ff" : "#1e3a5f",
+     "line-color": satelliteMode ? "#ffffff" : heatmapMode ? "#96c8ff" : "#1e3a5f",
       "line-width": ["case", ["==", ["get", "isSelected"], false], 0.4, 1.2],
       "line-opacity": [
         "case",
@@ -1516,10 +1517,10 @@ function CrimeMapping({
       "text-allow-overlap": false,
     },
     paint: {
-      "text-color": heatmapMode ? "rgba(220,235,255,0.9)" : "#0a1628",
-      "text-halo-color": heatmapMode
-        ? "rgba(0,0,0,0.7)"
-        : "rgba(255,255,255,0.85)",
+      "text-color": darkBase ? "rgba(255,255,255,0.95)" : "#0a1628",
+"text-halo-color": darkBase
+  ? "rgba(0,0,0,0.75)"
+  : "rgba(255,255,255,0.85)",
       "text-halo-width": 1.5,
     },
   };
@@ -1967,11 +1968,13 @@ function CrimeMapping({
                 [121.025, 14.495], // northeast corner [lng, lat]
               ]}
               style={{ width: "100%", height: "100%" }}
-              mapStyle={
-                heatmapMode
-                  ? "mapbox://styles/mapbox/dark-v11"
-                  : "mapbox://styles/mapbox/light-v11"
-              }
+            mapStyle={
+  satelliteMode
+    ? "mapbox://styles/mapbox/satellite-streets-v12"
+    : heatmapMode
+      ? "mapbox://styles/mapbox/dark-v11"
+      : "mapbox://styles/mapbox/light-v11"
+}
               attributionControl={false}
               onZoom={(e) => setZoom(e.viewState.zoom)}
               onDblClick={handleMapDblClick}
@@ -2025,8 +2028,8 @@ function CrimeMapping({
                   id="world-mask-fill"
                   type="fill"
                   paint={{
-                    "fill-color": heatmapMode ? "#000000" : "#e5e7eb",
-                    "fill-opacity": heatmapMode ? 0.6 : 0.55,
+                    "fill-color": darkBase ? "#000000" : "#e5e7eb",
+"fill-opacity": darkBase ? 0.6 : 0.55,
                   }}
                 />
               </Source>
@@ -2075,10 +2078,15 @@ function CrimeMapping({
                     longitude={pin.lng}
                     latitude={pin.lat}
                     anchor="bottom"
-                    onClick={(e) => {
-                      e.originalEvent.stopPropagation();
-                      setSelectedPin(pin);
-                    }}
+                   onClick={(e) => {
+  e.originalEvent.stopPropagation();
+  setSelectedPin(pin);
+  mapRef.current?.flyTo({
+    center: [pin.lng, pin.lat],
+    zoom: Math.max(zoom, 16),
+    duration: 800,
+  });
+}}
                   >
                     <div
                       className="crmap-pin-wrap"
@@ -2476,7 +2484,15 @@ function CrimeMapping({
               {showMapOptions && (
                 <div className="crmap-options-popover">
                   <div className="crmap-options-title">Map Options</div>
-
+<div className="crmap-map-option">
+  <span className="crmap-map-option-lbl">Satellite View</span>
+  <button
+    className={`crmap-toggle ${satelliteMode ? "on" : ""}`}
+    onClick={() => setSatelliteMode((v) => !v)}
+  >
+    <span className="crmap-toggle-knob" />
+  </button>
+</div>
                   {!isBarangayUser && !isInvestigator && (
                     <div className="crmap-map-option">
                       <span className="crmap-map-option-lbl">
